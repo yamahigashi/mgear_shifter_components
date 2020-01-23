@@ -85,9 +85,8 @@ class Guide(ComponentGuide):
     # @param self
     def addParameters(self):
 
-        # Ik
         self.pHeadRefArray = self.addParam("headrefarray", "string", "")
-        self.pIkRefArray = self.addParam("ikrefarray",  "string", "")
+        self.pUseExprespy = self.addParam("useExprespy", "bool", True)
 
         # Default values
         self.pUseIndex = self.addParam("useIndex", "bool", False)
@@ -141,13 +140,11 @@ class componentSettings(MayaQWidgetDockableMixin, componentMainSettings):
         self.tabs.insertTab(1, self.settingsTab, "Component Settings")
 
         # populate component settings
-        ikRefArrayItems = self.root.attr("ikrefarray").get().split(",")
-        for item in ikRefArrayItems:
-            self.settingsTab.ikRefArray_listWidget.addItem(item)
-
         headRefArrayItems = self.root.attr("headrefarray").get().split(",")
         for item in headRefArrayItems:
             self.settingsTab.headRefArray_listWidget.addItem(item)
+
+        self.populateCheck(self.settingsTab.useExprespy_checkBox, "useExprespy")
 
     def create_componentLayout(self):
 
@@ -159,21 +156,18 @@ class componentSettings(MayaQWidgetDockableMixin, componentMainSettings):
 
     def create_componentConnections(self):
 
-        self.settingsTab.ikRefArrayAdd_pushButton.clicked.connect(partial(self.addItem2listWidget, self.settingsTab.ikRefArray_listWidget, "ikrefarray"))
-        self.settingsTab.ikRefArrayRemove_pushButton.clicked.connect(partial(self.removeSelectedFromListWidget, self.settingsTab.ikRefArray_listWidget, "ikrefarray"))
-        self.settingsTab.ikRefArray_copyRef_pushButton.clicked.connect(partial(self.copyFromListWidget, self.settingsTab.headRefArray_listWidget, self.settingsTab.ikRefArray_listWidget, "ikrefarray"))
-        self.settingsTab.ikRefArray_listWidget.installEventFilter(self)
-
         self.settingsTab.headRefArrayAdd_pushButton.clicked.connect(partial(self.addItem2listWidget, self.settingsTab.headRefArray_listWidget, "headrefarray"))
         self.settingsTab.headRefArrayRemove_pushButton.clicked.connect(partial(self.removeSelectedFromListWidget, self.settingsTab.headRefArray_listWidget, "headrefarray"))
-        self.settingsTab.headRefArray_copyRef_pushButton.clicked.connect(partial(self.copyFromListWidget, self.settingsTab.ikRefArray_listWidget, self.settingsTab.headRefArray_listWidget, "headrefarray"))
         self.settingsTab.headRefArray_listWidget.installEventFilter(self)
+
+        self.settingsTab.useExprespy_checkBox.stateChanged.connect(
+            partial(self.updateCheck,
+                    self.settingsTab.useExprespy_checkBox,
+                    "useExprespy"))
 
     def eventFilter(self, sender, event):
         if event.type() == QtCore.QEvent.ChildRemoved:
-            if sender == self.settingsTab.ikRefArray_listWidget:
-                self.updateListAttr(sender, "ikrefarray")
-            elif sender == self.settingsTab.headRefArray_listWidget:
+            if sender == self.settingsTab.headRefArray_listWidget:
                 self.updateListAttr(sender, "headrefarray")
 
     def dockCloseEventTriggered(self):

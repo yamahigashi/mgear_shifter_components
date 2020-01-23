@@ -16,8 +16,8 @@
   <widget class="QGroupBox" name="upvRefArray_groupBox">
    <property name="geometry">
     <rect>
-     <x>11</x>
-     <y>374</y>
+     <x>10</x>
+     <y>60</y>
      <width>249</width>
      <height>176</height>
     </rect>
@@ -102,94 +102,21 @@
     </layout>
    </widget>
   </widget>
-  <widget class="QGroupBox" name="ikRefArray_groupBox">
+  <widget class="QCheckBox" name="useExprespy_checkBox">
    <property name="geometry">
     <rect>
-     <x>11</x>
-     <y>193</y>
-     <width>249</width>
-     <height>175</height>
+     <x>30</x>
+     <y>20</y>
+     <width>401</width>
+     <height>16</height>
     </rect>
    </property>
-   <property name="title">
-    <string>IK Reference Array</string>
+   <property name="text">
+    <string notr="true">Use Exprespy</string>
    </property>
-   <widget class="QWidget" name="layoutWidget">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>20</y>
-      <width>231</width>
-      <height>141</height>
-     </rect>
-    </property>
-    <layout class="QHBoxLayout" name="ikRefArray_horizontalLayout">
-     <item>
-      <layout class="QVBoxLayout" name="ikRefArray_verticalLayout_1">
-       <item>
-        <widget class="QListWidget" name="ikRefArray_listWidget">
-         <property name="dragDropOverwriteMode">
-          <bool>true</bool>
-         </property>
-         <property name="dragDropMode">
-          <enum>QAbstractItemView::InternalMove</enum>
-         </property>
-         <property name="defaultDropAction">
-          <enum>Qt::MoveAction</enum>
-         </property>
-         <property name="alternatingRowColors">
-          <bool>true</bool>
-         </property>
-         <property name="selectionMode">
-          <enum>QAbstractItemView::ExtendedSelection</enum>
-         </property>
-         <property name="selectionRectVisible">
-          <bool>false</bool>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QPushButton" name="ikRefArray_copyRef_pushButton">
-         <property name="text">
-          <string>Copy from Head Ref</string>
-         </property>
-        </widget>
-       </item>
-      </layout>
-     </item>
-     <item>
-      <layout class="QVBoxLayout" name="ikRefArray_verticalLayout_2">
-       <item>
-        <widget class="QPushButton" name="ikRefArrayAdd_pushButton">
-         <property name="text">
-          <string>&lt;&lt;</string>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QPushButton" name="ikRefArrayRemove_pushButton">
-         <property name="text">
-          <string>&gt;&gt;</string>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <spacer name="ikRefArray_verticalSpacer">
-         <property name="orientation">
-          <enum>Qt::Vertical</enum>
-         </property>
-         <property name="sizeHint" stdset="0">
-          <size>
-           <width>20</width>
-           <height>40</height>
-          </size>
-         </property>
-        </spacer>
-       </item>
-      </layout>
-     </item>
-    </layout>
-   </widget>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
   </widget>
  </widget>
  <resources/>
