@@ -45,7 +45,7 @@ class Guide(ComponentGuide):
     ##
     # @param self
     def postInit(self):
-        self.save_transform = ["root", "tan0", "tan1", "neck", "head", "eff"]
+        self.save_transform = ["root", "tan0", "eff0", "neck", "head", "eff1"]
         self.save_blade = ["blade"]
 
     # =====================================================
@@ -56,24 +56,28 @@ class Guide(ComponentGuide):
         self.root = self.addRoot()
         vTemp = tra.getOffsetPosition(self.root, [0, 1, 0])
         self.neck = self.addLoc("neck", self.root, vTemp)
+        # v1 = vec.linearlyInterpolate(self.root.getTranslation(space="world"), self.neck.getTranslation(space="world"), .666)
+        v1 = tra.getOffsetPosition(self.root, [0, 1.5, 0])
+        self.eff0 = self.addLoc("eff0", self.neck, v1)
 
-        vTemp = tra.getOffsetPosition(self.root, [0, 1.1, 0])
+        vTemp = tra.getOffsetPosition(self.root, [0, 1.5, 0])
         self.head = self.addLoc("head", self.neck, vTemp)
 
         vTemp = tra.getOffsetPosition(self.root, [0, 2, 0])
-        self.eff = self.addLoc("eff", self.head, vTemp)
+        self.eff1 = self.addLoc("eff1", self.head, vTemp)
 
-        v0 = vec.linearlyInterpolate(self.root.getTranslation(space="world"), self.neck.getTranslation(space="world"), .333)
+        v0 = tra.getOffsetPosition(self.root, [0, 1, 0.0001])
         self.tan0 = self.addLoc("tan0", self.root, v0)
-        v1 = vec.linearlyInterpolate(self.root.getTranslation(space="world"), self.neck.getTranslation(space="world"), .666)
-        self.tan1 = self.addLoc("tan1", self.neck, v1)
 
         self.blade = self.addBlade("blade", self.root, self.tan0)
 
-        centers = [self.root, self.tan0, self.tan1, self.neck]
+        centers = [self.root, self.neck, self.head]
         self.dispcrv = self.addDispCurve("neck_crv", centers, 3)
 
-        centers = [self.neck, self.head, self.eff]
+        centers = [self.neck, self.eff0]
+        self.dispcrv = self.addDispCurve("neck_crv", centers, 1)
+
+        centers = [self.head, self.eff1]
         self.dispcrv = self.addDispCurve("head_crv", centers, 1)
 
     # =====================================================

@@ -33,36 +33,43 @@ class Component(MainComponent):
     # @param self
     def addObjects(self):
 
-        self.normal = self.guide.blades["blade"].y
+        self.normal = self.guide.blades["blade"].z * -1.
 
         # Ik Controlers ------------------------------------
-        t = tra.getTransformLookingAt(self.guide.pos["tan1"], self.guide.pos["neck"], self.normal, "yx", self.negate)
+        t = tra.getTransform(self.root)
         t = tra.setMatrixPosition(t, self.guide.pos["neck"])
         self.neck_cns = pri.addTransform(self.root, self.getName("neck_cns"), t)
+        t = tra.getTransformLookingAt(self.guide.pos["neck"], self.guide.pos["eff0"], self.normal, "yx", self.negate)
+        t = tra.setMatrixPosition(t, self.guide.pos["neck"])
+        self.neck_npo = pri.addTransform(self.neck_cns, self.getName("neck_npo"), t)
 
         w = self.size * 0.5
         # for compatibility reason, this name is not neck_ctl, but ik_ctl
-        self.neck_ctl = self.addCtl(self.neck_cns, "ik_ctl", t, self.color_ik, "compas", w=w)
+        self.neck_ctl = self.addCtl(self.neck_npo, "ik_ctl", t, self.color_ik, "compas", w=w)
         att.setKeyableAttributes(self.neck_ctl)
         att.setRotOrder(self.neck_ctl, "ZXY")
         self.jnt_pos.append([self.neck_ctl, 0])
 
-        t = tra.getTransformLookingAt(self.guide.pos["head"], self.guide.pos["eff"], self.normal, "yx", self.negate)
-        self.head_npo = pri.addTransform(self.neck_ctl, self.getName("head_npo"), t)
+        t = tra.getTransformLookingAt(self.guide.pos["head"], self.guide.pos["eff1"], self.normal, "yx", self.negate)
+        self.head_pos_ref = pri.addTransform(self.neck_ctl, self.getName("head_pos_ref"), t)
 
         # TODO: Division -----------------------------------------
 
         # Head ---------------------------------------------
-        t = tra.getTransformLookingAt(self.guide.pos["head"], self.guide.pos["eff"], self.normal, "yx", self.negate)
+        t = tra.getTransform(self.root)
+        t = tra.setMatrixPosition(t, self.guide.pos["head"])
         self.head_cns = pri.addTransform(self.root, self.getName("head_cns"), t)
 
-        dist = vec.getDistance(self.guide.pos["head"], self.guide.pos["eff"])
+        t = tra.getTransformLookingAt(self.guide.pos["head"], self.guide.pos["eff1"], self.normal, "yx", self.negate)
+        self.head_npo = pri.addTransform(self.head_cns, self.getName("head_npo"), t)
+
+        dist = vec.getDistance(self.guide.pos["head"], self.guide.pos["eff1"])
         w = self.size * 0.5
         h = dist
         d = self.size * 0.5
         po = dt.Vector(0, dist * 0.5, 0)
 
-        self.head_ctl = self.addCtl(self.head_cns, "head_ctl", t, self.color_fk, "cube", w=w, h=h, d=d, po=po)
+        self.head_ctl = self.addCtl(self.head_npo, "head_ctl", t, self.color_fk, "cube", w=w, h=h, d=d, po=po)
         att.setRotOrder(self.head_ctl, "ZXY")
         att.setInvertMirror(self.neck_ctl, ["tx", "ry", "rz"])
         att.setInvertMirror(self.head_ctl, ["tx", "ry", "rz"])
@@ -82,9 +89,8 @@ class Component(MainComponent):
 
         if self.settings["headrefarray"]:
             ref_names = self.settings["headrefarray"].split(",")
-            if len(ref_names) > 1:
-                ref_names.insert(0, "self")
-                self.headref_att = self.addAnimEnumParam("headref", "Head Ref", 1, ref_names)
+            ref_names.insert(0, "self")
+            self.headref_att = self.addAnimEnumParam("headref", "Head Ref", 1, ref_names)
 
     # =====================================================
     # OPERATORS
@@ -105,26 +111,24 @@ class Component(MainComponent):
     # @param self
     def setRelation(self):
         self.relatives["root"] = self.root
-        self.relatives["tan1"] = self.root
+        self.relatives["eff0"] = self.root
         self.relatives["tan2"] = self.head_ctl
         self.relatives["neck"] = self.neck_ctl
         self.relatives["head"] = self.head_ctl
-        self.relatives["eff"] = self.head_ctl
+        self.relatives["eff1"] = self.head_ctl
 
         self.jointRelatives["root"] = 0
-        self.jointRelatives["tan1"] = 0
+        self.jointRelatives["eff0"] = 0
         self.jointRelatives["tan2"] = len(self.jnt_pos) - 1
         self.jointRelatives["neck"] = len(self.jnt_pos) - 1
         self.jointRelatives["head"] = len(self.jnt_pos) - 1
-        self.jointRelatives["eff"] = len(self.jnt_pos) - 1
+        self.jointRelatives["eff1"] = len(self.jnt_pos) - 1
 
     def connect_standard(self):
 
         self.parent.addChild(self.root)
 
-        # head position
-        # _ = pm.pointConstraint(self.head_npo, self.head_cns, maintainOffset=True)
-
+        # TODO: by settings gui
         self.connect_with_exprespy()
         # self.connect_with_nodespaghetti()
 
@@ -133,32 +137,20 @@ class Component(MainComponent):
         exprespy_template = textwrap.dedent("""
             import maya.api.OpenMaya as om
 
-            neck_ref = {neckref_att}     # 0: self, 1: head
-            head_ref = {headref_att}    # 0: self, 1: body, 2: local
+            neck_ref = {self.neckref_att}    # 0: self, 1: head
+            head_ref = {self.headref_att}    # 0: self, (1: body, 2: local etc...)
 
-            neck_base_pos = {neck_cns}.translate  # FIXME: CONSTANT
-            head_ref_pos = {head_npo}.translate  # FIXME: CONSTANT
+            neck_base_pos = {self.neck_cns}.translate  # FIXME: CONSTANT
+            head_ref_pos = {self.head_pos_ref}.translate  # FIXME: CONSTANT
 
             res_head_rot = om.MEulerRotation()
             res_neck_rot = om.MEulerRotation()
             res_head_pos = head_ref_pos
 
-            if neck_ref == 0:
-                tmp = om.MTransformationMatrix()
-                tmp.setTranslation(neck_base_pos, om.MSpace.kObject)
-                tmp2 = om.MTransformationMatrix(tmp.asMatrixInverse() * neck_C0_ik_ctl.inverseMatrix * neck_C0_head_npo.inverseMatrix )
-                res_head_pos = tmp2.translation(om.MSpace.kObject) * -1.
-
             if head_ref == 0:
-                res_head_rot = {neck_ctl}.rotate
-        """.format(**{
-            "neckref_att": self.neckref_att,
-            "headref_att": self.headref_att,
-            "neck_ctl": self.neck_ctl,
-            "neck_cns": self.neck_cns,
-            "head_ctl": self.head_ctl,
-            "head_npo": self.head_npo
-        }))
+                res_head_rot.setValue({self.neck_ctl}.rotate, {self.neck_ctl}.rotateOrder)
+                m = api.MMatrix()
+        """.format(**locals()))
 
         exprespy_head_ref_switch_template = textwrap.dedent("""
             elif head_ref == {i}:
@@ -166,30 +158,30 @@ class Component(MainComponent):
                 m = {mat_formula}
 
                 res_head_rot = api.MTransformationMatrix(m).rotation(False)
-                res_head_rot.reorderIt({head_cns}.rotateOrder)
-
-                if neck_ref != 0:
-
-                    neck_quat = api.MTransformationMatrix(m * {head_ctl}.matrix).rotation(True)
-                    identity = api.MQuaternion()
-                    res_neck_rot = api.MQuaternion.slerp(identity, neck_quat, {neck_rate}).asEulerRotation()
-
-                    tmp = om.MTransformationMatrix()
-                    tmp.setTranslation(neck_base_pos, om.MSpace.kObject)
-                    tmp.setRotation(res_neck_rot)
-                    tmp2 = om.MTransformationMatrix(tmp.asMatrixInverse() * neck_C0_ik_ctl.inverseMatrix * neck_C0_head_npo.inverseMatrix )
-                    res_head_pos = tmp2.translation(om.MSpace.kObject) * -1.
-
         """)
 
         exprespy_head_result_assignment_template = textwrap.dedent("""
-            {neck_cns}.rotate = res_neck_rot
-            {head_cns}.translate = res_head_pos
-            {head_cns}.rotate = res_head_rot
-        """.format(**{
-            "neck_cns": self.neck_cns,
-            "head_cns": self.head_cns
-        }))
+            if neck_ref == 0:
+                tmp = om.MTransformationMatrix()
+                tmp.setTranslation(neck_base_pos, om.MSpace.kObject)
+                tmp2 = om.MTransformationMatrix(tmp.asMatrixInverse() * {self.neck_npo}.inverseMatrix * {self.neck_ctl}.inverseMatrix * {self.head_pos_ref}.inverseMatrix )
+                res_head_pos = tmp2.translation(om.MSpace.kObject) * -1.
+            else:
+                neck_quat = api.MTransformationMatrix(m * {self.head_npo}.matrix * {self.head_ctl}.matrix).rotation(True)
+                identity = api.MQuaternion()
+                res_neck_rot = api.MQuaternion.slerp(identity, neck_quat, {self.neckrate_att}).asEulerRotation()
+
+                tmp = om.MTransformationMatrix()
+                tmp.setTranslation(neck_base_pos, om.MSpace.kObject)
+                tmp.setRotation(res_neck_rot)
+                tmp2 = om.MTransformationMatrix(tmp.asMatrixInverse() * {self.neck_npo}.inverseMatrix * {self.neck_ctl}.inverseMatrix * {self.head_pos_ref}.inverseMatrix )
+                res_head_pos = tmp2.translation(om.MSpace.kObject) * -1.
+
+            res_head_rot.reorderIt({self.head_cns}.rotateOrder)
+            {self.neck_cns}.rotate = res_neck_rot
+            {self.head_cns}.translate = res_head_pos
+            {self.head_cns}.rotate = res_head_rot
+        """)
 
         exprespy_code = exprespy_template
 
@@ -210,13 +202,10 @@ class Component(MainComponent):
                     "i": i + 1,
                     "ref_name": ref_name,
                     "mat_formula": mat,
-                    "head_ctl": self.head_ctl,
-                    "head_cns": self.head_cns,
-                    "neck_rate": self.neckrate_att,
                 })
                 exprespy_code += interpoleted
 
-        exprespy_code += exprespy_head_result_assignment_template
+        exprespy_code += exprespy_head_result_assignment_template.format(**locals())
 
         exprespy_node = om2.MFnDependencyNode()
         name = self.getName("exprespy_node")
@@ -231,7 +220,7 @@ class Component(MainComponent):
 
         # Head position
         mult = pm.createNode("multMatrix")
-        pm.connectAttr("{}.matrix".format(self.head_npo), "{}.matrixIn[0]".format(mult))
+        pm.connectAttr("{}.matrix".format(self.head_pos_ref), "{}.matrixIn[0]".format(mult))
         pm.connectAttr("{}.matrix".format(self.neck_ctl), "{}.matrixIn[1]".format(mult))
         pm.setAttr("{}.matrixIn[2]".format(mult), *cmds.getAttr("{}.matrix".format(self.neck_cns)), type="matrix")
         decomp = pm.createNode("decomposeMatrix")
@@ -313,7 +302,7 @@ class Component(MainComponent):
         pm.connectAttr("{}.outputMatrix".format(inv), "{}.matrixIn[0]".format(mult))
         pm.connectAttr("{}.inverseMatrix".format(self.head_ctl), "{}.matrixIn[1]".format(mult))
         pm.connectAttr("{}.inverseMatrix".format(self.neck_ctl), "{}.matrixIn[2]".format(mult))
-        pm.connectAttr("{}.inverseMatrix".format(self.head_npo), "{}.matrixIn[3]".format(mult))
+        pm.connectAttr("{}.inverseMatrix".format(self.head_pos_ref), "{}.matrixIn[3]".format(mult))
         inv = pm.createNode("inverseMatrix")
         pm.connectAttr("{}.matrixSum".format(mult), "{}.inputMatrix".format(inv))
         decomp = pm.createNode("decomposeMatrix")
@@ -352,7 +341,6 @@ class Component(MainComponent):
                 pm.connectAttr("{}.outputRotateX".format(decomp), "{}.colorIfTrueR".format(head_ref_cond))
                 pm.connectAttr("{}.outputRotateY".format(decomp), "{}.colorIfTrueG".format(head_ref_cond))
                 pm.connectAttr("{}.outputRotateZ".format(decomp), "{}.colorIfTrueB".format(head_ref_cond))
-
 
 
 def getFullPath(start, routes=None):
@@ -412,6 +400,3 @@ def _findPathAtoB(aPath, bPath):
     up = list(reversed(bPath[:(idx)]))
 
     return down, sharedNode, up
-
-
-# print findPathAtoB(1, 2)
