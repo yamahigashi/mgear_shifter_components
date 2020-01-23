@@ -91,6 +91,8 @@ class Component(MainComponent):
             ref_names = self.settings["headrefarray"].split(",")
             ref_names.insert(0, "self")
             self.headref_att = self.addAnimEnumParam("headref", "Head Ref", 1, ref_names)
+        else:
+            self.headref_att = self.addAnimEnumParam("headref", "Head Ref", 0, ["self"])
 
     # =====================================================
     # OPERATORS
@@ -100,9 +102,7 @@ class Component(MainComponent):
     # we shouldn't create any new object in this method.
     # @param self
     def addOperators(self):
-        if not cmds.pluginInfo("exprespy", q=True, loaded=True):
-            cmds.loadPlugin("exprespy.mll", quiet=True)
-            mgear.log("load plugin exprespy.mll")
+        pass
 
     # =====================================================
     # CONNECTOR
@@ -129,10 +129,19 @@ class Component(MainComponent):
         self.parent.addChild(self.root)
 
         # TODO: by settings gui
-        self.connect_with_exprespy()
-        # self.connect_with_nodespaghetti()
+        print(self.settings)
+        if self.settings["useExprespy"]:
+            try:
+                self.connect_with_exprespy()
+            except Exception:
+                print("exprespy failed")
+        else:
+            self.connect_with_nodespaghetti()
 
     def connect_with_exprespy(self):
+        if not cmds.pluginInfo("exprespy", q=True, loaded=True):
+            cmds.loadPlugin("exprespy.mll", quiet=True)
+            mgear.log("load plugin exprespy.mll")
 
         exprespy_template = textwrap.dedent("""
             import maya.api.OpenMaya as om
@@ -222,7 +231,8 @@ class Component(MainComponent):
         mult = pm.createNode("multMatrix")
         pm.connectAttr("{}.matrix".format(self.head_pos_ref), "{}.matrixIn[0]".format(mult))
         pm.connectAttr("{}.matrix".format(self.neck_ctl), "{}.matrixIn[1]".format(mult))
-        pm.setAttr("{}.matrixIn[2]".format(mult), *cmds.getAttr("{}.matrix".format(self.neck_cns)), type="matrix")
+        pm.setAttr("{}.matrixIn[2]".format(mult), *cmds.getAttr("{}.matrix".format(self.neck_npo)), type="matrix")
+        pm.setAttr("{}.matrixIn[3]".format(mult), *cmds.getAttr("{}.matrix".format(self.neck_cns)), type="matrix")
         decomp = pm.createNode("decomposeMatrix")
         pm.connectAttr("{}.matrixSum".format(mult), "{}.inputMatrix".format(decomp))
         # pm.connectAttr("{}.outputTranslate".format(decomp), "{}.translate".format(self.head_cns))
@@ -264,8 +274,8 @@ class Component(MainComponent):
         pm.connectAttr("{}.outColorR".format(head_ref_cond), "{}.inputRotateX".format(comp))
         pm.connectAttr("{}.outColorG".format(head_ref_cond), "{}.inputRotateY".format(comp))
         pm.connectAttr("{}.outColorB".format(head_ref_cond), "{}.inputRotateZ".format(comp))
-        pm.connectAttr("{}.outputMatrix".format(comp), "{}.matrixIn[0]".format(mult))
-        pm.connectAttr("{}.matrix".format(self.head_ctl), "{}.matrixIn[1]".format(mult))
+        pm.connectAttr("{}.matrix".format(self.head_ctl), "{}.matrixIn[0]".format(mult))
+        pm.connectAttr("{}.outputMatrix".format(comp), "{}.matrixIn[1]".format(mult))
 
         toQuat = pm.createNode("eulerToQuat")
         decomp = pm.createNode("decomposeMatrix")
@@ -291,7 +301,8 @@ class Component(MainComponent):
         # Head pos2
 
         comp = pm.createNode("composeMatrix")
-        pm.connectAttr("{}.outColor".format(head_ref_cond), "{}.inputRotate".format(comp))
+        pm.connectAttr("{}.outputQuat".format(slerp), "{}.inputQuat".format(comp))
+        pm.setAttr("{}.useEulerRotation".format(comp), False)
         pm.setAttr("{}.inputTranslateX".format(comp), cmds.getAttr("{}.translateX".format(self.neck_cns)))
         pm.setAttr("{}.inputTranslateY".format(comp), cmds.getAttr("{}.translateY".format(self.neck_cns)))
         pm.setAttr("{}.inputTranslateZ".format(comp), cmds.getAttr("{}.translateZ".format(self.neck_cns)))
@@ -300,7 +311,7 @@ class Component(MainComponent):
 
         mult = pm.createNode("multMatrix")
         pm.connectAttr("{}.outputMatrix".format(inv), "{}.matrixIn[0]".format(mult))
-        pm.connectAttr("{}.inverseMatrix".format(self.head_ctl), "{}.matrixIn[1]".format(mult))
+        pm.connectAttr("{}.inverseMatrix".format(self.neck_npo), "{}.matrixIn[1]".format(mult))
         pm.connectAttr("{}.inverseMatrix".format(self.neck_ctl), "{}.matrixIn[2]".format(mult))
         pm.connectAttr("{}.inverseMatrix".format(self.head_pos_ref), "{}.matrixIn[3]".format(mult))
         inv = pm.createNode("inverseMatrix")
