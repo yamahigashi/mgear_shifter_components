@@ -176,7 +176,7 @@ class Component(MainComponent):
                 tmp2 = om.MTransformationMatrix(tmp.asMatrixInverse() * {self.neck_npo}.inverseMatrix * {self.neck_ctl}.inverseMatrix * {self.head_pos_ref}.inverseMatrix )
                 res_head_pos = tmp2.translation(om.MSpace.kObject) * -1.
             else:
-                neck_quat = api.MTransformationMatrix(m * {self.head_npo}.matrix * {self.head_ctl}.matrix).rotation(True)
+                neck_quat = api.MTransformationMatrix(m * {self.head_ctl}).rotation(True)
                 identity = api.MQuaternion()
                 res_neck_rot = api.MQuaternion.slerp(identity, neck_quat, {self.neckrate_att}).asEulerRotation()
 
