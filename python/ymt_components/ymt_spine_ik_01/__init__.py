@@ -721,13 +721,9 @@ class Component(component.Main):
         if self.settings["isGlobalMaster"]:
             return
 
-        if self.settings["isSplitHip"]:
-            self.relatives["root"] = self.fk_hip_ctl
-        else:
-            self.relatives["root"] = self.fk_ctl[0]
-
+        self.relatives["root"] = self.fk_hip_ctl
         self.relatives["eff"] = self.fk_ctl[-1]
-        self.controlRelatives["root"] = self.fk_ctl[0]
+        self.controlRelatives["root"] = self.fk_hip_ctl
         self.jointRelatives["root"] = 0
 
         # for i in range(0, len(self.fk_ctl) - 1):
@@ -821,40 +817,23 @@ def vecProjection(a, b):
     return p
 
 
-try:
-    a = dt.Vector([-0.838670567945, 5.55111512313e-17, 0.544639035015])
-    x = dt.Vector([1.0, -0.0, -0.0])
-    z = dt.Vector([0.0, -0.0, -1.0])
-    # a = datatypes.Vector([0, 1, 0])
-    # b = datatypes.Vector([1, 1, 0])
+if __name__ == "__main__":
+    import ymt_spine_ik_01 as i
+    reload(i)
+    try:
+        cmds.delete("rig")
 
-    x = vecProjection(a, x)[0]
-    z = vecProjection(a, z)[2]
-    theta = math.atan2(x, z)
-    print(math.degrees(theta))
+    except Exception:
+        pass
+    try:
+        cmds.select("guide")
 
-    x = [-0.42992402624, 0.902865068359, 0.0]
-    z = [-0.8, -0.2, -0.0]
+    except Exception:
+        pass
+    try:
 
-    x = [0.981321904063, 0.192372868685, 0.0]
-    y = [0.0, 0.0, 1.0]
-    # print(datatypes.dot(x, y))
+        import mgear.shifter.guide_manager as gm
+        gm.build_from_selection()
 
-    # print(cross(x, z))
-    # test()
-    p = [
-        [0., 0., 0],
-        [0., 2.5, 0],
-        [0., 5., 0],
-        [0., 7.5, 0],
-        [0., 10., 0]
-    ]
-    print("------------------------------")
-    # crv = pm.curve(n="hoge", d=3, p=p)
-    # print(getCurveParamAtPosition(crv, [0., 0.1, 0]))
-    # print(getCurveParamAtPosition(crv, [0., 1, 0]))
-    # print(getCurveParamAtPosition(crv, [0., 5, 0]))
-    # print(getCurveParamAtPosition(crv, [0., 10, 0]))
-
-except Exception:
-    pass
+    except Exception:
+        pass
