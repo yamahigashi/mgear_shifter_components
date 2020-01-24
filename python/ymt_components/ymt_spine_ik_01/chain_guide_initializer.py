@@ -28,7 +28,7 @@ class ChainGuideInitializer(QtWidgets.QDialog,
         self.spacing = None
 
         self.create_connections()
-        self.setWindowTitle("Chain Initializer")
+        self.setWindowTitle("Chain Initializer For ymt spine ik 01")
 
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose, True)
 

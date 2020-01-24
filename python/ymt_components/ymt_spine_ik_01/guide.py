@@ -3,6 +3,7 @@ from functools import partial
 from mgear.shifter.component import guide
 from mgear.core import pyqt
 from mgear.core import transform
+from mgear.core import string
 from mgear.vendor.Qt import QtWidgets, QtCore
 
 from maya.app.general.mayaMixin import MayaQWidgetDockableMixin
@@ -10,6 +11,7 @@ from maya.app.general.mayaMixin import MayaQDockWidget
 
 import settingsUI as sui
 import pymel.core as pm
+from pymel.core import datatypes
 from mgear import shifter
 
 from . import chain_guide_initializer
@@ -107,6 +109,48 @@ class Guide(guide.ComponentGuide):
         self.divisions = self.root.ikNb.get()
 
         return self.divisions
+
+    def modalPositions(self):
+        """Launch a modal dialog to set position of the guide."""
+        self.sections_number = None
+        self.dir_axis = None
+        self.spacing = None
+
+        for name in self.save_transform:
+
+            if "#" in name:
+
+                init_window = chain_guide_initializer.exec_window()
+                if init_window:
+                    self.sections_number = init_window.sections_number
+                    self.dir_axis = init_window.dir_axis
+                    self.spacing = init_window.spacing
+
+                # None the action is cancel
+                else:
+                    return False
+                if self.sections_number:
+                    if self.dir_axis == 0:  # X
+                        offVec = datatypes.Vector(self.spacing, 0, 0)
+                    elif self.dir_axis == 3:  # -X
+                        offVec = datatypes.Vector(self.spacing * -1, 0, 0)
+                    elif self.dir_axis == 1:  # Y
+                        offVec = datatypes.Vector(0, self.spacing, 0)
+                    elif self.dir_axis == 4:  # -Y
+                        offVec = datatypes.Vector(0, self.spacing * -1, 0)
+                    elif self.dir_axis == 2:  # Z
+                        offVec = datatypes.Vector(0, 0, self.spacing)
+                    elif self.dir_axis == 5:  # -Z
+                        offVec = datatypes.Vector(0, 0, self.spacing * -1)
+
+                    newPosition = datatypes.Vector(0, 0, 0)
+                    for i in range(self.sections_number):
+                        newPosition = offVec + newPosition
+                        localName = string.replaceSharpWithPadding(name, i)
+                        self.tra[localName] = transform.getTransformFromPos(
+                            newPosition)
+        return True
+
 
 
 ##########################################################
