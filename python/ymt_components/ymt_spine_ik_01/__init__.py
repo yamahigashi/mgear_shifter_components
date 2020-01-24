@@ -4,7 +4,6 @@ import maya.api.OpenMaya as om
 
 import pymel.core as pm
 from pymel.core import datatypes
-from pymel.core import datatypes as dt
 
 from mgear.shifter import component
 
@@ -35,6 +34,8 @@ class Component(component.Main):
 
         # FIXME: remove unneccessary guide.tan
         self.guide.apos.pop()
+
+        self.divisions = len(self.guide.apos)
 
         self.normal = self.guide.blades["blade"].z * -1
         self.binormal = self.guide.blades["blade"].x
@@ -107,7 +108,6 @@ class Component(component.Main):
         self.mst_crv.setAttr("visibility", False)
         self.slv_crv.setAttr("visibility", False)
 
-        # add visual reference
         icon.connection_display_curve(self.getName("visualIKRef"), self.ik_ctl)
         if self.settings["isGlobalMaster"]:
             return
@@ -116,9 +116,6 @@ class Component(component.Main):
             self.addObjectsFkControl()
 
     def addObjectsFkControl(self):
-        # Division -----------------------------------------
-        # The user only define how many intermediate division he wants.
-        # First and last divisions are an obligation.
 
         parentdiv = self.root
         parentctl = self.root
@@ -367,26 +364,24 @@ class Component(component.Main):
         """Create the anim and setupr rig attributes for the component"""
         if not self.settings["isGlobalMaster"]:
             # Anim -------------------------------------------
-            self.position_att = self.addAnimParam(
-                "position",
-                "Position",
-                "double",
-                self.settings["position"], 0, 1)
+            self.volume_att = self.addAnimParam(
+                "volume", "Volume", "double", 1, 0, 1)
 
             self.maxstretch_att = self.addAnimParam(
                 "maxstretch",
                 "Max Stretch",
                 "double",
                 self.settings["maxstretch"],
-                1)
+                0.1,
+                10.)
 
             self.maxsquash_att = self.addAnimParam(
                 "maxsquash",
                 "Max Squash",
                 "double",
                 self.settings["maxsquash"],
-                0,
-                1)
+                0.,
+                1.)
 
             self.softness_att = self.addAnimParam(
                 "softness",
@@ -423,19 +418,38 @@ class Component(component.Main):
             False
         )
 
-        if self.guide.paramDefs["ik_profile"].value:
-            self.ik_value = self.guide.paramDefs["ik_profile"].value
-        else:
-            self.ik_value = fcurve.getFCurveValues(self.settings["ik_profile"],
-                                                   self.divisions)
-
-        self.ik_att = [self.addAnimParam("inter_ik_%s" % i,
-                                         "Inter IK %s" % i,
+        # Setup ------------------------------------------
+        # Eval Fcurve
+        ikname = "{}_ik_profile".format(self.guide.root.split("|")[-1])
+        self.ik_value = fcurve.getFCurveValues(ikname, self.settings["ikNb"])
+        self.ik_att = [self.addAnimParam("gravity_rate_ik%s" % i,
+                                         "Planetary Ik ratio %s" % i,
                                          "double",
                                          self.ik_value[i],
                                          0,
                                          1)
                        for i in range(1, self.settings["ikNb"] - 1)]
+
+        stname = "{}_st_profile".format(self.guide.root.split("|")[-1])
+        sqname = "{}_sq_profile".format(self.guide.root.split("|")[-1])
+        self.st_value = fcurve.getFCurveValues(stname, self.divisions)
+        self.sq_value = fcurve.getFCurveValues(sqname, self.divisions)
+
+        self.st_att = [self.addSetupParam("stretch_%s" % i,
+                                          "Stretch %s" % i,
+                                          "double",
+                                          self.st_value[i],
+                                          -1,
+                                          0)
+                       for i in range(self.divisions)]
+
+        self.sq_att = [self.addSetupParam("squash_%s" % i,
+                                          "Squash %s" % i,
+                                          "double",
+                                          self.sq_value[i],
+                                          0,
+                                          1)
+                       for i in range(self.divisions)]
 
     # =====================================================
     # OPERATORS
@@ -467,17 +481,19 @@ class Component(component.Main):
         # Curves -------------------------------------------
         op = applyop.gear_curveslide2_op(self.slv_crv, self.mst_crv, 0, 1.5, .5, .5)
 
-        pm.connectAttr(self.position_att, op + ".position")
+        # pm.connectAttr(self.position_att, op + ".position")
         pm.connectAttr(self.maxstretch_att, op + ".maxstretch")
         pm.connectAttr(self.maxsquash_att, op + ".maxsquash")
         pm.connectAttr(self.softness_att, op + ".softness")
 
+        # Volume driver ------------------------------------
+        crv_node = node.createCurveInfoNode(self.slv_crv)
         self.addOperatorsIkTwist()
 
         # Division -----------------------------------------
         rootWorld_node = node.createDecomposeMatrixNode(self.root.attr("worldMatrix"))
         for i in range(len(self.guide.apos)):
-            self.addFkOperator(i, rootWorld_node)
+            self.addFkOperator(i, rootWorld_node, crv_node)
 
         # CONNECT STACK
         # master components
@@ -542,7 +558,7 @@ class Component(component.Main):
             pm.connectAttr(inv + ".outFloat", c + ".target[0].targetWeight")
             pm.connectAttr(self.ik_att[i - 1], c + ".target[1].targetWeight")
 
-    def addFkOperator(self, i, rootWorld_node):
+    def addFkOperator(self, i, rootWorld_node, crv_node):
 
         if i == 0 and self.settings["isSplitHip"]:
             s = self.fk_hip_ctl
@@ -628,6 +644,18 @@ class Component(component.Main):
             [rootWorld_node + ".outputScaleX",
              rootWorld_node + ".outputScaleY",
              rootWorld_node + ".outputScaleZ"])
+
+        # Squash n Stretch
+        op = applyop.gear_squashstretch2_op(self.scl_transforms[i],
+                                            self.root,
+                                            pm.arclen(self.slv_crv),
+                                            "y",
+                                            div_node + ".output")
+
+        pm.connectAttr(self.volume_att, op + ".blend")
+        pm.connectAttr(crv_node + ".arcLength", op + ".driver")
+        pm.connectAttr(self.st_att[i], op + ".stretch")
+        pm.connectAttr(self.sq_att[i], op + ".squash")
 
         # Controlers
         tmp_local_npo_transform = getTransform(self.fk_local_npo[i])  # to fix mismatch before/after later
@@ -818,8 +846,9 @@ def vecProjection(a, b):
 
 
 if __name__ == "__main__":
-    import ymt_spine_ik_01 as i
-    reload(i)
+    import maya.cmds as cmds
+    import ymt_spine_ik_01 as m
+    reload(m)
     try:
         cmds.delete("rig")
 
