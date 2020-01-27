@@ -78,6 +78,8 @@ class Guide(guide.ComponentGuide):
         self.pOverrideNegate = self.addParam("overrideNegate", "bool", False)
         self.pikNb = self.addParam("ikNb", "long", 3, 2)
 
+        self.pIk0RefArray = self.addParam("ik0refarray", "string", "")
+        self.pIk1RefArray = self.addParam("ik1refarray", "string", "")
         self.pSplitHip = self.addParam("isSplitHip", "bool", True)
         self.pPosition = self.addParam("position", "double", 0, 0, 1)
         self.pMaxStretch = self.addParam("maxstretch", "double", 1, 1)
@@ -206,6 +208,14 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
         self.populateCheck(self.settingsTab.overrideNegate_checkBox,
                            "overrideNegate")
 
+        ik0RefArrayItems = self.root.attr("ik0refarray").get().split(",")
+        for item in ik0RefArrayItems:
+            self.settingsTab.ik0RefArray_listWidget.addItem(item)
+
+        ik1RefArrayItems = self.root.attr("ik1refarray").get().split(",")
+        for item in ik1RefArrayItems:
+            self.settingsTab.ik1RefArray_listWidget.addItem(item)
+
         self.settingsTab.ikNb_spinBox.setValue(
             self.root.attr("ikNb").get())
         self.settingsTab.softness_slider.setValue(
@@ -253,6 +263,25 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
             partial(self.updateSpinBox,
                     self.settingsTab.ikNb_spinBox,
                     "ikNb"))
+
+        self.settingsTab.ik0RefArrayAdd_pushButton.clicked.connect(
+            partial(self.addItem2listWidget,
+                    self.settingsTab.ik0RefArray_listWidget,
+                    "ik0refarray"))
+        self.settingsTab.ik0RefArrayRemove_pushButton.clicked.connect(
+            partial(self.removeSelectedFromListWidget,
+                    self.settingsTab.ik0RefArray_listWidget,
+                    "ik0refarray"))
+
+        self.settingsTab.ik1RefArrayAdd_pushButton.clicked.connect(
+            partial(self.addItem2listWidget,
+                    self.settingsTab.ik1RefArray_listWidget,
+                    "ik1refarray"))
+        self.settingsTab.ik1RefArrayRemove_pushButton.clicked.connect(
+            partial(self.removeSelectedFromListWidget,
+                    self.settingsTab.ik1RefArray_listWidget,
+                    "ik1refarray"))
+
         self.settingsTab.softness_slider.valueChanged.connect(
             partial(self.updateSlider,
                     self.settingsTab.softness_slider,
