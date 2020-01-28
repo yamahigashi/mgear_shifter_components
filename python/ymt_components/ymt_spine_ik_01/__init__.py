@@ -362,6 +362,29 @@ class Component(component.Main):
     # =====================================================
     def addAttributes(self):
         """Create the anim and setupr rig attributes for the component"""
+
+        if self.settings["ik0refarray"]:
+            ref_names = self.get_valid_alias_list(
+                self.settings["ik0refarray"].split(","))
+
+            if len(ref_names) > 1:
+                self.ikref_att = self.addAnimEnumParam(
+                    "ik0ref",
+                    "Ik0 Ref",
+                    0,
+                    ref_names)
+
+        if self.settings["ik1refarray"]:
+            ref_names = self.get_valid_alias_list(
+                self.settings["ik1refarray"].split(","))
+
+            if len(ref_names) > 1:
+                self.ikref_att = self.addAnimEnumParam(
+                    "ik1ref",
+                    "Ik1 Ref",
+                    0,
+                    ref_names)
+
         if not self.settings["isGlobalMaster"]:
             # Anim -------------------------------------------
             self.volume_att = self.addAnimParam(
@@ -718,6 +741,80 @@ class Component(component.Main):
 
             self.div_cns[i].attr("rotate").disconnect()
             pm.connectAttr(blend_node + ".output", self.div_cns[i] + ".rotate")
+
+    def connectRef(self, refArray, cns_obj, upVAttr=None, init_refNames=False):
+        """Connect the cns_obj to a multiple object using parentConstraint.
+
+        Args:
+            refArray (list of dagNode): List of driver objects
+            cns_obj (dagNode): The driven object.
+            upVAttr (bool): Set if the ref Array is for IK or Up vector
+        """
+        if refArray:
+            if upVAttr and not init_refNames:
+                # we only can perform name validation if the init_refnames are
+                # provided in a separated list. This check ensures backwards
+                # copatibility
+                ref_names = refArray.split(",")
+            else:
+                ref_names = self.get_valid_ref_list(refArray.split(","))
+
+            print(ref_names)
+            if not ref_names:
+                print("aaaaaaaaaaaaaaaaaaaaaaa")
+                # return if the not ref_names list
+                return
+            elif len(ref_names) == 1:
+                print("bbbbbbbbbbbbbbbbbbbbb")
+                ref = self.rig.findRelative(ref_names[0])
+                pm.parent(cns_obj, ref)
+            else:
+                ref = []
+                for ref_name in ref_names:
+                    ref.append(self.rig.findRelative(ref_name))
+
+                ref.append(cns_obj)
+                cns_node = pm.parentConstraint(*ref, maintainOffset=True)
+                cns_attr = pm.parentConstraint(
+                    cns_node, query=True, weightAliasList=True)
+                # check if the ref Array is for IK or Up vector
+                try:
+                    if upVAttr:
+                        oAttr = self.upvref_att
+                    else:
+                        oAttr = self.ikref_att
+
+                except AttributeError:
+                    oAttr = None
+
+                if oAttr:
+                    for i, attr in enumerate(cns_attr):
+                        node_name = pm.createNode("condition")
+                        pm.connectAttr(oAttr, node_name + ".firstTerm")
+                        pm.setAttr(node_name + ".secondTerm", i)
+                        pm.setAttr(node_name + ".operation", 0)
+                        pm.setAttr(node_name + ".colorIfTrueR", 1)
+                        pm.setAttr(node_name + ".colorIfFalseR", 0)
+                        pm.connectAttr(node_name + ".outColorR", attr)
+
+    def connect_standard(self):
+        self.parent.addChild(self.root)
+        print(self.settings["ik0refarray"])
+        print(self.settings["ik0refarray"])
+        print(self.settings["ik0refarray"])
+        print(self.settings["ik0refarray"])
+        print(self.settings["ik1refarray"])
+        print(self.settings["ik1refarray"])
+        print(self.settings["ik1refarray"])
+        print(self.settings["ik1refarray"])
+        print(self.settings["ik1refarray"])
+        print(self.settings["ik1refarray"])
+        print(self.settings["ik1refarray"])
+        print(self.settings["ik1refarray"])
+        print(self.settings["ik1refarray"])
+        print(self.settings["ik1refarray"])
+        self.connectRef(self.settings["ik0refarray"], self.ik_npo[0])
+        self.connectRef(self.settings["ik1refarray"], self.ik_npo[-1])
 
     def connect_master(self, mstr_out, slave_in, idx, offset):
         """Connect master and slave chain
