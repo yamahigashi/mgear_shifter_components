@@ -1,25 +1,17 @@
 ##########################################################
 # GLOBAL
 ##########################################################
-import math
 
 # Maya
 import pymel.core as pm
-import pymel.core.datatypes as dt
 
 # import maya.OpenMaya as om
 
 # mgear
-# from mgear.shifter.component import MainComponent
 import mgear.shifter_classic_components.arm_2jnt_04 as arm_2jnt_04
 
 import mgear.core.primitive as pri
 import mgear.core.transform as tra
-import mgear.core.attribute as att
-import mgear.core.node as nod
-# import mgear.core.icon as ico
-import mgear.core.vector as vec
-# import mgear.core.utils as utils
 
 
 ##########################################################
@@ -140,6 +132,7 @@ class Component(arm_2jnt_04.Component):
                 pm.connectAttr("{}.outputRotateZ".format(decomp), "{}.colorIfTrueB".format(head_ref_cond))
 
 
+# TODO: extract to common logic
 def getFullPath(start, routes=None):
     # type: (pm.nt.transform, List[pm.nt.transform]) -> List[pm.nt.transform]
     if not routes:
