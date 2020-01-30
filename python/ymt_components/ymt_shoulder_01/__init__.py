@@ -121,6 +121,13 @@ class Component(MainComponent):
 
         comp = pm.createNode("composeRotate")
         pm.connectAttr(src + ".rotateOrder", comp + ".rotateOrder")
+        if not self.negate:
+            pass
+            # pm.setAttr("{}.reverseOrder".format(decomp), True)
+            # pm.setAttr("{}.reverseOrder".format(comp), True)
+        else:
+            pm.setAttr("{}.axisOrient".format(decomp), dt.Vector(180, 0, 0))
+            pm.setAttr("{}.axisOrient".format(comp), dt.Vector(180, 0, 0))
 
         for att in ["roll", "bendH", "bendV"]:
             # conv_in = pm.createNode("unitConversion")a
@@ -134,8 +141,12 @@ class Component(MainComponent):
             except:
                 pm.connectAttr(multiply + ".outValue", comp + "." + att)
 
-            attr_pos = self.__getattribute__(att + "_att_pos")
-            attr_neg = self.__getattribute__(att + "_att_neg")
+            if self.negate:
+                attr_neg = self.__getattribute__(att + "_att_pos")
+                attr_pos = self.__getattribute__(att + "_att_neg")
+            else:
+                attr_pos = self.__getattribute__(att + "_att_pos")
+                attr_neg = self.__getattribute__(att + "_att_neg")
             cond = pm.createNode("condition")
             pm.connectAttr(attr_pos, cond + ".colorIfTrue.colorIfTrueR")
             pm.connectAttr(attr_neg, cond + ".colorIfFalse.colorIfFalseR")
@@ -152,6 +163,7 @@ class Component(MainComponent):
     def add_arm_connection_object(self, arm_comp):
         t = tra.getTransformLookingAt(self.guide.apos[0], self.guide.apos[1], self.normal, axis="xy", negate=self.negate)
         self.arm_npo = pri.addTransform(self.ctl_npo, self.getName("dummy_npo"), t)
+        pm.connectAttr("{}.rotate".format(self.ctl), "{}.rotate".format(self.arm_npo))
         self.arm_npo.addChild(arm_comp.dummy_chain[0])
         self.arm_npo.addChild(arm_comp.dummy_ikh)
 
@@ -206,4 +218,3 @@ class Component(MainComponent):
             import traceback as tb
             tb.print_exc()
             tb.print_stack()
-        pass
