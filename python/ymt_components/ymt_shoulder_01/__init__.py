@@ -170,13 +170,6 @@ class Component(MainComponent):
         self.shoulder_npo = pri.addTransform(self.ctl_npo, self.getName("dummy_npo2"), t)
         self.shoulder_npo.addChild(self.ctl)
 
-        t = tra.getTransformFromPos(self.guide.apos[0])
-        # self.orbit_ref3 = pri.addTransform(self.orbit_cns, self.getName("orbit_ref3"), t)
-        self.orbit_ref3 = pri.addTransform(self.root, self.getName("orbit_ref3"), t)
-        npo = pm.duplicate(arm_comp.dummy_chain[0])[0]
-        # self.orbit_npo = pri.addTransform(self.orbit_cns, self.getName("orbit_npo"), t)
-        self.orbit_ref1.addChild(npo)
-
         fk_quat = self.decompose_rotate(arm_comp.fk_ctl[0])
         ik_quat = self.decompose_rotate(arm_comp.dummy_chain[0])
 
