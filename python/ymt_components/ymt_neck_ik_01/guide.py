@@ -86,7 +86,7 @@ class Guide(ComponentGuide):
     def addParameters(self):
 
         self.pHeadRefArray = self.addParam("headrefarray", "string", "")
-        self.pUseExprespy = self.addParam("useExprespy", "bool", True)
+        self.pUseExprespy = self.addParam("useExprespy", "bool", False)
 
         # Default values
         self.pUseIndex = self.addParam("useIndex", "bool", False)
