@@ -114,7 +114,7 @@ class Component(MainComponent):
         self.bendV_att_pos = self.addAnimParam("bendV_pos", "bendVerticalPositive", "double", 0.1, 0, 1.0)
         self.bendV_att_neg = self.addAnimParam("bendV_neg", "bendVerticalNegative", "double", 0.3, 0, 1.0)
 
-    def decompose_rotate(self, src):
+    def decompose_rotate(self, src, rate_for_radian=1. / math.pi):
         decomp = pm.createNode("decomposeRotate")
         pm.connectAttr(src + ".rotate", decomp + ".rotate")
         pm.connectAttr(src + ".rotateOrder", decomp + ".rotateOrder")
@@ -132,13 +132,16 @@ class Component(MainComponent):
         for att in ["roll", "bendH", "bendV"]:
             # conv_in = pm.createNode("unitConversion")a
             out = "out" + att[0].upper() + att[1:]
+            out_port = "{}.{}".format(decomp, out)
+            stepped_port = self.smooth_step(out_port)
+
             multiply = pm.createNode("floatMath")
-            pm.connectAttr(decomp + "." + out, multiply + ".floatA")
+            pm.connectAttr(stepped_port, "{}.floatA".format(multiply))
             pm.setAttr(multiply + ".operation", 2)
 
             try:
                 pm.connectAttr(multiply + ".outFloat", comp + "." + att)
-            except:
+            except AttributeError:
                 pm.connectAttr(multiply + ".outValue", comp + "." + att)
 
             if self.negate:
@@ -155,10 +158,40 @@ class Component(MainComponent):
 
             pm.connectAttr(cond + ".outColor.outColorR", multiply + ".floatB")
 
+            for unit_conv in cmds.listConnections(out_port, s=False, d=True, type="unitConversion"):
+                pm.setAttr("{}.conversionFactor".format(unit_conv), rate_for_radian)
+
         toQuat = pm.createNode("eulerToQuat")
         pm.connectAttr("{}.outRotate".format(comp), "{}.inputRotate".format(toQuat))
 
+        for unit_conv in cmds.listConnections("{}".format(comp), s=True, d=False, type="unitConversion"):
+            pm.setAttr("{}.conversionFactor".format(unit_conv), 1.0 / rate_for_radian)
+
         return toQuat
+
+    def smooth_step(self, in_port):
+        cond = pm.createNode("condition")
+        pm.connectAttr(in_port, "{}.firstTerm".format(cond))
+        pm.setAttr("{}.secondTerm".format(cond), 0.)
+        pm.setAttr("{}.operation".format(cond), 3)  # Greater Equal
+        pm.setAttr("{}.colorIfTrue.colorIfTrueR".format(cond), 1.)
+        pm.setAttr("{}.colorIfFalse.colorIfFalseR".format(cond), -1.)
+
+        absval = pm.createNode("math_Absolute")
+        smooth = pm.createNode("math_Smoothstep")
+
+        pm.connectAttr(in_port, "{}.input".format(absval))
+        pm.connectAttr("{}.output".format(absval), "{}.input".format(smooth))
+
+        multiply = pm.createNode("floatMath")
+        pm.connectAttr("{}.output".format(smooth), "{}.floatA".format(multiply))
+        pm.connectAttr("{}.outColor.outColorR".format(cond), "{}.floatB".format(multiply))
+        pm.setAttr(multiply + ".operation", 2)
+
+        return "{}.outFloat".format(multiply)
+
+    # def sigmoid(self):
+    #    return vec3(1.0) / (vec3(1.0) + exp(-(x * 10.0 - 5.0)))
 
     def add_arm_connection_object(self, arm_comp):
         t = tra.getTransformLookingAt(self.guide.apos[0], self.guide.apos[1], self.normal, axis="xy", negate=self.negate)
@@ -169,6 +202,13 @@ class Component(MainComponent):
 
         self.shoulder_npo = pri.addTransform(self.ctl_npo, self.getName("dummy_npo2"), t)
         self.shoulder_npo.addChild(self.ctl)
+
+        t = tra.getTransformFromPos(self.guide.apos[0])
+        # self.orbit_ref3 = pri.addTransform(self.orbit_cns, self.getName("orbit_ref3"), t)
+        self.orbit_ref3 = pri.addTransform(self.root, self.getName("orbit_ref3"), t)
+        npo = pm.duplicate(arm_comp.dummy_chain[0])[0]
+        # self.orbit_npo = pri.addTransform(self.orbit_cns, self.getName("orbit_npo"), t)
+        self.orbit_ref1.addChild(npo)
 
         fk_quat = self.decompose_rotate(arm_comp.fk_ctl[0])
         ik_quat = self.decompose_rotate(arm_comp.dummy_chain[0])
@@ -190,6 +230,9 @@ class Component(MainComponent):
         self.orbit_ref2.addChild(arm_comp.armChainUpvRef[0])
         self.orbit_ref2.addChild(arm_comp.ikHandleUpvRef)
 
+        return
+        t = tra.getTransformFromPos(self.guide.apos[0])
+        self.orbit_ref3 = pri.addTransform(self.root, self.getName("orbit_ref3"), t)
         pm.parentConstraint(self.orbit_ctl, self.orbit_ref3, maintainOffset=True)
         try:
             self.orbit_ref3.addChild(arm_comp.fk_cns)
@@ -203,11 +246,17 @@ class Component(MainComponent):
         if not cmds.pluginInfo("rotationDriver.py", q=True, loaded=True):
             cmds.loadPlugin("rotationDriver.py", quiet=True)
 
+        cycle = cmds.cycleCheck(q=True, evaluation=True)
         try:
+            cmds.cycleCheck(evaluation=False)
             self.insert_dummy_arm(arm_comp)
             self.add_arm_connection_attr(arm_comp)
             self.add_arm_connection_object(arm_comp)
+
         except Exception:
             import traceback as tb
             tb.print_exc()
             tb.print_stack()
+
+        finally:
+            cycle = cmds.cycleCheck(evaluation=cycle)
