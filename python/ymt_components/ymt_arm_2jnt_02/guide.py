@@ -73,6 +73,7 @@ class Guide(arm_2jnt_04.Guide):
         super(Guide, self).addParameters()
 
         self.pFkRefArray = self.addParam("fkrefarray", "string", "")
+        self.pSmoothStep = self.addParam("smoothStep", "bool", False)
 
 
 class settingsTab(QtWidgets.QDialog, sui.Ui_Form):
@@ -139,6 +140,7 @@ class componentSettings(MayaQWidgetDockableMixin, componentMainSettings):
         self.populateCheck(self.settingsTab.mirrorMid_checkBox, "mirrorMid")
         self.populateCheck(self.settingsTab.mirrorIK_checkBox, "mirrorIK")
         self.populateCheck(self.settingsTab.extraTweak_checkBox, "extraTweak")
+        self.populateCheck(self.settingsTab.smoothStep_checkBox, "smoothStep")
         self.settingsTab.div0_spinBox.setValue(self.root.attr("div0").get())
         self.settingsTab.div1_spinBox.setValue(self.root.attr("div1").get())
 
@@ -154,22 +156,6 @@ class componentSettings(MayaQWidgetDockableMixin, componentMainSettings):
         for item in pinRefArrayItems:
             self.settingsTab.pinRefArray_listWidget.addItem(item)
 
-        print(self.root)
-        print(self.root)
-        print(self.root)
-        print(self.root)
-        print(self.root)
-        print(self.root)
-        print(self.root)
-        print(self.root)
-        print(self.root)
-        print(self.root)
-        print(self.root)
-        print(self.root)
-        print(self.root)
-        print(self.root)
-        print(self.root)
-        print(self.root)
         fkRefArrayItems = self.root.attr("fkrefarray").get().split(",")
         for item in fkRefArrayItems:
             self.settingsTab.fkRefArray_listWidget.addItem(item)
@@ -243,6 +229,10 @@ class componentSettings(MayaQWidgetDockableMixin, componentMainSettings):
         self.settingsTab.extraTweak_checkBox.stateChanged.connect(
             partial(self.updateCheck,
                     self.settingsTab.extraTweak_checkBox, "extraTweak"))
+
+        self.settingsTab.smoothStep_checkBox.stateChanged.connect(
+            partial(self.updateCheck,
+                    self.settingsTab.smoothStep_checkBox, "smoothStep"))
 
         self.settingsTab.mirrorIK_checkBox.stateChanged.connect(
             partial(self.updateCheck,

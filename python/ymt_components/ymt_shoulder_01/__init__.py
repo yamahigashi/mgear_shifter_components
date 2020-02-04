@@ -14,6 +14,9 @@ import mgear.core.transform as tra
 
 import mgear.core.vector as vec
 
+if False:
+    from typing import List, Tuple, Any
+
 
 ##########################################################
 # COMPONENT
@@ -238,7 +241,7 @@ class Component(MainComponent):
         self.bendV_att_pos = self.addAnimParam("bendV_pos", "bendVerticalPositive", "double", 0.45, 0, 1.0)
         self.bendV_att_neg = self.addAnimParam("bendV_neg", "bendVerticalNegative", "double", 0.4, 0, 1.0)
 
-    def decompose_rotate(self, src, rate_for_radian=2. / math.pi):
+    def decompose_rotate(self, src, rate_for_radian=2. / math.pi, smooth_step=False):
         decomp = pm.createNode("decomposeRotate")
         pm.connectAttr(src + ".rotate", decomp + ".rotate")
         pm.connectAttr(src + ".rotateOrder", decomp + ".rotateOrder")
@@ -258,7 +261,7 @@ class Component(MainComponent):
             out = "out" + att[0].upper() + att[1:]
             out_port = "{}.{}".format(decomp, out)
 
-            if False:  # TODO
+            if smooth_step:
                 stepped_port = self.smooth_step(out_port)
             else:
                 stepped_port = out_port
@@ -339,8 +342,8 @@ class Component(MainComponent):
         # self.orbit_npo = pri.addTransform(self.orbit_cns, self.getName("orbit_npo"), t)
         self.orbit_ref1.addChild(npo)
 
-        fk_quat = self.decompose_rotate(arm_comp.fk_ctl[0])
-        ik_quat = self.decompose_rotate(arm_comp.dummy_chain_npo)
+        fk_quat = self.decompose_rotate(arm_comp.fk_ctl[0], smooth_step=arm_comp.settings["smoothStep"])
+        ik_quat = self.decompose_rotate(arm_comp.dummy_chain_npo, smooth_step=arm_comp.settings["smoothStep"])
 
         slerp = pm.createNode("quatSlerp")
         pm.connectAttr("{}.outputQuat".format(fk_quat), "{}.input1Quat".format(slerp))
@@ -360,6 +363,7 @@ class Component(MainComponent):
         self.orbit_ref2.addChild(arm_comp.ikHandleUpvRef)
 
         return
+        '''
         t = tra.getTransformFromPos(self.guide.apos[0])
         self.orbit_ref3 = pri.addTransform(self.root, self.getName("orbit_ref3"), t)
         pm.parentConstraint(self.orbit_ctl, self.orbit_ref3, maintainOffset=True)
@@ -370,6 +374,7 @@ class Component(MainComponent):
                 self.orbit_ref3.addChild(arm_comp.fk_npo[0])
             except AttributeError:
                 self.orbit_ref3.addChild(arm_comp.fk0_cns)
+        '''
 
     def connect_arm(self, arm_comp):
         if not cmds.pluginInfo("rotationDriver.py", q=True, loaded=True):
