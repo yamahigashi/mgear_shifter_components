@@ -30,13 +30,12 @@ class Component(arm_2jnt_04.Component):
     def addAttributes(self):
         super(Component, self).addAttributes()
 
-        if self.settings["fkrefarray"]:
-            ref_names = self.get_valid_alias_list(
-                self.settings["fkrefarray"].split(","))
-            ref_names.insert(0, "self")
-
-            if len(ref_names) > 1:
-                self.fkref_att = self.addAnimEnumParam("fkref", "Fk Ref", 1, ref_names)
+        ref_names = self.get_valid_alias_list(self.settings.get("fkrefarray", "").split(","))
+        ref_names.insert(0, "self")
+        if not self.settings["fkrefarray"]:
+            self.fkref_att = self.addAnimEnumParam("fkref", "Fk Ref", 0, ref_names)
+        else:
+            self.fkref_att = self.addAnimEnumParam("fkref", "Fk Ref", 1, ref_names)
 
     def addConnection(self):
         self.connections["standard"] = self.connect_standard
@@ -82,21 +81,20 @@ class Component(arm_2jnt_04.Component):
 
     def postConnect(self):
 
-        # Head ref switch
-        head_ref_cond = pm.createNode("condition")
-        pm.connectAttr(self.fkref_att, "{}.firstTerm".format(head_ref_cond))
-        pm.setAttr("{}.secondTerm".format(head_ref_cond), 0)
-        pm.setAttr("{}.operation".format(head_ref_cond), 0)
-        pm.setAttr("{}.colorIfTrueR".format(head_ref_cond), 0)
-        pm.setAttr("{}.colorIfTrueG".format(head_ref_cond), 0)
-        pm.setAttr("{}.colorIfTrueB".format(head_ref_cond), 0)
-        pm.setAttr("{}.colorIfFalseR".format(head_ref_cond), 0)
-        pm.setAttr("{}.colorIfFalseG".format(head_ref_cond), 0)
-        pm.setAttr("{}.colorIfFalseB".format(head_ref_cond), 0)
+        fk_ref_cond = pm.createNode("condition")
+        pm.connectAttr(self.fkref_att, "{}.firstTerm".format(fk_ref_cond))
+        pm.setAttr("{}.secondTerm".format(fk_ref_cond), 0)
+        pm.setAttr("{}.operation".format(fk_ref_cond), 0)
+        pm.setAttr("{}.colorIfTrueR".format(fk_ref_cond), 0)
+        pm.setAttr("{}.colorIfTrueG".format(fk_ref_cond), 0)
+        pm.setAttr("{}.colorIfTrueB".format(fk_ref_cond), 0)
+        pm.setAttr("{}.colorIfFalseR".format(fk_ref_cond), 0)
+        pm.setAttr("{}.colorIfFalseG".format(fk_ref_cond), 0)
+        pm.setAttr("{}.colorIfFalseB".format(fk_ref_cond), 0)
 
-        pm.connectAttr("{}.outColorR".format(head_ref_cond), "{}.rotateX".format(self.fk0_cns))
-        pm.connectAttr("{}.outColorG".format(head_ref_cond), "{}.rotateY".format(self.fk0_cns))
-        pm.connectAttr("{}.outColorB".format(head_ref_cond), "{}.rotateZ".format(self.fk0_cns))
+        pm.connectAttr("{}.outColorR".format(fk_ref_cond), "{}.rotateX".format(self.fk0_cns))
+        pm.connectAttr("{}.outColorG".format(fk_ref_cond), "{}.rotateY".format(self.fk0_cns))
+        pm.connectAttr("{}.outColorB".format(fk_ref_cond), "{}.rotateZ".format(self.fk0_cns))
 
         if self.settings["fkrefarray"]:
 
@@ -104,11 +102,10 @@ class Component(arm_2jnt_04.Component):
             for i, ref_name in enumerate(ref_names):
 
                 _head_ref_cond = pm.createNode("condition")
-                print(i, ref_name, _head_ref_cond)
-                pm.connectAttr("{}.outColorR".format(_head_ref_cond), "{}.colorIfFalseR".format(head_ref_cond))
-                pm.connectAttr("{}.outColorG".format(_head_ref_cond), "{}.colorIfFalseG".format(head_ref_cond))
-                pm.connectAttr("{}.outColorB".format(_head_ref_cond), "{}.colorIfFalseB".format(head_ref_cond))
-                head_ref_cond = _head_ref_cond
+                pm.connectAttr("{}.outColorR".format(_head_ref_cond), "{}.colorIfFalseR".format(fk_ref_cond))
+                pm.connectAttr("{}.outColorG".format(_head_ref_cond), "{}.colorIfFalseG".format(fk_ref_cond))
+                pm.connectAttr("{}.outColorB".format(_head_ref_cond), "{}.colorIfFalseB".format(fk_ref_cond))
+                fk_ref_cond = _head_ref_cond
 
                 pm.connectAttr(self.fkref_att, "{}.firstTerm".format(_head_ref_cond))
                 pm.setAttr("{}.secondTerm".format(_head_ref_cond), i + 1)
@@ -127,9 +124,9 @@ class Component(arm_2jnt_04.Component):
 
                 decomp = pm.createNode("decomposeMatrix")
                 pm.connectAttr("{}.matrixSum".format(mult), "{}.inputMatrix".format(decomp))
-                pm.connectAttr("{}.outputRotateX".format(decomp), "{}.colorIfTrueR".format(head_ref_cond))
-                pm.connectAttr("{}.outputRotateY".format(decomp), "{}.colorIfTrueG".format(head_ref_cond))
-                pm.connectAttr("{}.outputRotateZ".format(decomp), "{}.colorIfTrueB".format(head_ref_cond))
+                pm.connectAttr("{}.outputRotateX".format(decomp), "{}.colorIfTrueR".format(fk_ref_cond))
+                pm.connectAttr("{}.outputRotateY".format(decomp), "{}.colorIfTrueG".format(fk_ref_cond))
+                pm.connectAttr("{}.outputRotateZ".format(decomp), "{}.colorIfTrueB".format(fk_ref_cond))
 
 
 # TODO: extract to common logic
