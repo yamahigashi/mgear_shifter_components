@@ -111,7 +111,6 @@ class Component(MainComponent):
         arm_comp.dummy_ikh = pri.addIkHandle(arm_comp.root, arm_comp.getName("dummy_ikh"), arm_comp.dummy_chain)
         arm_comp.dummy_ikh.attr("visibility").set(False)
         pm.poleVectorConstraint(arm_comp.upv_ctl, arm_comp.dummy_ikh)
-        # pm.pointConstraint(arm_comp.ik_ctl, arm_comp.dummy_ikh, maintainOffset=False)
         pm.makeIdentity(arm_comp.dummy_chain[0], a=1, t=1, r=1, s=1)
 
         t = tra.getTransform(arm_comp.dummy_chain[0])
@@ -128,17 +127,12 @@ class Component(MainComponent):
 
     def set_softik_dummy(self, arm_comp):
         # --------------------------------------------------
-        # WIP softik
+        # refs: https://qiita.com/hossan_TK9004/items/a76a58a49f6affb1ab21
         nt = cmds.createNode('network', n='softIK_info')
         cmds.addAttr(nt, ln='ikMaxLength', at='float')
         cmds.addAttr(nt, ln='startLengthSoftCorrection', at='float')
 
         # get max Distance
-        # rootPoint = cmds.xform('root', q=True, rp=True, ws=True, wd=True)
-        # currentPoint = cmds.xform('baseTrns', q=True, rp=True, ws=True, wd=True)
-
-        # rootVector = dt.Vector(rootPoint)
-        # currentVector = dt.Vector(currentPoint)
         rootVector = self.guide.apos[0]
         currentVector = arm_comp.guide.pos["wrist"]
         t = tra.getTransformFromPos(arm_comp.guide.pos["wrist"])
@@ -160,8 +154,6 @@ class Component(MainComponent):
             pm.connectAttr("{}.matrix".format(d), "{}.matrixIn[{}]".format(ikMat, i))
         pm.connectAttr("{}.matrixSum".format(ikMat), "{}.inMatrix2".format(distNode))
 
-        # pm.connectAttr("{}.matrixSum".format(ikMat), "{}.matrix".format(self.softdummy_npo))
-        # return
         # ---
         culLength = cmds.shadingNode('plusMinusAverage', au=True, n='culLength')
         cmds.setAttr('{}.operation'.format(culLength), 2)
@@ -228,6 +220,7 @@ class Component(MainComponent):
         cmds.connectAttr('{}.outColorG'.format(cond), '{}.translateY'.format(self.softdummy_npo))
         cmds.connectAttr('{}.outColorB'.format(cond), '{}.translateZ'.format(self.softdummy_npo))
 
+        # apply offset to rest angle
         cmds.setAttr("{}.inputX".format(arm_comp.dummy_chain_offset), -1. * cmds.getAttr("{}.rx".format(arm_comp.dummy_chain[0])))
         cmds.setAttr("{}.inputY".format(arm_comp.dummy_chain_offset), -1. * cmds.getAttr("{}.ry".format(arm_comp.dummy_chain[0])))
         cmds.setAttr("{}.inputZ".format(arm_comp.dummy_chain_offset), -1. * cmds.getAttr("{}.rz".format(arm_comp.dummy_chain[0])))
@@ -335,13 +328,6 @@ class Component(MainComponent):
         self.shoulder_npo = pri.addTransform(self.ctl_npo, self.getName("dummy_npo2"), t)
         self.shoulder_npo.addChild(self.ctl)
 
-        t = tra.getTransformFromPos(self.guide.apos[0])
-        # self.orbit_ref3 = pri.addTransform(self.orbit_cns, self.getName("orbit_ref3"), t)
-        self.orbit_ref3 = pri.addTransform(self.root, self.getName("orbit_ref3"), t)
-        npo = pm.duplicate(arm_comp.dummy_chain[0])[0]
-        # self.orbit_npo = pri.addTransform(self.orbit_cns, self.getName("orbit_npo"), t)
-        self.orbit_ref1.addChild(npo)
-
         fk_quat = self.decompose_rotate(arm_comp.fk_ctl[0], smooth_step=arm_comp.settings["smoothStep"])
         ik_quat = self.decompose_rotate(arm_comp.dummy_chain_npo, smooth_step=arm_comp.settings["smoothStep"])
 
@@ -361,20 +347,6 @@ class Component(MainComponent):
             self.orbit_ref2.addChild(arm_comp.ikRot_npo)
         self.orbit_ref2.addChild(arm_comp.armChainUpvRef[0])
         self.orbit_ref2.addChild(arm_comp.ikHandleUpvRef)
-
-        return
-        '''
-        t = tra.getTransformFromPos(self.guide.apos[0])
-        self.orbit_ref3 = pri.addTransform(self.root, self.getName("orbit_ref3"), t)
-        pm.parentConstraint(self.orbit_ctl, self.orbit_ref3, maintainOffset=True)
-        try:
-            self.orbit_ref3.addChild(arm_comp.fk_cns)
-        except AttributeError:
-            try:
-                self.orbit_ref3.addChild(arm_comp.fk_npo[0])
-            except AttributeError:
-                self.orbit_ref3.addChild(arm_comp.fk0_cns)
-        '''
 
     def connect_arm(self, arm_comp):
         if not cmds.pluginInfo("rotationDriver.py", q=True, loaded=True):

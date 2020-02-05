@@ -11,6 +11,7 @@ import pymel.core as pm
 import mgear.shifter_classic_components.arm_2jnt_04 as arm_2jnt_04
 
 import mgear.core.primitive as pri
+import mgear.core.attribute as att
 import mgear.core.transform as tra
 
 
@@ -36,6 +37,17 @@ class Component(arm_2jnt_04.Component):
             self.fkref_att = self.addAnimEnumParam("fkref", "Fk Ref", 0, ref_names)
         else:
             self.fkref_att = self.addAnimEnumParam("fkref", "Fk Ref", 1, ref_names)
+
+    def addOperators(self):
+        super(Component, self).addOperators()
+
+        for shp in self.ikcns_ctl.getShapes():
+            try:
+                pm.disconnectAttr(self.blend_att, shp.attr("visibility"))
+                shp.setAttr("visibility", False)
+            except RuntimeError:
+                pass
+        att.setKeyableAttributes(self.ikcns_ctl, [])
 
     def addConnection(self):
         self.connections["standard"] = self.connect_standard
