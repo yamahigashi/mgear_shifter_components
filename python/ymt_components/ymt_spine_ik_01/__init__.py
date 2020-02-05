@@ -759,13 +759,10 @@ class Component(component.Main):
             else:
                 ref_names = self.get_valid_ref_list(refArray.split(","))
 
-            print(ref_names)
             if not ref_names:
-                print("aaaaaaaaaaaaaaaaaaaaaaa")
                 # return if the not ref_names list
                 return
             elif len(ref_names) == 1:
-                print("bbbbbbbbbbbbbbbbbbbbb")
                 ref = self.rig.findRelative(ref_names[0])
                 pm.parent(cns_obj, ref)
             else:
@@ -799,20 +796,6 @@ class Component(component.Main):
 
     def connect_standard(self):
         self.parent.addChild(self.root)
-        print(self.settings["ik0refarray"])
-        print(self.settings["ik0refarray"])
-        print(self.settings["ik0refarray"])
-        print(self.settings["ik0refarray"])
-        print(self.settings["ik1refarray"])
-        print(self.settings["ik1refarray"])
-        print(self.settings["ik1refarray"])
-        print(self.settings["ik1refarray"])
-        print(self.settings["ik1refarray"])
-        print(self.settings["ik1refarray"])
-        print(self.settings["ik1refarray"])
-        print(self.settings["ik1refarray"])
-        print(self.settings["ik1refarray"])
-        print(self.settings["ik1refarray"])
         self.connectRef(self.settings["ik0refarray"], self.ik_npo[0])
         self.connectRef(self.settings["ik1refarray"], self.ik_npo[-1])
 
