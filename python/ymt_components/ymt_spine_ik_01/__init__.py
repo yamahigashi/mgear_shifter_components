@@ -837,13 +837,19 @@ class Component(component.Main):
 
         # for i in range(0, len(self.fk_ctl) - 1):
         if self.settings["isSplitHip"]:
-            for i in range(1, len(self.guide.apos) - 1):
+            for i in range(0, len(self.guide.apos) - 1):
 
                 self.relatives["%s_loc" % i] = self.fk_ctl[i + 1]
                 self.controlRelatives["%s_loc" % i] = self.fk_ctl[i + 1]
 
                 self.jointRelatives["%s_loc" % (i)] = (i + 2)
                 self.aliasRelatives["%s_ctl" % (i)] = (i + 2)
+
+            self.relatives["0_loc"] = self.fk_ctl[1]
+            self.controlRelatives["0_loc"] = self.fk_ctl[1]
+
+            self.jointRelatives["0_loc"] = (2)
+            self.aliasRelatives["0_ctl"] = (2)
 
         else:
             for i, ctl in enumerate(self.fk_ctl):
