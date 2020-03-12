@@ -211,6 +211,7 @@ class Component(component.Main):
 
         attribute.setKeyableAttributes(ik_ctl, self.tr_params)
         self.ik_ctl.append(ik_ctl)
+        attribute.setInvertMirror(ik_ctl, ["tx", "rz", "ry"])
 
         # ik global ref
         ik_global_ref = primitive.addTransform(
