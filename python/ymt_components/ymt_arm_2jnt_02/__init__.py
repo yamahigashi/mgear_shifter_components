@@ -3,6 +3,7 @@
 ##########################################################
 
 # Maya
+import maya.cmds as cmds
 import pymel.core as pm
 
 # import maya.OpenMaya as om
@@ -37,6 +38,20 @@ class Component(arm_2jnt_04.Component):
             self.fkref_att = self.addAnimEnumParam("fkref", "Fk Ref", 0, ref_names)
         else:
             self.fkref_att = self.addAnimEnumParam("fkref", "Fk Ref", 1, ref_names)
+
+        for x in self.fk_ctl:
+            att.setInvertMirror(x, ["tx", "ty", "tz"])
+
+        att.setInvertMirror(self.ik_ctl, ["tz"])
+        att.setInvertMirror(self.upv_ctl, ["tx"])
+        att.setInvertMirror(self.ikRot_ctl, [])
+
+        cmds.addAttr(self.ik_ctl.name(), longName="invPivotTx", defaultValue=0.,  minValue=-360., maxValue=360.)
+        cmds.addAttr(self.ik_ctl.name(), longName="invPivotTy", defaultValue=0.,  minValue=-360., maxValue=360.)
+        cmds.addAttr(self.ik_ctl.name(), longName="invPivotTz", defaultValue=0.,  minValue=-360., maxValue=360.)
+        cmds.addAttr(self.ik_ctl.name(), longName="invPivotRx", defaultValue=90. * self.n_factor, minValue=-360., maxValue=360.)
+        cmds.addAttr(self.ik_ctl.name(), longName="invPivotRy", defaultValue=0. * self.n_factor,  minValue=-360., maxValue=360.)
+        cmds.addAttr(self.ik_ctl.name(), longName="invPivotRz", defaultValue=90. * self.n_factor, minValue=-360., maxValue=360.)
 
     def addOperators(self):
         super(Component, self).addOperators()

@@ -128,12 +128,15 @@ def applyMirror(nameSpace, mirrorEntry):
 
     try:
         if (
-            pm.attributeQuery(attr, node=node, shortName=True, exists=True) and not node.attr(attr).isLocked()
+            pm.attributeQuery(attr, node=node, shortName=True, exists=True, keyable=True) and not node.attr(attr).isLocked()
         ):
+            if isinstance(val, str) or isinstance(val, unicode):
+                return
+
             node.attr(attr).set(val)
 
     except RuntimeError:
-        mgear.log("applyMirror failed: {0} {1}: {2}".format(node.name(), attr), mgear.sev_error)
+        mgear.log("applyMirror failed: {0} {1}: {2}".format(node.name(), attr, val), mgear.sev_error)
 
 
 def gatherMirrorData(nameSpace, node, flip):
@@ -184,7 +187,8 @@ def calculateMirrorData(srcNode, targetNode, flip=False):
         if not pm.attributeQuery(invCheckName,
                                  node=srcNode,
                                  shortName=True,
-                                 exists=True):
+                                 exists=True,
+                                 keyable=True):
 
             # if not exists, straight
             inv = 1
@@ -202,7 +206,8 @@ def calculateMirrorData(srcNode, targetNode, flip=False):
         if not pm.attributeQuery(pivotCheckName,
                                  node=srcNode,
                                  shortName=True,
-                                 exists=True):
+                                 exists=True,
+                                 keyable=True):
 
             # if not exists, straight
             pivot = 0.
