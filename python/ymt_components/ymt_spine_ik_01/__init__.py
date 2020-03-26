@@ -353,8 +353,9 @@ class Component(component.Main):
         self.twister.append(twister)
         self.ref_twist.append(ref_twist)
 
-        for x in self.fk_ctl[:-1]:
+        for x in self.fk_ctl:
             attribute.setInvertMirror(x, ["tx", "rz", "ry"])
+        attribute.setInvertMirror(self.fk_hip_ctl, ["tx", "rz", "ry"])
 
         return parentdiv, parentctl
 
