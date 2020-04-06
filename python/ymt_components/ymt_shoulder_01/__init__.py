@@ -340,6 +340,8 @@ class Component(MainComponent):
         pm.connectAttr(slerp + ".outputQuat", quat2euler + ".inputQuat")
         pm.connectAttr(quat2euler + ".outputRotate", self.shoulder_npo + ".rotate")
 
+    def reparent_arm_hierarchy(self, arm_comp):
+
         self.orbit_ref2.addChild(arm_comp.ik_cns)
         self.orbit_ref2.addChild(arm_comp.upv_cns)
 
@@ -358,9 +360,11 @@ class Component(MainComponent):
         cycle = cmds.cycleCheck(q=True, evaluation=True)
         try:
             cmds.cycleCheck(evaluation=False)
+
             self.insert_dummy_arm(arm_comp)
             self.add_arm_connection_attr(arm_comp)
             self.add_arm_connection_object(arm_comp)
+            self.reparent_arm_hierarchy(arm_comp)
             self.set_softik_dummy(arm_comp)
 
         except Exception:
