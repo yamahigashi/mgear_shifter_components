@@ -12,6 +12,10 @@ import mgear.synoptic.utils as syn_utils
 import mgear.core.utils as utils
 import gml_maya.decorator as deco
 
+if False:
+    # For type annotation
+    from typing import Optional, Dict, List, Tuple, Pattern, Callable, Any, Text  # NOQA
+
 
 class MirrorEntry(object):
 
@@ -42,16 +46,17 @@ class ikfkMatchButton(QtWidgets.QPushButton):
     def __init__(self, *args, **kwargs):
         # type: (*str, **str) -> None
         super(ikfkMatchButton, self).__init__(*args, **kwargs)
-        self.numFkControllers = None
+        self.numFkControllers = None  # type: Optional[int]
 
     def searchNumberOfFkControllers(self):
-        # type: () -> None
+        # type: () -> int
 
         for i in range(self.MAXIMUM_TRY_FOR_SEARCHING_FK):
             prop = self.property("fk{0}".format(str(i)))
             if not prop:
-                self.numFkControllers = i
-                break
+                return i
+
+        return 0
 
     def mousePressEvent(self, event):
         # type: (QtCore.QEvent) -> None
@@ -63,7 +68,7 @@ class ikfkMatchButton(QtWidgets.QPushButton):
         uiHost_name = str(self.property("uiHost_name"))
 
         if not self.numFkControllers:
-            self.searchNumberOfFkControllers()
+            self.numFkControllers = self.searchNumberOfFkControllers()
 
         additional_fk = self.property("additional_fk")
         if additional_fk:
@@ -245,6 +250,7 @@ def calculateMirrorData(srcNode, targetNode, flip=False):
 
 
 def getPivotCheckButtonAttrName(str):
+    # type: (Text) -> Text
     """Get the invert check butto attribute name
 
     Args:
@@ -253,7 +259,6 @@ def getPivotCheckButtonAttrName(str):
     Returns:
         str: The checked attribute name
     """
-    # type: (Text) -> Text
     return "invPivot{0}".format(str.lower().capitalize())
 
 
@@ -475,7 +480,7 @@ class IkFkTransfer(anim_utils.AbstractAnimationTransfer):
         return node
 
     def _getMth(self, name):
-        # type: (str) -> pm.nodetypes.Transform
+        # type: (Text) -> pm.nodetypes.Transform
 
         tmp = name.split("_")
         tmp[-1] = "mth"
@@ -533,6 +538,19 @@ class IkFkTransfer(anim_utils.AbstractAnimationTransfer):
 
         if switchTo is not None:
             if "fk" in switchTo.lower():
+                to_fk = True
+
+            else:
+                to_fk = False
+
+        else:
+            if self.comboBoxSpaces.currentIndex() != 0:  # to FK
+                to_fk = True
+
+            else:  # to IK
+                to_fk = False
+
+            if to_fk:
 
                 val_src_nodes = self.fkTargets
                 key_src_nodes = [self.ikCtrl, self.upvCtrl]
@@ -541,7 +559,6 @@ class IkFkTransfer(anim_utils.AbstractAnimationTransfer):
                     key_src_nodes.append(self.ikRotCtl)
 
             else:
-
                 val_src_nodes = [self.ikTarget, self.upvTarget]
                 key_src_nodes = self.fkCtrls
                 key_dst_nodes = [self.ikCtrl, self.upvCtrl]
@@ -552,29 +569,6 @@ class IkFkTransfer(anim_utils.AbstractAnimationTransfer):
                 # reset roll channel:
                 roll_att = self.getChangeRollAttrName()
                 pm.cutKey(roll_att, time=(startFrame, endFrame), cl=True)
-                pm.setAttr(roll_att, 0)
-
-        else:
-            if self.comboBoxSpaces.currentIndex() != 0:  # to FK
-
-                val_src_nodes = self.fkTargets
-                key_src_nodes = [self.ikCtrl, self.upvCtrl]
-                key_dst_nodes = self.fkCtrls
-                if ikRot:
-                    key_src_nodes.append(self.ikRotCtl)
-
-            else:  # to IK
-
-                val_src_nodes = [self.ikTarget, self.upvTarget]
-                key_src_nodes = self.fkCtrls
-                key_dst_nodes = [self.ikCtrl, self.upvCtrl]
-                if ikRot:
-                    val_src_nodes.append(self.ikRotTarget)
-                    key_dst_nodes.append(self.ikRotCtl)
-
-                # reset roll channel:
-                roll_att = self.getChangeRollAttrName()
-                pm.cutKey(roll_att, time=(startFrame, endFrame))
                 pm.setAttr(roll_att, 0)
 
         self.bakeAnimation(self.getChangeAttrName(),
@@ -630,7 +624,25 @@ class IkFkTransfer(anim_utils.AbstractAnimationTransfer):
 
             # bake the stored transforms to the cotrols
             for j, n in enumerate(key_dst_nodes):
-                n.setMatrix(worldMatrixList[i][j], worldSpace=True)
+                # n.setMatrix(worldMatrixList[i][j], worldSpace=True)
+
+                _m = []
+                for row in worldMatrixList[i][j]:
+                    for elem in row:
+                        _m.append(elem)
+                for _ in range(2):
+                    cmds.xform(n.name(), ws=True, matrix=_m)
+
+            # bake the stored transforms to the cotrols
+            for j, n in enumerate(key_dst_nodes):
+                # n.setMatrix(worldMatrixList[i][j], worldSpace=True)
+
+                _m = []
+                for row in worldMatrixList[i][j]:
+                    for elem in row:
+                        _m.append(elem)
+                for _ in range(2):
+                    cmds.xform(n.name(), ws=True, matrix=_m)
 
             pm.setKeyframe(key_dst_nodes, at=channels)
             pm.setKeyframe(switch_attr_name)
@@ -761,3 +773,44 @@ class IkFkTransfer(anim_utils.AbstractAnimationTransfer):
 
         kwargs.update({"switchTo": "fk"})
         IkFkTransfer.execute(model, ikfk_attr, uihost, fks, ik, upv, ikRot, **kwargs)
+
+    def getWorldMatrices(self, start, end, val_src_nodes, keyframes):
+        # type: (int, int, List[pm.nodetypes.Transform]) -> \
+        # List[List[pm.datatypes.Matrix]]
+        """ returns matrice List[frame][controller number]."""
+
+        res = []
+        for x in keyframes:
+            tmp = []
+            pm.currentTime(x)
+            for n in val_src_nodes:
+                tmp.append(pm.getAttr(n + '.worldMatrix', time=x))
+
+            res.append(tmp)
+
+        return res
+
+
+class toggleControllerVisibilityButton(QtWidgets.QPushButton):
+    """Toggle Controllers visibility."""
+
+    def __init__(self, *args, **kwargs):
+        # type: (*str, **str) -> None
+        super(toggleControllerVisibilityButton, self).__init__(*args, **kwargs)
+
+    def mousePressEvent(self, event):
+        # type: (QtCore.QEvent) -> None
+
+        import ymt_synoptics.ymt_biped.logic as l
+
+        mouse_button = event.button()
+        model = syn_utils.getModel(self)
+
+        print(model)
+        l.hoge(model, mouse_button)
+
+
+if __name__ == "__main__":
+    import ymt_synoptics.ymt_biped.control as c
+    reload(c)  # NOQA
+    print(c)
