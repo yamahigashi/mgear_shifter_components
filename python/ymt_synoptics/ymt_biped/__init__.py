@@ -1,7 +1,9 @@
 import os
 
+import pymel.core as pm
+
 from mgear.synoptic.tabs import MainSynopticTab
-from mgear.vendor.Qt import QtWidgets
+from mgear.vendor.Qt import QtWidgets, QtCore
 
 from mgear.synoptic import utils
 from . import widget
@@ -33,6 +35,12 @@ class SynopticTab(MainSynopticTab, widget.Ui_biped_body):
 
     # ============================================
     # BUTTONS
+    def selAll_clicked(self):
+        # type: () -> None
+        model = utils.getModel(self)
+        modifiers = QtWidgets.QApplication.keyboardModifiers()
+        selAll(model, modifiers)
+
     def selRight_clicked(self):
         model = utils.getModel(self)
         # i : num of fingers, j : finger length
@@ -70,3 +78,27 @@ class SynopticTab(MainSynopticTab, widget.Ui_biped_body):
         thumb_names = ["thumb_L0_fk%s_ctl" % j for j in range(3)]
         object_names.extend(thumb_names)
         utils.keyObj(model, object_names)
+
+
+def selAll(model, modifiers):
+    """Select all controlers
+
+    Args:
+        model (PyNode): Rig top node
+    """
+
+    rig_models = [item for item in pm.ls(transforms=True)
+                  if item.hasAttr("is_rig")]
+
+    controlers = utils.getControlers(model)
+    if modifiers == QtCore.Qt.ShiftModifier:  # shift
+        pm.select(controlers, toggle=True)
+    elif modifiers == QtCore.Qt.ControlModifier:  # shift
+        pm.select(cl=True)
+        rig_models = [item for item in pm.ls(transforms=True)
+                      if item.hasAttr("is_rig")]
+        for model in rig_models:
+            controlers = utils.getControlers(model)
+            pm.select(controlers, toggle=True)
+    else:
+        pm.select(controlers)
