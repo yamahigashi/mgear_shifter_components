@@ -19,8 +19,6 @@ if False:
 
 
 def hoge(rig, button):
-    print(type(rig))
-    print(button)
 
     if button == QtCore.Qt.RightButton:
         hide_all()

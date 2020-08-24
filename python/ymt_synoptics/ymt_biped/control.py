@@ -10,11 +10,14 @@ from mgear.core import pyqt
 import mgear.core.anim_utils as anim_utils
 import mgear.synoptic.utils as syn_utils
 import mgear.core.utils as utils
+
 import gml_maya.decorator as deco
+import gml_maya.node as node_utils
 
 if False:
     # For type annotation
     from typing import Optional, Dict, List, Tuple, Pattern, Callable, Any, Text  # NOQA
+    from pm.notetypes import Transform
 
 
 class MirrorEntry(object):
@@ -110,13 +113,17 @@ def mirrorPose(flip=False, nodes=None):
     if nodes is None:
         nodes = pm.selected()
 
-    nameSpace = False
-    if nodes:
-        nameSpace = syn_utils.getNamespace(nodes[0])
+    try:
+        nameSpace = False
+        if nodes:
+            nameSpace = syn_utils.getNamespace(nodes[0])
 
-    mirrorEntries = []
-    for oSel in nodes:
-        mirrorEntries.extend(gatherMirrorData(nameSpace, oSel, flip))
+        mirrorEntries = []
+        for oSel in nodes:
+            mirrorEntries.extend(gatherMirrorData(nameSpace, oSel, flip))
+    except:
+        import traceback
+        traceback.print_exc()
 
     for dat in mirrorEntries:
         applyMirror(nameSpace, dat)
@@ -172,7 +179,7 @@ def gatherMirrorData(nameSpace, node, flip):
 
 
 def calculateMirrorData(srcNode, targetNode, flip=False):
-    # type: (pm.PyNode, pm.PyNode, bool) -> List[MirrorEntry]
+    # type: (Transform, Transform, bool) -> List[MirrorEntry]
     """Calculate the mirror data
 
     Args:
@@ -188,6 +195,10 @@ def calculateMirrorData(srcNode, targetNode, flip=False):
 
     # mirror attribute of source
     for attrName in anim_utils.listAttrForMirror(srcNode):
+
+        full_path = "{}.{}".format(srcNode.name(), attrName)
+        if node_utils.is_proxy_attribute(full_path):
+            continue
 
         # whether does attribute "invTx" exists when attrName is "tx"
         invCheckName = anim_utils.getInvertCheckButtonAttrName(attrName)
@@ -806,7 +817,6 @@ class toggleControllerVisibilityButton(QtWidgets.QPushButton):
         mouse_button = event.button()
         model = syn_utils.getModel(self)
 
-        print(model)
         l.hoge(model, mouse_button)
 
 
