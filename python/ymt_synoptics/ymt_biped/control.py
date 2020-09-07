@@ -446,6 +446,8 @@ def ikFkMatch(namespace,
 
         for tip in leg_tip_con:
             node = _get_node("{}_{}".format(prefix, tip))
+            if not node:
+                continue
             attribute.reset_SRT([node, ])
 
 
