@@ -6755,13 +6755,13 @@
     <string>armUI_R0_ctl</string>
    </property>
    <property name="fk0" stdset="0">
-    <string>arm_R0_fk0_ctl</string>
+    <string>shoulder_R0_ctl</string>
    </property>
    <property name="fk1" stdset="0">
-    <string>arm_R0_fk1_ctl</string>
+    <string>arm_R0_fk0_ctl</string>
    </property>
    <property name="fk2" stdset="0">
-    <string>arm_R0_fk2_ctl</string>
+    <string>arm_R0_fk1_ctl</string>
    </property>
    <property name="ik" stdset="0">
     <string>arm_R0_ik_ctl</string>
@@ -6771,6 +6771,9 @@
    </property>
    <property name="ikRot" stdset="0">
     <string>arm_R0_ikRot_ctl</string>
+   </property>
+   <property name="fk3" stdset="0">
+    <string>arm_R0_fk2_ctl</string>
    </property>
   </widget>
   <widget class="ikfkMatchButton" name="b_keySel_3">
@@ -7758,13 +7761,13 @@
     <string>armUI_L0_ctl</string>
    </property>
    <property name="fk0" stdset="0">
-    <string>arm_L0_fk0_ctl</string>
+    <string>shoulder_L0_ctl</string>
    </property>
    <property name="fk1" stdset="0">
-    <string>arm_L0_fk1_ctl</string>
+    <string>arm_L0_fk0_ctl</string>
    </property>
    <property name="fk2" stdset="0">
-    <string>arm_L0_fk2_ctl</string>
+    <string>arm_L0_fk1_ctl</string>
    </property>
    <property name="ik" stdset="0">
     <string>arm_L0_ik_ctl</string>
@@ -7774,6 +7777,9 @@
    </property>
    <property name="ikRot" stdset="0">
     <string>arm_L0_ikRot_ctl</string>
+   </property>
+   <property name="fk3" stdset="0">
+    <string>arm_L0_fk2_ctl</string>
    </property>
   </widget>
   <widget class="QWidget" name="layoutWidget_3">
@@ -7840,7 +7846,7 @@
     </item>
    </layout>
   </widget>
-  <widget class="SelectBtn_LFkBox" name="global_C0_ctl" native="true">
+  <widget class="SelectBtn_LFkBox" name="global_C0_ctl">
    <property name="geometry">
     <rect>
      <x>121</x>
@@ -8271,7 +8277,7 @@
     <string>global_C0_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_greenBox" name="w_arm_R0_ik_ctl" native="true">
+  <widget class="SelectBtn_greenBox" name="w_arm_R0_ik_ctl">
    <property name="geometry">
     <rect>
      <x>12</x>
@@ -8702,7 +8708,7 @@
     <string>arm_R0_ik_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_darkGreenBox" name="w_arm_R0_fk1_ctl" native="true">
+  <widget class="SelectBtn_darkGreenBox" name="w_arm_R0_fk1_ctl">
    <property name="geometry">
     <rect>
      <x>52</x>
@@ -9133,7 +9139,7 @@
     <string>arm_R0_fk1_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_darkGreenBox" name="w_leg_R0_fk1_ctl" native="true">
+  <widget class="SelectBtn_darkGreenBox" name="w_leg_R0_fk1_ctl">
    <property name="geometry">
     <rect>
      <x>128</x>
@@ -9564,7 +9570,7 @@
     <string>leg_R0_fk1_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_darkGreenBox" name="w_arm_R0_fk0_ctl" native="true">
+  <widget class="SelectBtn_darkGreenBox" name="w_arm_R0_fk0_ctl">
    <property name="geometry">
     <rect>
      <x>52</x>
@@ -9995,7 +10001,7 @@
     <string>arm_R0_fk0_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_RFkBox" name="w_thumb_L0_fk1_ctl" native="true">
+  <widget class="SelectBtn_RFkBox" name="w_thumb_L0_fk1_ctl">
    <property name="geometry">
     <rect>
      <x>221</x>
@@ -10426,7 +10432,7 @@
     <string>thumb_L0_fk1_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_yellowBox" name="legUI_L0_ctl" native="true">
+  <widget class="SelectBtn_yellowBox" name="legUI_L0_ctl">
    <property name="geometry">
     <rect>
      <x>52</x>
@@ -10857,7 +10863,7 @@
     <string>legUI_L0_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_yellowBox" name="w_spine_C0_ik0_ctl" native="true">
+  <widget class="SelectBtn_yellowBox" name="w_spine_C0_ik0_ctl">
    <property name="geometry">
     <rect>
      <x>115</x>
@@ -11288,7 +11294,7 @@
     <string>spine_C0_ik0_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_RIkCircle" name="w_foot_L0_roll_ctl" native="true">
+  <widget class="SelectBtn_RIkCircle" name="w_foot_L0_roll_ctl">
    <property name="geometry">
     <rect>
      <x>225</x>
@@ -11719,7 +11725,7 @@
     <string>foot_L0_roll_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_LFkBox" name="w_spine_C0_fk0_ctl" native="true">
+  <widget class="SelectBtn_LFkBox" name="w_spine_C0_fk0_ctl">
    <property name="geometry">
     <rect>
      <x>116</x>
@@ -12150,7 +12156,7 @@
     <string>spine_C0_fk0_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_greenCircle" name="shoulder_R0_orbit_ctl" native="true">
+  <widget class="SelectBtn_greenCircle" name="shoulder_R0_orbit_ctl">
    <property name="geometry">
     <rect>
      <x>49</x>
@@ -12581,7 +12587,7 @@
     <string>shoulder_R0_orbit_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_RFkBox" name="w_finger_L0_fk2_ctl" native="true">
+  <widget class="SelectBtn_RFkBox" name="w_finger_L0_fk2_ctl">
    <property name="geometry">
     <rect>
      <x>237</x>
@@ -13012,7 +13018,7 @@
     <string>finger_L0_fk2_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_RFkBox" name="w_thumb_L0_fk0_ctl" native="true">
+  <widget class="SelectBtn_RFkBox" name="w_thumb_L0_fk0_ctl">
    <property name="geometry">
     <rect>
      <x>221</x>
@@ -13443,7 +13449,7 @@
     <string>thumb_L0_fk0_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_RFkBox" name="w_arm_L0_fk2_ctl" native="true">
+  <widget class="SelectBtn_RFkBox" name="w_arm_L0_fk2_ctl">
    <property name="geometry">
     <rect>
      <x>246</x>
@@ -13874,7 +13880,7 @@
     <string>arm_L0_fk2_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_yellowBox" name="local_C0_ctl" native="true">
+  <widget class="SelectBtn_yellowBox" name="local_C0_ctl">
    <property name="geometry">
     <rect>
      <x>121</x>
@@ -14305,7 +14311,7 @@
     <string>local_C0_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_greenCircle" name="w_leg_R0_mid_ctl" native="true">
+  <widget class="SelectBtn_greenCircle" name="w_leg_R0_mid_ctl">
    <property name="geometry">
     <rect>
      <x>125</x>
@@ -14736,7 +14742,7 @@
     <string>leg_R0_mid_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_darkGreenBox" name="w_finger_R1_fk2_ctl" native="true">
+  <widget class="SelectBtn_darkGreenBox" name="w_finger_R1_fk2_ctl">
    <property name="geometry">
     <rect>
      <x>65</x>
@@ -15167,7 +15173,7 @@
     <string>finger_R1_fk2_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_RIkCircle" name="w_foot_L0_heel_ctl" native="true">
+  <widget class="SelectBtn_RIkCircle" name="w_foot_L0_heel_ctl">
    <property name="geometry">
     <rect>
      <x>162</x>
@@ -15598,7 +15604,7 @@
     <string>foot_L0_heel_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_darkGreenBox" name="w_thumb_R0_fk1_ctl" native="true">
+  <widget class="SelectBtn_darkGreenBox" name="w_thumb_R0_fk1_ctl">
    <property name="geometry">
     <rect>
      <x>95</x>
@@ -16029,7 +16035,7 @@
     <string>thumb_R0_fk1_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_yellowBox" name="legUI_R0_ctl" native="true">
+  <widget class="SelectBtn_yellowBox" name="legUI_R0_ctl">
    <property name="geometry">
     <rect>
      <x>29</x>
@@ -16460,7 +16466,7 @@
     <string>legUI_R0_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_RFkBox" name="w_finger_L2_fk2_ctl" native="true">
+  <widget class="SelectBtn_RFkBox" name="w_finger_L2_fk2_ctl">
    <property name="geometry">
     <rect>
      <x>266</x>
@@ -16891,7 +16897,7 @@
     <string>finger_L2_fk2_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_LFkBox" name="w_body_C0_ctl" native="true">
+  <widget class="SelectBtn_LFkBox" name="w_body_C0_ctl">
    <property name="enabled">
     <bool>true</bool>
    </property>
@@ -17328,7 +17334,7 @@
     <string>body_C0_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_greenCircle" name="w_foot_R0_heel_ctl" native="true">
+  <widget class="SelectBtn_greenCircle" name="w_foot_R0_heel_ctl">
    <property name="geometry">
     <rect>
      <x>143</x>
@@ -17759,7 +17765,7 @@
     <string>foot_R0_heel_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_RIkBox" name="w_arm_L0_ik_ctl" native="true">
+  <widget class="SelectBtn_RIkBox" name="w_arm_L0_ik_ctl">
    <property name="geometry">
     <rect>
      <x>291</x>
@@ -18190,7 +18196,7 @@
     <string>arm_L0_ik_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_darkGreenBox" name="w_finger_R0_fk2_ctl" native="true">
+  <widget class="SelectBtn_darkGreenBox" name="w_finger_R0_fk2_ctl">
    <property name="geometry">
     <rect>
      <x>80</x>
@@ -18621,7 +18627,7 @@
     <string>finger_R0_fk2_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_yellowBox" name="spineUI_C0_ctl" native="true">
+  <widget class="SelectBtn_yellowBox" name="spineUI_C0_ctl">
    <property name="geometry">
     <rect>
      <x>40</x>
@@ -19052,7 +19058,7 @@
     <string>spineUI_C0_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_yellowBox" name="w_spine_C0_ik1_ctl" native="true">
+  <widget class="SelectBtn_yellowBox" name="w_spine_C0_ik1_ctl">
    <property name="geometry">
     <rect>
      <x>115</x>
@@ -19483,7 +19489,7 @@
     <string>spine_C0_ik2_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_darkGreenBox" name="w_finger_R2_fk2_ctl" native="true">
+  <widget class="SelectBtn_darkGreenBox" name="w_finger_R2_fk2_ctl">
    <property name="geometry">
     <rect>
      <x>51</x>
@@ -19914,7 +19920,7 @@
     <string>finger_R2_fk2_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_RFkBox" name="leg_L0_root_ctl" native="true">
+  <widget class="SelectBtn_RFkBox" name="leg_L0_root_ctl">
    <property name="geometry">
     <rect>
      <x>170</x>
@@ -20345,7 +20351,7 @@
     <string>leg_L0_root_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_darkGreenBox" name="leg_R0_root_ctl" native="true">
+  <widget class="SelectBtn_darkGreenBox" name="leg_R0_root_ctl">
    <property name="geometry">
     <rect>
      <x>120</x>
@@ -20776,7 +20782,7 @@
     <string>leg_R0_root_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_darkGreenBox" name="w_finger_R0_fk0_ctl" native="true">
+  <widget class="SelectBtn_darkGreenBox" name="w_finger_R0_fk0_ctl">
    <property name="geometry">
     <rect>
      <x>80</x>
@@ -21207,7 +21213,7 @@
     <string>finger_R0_fk0_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_darkGreenBox" name="w_finger_R1_fk0_ctl" native="true">
+  <widget class="SelectBtn_darkGreenBox" name="w_finger_R1_fk0_ctl">
    <property name="geometry">
     <rect>
      <x>65</x>
@@ -21638,7 +21644,7 @@
     <string>finger_R1_fk1_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_RFkBox" name="w_leg_L0_fk2_ctl" native="true">
+  <widget class="SelectBtn_RFkBox" name="w_leg_L0_fk2_ctl">
    <property name="geometry">
     <rect>
      <x>178</x>
@@ -22069,7 +22075,7 @@
     <string>leg_L0_fk2_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_RFkBox" name="w_finger_L2_fk1_ctl" native="true">
+  <widget class="SelectBtn_RFkBox" name="w_finger_L2_fk1_ctl">
    <property name="geometry">
     <rect>
      <x>266</x>
@@ -22500,7 +22506,7 @@
     <string>finger_L2_fk1_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_darkGreenBox" name="w_thumb_R0_fk2_ctl" native="true">
+  <widget class="SelectBtn_darkGreenBox" name="w_thumb_R0_fk2_ctl">
    <property name="geometry">
     <rect>
      <x>95</x>
@@ -22931,7 +22937,7 @@
     <string>thumb_R0_fk2_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_RFkBox" name="w_shoulder_L0_fk0_ctl" native="true">
+  <widget class="SelectBtn_RFkBox" name="w_shoulder_L0_fk0_ctl">
    <property name="geometry">
     <rect>
      <x>200</x>
@@ -23362,7 +23368,7 @@
     <string>shoulder_L0_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_LFkBox" name="w_spine_C0_fk2_ctl" native="true">
+  <widget class="SelectBtn_LFkBox" name="w_spine_C0_fk2_ctl">
    <property name="geometry">
     <rect>
      <x>116</x>
@@ -23793,7 +23799,7 @@
     <string>spine_C0_fk2_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_RFkBox" name="w_arm_L0_fk1_ctl" native="true">
+  <widget class="SelectBtn_RFkBox" name="w_arm_L0_fk1_ctl">
    <property name="geometry">
     <rect>
      <x>255</x>
@@ -24224,7 +24230,7 @@
     <string>arm_L0_fk1_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_RFkBox" name="w_leg_L0_fk1_ctl" native="true">
+  <widget class="SelectBtn_RFkBox" name="w_leg_L0_fk1_ctl">
    <property name="geometry">
     <rect>
      <x>178</x>
@@ -24655,7 +24661,7 @@
     <string>leg_L0_fk1_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_darkGreenBox" name="w_finger_R1_fk1_ctl" native="true">
+  <widget class="SelectBtn_darkGreenBox" name="w_finger_R1_fk1_ctl">
    <property name="geometry">
     <rect>
      <x>65</x>
@@ -25086,7 +25092,7 @@
     <string>finger_R1_fk0_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_RFkBox" name="w_thumb_L0_fk2_ctl" native="true">
+  <widget class="SelectBtn_RFkBox" name="w_thumb_L0_fk2_ctl">
    <property name="geometry">
     <rect>
      <x>221</x>
@@ -25517,7 +25523,7 @@
     <string>thumb_L0_fk2_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_RIkBox" name="w_leg_L0_upv_ctl" native="true">
+  <widget class="SelectBtn_RIkBox" name="w_leg_L0_upv_ctl">
    <property name="geometry">
     <rect>
      <x>200</x>
@@ -25948,7 +25954,7 @@
     <string>leg_L0_upv_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_RFkBox" name="w_finger_L0_fk1_ctl" native="true">
+  <widget class="SelectBtn_RFkBox" name="w_finger_L0_fk1_ctl">
    <property name="geometry">
     <rect>
      <x>237</x>
@@ -26379,7 +26385,7 @@
     <string>finger_L0_fk1_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_RFkBox" name="w_finger_L2_fk0_ctl" native="true">
+  <widget class="SelectBtn_RFkBox" name="w_finger_L2_fk0_ctl">
    <property name="geometry">
     <rect>
      <x>266</x>
@@ -26810,7 +26816,7 @@
     <string>finger_L2_fk0_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_darkGreenBox" name="w_leg_R0_fk2_ctl" native="true">
+  <widget class="SelectBtn_darkGreenBox" name="w_leg_R0_fk2_ctl">
    <property name="geometry">
     <rect>
      <x>105</x>
@@ -27241,7 +27247,7 @@
     <string>leg_R0_fk2_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_greenCircle" name="w_foot_R0_tip_ctl" native="true">
+  <widget class="SelectBtn_greenCircle" name="w_foot_R0_tip_ctl">
    <property name="geometry">
     <rect>
      <x>15</x>
@@ -27672,7 +27678,7 @@
     <string>foot_R0_tip_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_RFkBox" name="w_finger_L1_fk1_ctl" native="true">
+  <widget class="SelectBtn_RFkBox" name="w_finger_L1_fk1_ctl">
    <property name="geometry">
     <rect>
      <x>251</x>
@@ -28103,7 +28109,7 @@
     <string>finger_L1_fk0_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_greenBox" name="w_leg_R0_ik_ctl" native="true">
+  <widget class="SelectBtn_greenBox" name="w_leg_R0_ik_ctl">
    <property name="geometry">
     <rect>
      <x>43</x>
@@ -28534,7 +28540,7 @@
     <string>leg_R0_ik_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_yellowBox" name="armUI_R0_ctl" native="true">
+  <widget class="SelectBtn_yellowBox" name="armUI_R0_ctl">
    <property name="geometry">
     <rect>
      <x>22</x>
@@ -28965,7 +28971,7 @@
     <string>armUI_R0_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_greenBox" name="w_leg_R0_upv_ctl" native="true">
+  <widget class="SelectBtn_greenBox" name="w_leg_R0_upv_ctl">
    <property name="geometry">
     <rect>
      <x>101</x>
@@ -29396,7 +29402,7 @@
     <string>leg_R0_upv_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_darkGreenBox" name="w_leg_R0_fk0_ctl" native="true">
+  <widget class="SelectBtn_darkGreenBox" name="w_leg_R0_fk0_ctl">
    <property name="geometry">
     <rect>
      <x>128</x>
@@ -29827,7 +29833,7 @@
     <string>leg_R0_fk0_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_RFkBox" name="w_leg_L0_fk0_ctl" native="true">
+  <widget class="SelectBtn_RFkBox" name="w_leg_L0_fk0_ctl">
    <property name="geometry">
     <rect>
      <x>178</x>
@@ -30261,7 +30267,7 @@
     <string>leg_L0_fk0_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_RIkCircle" name="shoulder_L0_orbit_ctl" native="true">
+  <widget class="SelectBtn_RIkCircle" name="shoulder_L0_orbit_ctl">
    <property name="geometry">
     <rect>
      <x>252</x>
@@ -30692,7 +30698,7 @@
     <string>shoulder_L0_orbit_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_darkGreenBox" name="w_finger_R0_fk1_ctl" native="true">
+  <widget class="SelectBtn_darkGreenBox" name="w_finger_R0_fk1_ctl">
    <property name="geometry">
     <rect>
      <x>80</x>
@@ -31123,7 +31129,7 @@
     <string>finger_R0_fk1_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_LFkBox" name="w_spine_C0_fk1_ctl" native="true">
+  <widget class="SelectBtn_LFkBox" name="w_spine_C0_fk1_ctl">
    <property name="geometry">
     <rect>
      <x>116</x>
@@ -31554,7 +31560,7 @@
     <string>spine_C0_fk1_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_RIkCircle" name="w_arm_L0_mid_ctl" native="true">
+  <widget class="SelectBtn_RIkCircle" name="w_arm_L0_mid_ctl">
    <property name="geometry">
     <rect>
      <x>255</x>
@@ -31985,7 +31991,7 @@
     <string>arm_L0_mid_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_RFkBox" name="w_finger_L1_fk2_ctl" native="true">
+  <widget class="SelectBtn_RFkBox" name="w_finger_L1_fk2_ctl">
    <property name="geometry">
     <rect>
      <x>251</x>
@@ -32416,7 +32422,7 @@
     <string>finger_L1_fk2_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_RFkBox" name="foot_L0_fk0_ctl" native="true">
+  <widget class="SelectBtn_RFkBox" name="foot_L0_fk0_ctl">
    <property name="geometry">
     <rect>
      <x>200</x>
@@ -32847,7 +32853,7 @@
     <string>foot_L0_fk0_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_yellowBox" name="armUI_L0_ctl" native="true">
+  <widget class="SelectBtn_yellowBox" name="armUI_L0_ctl">
    <property name="geometry">
     <rect>
      <x>48</x>
@@ -33278,7 +33284,7 @@
     <string>armUI_L0_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_darkGreenBox" name="w_shoulder_R0_fk0_ctl" native="true">
+  <widget class="SelectBtn_darkGreenBox" name="w_shoulder_R0_fk0_ctl">
    <property name="geometry">
     <rect>
      <x>80</x>
@@ -33709,7 +33715,7 @@
     <string>shoulder_R0_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_RIkBox" name="arm_L0_upv_ctl" native="true">
+  <widget class="SelectBtn_RIkBox" name="arm_L0_upv_ctl">
    <property name="geometry">
     <rect>
      <x>287</x>
@@ -34140,7 +34146,7 @@
     <string>arm_L0_upv_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_greenCircle" name="w_arm_R0_mid_ctl" native="true">
+  <widget class="SelectBtn_greenCircle" name="w_arm_R0_mid_ctl">
    <property name="geometry">
     <rect>
      <x>45</x>
@@ -34571,7 +34577,7 @@
     <string>arm_R0_mid_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_RFkBox" name="w_finger_L0_fk0_ctl" native="true">
+  <widget class="SelectBtn_RFkBox" name="w_finger_L0_fk0_ctl">
    <property name="geometry">
     <rect>
      <x>237</x>
@@ -35002,7 +35008,7 @@
     <string>finger_L0_fk0_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_redCircle" name="spine_C0_tan_ctl" native="true">
+  <widget class="SelectBtn_redCircle" name="spine_C0_tan_ctl">
    <property name="geometry">
     <rect>
      <x>188</x>
@@ -35433,7 +35439,7 @@
     <string>spine_C0_ik1_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_LFkBox" name="neck_C0_head_ctl" native="true">
+  <widget class="SelectBtn_LFkBox" name="neck_C0_head_ctl">
    <property name="geometry">
     <rect>
      <x>139</x>
@@ -35864,7 +35870,7 @@
     <string>neck_C0_head_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_RIkCircle" name="w_foot_L0_tip_ctl" native="true">
+  <widget class="SelectBtn_RIkCircle" name="w_foot_L0_tip_ctl">
    <property name="geometry">
     <rect>
      <x>285</x>
@@ -36295,7 +36301,7 @@
     <string>foot_L0_tip_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_darkGreenBox" name="w_arm_R0_fk2_ctl" native="true">
+  <widget class="SelectBtn_darkGreenBox" name="w_arm_R0_fk2_ctl">
    <property name="geometry">
     <rect>
      <x>43</x>
@@ -36726,7 +36732,7 @@
     <string>arm_R0_fk2_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_RIkBox" name="w_leg_L0_ik_ctl" native="true">
+  <widget class="SelectBtn_RIkBox" name="w_leg_L0_ik_ctl">
    <property name="geometry">
     <rect>
      <x>169</x>
@@ -37157,7 +37163,7 @@
     <string>leg_L0_ik_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_darkGreenBox" name="w_thumb_R0_fk0_ctl" native="true">
+  <widget class="SelectBtn_darkGreenBox" name="w_thumb_R0_fk0_ctl">
    <property name="geometry">
     <rect>
      <x>95</x>
@@ -37588,7 +37594,7 @@
     <string>thumb_R0_fk0_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_RFkBox" name="w_arm_L0_fk0_ctl" native="true">
+  <widget class="SelectBtn_RFkBox" name="w_arm_L0_fk0_ctl">
    <property name="geometry">
     <rect>
      <x>255</x>
@@ -38019,7 +38025,7 @@
     <string>arm_L0_fk0_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_RFkBox" name="w_finger_L1_fk0_ctl" native="true">
+  <widget class="SelectBtn_RFkBox" name="w_finger_L1_fk0_ctl">
    <property name="geometry">
     <rect>
      <x>251</x>
@@ -38450,7 +38456,7 @@
     <string>finger_L1_fk1_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_greenCircle" name="w_foot_R0_roll_ctl" native="true">
+  <widget class="SelectBtn_greenCircle" name="w_foot_R0_roll_ctl">
    <property name="geometry">
     <rect>
      <x>78</x>
@@ -38881,7 +38887,7 @@
     <string>foot_R0_roll_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_darkGreenBox" name="w_finger_R2_fk1_ctl" native="true">
+  <widget class="SelectBtn_darkGreenBox" name="w_finger_R2_fk1_ctl">
    <property name="geometry">
     <rect>
      <x>51</x>
@@ -39312,7 +39318,7 @@
     <string>finger_R2_fk1_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_RIkCircle" name="w_leg_L0_mid_ctl" native="true">
+  <widget class="SelectBtn_RIkCircle" name="w_leg_L0_mid_ctl">
    <property name="geometry">
     <rect>
      <x>175</x>
@@ -39743,7 +39749,7 @@
     <string>leg_L0_mid_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_greenBox" name="arm_R0_upv_ctl" native="true">
+  <widget class="SelectBtn_greenBox" name="arm_R0_upv_ctl">
    <property name="geometry">
     <rect>
      <x>12</x>
@@ -40174,7 +40180,7 @@
     <string>arm_R0_upv_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_darkGreenBox" name="w_finger_R2_fk0_ctl" native="true">
+  <widget class="SelectBtn_darkGreenBox" name="w_finger_R2_fk0_ctl">
    <property name="geometry">
     <rect>
      <x>51</x>
@@ -40605,7 +40611,7 @@
     <string>finger_R2_fk0_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_darkGreenBox" name="foot_R0_fk0_ctl" native="true">
+  <widget class="SelectBtn_darkGreenBox" name="foot_R0_fk0_ctl">
    <property name="geometry">
     <rect>
      <x>85</x>
@@ -41036,7 +41042,7 @@
     <string>foot_R0_fk0_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_yellowCircle" name="faceUI_C0_ctl" native="true">
+  <widget class="SelectBtn_yellowCircle" name="faceUI_C0_ctl">
    <property name="geometry">
     <rect>
      <x>38</x>
@@ -41467,7 +41473,7 @@
     <string>faceUI_C0_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_yellowBox" name="neck_C0_ik_ctl" native="true">
+  <widget class="SelectBtn_yellowBox" name="neck_C0_ik_ctl">
    <property name="geometry">
     <rect>
      <x>138</x>
@@ -41898,7 +41904,7 @@
     <string>neck_C0_ik_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_RFkBox" name="finger_L3_fk2_ctl" native="true">
+  <widget class="SelectBtn_RFkBox" name="finger_L3_fk2_ctl">
    <property name="geometry">
     <rect>
      <x>280</x>
@@ -42329,7 +42335,7 @@
     <string>finger_L3_fk2_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_RFkBox" name="finger_L3_fk1_ctl" native="true">
+  <widget class="SelectBtn_RFkBox" name="finger_L3_fk1_ctl">
    <property name="geometry">
     <rect>
      <x>280</x>
@@ -42760,7 +42766,7 @@
     <string>finger_L3_fk1_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_RFkBox" name="finger_L3_fk0_ctl" native="true">
+  <widget class="SelectBtn_RFkBox" name="finger_L3_fk0_ctl">
    <property name="geometry">
     <rect>
      <x>280</x>
@@ -43191,7 +43197,7 @@
     <string>finger_L3_fk0_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_yellowOutlineBox" name="spine_C0_spinePosition_ctl" native="true">
+  <widget class="SelectBtn_yellowOutlineBox" name="spine_C0_spinePosition_ctl">
    <property name="geometry">
     <rect>
      <x>190</x>
@@ -43622,7 +43628,7 @@
     <string>rib_C0_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_darkGreenBox" name="finger_R3_fk2_ctl" native="true">
+  <widget class="SelectBtn_darkGreenBox" name="finger_R3_fk2_ctl">
    <property name="geometry">
     <rect>
      <x>37</x>
@@ -44053,7 +44059,7 @@
     <string>finger_R3_fk2_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_darkGreenBox" name="finger_R3_fk1_ctl" native="true">
+  <widget class="SelectBtn_darkGreenBox" name="finger_R3_fk1_ctl">
    <property name="geometry">
     <rect>
      <x>37</x>
@@ -44484,7 +44490,7 @@
     <string>finger_R3_fk1_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_darkGreenBox" name="finger_R3_fk0_ctl" native="true">
+  <widget class="SelectBtn_darkGreenBox" name="finger_R3_fk0_ctl">
    <property name="geometry">
     <rect>
      <x>37</x>
@@ -44915,7 +44921,7 @@
     <string>finger_R3_fk0_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_yellowOutlineBox" name="finger_L_fk0" native="true">
+  <widget class="SelectBtn_yellowOutlineBox" name="finger_L_fk0">
    <property name="geometry">
     <rect>
      <x>294</x>
@@ -45346,7 +45352,7 @@
     <string>finger_L0_fk0_ctl,finger_L1_fk0_ctl,finger_L2_fk0_ctl,finger_L3_fk0_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_yellowOutlineBox" name="finger_L_fk1" native="true">
+  <widget class="SelectBtn_yellowOutlineBox" name="finger_L_fk1">
    <property name="geometry">
     <rect>
      <x>294</x>
@@ -45777,7 +45783,7 @@
     <string>finger_L0_fk1_ctl,finger_L1_fk1_ctl,finger_L2_fk1_ctl,finger_L3_fk1_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_yellowOutlineBox" name="finger_L_fk2" native="true">
+  <widget class="SelectBtn_yellowOutlineBox" name="finger_L_fk2">
    <property name="geometry">
     <rect>
      <x>294</x>
@@ -46208,7 +46214,7 @@
     <string>finger_L0_fk2_ctl,finger_L1_fk2_ctl,finger_L2_fk2_ctl,finger_L3_fk2_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_yellowOutlineBox" name="finger_L3" native="true">
+  <widget class="SelectBtn_yellowOutlineBox" name="finger_L3">
    <property name="geometry">
     <rect>
      <x>281</x>
@@ -46639,7 +46645,7 @@
     <string>finger_L3_fk0_ctl,finger_L3_fk1_ctl,finger_L3_fk2_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_yellowOutlineBox" name="finger_L2" native="true">
+  <widget class="SelectBtn_yellowOutlineBox" name="finger_L2">
    <property name="geometry">
     <rect>
      <x>266</x>
@@ -47070,7 +47076,7 @@
     <string>finger_L2_fk0_ctl,finger_L2_fk1_ctl,finger_L2_fk2_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_yellowOutlineBox" name="finger_L1" native="true">
+  <widget class="SelectBtn_yellowOutlineBox" name="finger_L1">
    <property name="geometry">
     <rect>
      <x>251</x>
@@ -47501,7 +47507,7 @@
     <string>finger_L1_fk0_ctl,finger_L1_fk1_ctl,finger_L1_fk2_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_yellowOutlineBox" name="finger_L0" native="true">
+  <widget class="SelectBtn_yellowOutlineBox" name="finger_L0">
    <property name="geometry">
     <rect>
      <x>236</x>
@@ -47932,7 +47938,7 @@
     <string>finger_L0_fk0_ctl,finger_L0_fk1_ctl,finger_L0_fk2_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_yellowOutlineBox" name="thumb_L0" native="true">
+  <widget class="SelectBtn_yellowOutlineBox" name="thumb_L0">
    <property name="geometry">
     <rect>
      <x>221</x>
@@ -48363,7 +48369,7 @@
     <string>thumb_L0_fk0_ctl,thumb_L0_fk1_ctl,thumb_L0_fk2_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_LFkBox" name="w_spine_C0_fk2_ctl_2" native="true">
+  <widget class="SelectBtn_LFkBox" name="w_spine_C0_fk2_ctl_2">
    <property name="geometry">
     <rect>
      <x>101</x>
@@ -48794,7 +48800,7 @@
     <string>spine_C0_fk0_ctl,spine_C0_fk1_ctl,spine_C0_fk2_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_yellowOutlineBox" name="finger_R_fk2" native="true">
+  <widget class="SelectBtn_yellowOutlineBox" name="finger_R_fk2">
    <property name="geometry">
     <rect>
      <x>20</x>
@@ -49225,7 +49231,7 @@
     <string>finger_R0_fk2_ctl,finger_R1_fk2_ctl,finger_R2_fk2_ctl,finger_R3_fk2_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_yellowOutlineBox" name="finger_R_fk0" native="true">
+  <widget class="SelectBtn_yellowOutlineBox" name="finger_R_fk0">
    <property name="geometry">
     <rect>
      <x>20</x>
@@ -49656,7 +49662,7 @@
     <string>finger_R0_fk0_ctl,finger_R1_fk0_ctl,finger_R2_fk0_ctl,finger_R3_fk0_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_yellowOutlineBox" name="finger_R_fk1" native="true">
+  <widget class="SelectBtn_yellowOutlineBox" name="finger_R_fk1">
    <property name="geometry">
     <rect>
      <x>20</x>
@@ -50087,7 +50093,7 @@
     <string>finger_R0_fk1_ctl,finger_R1_fk1_ctl,finger_R2_fk1_ctl,finger_R3_fk1_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_yellowOutlineBox" name="finger_R0" native="true">
+  <widget class="SelectBtn_yellowOutlineBox" name="finger_R0">
    <property name="geometry">
     <rect>
      <x>80</x>
@@ -50518,7 +50524,7 @@
     <string>finger_R0_fk0_ctl,finger_R0_fk1_ctl,finger_R0_fk2_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_yellowOutlineBox" name="finger_R2" native="true">
+  <widget class="SelectBtn_yellowOutlineBox" name="finger_R2">
    <property name="geometry">
     <rect>
      <x>50</x>
@@ -50949,7 +50955,7 @@
     <string>finger_R2_fk0_ctl,finger_R2_fk1_ctl,finger_R2_fk2_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_yellowOutlineBox" name="finger_R1" native="true">
+  <widget class="SelectBtn_yellowOutlineBox" name="finger_R1">
    <property name="geometry">
     <rect>
      <x>65</x>
@@ -51380,7 +51386,7 @@
     <string>finger_R1_fk0_ctl,finger_R1_fk1_ctl,finger_R1_fk2_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_yellowOutlineBox" name="finger_R3" native="true">
+  <widget class="SelectBtn_yellowOutlineBox" name="finger_R3">
    <property name="geometry">
     <rect>
      <x>35</x>
@@ -51811,7 +51817,7 @@
     <string>finger_R3_fk0_ctl,finger_R3_fk1_ctl,finger_R3_fk2_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_yellowOutlineBox" name="thumb_R0" native="true">
+  <widget class="SelectBtn_yellowOutlineBox" name="thumb_R0">
    <property name="geometry">
     <rect>
      <x>94</x>
@@ -52242,7 +52248,7 @@
     <string>thumb_R0_fk0_ctl,thumb_R0_fk1_ctl,thumb_R0_fk2_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_RIkCircle" name="arm_L0_ikRot_ctl" native="true">
+  <widget class="SelectBtn_RIkCircle" name="arm_L0_ikRot_ctl">
    <property name="geometry">
     <rect>
      <x>291</x>
@@ -52673,7 +52679,7 @@
     <string>arm_L0_ikRot_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_greenCircle" name="arm_R0_ikRot_ctl" native="true">
+  <widget class="SelectBtn_greenCircle" name="arm_R0_ikRot_ctl">
    <property name="geometry">
     <rect>
      <x>12</x>
@@ -53104,7 +53110,7 @@
     <string>arm_R0_ikRot_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_darkGreenBox" name="meta_R0_ctl" native="true">
+  <widget class="SelectBtn_darkGreenBox" name="meta_R0_ctl">
    <property name="geometry">
     <rect>
      <x>9</x>
@@ -53535,7 +53541,7 @@
     <string>meta_R0_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_RFkBox" name="meta_L0_ctl" native="true">
+  <widget class="SelectBtn_RFkBox" name="meta_L0_ctl">
    <property name="geometry">
     <rect>
      <x>309</x>
@@ -53966,10 +53972,10 @@
     <string>meta_L0_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_RIkCircle" name="foot_L0_bk0_ctl" native="true">
+  <widget class="SelectBtn_RIkCircle" name="foot_L0_bk0_ctl">
    <property name="geometry">
     <rect>
-     <x>240</x>
+     <x>260</x>
      <y>490</y>
      <width>16</width>
      <height>16</height>
@@ -54397,10 +54403,10 @@
     <string>foot_L0_bk0_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_greenCircle" name="foot_R0_bk0_ctl" native="true">
+  <widget class="SelectBtn_greenCircle" name="foot_R0_bk0_ctl">
    <property name="geometry">
     <rect>
-     <x>60</x>
+     <x>40</x>
      <y>490</y>
      <width>16</width>
      <height>16</height>
@@ -54828,7 +54834,7 @@
     <string>foot_R0_bk0_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_RIkCircle" name="thumbRoll_L0_ctl" native="true">
+  <widget class="SelectBtn_RIkCircle" name="thumbRoll_L0_ctl">
    <property name="geometry">
     <rect>
      <x>220</x>
@@ -55259,7 +55265,7 @@
     <string>thumbRoll_L0_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_greenCircle" name="thumbRoll_R0_ctl" native="true">
+  <widget class="SelectBtn_greenCircle" name="thumbRoll_R0_ctl">
    <property name="geometry">
     <rect>
      <x>87</x>
@@ -58306,7 +58312,7 @@
     <bool>false</bool>
    </property>
   </widget>
-  <widget class="SelectBtn_LFkBox" name="w_spine_C0_fk_hip_ctl" native="true">
+  <widget class="SelectBtn_LFkBox" name="w_spine_C0_fk_hip_ctl">
    <property name="geometry">
     <rect>
      <x>130</x>
@@ -58737,7 +58743,7 @@
     <string>spine_C0_fk_hip_ctl</string>
    </property>
   </widget>
-  <widget class="SelectBtn_LFkBox" name="w_spine_C0_fk3_ctl" native="true">
+  <widget class="SelectBtn_LFkBox" name="w_spine_C0_fk3_ctl">
    <property name="geometry">
     <rect>
      <x>130</x>
@@ -59168,6 +59174,868 @@
     <string>spine_C0_fk3_ctl</string>
    </property>
   </widget>
+  <widget class="SelectBtn_greenCircle" name="foot_R0_bk1_ctl">
+   <property name="geometry">
+    <rect>
+     <x>60</x>
+     <y>490</y>
+     <width>16</width>
+     <height>16</height>
+    </rect>
+   </property>
+   <property name="palette">
+    <palette>
+     <active>
+      <colorrole role="WindowText">
+       <brush brushstyle="SolidPattern">
+        <color alpha="255">
+         <red>0</red>
+         <green>0</green>
+         <blue>0</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="Button">
+       <brush brushstyle="SolidPattern">
+        <color alpha="0">
+         <red>235</red>
+         <green>0</green>
+         <blue>0</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="Light">
+       <brush brushstyle="SolidPattern">
+        <color alpha="0">
+         <red>255</red>
+         <green>97</green>
+         <blue>97</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="Midlight">
+       <brush brushstyle="SolidPattern">
+        <color alpha="0">
+         <red>245</red>
+         <green>48</green>
+         <blue>48</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="Dark">
+       <brush brushstyle="SolidPattern">
+        <color alpha="0">
+         <red>117</red>
+         <green>0</green>
+         <blue>0</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="Mid">
+       <brush brushstyle="SolidPattern">
+        <color alpha="0">
+         <red>157</red>
+         <green>0</green>
+         <blue>0</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="Text">
+       <brush brushstyle="SolidPattern">
+        <color alpha="255">
+         <red>0</red>
+         <green>0</green>
+         <blue>0</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="BrightText">
+       <brush brushstyle="SolidPattern">
+        <color alpha="255">
+         <red>255</red>
+         <green>255</green>
+         <blue>255</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="ButtonText">
+       <brush brushstyle="SolidPattern">
+        <color alpha="255">
+         <red>0</red>
+         <green>0</green>
+         <blue>0</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="Base">
+       <brush brushstyle="SolidPattern">
+        <color alpha="255">
+         <red>255</red>
+         <green>255</green>
+         <blue>255</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="Window">
+       <brush brushstyle="SolidPattern">
+        <color alpha="0">
+         <red>235</red>
+         <green>0</green>
+         <blue>0</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="Shadow">
+       <brush brushstyle="SolidPattern">
+        <color alpha="255">
+         <red>0</red>
+         <green>0</green>
+         <blue>0</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="AlternateBase">
+       <brush brushstyle="SolidPattern">
+        <color alpha="127">
+         <red>245</red>
+         <green>127</green>
+         <blue>127</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="ToolTipBase">
+       <brush brushstyle="SolidPattern">
+        <color alpha="255">
+         <red>255</red>
+         <green>255</green>
+         <blue>220</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="ToolTipText">
+       <brush brushstyle="SolidPattern">
+        <color alpha="255">
+         <red>0</red>
+         <green>0</green>
+         <blue>0</blue>
+        </color>
+       </brush>
+      </colorrole>
+     </active>
+     <inactive>
+      <colorrole role="WindowText">
+       <brush brushstyle="SolidPattern">
+        <color alpha="255">
+         <red>0</red>
+         <green>0</green>
+         <blue>0</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="Button">
+       <brush brushstyle="SolidPattern">
+        <color alpha="0">
+         <red>235</red>
+         <green>0</green>
+         <blue>0</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="Light">
+       <brush brushstyle="SolidPattern">
+        <color alpha="0">
+         <red>255</red>
+         <green>97</green>
+         <blue>97</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="Midlight">
+       <brush brushstyle="SolidPattern">
+        <color alpha="0">
+         <red>245</red>
+         <green>48</green>
+         <blue>48</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="Dark">
+       <brush brushstyle="SolidPattern">
+        <color alpha="0">
+         <red>117</red>
+         <green>0</green>
+         <blue>0</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="Mid">
+       <brush brushstyle="SolidPattern">
+        <color alpha="0">
+         <red>157</red>
+         <green>0</green>
+         <blue>0</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="Text">
+       <brush brushstyle="SolidPattern">
+        <color alpha="255">
+         <red>0</red>
+         <green>0</green>
+         <blue>0</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="BrightText">
+       <brush brushstyle="SolidPattern">
+        <color alpha="255">
+         <red>255</red>
+         <green>255</green>
+         <blue>255</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="ButtonText">
+       <brush brushstyle="SolidPattern">
+        <color alpha="255">
+         <red>0</red>
+         <green>0</green>
+         <blue>0</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="Base">
+       <brush brushstyle="SolidPattern">
+        <color alpha="255">
+         <red>255</red>
+         <green>255</green>
+         <blue>255</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="Window">
+       <brush brushstyle="SolidPattern">
+        <color alpha="0">
+         <red>235</red>
+         <green>0</green>
+         <blue>0</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="Shadow">
+       <brush brushstyle="SolidPattern">
+        <color alpha="255">
+         <red>0</red>
+         <green>0</green>
+         <blue>0</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="AlternateBase">
+       <brush brushstyle="SolidPattern">
+        <color alpha="127">
+         <red>245</red>
+         <green>127</green>
+         <blue>127</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="ToolTipBase">
+       <brush brushstyle="SolidPattern">
+        <color alpha="255">
+         <red>255</red>
+         <green>255</green>
+         <blue>220</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="ToolTipText">
+       <brush brushstyle="SolidPattern">
+        <color alpha="255">
+         <red>0</red>
+         <green>0</green>
+         <blue>0</blue>
+        </color>
+       </brush>
+      </colorrole>
+     </inactive>
+     <disabled>
+      <colorrole role="WindowText">
+       <brush brushstyle="SolidPattern">
+        <color alpha="0">
+         <red>117</red>
+         <green>0</green>
+         <blue>0</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="Button">
+       <brush brushstyle="SolidPattern">
+        <color alpha="0">
+         <red>235</red>
+         <green>0</green>
+         <blue>0</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="Light">
+       <brush brushstyle="SolidPattern">
+        <color alpha="0">
+         <red>255</red>
+         <green>97</green>
+         <blue>97</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="Midlight">
+       <brush brushstyle="SolidPattern">
+        <color alpha="0">
+         <red>245</red>
+         <green>48</green>
+         <blue>48</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="Dark">
+       <brush brushstyle="SolidPattern">
+        <color alpha="0">
+         <red>117</red>
+         <green>0</green>
+         <blue>0</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="Mid">
+       <brush brushstyle="SolidPattern">
+        <color alpha="0">
+         <red>157</red>
+         <green>0</green>
+         <blue>0</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="Text">
+       <brush brushstyle="SolidPattern">
+        <color alpha="0">
+         <red>117</red>
+         <green>0</green>
+         <blue>0</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="BrightText">
+       <brush brushstyle="SolidPattern">
+        <color alpha="255">
+         <red>255</red>
+         <green>255</green>
+         <blue>255</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="ButtonText">
+       <brush brushstyle="SolidPattern">
+        <color alpha="0">
+         <red>117</red>
+         <green>0</green>
+         <blue>0</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="Base">
+       <brush brushstyle="SolidPattern">
+        <color alpha="0">
+         <red>235</red>
+         <green>0</green>
+         <blue>0</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="Window">
+       <brush brushstyle="SolidPattern">
+        <color alpha="0">
+         <red>235</red>
+         <green>0</green>
+         <blue>0</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="Shadow">
+       <brush brushstyle="SolidPattern">
+        <color alpha="255">
+         <red>0</red>
+         <green>0</green>
+         <blue>0</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="AlternateBase">
+       <brush brushstyle="SolidPattern">
+        <color alpha="0">
+         <red>235</red>
+         <green>0</green>
+         <blue>0</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="ToolTipBase">
+       <brush brushstyle="SolidPattern">
+        <color alpha="255">
+         <red>255</red>
+         <green>255</green>
+         <blue>220</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="ToolTipText">
+       <brush brushstyle="SolidPattern">
+        <color alpha="255">
+         <red>0</red>
+         <green>0</green>
+         <blue>0</blue>
+        </color>
+       </brush>
+      </colorrole>
+     </disabled>
+    </palette>
+   </property>
+   <property name="autoFillBackground">
+    <bool>true</bool>
+   </property>
+   <property name="object" stdset="0">
+    <string>foot_R0_bk1_ctl</string>
+   </property>
+  </widget>
+  <widget class="SelectBtn_RIkCircle" name="foot_L0_bk1_ctl">
+   <property name="geometry">
+    <rect>
+     <x>240</x>
+     <y>490</y>
+     <width>16</width>
+     <height>16</height>
+    </rect>
+   </property>
+   <property name="palette">
+    <palette>
+     <active>
+      <colorrole role="WindowText">
+       <brush brushstyle="SolidPattern">
+        <color alpha="255">
+         <red>0</red>
+         <green>0</green>
+         <blue>0</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="Button">
+       <brush brushstyle="SolidPattern">
+        <color alpha="0">
+         <red>235</red>
+         <green>0</green>
+         <blue>0</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="Light">
+       <brush brushstyle="SolidPattern">
+        <color alpha="0">
+         <red>255</red>
+         <green>97</green>
+         <blue>97</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="Midlight">
+       <brush brushstyle="SolidPattern">
+        <color alpha="0">
+         <red>245</red>
+         <green>48</green>
+         <blue>48</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="Dark">
+       <brush brushstyle="SolidPattern">
+        <color alpha="0">
+         <red>117</red>
+         <green>0</green>
+         <blue>0</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="Mid">
+       <brush brushstyle="SolidPattern">
+        <color alpha="0">
+         <red>157</red>
+         <green>0</green>
+         <blue>0</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="Text">
+       <brush brushstyle="SolidPattern">
+        <color alpha="255">
+         <red>0</red>
+         <green>0</green>
+         <blue>0</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="BrightText">
+       <brush brushstyle="SolidPattern">
+        <color alpha="255">
+         <red>255</red>
+         <green>255</green>
+         <blue>255</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="ButtonText">
+       <brush brushstyle="SolidPattern">
+        <color alpha="255">
+         <red>0</red>
+         <green>0</green>
+         <blue>0</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="Base">
+       <brush brushstyle="SolidPattern">
+        <color alpha="255">
+         <red>255</red>
+         <green>255</green>
+         <blue>255</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="Window">
+       <brush brushstyle="SolidPattern">
+        <color alpha="0">
+         <red>235</red>
+         <green>0</green>
+         <blue>0</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="Shadow">
+       <brush brushstyle="SolidPattern">
+        <color alpha="255">
+         <red>0</red>
+         <green>0</green>
+         <blue>0</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="AlternateBase">
+       <brush brushstyle="SolidPattern">
+        <color alpha="127">
+         <red>245</red>
+         <green>127</green>
+         <blue>127</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="ToolTipBase">
+       <brush brushstyle="SolidPattern">
+        <color alpha="255">
+         <red>255</red>
+         <green>255</green>
+         <blue>220</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="ToolTipText">
+       <brush brushstyle="SolidPattern">
+        <color alpha="255">
+         <red>0</red>
+         <green>0</green>
+         <blue>0</blue>
+        </color>
+       </brush>
+      </colorrole>
+     </active>
+     <inactive>
+      <colorrole role="WindowText">
+       <brush brushstyle="SolidPattern">
+        <color alpha="255">
+         <red>0</red>
+         <green>0</green>
+         <blue>0</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="Button">
+       <brush brushstyle="SolidPattern">
+        <color alpha="0">
+         <red>235</red>
+         <green>0</green>
+         <blue>0</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="Light">
+       <brush brushstyle="SolidPattern">
+        <color alpha="0">
+         <red>255</red>
+         <green>97</green>
+         <blue>97</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="Midlight">
+       <brush brushstyle="SolidPattern">
+        <color alpha="0">
+         <red>245</red>
+         <green>48</green>
+         <blue>48</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="Dark">
+       <brush brushstyle="SolidPattern">
+        <color alpha="0">
+         <red>117</red>
+         <green>0</green>
+         <blue>0</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="Mid">
+       <brush brushstyle="SolidPattern">
+        <color alpha="0">
+         <red>157</red>
+         <green>0</green>
+         <blue>0</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="Text">
+       <brush brushstyle="SolidPattern">
+        <color alpha="255">
+         <red>0</red>
+         <green>0</green>
+         <blue>0</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="BrightText">
+       <brush brushstyle="SolidPattern">
+        <color alpha="255">
+         <red>255</red>
+         <green>255</green>
+         <blue>255</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="ButtonText">
+       <brush brushstyle="SolidPattern">
+        <color alpha="255">
+         <red>0</red>
+         <green>0</green>
+         <blue>0</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="Base">
+       <brush brushstyle="SolidPattern">
+        <color alpha="255">
+         <red>255</red>
+         <green>255</green>
+         <blue>255</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="Window">
+       <brush brushstyle="SolidPattern">
+        <color alpha="0">
+         <red>235</red>
+         <green>0</green>
+         <blue>0</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="Shadow">
+       <brush brushstyle="SolidPattern">
+        <color alpha="255">
+         <red>0</red>
+         <green>0</green>
+         <blue>0</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="AlternateBase">
+       <brush brushstyle="SolidPattern">
+        <color alpha="127">
+         <red>245</red>
+         <green>127</green>
+         <blue>127</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="ToolTipBase">
+       <brush brushstyle="SolidPattern">
+        <color alpha="255">
+         <red>255</red>
+         <green>255</green>
+         <blue>220</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="ToolTipText">
+       <brush brushstyle="SolidPattern">
+        <color alpha="255">
+         <red>0</red>
+         <green>0</green>
+         <blue>0</blue>
+        </color>
+       </brush>
+      </colorrole>
+     </inactive>
+     <disabled>
+      <colorrole role="WindowText">
+       <brush brushstyle="SolidPattern">
+        <color alpha="0">
+         <red>117</red>
+         <green>0</green>
+         <blue>0</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="Button">
+       <brush brushstyle="SolidPattern">
+        <color alpha="0">
+         <red>235</red>
+         <green>0</green>
+         <blue>0</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="Light">
+       <brush brushstyle="SolidPattern">
+        <color alpha="0">
+         <red>255</red>
+         <green>97</green>
+         <blue>97</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="Midlight">
+       <brush brushstyle="SolidPattern">
+        <color alpha="0">
+         <red>245</red>
+         <green>48</green>
+         <blue>48</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="Dark">
+       <brush brushstyle="SolidPattern">
+        <color alpha="0">
+         <red>117</red>
+         <green>0</green>
+         <blue>0</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="Mid">
+       <brush brushstyle="SolidPattern">
+        <color alpha="0">
+         <red>157</red>
+         <green>0</green>
+         <blue>0</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="Text">
+       <brush brushstyle="SolidPattern">
+        <color alpha="0">
+         <red>117</red>
+         <green>0</green>
+         <blue>0</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="BrightText">
+       <brush brushstyle="SolidPattern">
+        <color alpha="255">
+         <red>255</red>
+         <green>255</green>
+         <blue>255</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="ButtonText">
+       <brush brushstyle="SolidPattern">
+        <color alpha="0">
+         <red>117</red>
+         <green>0</green>
+         <blue>0</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="Base">
+       <brush brushstyle="SolidPattern">
+        <color alpha="0">
+         <red>235</red>
+         <green>0</green>
+         <blue>0</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="Window">
+       <brush brushstyle="SolidPattern">
+        <color alpha="0">
+         <red>235</red>
+         <green>0</green>
+         <blue>0</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="Shadow">
+       <brush brushstyle="SolidPattern">
+        <color alpha="255">
+         <red>0</red>
+         <green>0</green>
+         <blue>0</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="AlternateBase">
+       <brush brushstyle="SolidPattern">
+        <color alpha="0">
+         <red>235</red>
+         <green>0</green>
+         <blue>0</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="ToolTipBase">
+       <brush brushstyle="SolidPattern">
+        <color alpha="255">
+         <red>255</red>
+         <green>255</green>
+         <blue>220</blue>
+        </color>
+       </brush>
+      </colorrole>
+      <colorrole role="ToolTipText">
+       <brush brushstyle="SolidPattern">
+        <color alpha="255">
+         <red>0</red>
+         <green>0</green>
+         <blue>0</blue>
+        </color>
+       </brush>
+      </colorrole>
+     </disabled>
+    </palette>
+   </property>
+   <property name="autoFillBackground">
+    <bool>true</bool>
+   </property>
+   <property name="object" stdset="0">
+    <string>foot_L0_bk1_ctl</string>
+   </property>
+  </widget>
   <zorder>img_background</zorder>
   <zorder>b_selD</zorder>
   <zorder>b_selE</zorder>
@@ -59308,35 +60176,37 @@
   <zorder>b_toggleVisibility</zorder>
   <zorder>w_spine_C0_fk_hip_ctl</zorder>
   <zorder>w_spine_C0_fk3_ctl</zorder>
+  <zorder>foot_R0_bk1_ctl</zorder>
+  <zorder>foot_L0_bk1_ctl</zorder>
  </widget>
  <customwidgets>
   <customwidget>
    <class>SelectBtn_RFkBox</class>
-   <extends>QWidget</extends>
+   <extends>QPushButton</extends>
    <header>mgear.synoptic.widgets</header>
    <container>1</container>
   </customwidget>
   <customwidget>
    <class>SelectBtn_LFkBox</class>
-   <extends>QWidget</extends>
+   <extends>QPushButton</extends>
    <header>mgear.synoptic.widgets</header>
    <container>1</container>
   </customwidget>
   <customwidget>
    <class>SelectBtn_RIkBox</class>
-   <extends>QWidget</extends>
+   <extends>QPushButton</extends>
    <header>mgear.synoptic.widgets</header>
    <container>1</container>
   </customwidget>
   <customwidget>
    <class>SelectBtn_yellowBox</class>
-   <extends>QWidget</extends>
+   <extends>QPushButton</extends>
    <header>mgear.synoptic.widgets</header>
    <container>1</container>
   </customwidget>
   <customwidget>
    <class>SelectBtn_RIkCircle</class>
-   <extends>QWidget</extends>
+   <extends>QPushButton</extends>
    <header>mgear.synoptic.widgets</header>
    <container>1</container>
   </customwidget>
@@ -59362,7 +60232,7 @@
   </customwidget>
   <customwidget>
    <class>SelectBtn_greenCircle</class>
-   <extends>QWidget</extends>
+   <extends>QPushButton</extends>
    <header>mgear.synoptic.widgets</header>
    <container>1</container>
   </customwidget>
@@ -59378,31 +60248,31 @@
   </customwidget>
   <customwidget>
    <class>SelectBtn_darkGreenBox</class>
-   <extends>QWidget</extends>
+   <extends>QPushButton</extends>
    <header>mgear.synoptic.widgets</header>
    <container>1</container>
   </customwidget>
   <customwidget>
    <class>SelectBtn_redCircle</class>
-   <extends>QWidget</extends>
+   <extends>QPushButton</extends>
    <header>mgear.synoptic.widgets</header>
    <container>1</container>
   </customwidget>
   <customwidget>
    <class>SelectBtn_yellowOutlineBox</class>
-   <extends>QWidget</extends>
+   <extends>QPushButton</extends>
    <header>mgear.synoptic.widgets</header>
    <container>1</container>
   </customwidget>
   <customwidget>
    <class>SelectBtn_greenBox</class>
-   <extends>QWidget</extends>
+   <extends>QPushButton</extends>
    <header>mgear.synoptic.widgets</header>
    <container>1</container>
   </customwidget>
   <customwidget>
    <class>SelectBtn_yellowCircle</class>
-   <extends>QWidget</extends>
+   <extends>QPushButton</extends>
    <header>mgear.synoptic.widgets</header>
    <container>1</container>
   </customwidget>
