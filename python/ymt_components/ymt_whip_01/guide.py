@@ -86,6 +86,7 @@ class Guide(guide.ComponentGuide):
         self.pIk0RefArray = self.addParam("ik0refarray", "string", "")
         self.pIk1RefArray = self.addParam("ik1refarray", "string", "")
         self.pSplitHip = self.addParam("isPlanetaryIkBindToGlobal", "bool", True)
+        self.pAimTip = self.addParam("isUpvectorAimToTip", "bool", False)
         self.pPosition = self.addParam("position", "double", 0, 0, 1)
         self.pMaxStretch = self.addParam("maxstretch", "double", 1, 1)
         self.pMaxSquash = self.addParam("maxsquash", "double", 1, 0, 1)
@@ -240,6 +241,8 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
                            "isBoundFkToCurve")
         self.populateCheck(self.settingsTab.isPlanetaryIkBindToGlobal_checkBox,
                            "isPlanetaryIkBindToGlobal")
+        self.populateCheck(self.settingsTab.isUpvectorAimToTip_checkBox,
+                           "isUpvectorAimToTip")
         self.settingsTab.masterLocal_lineEdit.setText(
             self.root.attr("masterChainLocal").get())
         self.settingsTab.masterGlobal_lineEdit.setText(
@@ -342,6 +345,11 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
             partial(self.updateCheck,
                     self.settingsTab.isPlanetaryIkBindToGlobal_checkBox,
                     "isPlanetaryIkBindToGlobal"))
+
+        self.settingsTab.isUpvectorAimToTip_checkBox.stateChanged.connect(
+            partial(self.updateCheck,
+                    self.settingsTab.isUpvectorAimToTip_checkBox,
+                    "isUpvectorAimToTip"))
 
         self.settingsTab.ikProfile_pushButton.clicked.connect(
             self.setProfile)

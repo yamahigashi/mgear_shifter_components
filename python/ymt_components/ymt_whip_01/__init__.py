@@ -639,13 +639,32 @@ class Component(component.Main):
             self.addOperatorsNotGlobalMaster()
 
         pm.parentConstraint(self.ik_ctl[0], self.aim_npo, mo=True, skipRotate=("x", "y", "z"))
-        aim = pm.aimConstraint(self.ik_ctl[-1],
-                               self.aim_npo,
-                               mo=True,
-                               worldUpType="objectrotation",
-                               worldUpObject=self.root,
-                               worldUpVector=(-1.0, 0., 0.)
-                               )
+
+        if False or self.settings["isUpvectorAimToTip"]:
+            aimv = (0., 1., 0.)
+            upv = (0., 1., 0.)
+
+            _bx = abs(self.guide.blades["blade"].y[0])
+            _by = abs(self.guide.blades["blade"].y[1])
+            _bz = abs(self.guide.blades["blade"].y[2])
+            _bmax = max(_bx, _by, _bz)
+
+            if _bmax == _bx:
+                aimv = (1., 0., 0.)
+            elif _bmax == _by:
+                aimv = (0., 1., 0.)
+            elif _bmax == _bz:
+                aimv = (0., 0., 1.)
+
+            aim = pm.aimConstraint(self.ik_ctl[-1],
+                                   self.aim_npo,
+                                   mo=True,
+                                   aimVector=aimv,
+                                   upVector=upv,
+                                   worldUpType="objectrotation",
+                                   worldUpObject=self.root,
+                                   worldUpVector=(-1.0, 0., 0.)
+                                   )
         # pm.setAttr(aim + ".upVectorX", 0)
         # pm.setAttr(aim + ".upVectorY", 1)
         # pm.setAttr(aim + ".upVectorZ", 0)
@@ -1160,7 +1179,7 @@ class Component(component.Main):
 
         if self.settings["isPlanetaryIkBindToGlobal"]:
             for i in range(2, self.settings["ikNb"] - 1):
-                self.connectRef(self.settings["ik1refarray"], self.ik_npo[i])
+                self.connectRef(self.settings["ik0refarray"], self.ik_npo[i])
 
         self.mst_crv.setAttr("visibility", False)
         self.slv_crv.setAttr("visibility", False)
@@ -1297,24 +1316,12 @@ def create_exprespy_node(func, name, rewrite_map, additional_code=None):
     return exp_node
 
 
+def get_nearest_axis_orient(a, b):
+    # returns normalized axis of orientation of a to b
+    ta = getTransform(a)
+    tb = getTransform(b)
+    tb - ta
+
+
 if __name__ == "__main__":
-    import maya.cmds as cmds
-    import ymt_spine_ik_01 as m
-    reload(m)
-    try:
-        cmds.delete("rig")
-
-    except Exception:
-        pass
-    try:
-        cmds.select("guide")
-
-    except Exception:
-        pass
-    try:
-
-        import mgear.shifter.guide_manager as gm
-        gm.build_from_selection()
-
-    except Exception:
-        pass
+    pass
