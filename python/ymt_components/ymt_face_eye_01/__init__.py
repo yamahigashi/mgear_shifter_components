@@ -105,11 +105,20 @@ class Component(component.Main):
             self.mirror_conf = [0, 0, 0,
                                 0, 0, 0,
                                 0, 0, 0]
+
+        # -------------------------------------------------------
+        self.inPos = self.guide.apos[-5]
+        self.outPos = self.guide.apos[-4]
+        self.upPos = self.guide.apos[-3]
+        self.lowPos = self.guide.apos[-2]
+        self.frontPos = self.guide.apos[-1]
+        self.rootPos = self.guide.apos[0]
+
         # -------------------------------------------------------
         self.ctlName = "ctl"
-        self.offset = 0.05
-        self.blinkH = 0.020
-        self.upperVTrack = 0.02
+        self.offset = (self.frontPos - self.rootPos) * 0.3
+        self.blinkH = 0.2
+        self.upperVTrack = 0.04
         self.upperHTrack = 0.01
         self.lowerVTrack = 0.02
         self.lowerHTrack = 0.01
@@ -147,11 +156,9 @@ class Component(component.Main):
         self.num_uplocs = self.getNumberOfLocators("_uploc")
         self.num_lowlocs = self.getNumberOfLocators("_lowloc")
 
-        self.eyeCrv_root = addTransform(self.root, self.getName("crvs"))
-
         self.guide.eyeMesh = self.guide.getObjects(self.guide.root)["eyeMesh"]
 
-        self.addCurve(self.eyeCrv_root)
+        self.addCurve()
         self.addControllers()
 
     def getNumberOfLocators(self, query):
@@ -173,11 +180,21 @@ class Component(component.Main):
         positions.append(self.guide.apos[-4])
         positions.extend(reversed(self.guide.apos[self.num_uplocs + 1:-5]))
 
-        # mgear_util.draw_eye_guide_mesh_plane(joint_points)
-        return draw_eye_guide_mesh_plane(positions)
+        return draw_eye_guide_mesh_plane(positions, self.root)
+        # return mgear_util.draw_eye_guide_mesh_plane(joint_points)
+
+    def addCurve(self):
+
+        t = getTransform(self.root)
+        crv_root = addTransform(self.root, self.getName("crvs"), t)
+
+        plane = self.addDummyPlane()
+        self.addCurves(crv_root, plane)
+        pm.delete(pm.PyNode(plane.name()))
 
     def addCurves(self, crv_root, plane):
 
+        t = getTransform(self.root)
         gen = curve.createCurveFromOrderedEdges
         gen2 = curve.createCurveFromCurve
         planeNode = pm.PyNode(plane.fullPathName())
@@ -189,8 +206,8 @@ class Component(component.Main):
         edgeList = [pm.PyNode(x) for x in edgeList]
 
         # upEyelid = meshNavigation.edgeRangeInLoopFromMid(edgeList, upPos, inPos, outPos)
-        self.upCrv = gen(edgeList, planeNode.verts[1], self.getName("upperEyelid"), parent=crv_root)
-        self.upCrv_ctl = gen(edgeList, planeNode.verts[1], self.getName("upCtl_crv"), parent=crv_root)
+        self.upCrv = gen(edgeList, planeNode.verts[1], self.getName("upperEyelid"), parent=crv_root, m=t)
+        self.upCrv_ctl = gen(edgeList, planeNode.verts[1], self.getName("upCtl_crv"), parent=crv_root, m=t)
         pm.rebuildCurve(self.upCrv_ctl, s=2, rt=0, rpo=True, ch=False)
 
         # -------------------------------------------------------------------
@@ -199,8 +216,8 @@ class Component(component.Main):
             edgeList.append("{}.e[{}]".format(plane.fullPathName(), i * 2 + 1))
         edgeList = [pm.PyNode(x) for x in edgeList]
 
-        self.lowCrv = gen(edgeList, planeNode.verts[1], self.getName("lowerEyelid"), parent=crv_root)
-        self.lowCrv_ctl = gen(edgeList, planeNode.verts[1], self.getName("lowCtl_crv"), parent=crv_root)
+        self.lowCrv = gen(edgeList, planeNode.verts[1], self.getName("lowerEyelid"), parent=crv_root, m=t)
+        self.lowCrv_ctl = gen(edgeList, planeNode.verts[1], self.getName("lowCtl_crv"), parent=crv_root, m=t)
         pm.rebuildCurve(self.lowCrv_ctl, s=2, rt=0, rpo=True, ch=False)
 
         # -------------------------------------------------------------------
@@ -226,12 +243,6 @@ class Component(component.Main):
         for crv in rigCrvs:
             crv.attr("visibility").set(False)
 
-    def addCurve(self, crv_root):
-
-        plane = self.addDummyPlane()
-        self.addCurves(crv_root, plane)
-        pm.delete(pm.PyNode(plane.name()))
-
     def getBboxRadius(self):
         # localBBOX
 
@@ -242,25 +253,30 @@ class Component(component.Main):
         return wRadius, dRadius
 
     def addControllers(self):
-        axis = "z-x"
+        axis = "zy"
 
         inPos = self.guide.apos[-5]
         outPos = self.guide.apos[-4]
         upPos = self.guide.apos[-3]
         lowPos = self.guide.apos[-2]
+        frontPos = self.guide.apos[-1]
 
         self.bboxCenter = meshNavigation.bboxCenter(self.guide.eyeMesh)
-        # averagePosition = ((upPos + lowPos + inPos + outPos) / 4)
+        averagePosition = ((upPos + lowPos + inPos + outPos) / 4)
 
-        normalPos = outPos
-        normalVec = self.bboxCenter - normalPos
+        # normalPos = outPos
+        normalVec = upPos - lowPos
 
         t = transform.getTransformLookingAt(
-            self.bboxCenter,
-            self.guide.apos[-1],
+            self.root.getTranslation(space="world"),
+            # self.bboxCenter,
+            frontPos,
             normalVec,
             axis=axis,
             negate=self.negate)
+
+        # averagePosition,
+        t_arrow = setMatrixPosition(t, self.bboxCenter)
 
         self.eyeTargets_root = addTransform(self.root, self.getName("targets"), t)
         self.jnt_root = primitive.addTransformFromPos(self.root, self.getName("joints"), pos=self.bboxCenter)
@@ -272,7 +288,7 @@ class Component(component.Main):
         #     deformers_group.addChild(jnt_root)
 
         self.addOverControllers(t)
-        self.addLookAtControlers(t, self.bboxCenter, self.guide.apos[-1], upPos)
+        self.addLookAtControlers(t, t_arrow)
         self.addAimControllers(t)
         self.addCurveControllers(t)
         self.addCurveJoints(t)
@@ -289,7 +305,7 @@ class Component(component.Main):
                                     w=self.getBboxRadius()[0],
                                     d=self.getBboxRadius()[1],
                                     ro=datatypes.Vector(1.57079633, 0, 0),
-                                    # po=datatypes.Vector(0, 0, over_offset),
+                                    po=self.offset,
                                     )
 
         if self.negate:
@@ -304,45 +320,40 @@ class Component(component.Main):
             self.over_ctl,
             params=["tx", "ty", "tz", "ro", "rx", "ry", "rz", "sx", "sy", "sz"])
 
-    def addLookAtControlers(self, t, rotCenter, lookat, upPos):
-        self.center_lookat = addTransform(self.over_ctl, self.getName("center_lookat"), t)
+    def addLookAtControlers(self, t_root, t_look):
+        self.center_lookat = addTransform(self.over_ctl, self.getName("center_lookat"), t_root)
 
         # Tracking
         # Eye aim control
-        self.t_arrow = transform.getTransformLookingAt(rotCenter, lookat, upPos, axis="zy", negate=False)
 
         radius = abs(self.getBboxRadius()[0] / 1.7)
 
-        self.arrow_npo = addTransform(self.root, self.getName("aim_npo"), self.t_arrow)
+        self.arrow_npo = addTransform(self.root, self.getName("aim_npo"), t_look)
         self.arrow_ctl = self.addCtl(
             self.arrow_npo,
             self.getName("aim_%s" % self.ctlName),
-            self.t_arrow,
+            t_look,
             self.color_ik,
             "arrow",
             w=1,
-            po=datatypes.Vector(0, 0, radius),
+            po=datatypes.Vector(0, 0, radius) + self.offset,
         )
 
         attribute.setKeyableAttributes(self.arrow_ctl, params=["rx", "ry", "rz"])
         # self.addAnimParam(self.arrow_ctl, "isCtl", "bool", keyable=False)
 
     def addAimControllers(self, t):
-        # tracking custom trigger
-        if self.negate:
-            tt = self.t_arrow
-        else:
-            tt = t
 
-        aimTrigger_root = addTransform(self.center_lookat, self.getName("aimTrigger_root"), tt)
+        # tracking custom trigger
+        aimTrigger_root = addTransform(self.center_lookat, self.getName("aimTrigger_root"), t)
         # For some unknown reason the right side gets scewed rotation values
         resetTransform(aimTrigger_root)
-        aimTrigger_lvl = addTransform(aimTrigger_root, self.getName("aimTrigger_lvl"), tt)
+        aimTrigger_lvl = addTransform(aimTrigger_root, self.getName("aimTrigger_lvl"), t)
 
         # For some unknown reason the right side gets scewed rotation values
         resetTransform(aimTrigger_lvl)
         aimTrigger_lvl.attr("tz").set(1.0)
-        self.aimTrigger_ref = addTransform(aimTrigger_lvl, self.getName("self.aimTrigger_ref"), tt)
+        self.aimTrigger_ref = addTransform(aimTrigger_lvl, self.getName("self.aimTrigger_ref"), t)
 
         # For some unknown reason the right side gets scewed rotation values
         resetTransform(self.aimTrigger_ref)
@@ -378,12 +389,14 @@ class Component(component.Main):
             if utils.is_odd(i):
                 color = 14
                 wd = .5
+                offset = self.offset * 1.1
                 icon_shape = "circle"
                 params = ["tx", "ty", "tz"]
 
             else:
                 color = 4
                 wd = .7
+                offset = self.offset * 1.3
                 icon_shape = "square"
                 params = ["tx", "ty", "tz", "ro", "rx", "ry", "rz", "sx", "sy", "sz"]
 
@@ -404,7 +417,7 @@ class Component(component.Main):
                               w=wd,
                               d=wd,
                               ro=datatypes.Vector(1.57079633, 0, 0),
-                              po=datatypes.Vector(0, 0, self.offset),
+                              po=offset
                               )
 
             attribute.setKeyableAttributes(ctl, params)
@@ -436,6 +449,11 @@ class Component(component.Main):
             cvs = [cv for cv in reversed(cvs)]
 
         # aim constrain targets and joints
+        icon_shape = "sphere"
+        color = 4
+        wd = .3
+        offset = self.offset * 0.3
+
         for i, cv in enumerate(cvs):
 
             # aim targets
@@ -452,15 +470,22 @@ class Component(component.Main):
             applyop.aimCns(npo, trn, axis="zy", wupObject=self.jnt_root)
 
             ctl_name = self.getName("crvdetail%s_%s" % (i, self.ctlName))
-            icon_shape = "square"
-            color = 4
-            wd = .3
             xform = setMatrixPosition(t, cv)
-            ctl = self.addCtl(npo, ctl_name, xform, color, icon_shape, w=wd, d=wd, ro=datatypes.Vector(1.57079633, 0, 0), po=datatypes.Vector(0, 0, self.offset))
+            ctl = self.addCtl(
+                npo,
+                ctl_name,
+                xform,
+                color,
+                icon_shape,
+                w=wd,
+                d=wd,
+                ro=datatypes.Vector(1.57079633, 0, 0),
+                po=offset
+            )
 
             controls.append(ctl)
 
-            jnt_name = self.getName("{}_jnt{}".format(name, i))
+            jnt_name = "{}{}".format(name, i)
             self.jnt_pos.append([ctl, jnt_name])
 
         return controls
@@ -681,10 +706,13 @@ class Component(component.Main):
         # self.relatives["root"] = self.fk_ctl[0]
 
 
-def draw_eye_guide_mesh_plane(points):
-    # type: (Tuple[float, float, float]) -> om.MFnMesh
+def draw_eye_guide_mesh_plane(points, t):
+    # type: (Tuple[float, float, float], datatypes.MMatrix) -> om.MFnMesh
 
     mesh = om.MFnMesh()
+
+    points = [x - t.getTranslation(space="world") for x in points]
+    # points = [x - t.getTranslation(space="world") for x in points]
 
     mean_x = sum(p[0] for p in points) / len(points)
     mean_y = sum(p[1] for p in points) / len(points)
@@ -716,7 +744,13 @@ def draw_eye_guide_mesh_plane(points):
             polygonConnects.append(i + 1)
             polygonConnects.append(0)
 
-    mesh.create(vertices, polygonCounts, polygonConnects)
+    mesh_obj = mesh.create(vertices, polygonCounts, polygonConnects)
+    return mesh
+    mesh_trans = om.MFnTransform(mesh_obj)
+    n = pm.PyNode(mesh_trans.name())
+    v = t.getTranslation(space="world")
+    n.setTranslation(v, om.MSpace.kWorld)
+
     return mesh
 
 

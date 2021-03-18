@@ -12,7 +12,7 @@ from mgear.core import transform
 # from mgear.core.transform import getTransformLookingAt
 # from mgear.core.transform import getChainTransform2
 # from mgear.core.transform import setMatrixPosition
-# from mgear.core.primitive import addTransform
+from mgear.core.primitive import addTransform
 
 
 from maya.app.general.mayaMixin import MayaQWidgetDockableMixin
@@ -99,7 +99,7 @@ class Guide(guide.ComponentGuide):
 
         v = transform.getOffsetPosition(self.root, [0, 0.0000001, 2.5])
         self.tan = self.addLoc("tan", self.root, v)
-        self.blade = self.addBlade("blade", self.eyeMesh, self.tan)
+        self.blade = self.addBlade("blade", self.root, self.tan)
 
     def addParameters(self):
         """Add the configurations settings"""
