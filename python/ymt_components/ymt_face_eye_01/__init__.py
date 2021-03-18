@@ -86,7 +86,6 @@ class Component(component.Main):
     # =====================================================
     def addObjects(self):
         """Add all the objects needed to create the component."""
-        self.divisions = len(self.guide.apos)
 
         self.normal = self.guide.blades["blade"].z * -1.
         self.binormal = self.guide.blades["blade"].x
@@ -107,6 +106,10 @@ class Component(component.Main):
                                 0, 0, 0]
 
         # -------------------------------------------------------
+
+        self.num_uplocs = self.getNumberOfLocators("_uploc")
+        self.num_lowlocs = self.getNumberOfLocators("_lowloc")
+
         self.inPos = self.guide.apos[-5]
         self.outPos = self.guide.apos[-4]
         self.upPos = self.guide.apos[-3]
@@ -114,9 +117,16 @@ class Component(component.Main):
         self.frontPos = self.guide.apos[-1]
         self.rootPos = self.guide.apos[0]
 
+        self.uplocsPos = self.guide.apos[2:self.num_uplocs + 2]
+        self.lowlocsPos = self.guide.apos[2 + self.num_uplocs:-5]
+
+        self.offset = (self.frontPos - self.rootPos) * 0.3
+        if self.negate:
+            pass
+            # self.offset[2] = self.offset[2] * -1.0
+
         # -------------------------------------------------------
         self.ctlName = "ctl"
-        self.offset = (self.frontPos - self.rootPos) * 0.3
         self.blinkH = 0.2
         self.upperVTrack = 0.04
         self.upperHTrack = 0.01
@@ -152,10 +162,6 @@ class Component(component.Main):
         self.midTargetLower = None
 
         self.previusTag = self.parentCtlTag
-
-        self.num_uplocs = self.getNumberOfLocators("_uploc")
-        self.num_lowlocs = self.getNumberOfLocators("_lowloc")
-
         self.guide.eyeMesh = self.guide.getObjects(self.guide.root)["eyeMesh"]
 
         self.addCurve()
@@ -175,10 +181,10 @@ class Component(component.Main):
     def addDummyPlane(self):
         # type: () -> om.MFnMesh
 
-        positions = [self.guide.apos[-5]]
-        positions.extend(self.guide.apos[1:self.num_uplocs + 1])
-        positions.append(self.guide.apos[-4])
-        positions.extend(reversed(self.guide.apos[self.num_uplocs + 1:-5]))
+        positions = [self.inPos]
+        positions.extend(self.uplocsPos)
+        positions.append(self.outPos)
+        positions.extend(reversed(self.lowlocsPos))
 
         return draw_eye_guide_mesh_plane(positions, self.root)
         # return mgear_util.draw_eye_guide_mesh_plane(joint_points)
@@ -266,6 +272,9 @@ class Component(component.Main):
 
         # normalPos = outPos
         normalVec = upPos - lowPos
+        if self.negate:
+            pass
+            # normalVec = normalVec * -1.0
 
         t = transform.getTransformLookingAt(
             self.root.getTranslation(space="world"),
@@ -273,7 +282,8 @@ class Component(component.Main):
             frontPos,
             normalVec,
             axis=axis,
-            negate=self.negate)
+            # negate=self.negate)
+        ) 
 
         # averagePosition,
         t_arrow = setMatrixPosition(t, self.bboxCenter)
@@ -309,9 +319,11 @@ class Component(component.Main):
                                     )
 
         if self.negate:
-            self.over_npo.attr("rx").set(self.over_npo.attr("rx").get() * -1)
-            self.over_npo.attr("ry").set(self.over_npo.attr("ry").get() + 180)
-            self.over_npo.attr("sz").set(-1)
+            # TODO: implement later
+            # self.over_npo.attr("rx").set(self.over_npo.attr("rx").get() * -1)
+            # self.over_npo.attr("ry").set(self.over_npo.attr("ry").get() + 180)
+            # self.over_npo.attr("sz").set(-1)
+            pass
 
         # node.add_controller_tag(over_ctl)
         # self.addAnimParam(over_ctl, "isCtl", "bool", keyable=False)
@@ -327,6 +339,16 @@ class Component(component.Main):
         # Eye aim control
 
         radius = abs(self.getBboxRadius()[0] / 1.7)
+        if True or not self.negate:
+            ro = datatypes.Vector(0, 0, 0)
+            po = datatypes.Vector(0, 0, radius) + self.offset
+        else:
+            ro = datatypes.Vector(math.pi, 0, 0)
+            po = datatypes.Vector(0, 0, radius * -1.0) + self.offset
+
+            addRot = datatypes.TransformationMatrix()
+            addRot.setRotation(0, math.pi / 2.0, 0)
+            t_look = t_look * addRot
 
         self.arrow_npo = addTransform(self.root, self.getName("aim_npo"), t_look)
         self.arrow_ctl = self.addCtl(
@@ -336,7 +358,8 @@ class Component(component.Main):
             self.color_ik,
             "arrow",
             w=1,
-            po=datatypes.Vector(0, 0, radius) + self.offset,
+            ro=ro,
+            po=po,
         )
 
         attribute.setKeyableAttributes(self.arrow_ctl, params=["rx", "ry", "rz"])
@@ -382,7 +405,8 @@ class Component(component.Main):
 
         cvs = crv.getCVs(space="world")
         if self.negate:
-            cvs = [cv for cv in reversed(cvs)]
+            # cvs = [cv for cv in reversed(cvs)]
+            pass
 
         ctls = []
         for i, cv in enumerate(cvs):
@@ -422,8 +446,9 @@ class Component(component.Main):
 
             attribute.setKeyableAttributes(ctl, params)
             if self.negate:
-                npoBase.attr("ry").set(180)
-                npoBase.attr("sz").set(-1)
+                pass
+                # npoBase.attr("ry").set(180)
+                # npoBase.attr("sz").set(-1)
 
             ctls.append(ctl)
 
@@ -446,7 +471,8 @@ class Component(component.Main):
         crv_info = node.createCurveInfoNode(crv)
 
         if self.negate:
-            cvs = [cv for cv in reversed(cvs)]
+            pass
+            # cvs = [cv for cv in reversed(cvs)]
 
         # aim constrain targets and joints
         icon_shape = "sphere"
@@ -588,7 +614,8 @@ class Component(component.Main):
 
         # Correct right side horizontal tracking
         if self.negate:
-            mult_node = node.createMulNode(mult_node.attr("outputX"), -1)
+            pass
+            # mult_node = node.createMulNode(mult_node.attr("outputX"), -1)
 
         pm.connectAttr(mult_node + ".outputX", self.trackLvl[0].attr("tx"))
 
@@ -598,7 +625,8 @@ class Component(component.Main):
 
         # Correct right side horizontal tracking
         if self.negate:
-            mult_node = node.createMulNode(mult_node.attr("outputX"), -1)
+            pass
+            # mult_node = node.createMulNode(mult_node.attr("outputX"), -1)
 
         pm.connectAttr(mult_node + ".outputX", self.trackLvl[1].attr("tx"))
 
