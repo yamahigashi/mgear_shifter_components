@@ -282,13 +282,17 @@ class Component(component.Main):
             frontPos,
             normalVec,
             axis=axis,
-            # negate=self.negate)
+            # negate=self.negate
         ) 
 
         # averagePosition,
         t_arrow = setMatrixPosition(t, self.bboxCenter)
 
         self.eyeTargets_root = addTransform(self.root, self.getName("targets"), t)
+        if self.negate:
+            # self.eyeTargets_root.attr("sx").set(-1.)
+            # self.eyeTargets_root.attr("sz").set(-1.)
+            pass
         self.jnt_root = primitive.addTransformFromPos(self.root, self.getName("joints"), pos=self.bboxCenter)
         # TODO: implement later
         # if deformers_group:
@@ -321,7 +325,7 @@ class Component(component.Main):
         if self.negate:
             # TODO: implement later
             # self.over_npo.attr("rx").set(self.over_npo.attr("rx").get() * -1)
-            # self.over_npo.attr("ry").set(self.over_npo.attr("ry").get() + 180)
+            # self.over_npo.attr("sx").set(-1)
             # self.over_npo.attr("sz").set(-1)
             pass
 
@@ -333,22 +337,19 @@ class Component(component.Main):
             params=["tx", "ty", "tz", "ro", "rx", "ry", "rz", "sx", "sy", "sz"])
 
     def addLookAtControlers(self, t_root, t_look):
-        self.center_lookat = addTransform(self.over_ctl, self.getName("center_lookat"), t_root)
-
         # Tracking
         # Eye aim control
+
+        self.center_lookat = addTransform(self.over_ctl, self.getName("center_lookat"), t_root)
 
         radius = abs(self.getBboxRadius()[0] / 1.7)
         if True or not self.negate:
             ro = datatypes.Vector(0, 0, 0)
             po = datatypes.Vector(0, 0, radius) + self.offset
+
         else:
             ro = datatypes.Vector(math.pi, 0, 0)
             po = datatypes.Vector(0, 0, radius * -1.0) + self.offset
-
-            addRot = datatypes.TransformationMatrix()
-            addRot.setRotation(0, math.pi / 2.0, 0)
-            t_look = t_look * addRot
 
         self.arrow_npo = addTransform(self.root, self.getName("aim_npo"), t_look)
         self.arrow_ctl = self.addCtl(
