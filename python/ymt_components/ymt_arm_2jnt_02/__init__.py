@@ -3,6 +3,7 @@
 ##########################################################
 
 # Maya
+import maya.cmds as cmds
 import pymel.core as pm
 
 # import maya.OpenMaya as om
@@ -13,6 +14,10 @@ import mgear.shifter_classic_components.arm_2jnt_04 as arm_2jnt_04
 import mgear.core.primitive as pri
 import mgear.core.attribute as att
 import mgear.core.transform as tra
+
+
+if False:
+    from typing import List, Tuple, Any
 
 
 ##########################################################
@@ -38,6 +43,11 @@ class Component(arm_2jnt_04.Component):
         else:
             self.fkref_att = self.addAnimEnumParam("fkref", "Fk Ref", 1, ref_names)
 
+        for x in self.fk_ctl:
+            att.setInvertMirror(x, ["tx", "ty", "tz"])
+
+        att.setInvertMirror(self.ik_ctl, ["tx", "ry", "rz"])
+
     def addOperators(self):
         super(Component, self).addOperators()
 
@@ -52,6 +62,58 @@ class Component(arm_2jnt_04.Component):
     def addConnection(self):
         self.connections["standard"] = self.connect_standard
         self.connections["ymt_shoulder_01"] = self.connect_ymt_shoulder
+
+    def connectRef(self, refArray, cns_obj, upVAttr=None, init_refNames=False):
+        """Connect the cns_obj to a multiple object using parentConstraint.
+
+        Args:
+            refArray (list of dagNode): List of driver objects
+            cns_obj (dagNode): The driven object.
+            upVAttr (bool): Set if the ref Array is for IK or Up vector
+        """
+        if not refArray:
+            return
+
+        if upVAttr and not init_refNames:
+            # we only can perform name validation if the init_refnames are
+            # provided in a separated list. This check ensures backwards
+            # copatibility
+            ref_names = refArray.split(",")
+        else:
+            ref_names = self.get_valid_ref_list(refArray.split(","))
+
+        if not ref_names:
+            # return if the not ref_names list
+            return
+
+        ref = []
+        for ref_name in ref_names:
+            ref.append(self.rig.findRelative(ref_name))
+
+        ref.append(cns_obj)
+        cns_node = pm.parentConstraint(*ref, maintainOffset=True)
+        cns_attr = pm.parentConstraint(
+            cns_node, query=True, weightAliasList=True)
+
+        # check if the ref Array is for IK or Up vector
+        try:
+            if upVAttr:
+                oAttr = self.upvref_att
+            else:
+                oAttr = self.ikref_att
+
+        except AttributeError:
+            oAttr = None
+
+        if oAttr:
+            for i, attr in enumerate(cns_attr):
+                node_name = pm.createNode("condition")
+                pm.connectAttr(oAttr, node_name + ".firstTerm")
+                pm.setAttr(node_name + ".secondTerm", i)
+                pm.setAttr(node_name + ".operation", 0)
+                pm.setAttr(node_name + ".colorIfTrueR", 1)
+                pm.setAttr(node_name + ".colorIfFalseR", 0)
+                pm.connectAttr(node_name + ".outColorR", attr)
 
     def connect_standard(self):
         """standard connection definition for the component"""
@@ -80,14 +142,12 @@ class Component(arm_2jnt_04.Component):
                              ["Auto"])
 
     def connect_ymt_shoulder(self):
-        self.connect_standard()
 
         # If the parent component hasn't been generated we skip the connection
-        if self.parent_comp is None:
-            return
+        if self.parent_comp is not None and "ymt_shoulder" in str(type(self.parent_comp)):
+            self.parent_comp.connect_arm(self)
 
-        # IK dummy Chain -----------------------------------------
-        self.parent_comp.connect_arm(self)
+        self.connect_standard()
 
         return
 

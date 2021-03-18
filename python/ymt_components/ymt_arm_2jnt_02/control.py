@@ -1,29 +1,3 @@
-# MGEAR is under the terms of the MIT License
-
-# Copyright (c) 2016 Jeremie Passerin, Miquel Campos
-
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-
-# The above copyright notice and this permission notice shall be included in all
-# copies or substantial portions of the Software.
-
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-# SOFTWARE.
-
-# Author:     Jeremie Passerin      geerem@hotmail.com  www.jeremiepasserin.com
-# Author:     Miquel Campos         hello@miquel-campos.com  www.miquel-campos.com
-# Date:       2016 / 10 / 10
-
 ##################################################
 # GLOBAL
 ##################################################
@@ -40,6 +14,9 @@ import mgear.core.transform as tra
 import mgear.synoptic.utils as syn_uti
 # import mgear.core.synoptic.widgets as syn_widget
 
+from ymt_components.control import AbstractControllerButton
+import ymt_components.ymt_arm_2jnt_02 as comp
+
 QtGui, QtCore, QtWidgets, wrapInstance = gqt.qt_import()
 
 
@@ -49,65 +26,75 @@ QtGui, QtCore, QtWidgets, wrapInstance = gqt.qt_import()
 # They must be declared first because they are used in the widget.ui
 
 
-class AbstractController(object):
+class ikfkMatchAllButton(AbstractControllerButton):
 
-    def __init__(self, button):
-        self.button = button
+    def __init__(self, *args, **kwargs):
 
+        super(ikfkMatchAllButton, self).__init__(*args, **kwargs)
+        self.model = syn_uti.getModel(self)
 
-class ikfkMatchAllButton(AbstractController):
+    controllers = {
+        "ikfk_attr": "arm_blend",
+        "fk0": "arm_"
+    }
 
     def mousePressEvent(self, event):
         # type: (QtCore.QEvent) -> None
 
         mouse_button = event.button()
-        model = syn_uti.getModel(self.button)
 
-        if not self.button.isControllerSetup():
-            self.button.lookupControllers()
-            self.button.ikRot = self.button.ik.replace("_ik_", "_rot_")
+        if not self.isControllerSetup():
+            self.lookupControllers()
+            self.ikRot = self.ik.replace("_ik_", "_rot_")
 
         if mouse_button == QtCore.Qt.RightButton:
             IkFkTransfer.showUI(
-                model, self.button.ikfk_attr, self.button.uiHost_name, self.button.fks, self.button.ik, self.button.upv, self.button.ikRot)
+                self.model, self.ikfk_attr, self.uiHost_name, self.fks, self.ik, self.upv, self.ikRot)
             return
 
         else:
             ikFkMatch(
-                model, self.button.ikfk_attr, self.button.uiHost_name, self.button.fks, self.button.ik, self.button.upv, self.button.ikRot)
+                self.model, self.ikfk_attr, self.uiHost_name, self.fks, self.ik, self.upv, self.ikRot)
             return
 
 
-class ikfkMatchButton(AbstractController):
+class ikfkMatchButton(AbstractControllerButton):
+    def __init__(self, *args, **kwargs):
+
+        print(args)
+        print(kwargs)
+        super(ikfkMatchButton, self).__init__(*args, **kwargs)
+        print(self.parentWidget())
+        self.model = syn_uti.getModel(self)
 
     def mousePressEvent(self, event):
         # type: (QtCore.QEvent) -> None
 
         mouse_button = event.button()
-        model = syn_uti.getModel(self.button)
+        model = syn_uti.getModel(self)
 
-        if not self.button.isControllerSetup():
-            self.button.lookupControllers()
-            self.button.ikRot = self.button.ik.replace("_ik_", "_rot_")
+        if not self.isControllerSetup():
+            self.lookupControllers()
+            self.ikRot = self.ik.replace("_ik_", "_rot_")
 
         if mouse_button == QtCore.Qt.RightButton:
             IkFkTransfer.showUI(
-                model, self.button.ikfk_attr, self.button.uiHost_name, self.button.fks, self.button.ik, self.button.upv, self.button.ikRot)
+                model, self.ikfk_attr, self.uiHost_name, self.fks, self.ik, self.upv, self.ikRot)
             return
 
         else:
             ikFkMatch(
-                model, self.button.ikfk_attr, self.button.uiHost_name, self.button.fks, self.button.ik, self.button.upv, self.button.ikRot)
+                model, self.ikfk_attr, self.uiHost_name, self.fks, self.ik, self.upv, self.ikRot)
             return
 
 
-class ikRotSpaceMatchButton(AbstractController):
+class ikRotSpaceMatchButton(AbstractControllerButton):
 
     def mousePressEvent(self, event):
         # type: (QtCore.QEvent) -> None
 
         mouse_button = event.button()
-        model = syn_uti.getModel(self.button)
+        model = syn_uti.getModel(self)
 
         if not self.button.isControllerSetup():
             self.button.lookupControllers()
