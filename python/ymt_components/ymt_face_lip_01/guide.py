@@ -30,8 +30,8 @@ AUTHOR = "yamahigashi"
 EMAIL = "yamahigashi@gmail.com"
 URL = "github.com/yamahigashi"
 VERSION = [1, 0, 0]
-TYPE = "ymt_face_eye_01"
-NAME = "eye"
+TYPE = "ymt_face_lip_01"
+NAME = "lip"
 DESCRIPTION = ""
 
 ##########################################################
@@ -54,7 +54,7 @@ class Guide(guide.ComponentGuide):
     def postInit(self):
         """Initialize the position for the guide"""
 
-        self.save_transform = ["root", "eyeMesh", "#_uploc", "#_lowloc", "inloc", "outloc", "uploc", "lowloc", "tan"]
+        self.save_transform = ["root", "#_uploc", "#_lowloc", "inloc", "outloc", "uploc", "lowloc", "tan"]
         self.save_blade = ["blade"]
         self.addMinMax("#_uploc", 1, -1)
         self.addMinMax("#_lowloc", 1, -1)
@@ -90,43 +90,9 @@ class Guide(guide.ComponentGuide):
         self.dispcrv = self.addDispCurve("crv", centers)
         self.addDispCurve("crvRef", centers, 3)
 
-        v = transform.getTranslation(self.root)
-        self.eyeMesh = self.addEyeMesh("eyeMesh", self.root, v)
-
         v = transform.getOffsetPosition(self.root, [0, 0.0000001, 2.5])
         self.tan = self.addLoc("tan", self.root, v)
         self.blade = self.addBlade("blade", self.root, self.tan)
-
-    def addEyeMesh(self, name, parent, position=None):
-        """Add a loc object to the guide.
-
-        This mehod can initialize the object or draw it.
-        Loc object is a simple null to define a position or a tranformation in
-        the guide.
-
-        Args:
-            name (str): Local name of the element.
-            parent (dagNode): The parent of the element.
-            position (vector): The default position of the element.
-
-        Returns:
-            dagNode: The locator object.
-
-        """
-        if name not in self.tra.keys():
-            self.tra[name] = transform.getTransformFromPos(position)
-
-        eyeMesh = pm.polySphere(
-            name=self.getName(name),
-            subdivisionsX=30,
-            subdivisionsY=45,
-            radius=0.5)[0]
-        eyeMesh.setTransformation(self.tra[name])
-        pm.parent(eyeMesh, parent)
-
-        eyeMesh.setTranslation
-
-        return eyeMesh
 
     def addParameters(self):
         """Add the configurations settings"""
