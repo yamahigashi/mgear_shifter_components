@@ -261,9 +261,18 @@ class Component(component.Main):
     def addCurveBaseControllers(self, crv_root, plane):
 
         def gen2(crv, name, nbPoints, tobe_offset):
+            t = getTransform(self.root)
 
-            new_crv = curve.createCurveFromCurve(crv, self.getName(name), nbPoints=nbPoints, parent=crv_root)
+            new_crv = curve.createCurveFromCurve(crv, self.getName(name), nbPoints=nbPoints, parent=crv_root, m=t)
             new_crv.attr("visibility").set(False)
+
+            # double translation denial
+            cvs = new_crv.getCVs(space="world")
+            for i, cv in enumerate(cvs):
+                x, y, z = transform.getTranslation(new_crv)
+                offset = [cv[0] - x, cv[1] - y, cv[2] - z]
+                new_crv.setCV(i, offset, space='world')
+
             if not tobe_offset:
                 return new_crv
 
@@ -299,6 +308,7 @@ class Component(component.Main):
 
         lvlType = "transform"
         cvs = crv.getCVs(space="world")
+        local_cvs = crv.getCVs(space="object")
         controls = []
         t = getTransform(self.root)
 
@@ -315,7 +325,7 @@ class Component(component.Main):
             upv = addTransform(rope_root, self.getName("{}LipRope_upv{}".format(name, str(i).zfill(3))))
             npo = addTransform(rope_root, self.getName("{}LipRope_npo{}".format(name, str(i).zfill(3))))
 
-            oParam, oLength = curve.getCurveParamAtPosition(rope, cv)
+            oParam, oLength = curve.getCurveParamAtPosition(rope, local_cvs[i])
             uLength = curve.findLenghtFromParam(rope, oParam)
             u = uLength / oLength
 
