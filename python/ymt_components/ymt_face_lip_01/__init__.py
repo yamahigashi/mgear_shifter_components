@@ -293,7 +293,7 @@ class Component(component.Main):
 
     def addControlJoints(self):
         self.upJoints = self._addControlJoints(self.upCrv, "up", self.lipsRope_root, self.upRope, self.upRope_upv)
-        self.lowJoints = self._addControlJoints(self.lowCrv, "up", self.lipsRope_root, self.lowRope, self.lowRope_upv)
+        self.lowJoints = self._addControlJoints(self.lowCrv, "low", self.lipsRope_root, self.lowRope, self.lowRope_upv)
 
     def _addControlJoints(self, crv, name, rope_root, rope, rope_upv):
 
