@@ -371,7 +371,7 @@ class Component(component.Main):
 
             # getting joint parent
             # jnt = rigbits.addJnt(npo, noReplace=True, parent=self.j_parent)
-            self.jnt_pos.append([ctl, i])
+            self.jnt_pos.append([ctl, "{}{}".format(name, i)])
 
         pm.progressWindow(e=True, endProgress=True)
         return controls
