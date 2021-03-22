@@ -539,7 +539,7 @@ class Component(component.Main):
         rev_node = pm.createNode("reverse")
         rev_nodeLower = pm.createNode("reverse")
         pm.connectAttr(self.bs_lowBlink[0].attr(self.midTargetLower.name()), rev_node + ".inputX")
-        pm.connectAttr(rev_node + ".outputX",self.bs_lowBlink[0].attr(self.lowTarget.name()))
+        pm.connectAttr(rev_node + ".outputX", self.bs_lowBlink[0].attr(self.lowTarget.name()))
 
         rev_node = pm.createNode("reverse")
         pm.connectAttr(self.bs_mid[0].attr(self.upTarget.name()), rev_node + ".inputX")
