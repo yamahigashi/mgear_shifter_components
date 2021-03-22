@@ -218,14 +218,14 @@ class Component(component.Main):
 
         t = getTransform(self.root)
         gen = curve.createCurveFromOrderedEdges
-        gen2 = curve.createCurveFromCurve
         planeNode = pm.PyNode(plane.fullPathName())
 
         # -------------------------------------------------------------------
         def _inner(edges, name):
             crv = gen(edges, planeNode.verts[1], self.getName("{}Crv".format(name)), parent=crv_root, m=t)
             ctl = gen(edges, planeNode.verts[1], self.getName("{}Ctl_crv".format(name)), parent=crv_root, m=t)
-            # pm.rebuildCurve(ctl, s=2, rt=0, rpo=True, ch=False)
+            crv.attr("visibility").set(False)
+            ctl.attr("visibility").set(False)
 
             cvs = crv.getCVs(space="world")
             for i, cv in enumerate(cvs):
