@@ -637,15 +637,15 @@ class Component(component.Main):
 
         # create ghost controls
         self.mouthSlide_ctl = ghost.createGhostCtl(slide_c_ref, intTra)
-        # self.cornerL_ctl = ghost.createGhostCtl(corner_l_ref, self.mouthSlide_ctl)
-        # self.cornerR_ctl = ghost.createGhostCtl(corner_r_ref, self.mouthSlide_ctl)
         self.cornerL_ctl = ghost.createGhostCtl(corner_l_ref, slide_c_ref)
         self.cornerR_ctl = ghost.createGhostCtl(corner_r_ref, slide_c_ref)
+        # self.cornerL_ctl = createGhostWithParentConstraint(corner_l_ref, slide_c_ref)
+        # self.cornerR_ctl = createGhostWithParentConstraint(corner_r_ref, slide_c_ref)
 
         # pm.parent(corner_l_ref.parent, slide_c_ref)
         # pm.parent(corner_r_ref.parent, slide_c_ref)
-        # pm.parentConstraint(slide_c_ref, self.lips_R_Corner_npo, mo=True)
-        # pm.parentConstraint(slide_c_ref, self.lips_L_Corner_npo, mo=True)
+        # attribute.setKeyableAttributes(self.lips_L_Corner_npo)
+        # attribute.setKeyableAttributes(self.lips_R_Corner_npo)
 
         # slide system
         ghostSlider(
@@ -661,12 +661,16 @@ class Component(component.Main):
         # connect pucker
         pm.connectAttr(self.mouthSlide_ctl.tz, slide_c_ref.tz)
 
+        pm.parentConstraint(corner_l_ref, self.lips_L_Corner_npo, mo=True)
+        pm.parentConstraint(corner_r_ref, self.lips_R_Corner_npo, mo=True)
 
     def connect_mouth_ghost(self, lipup_ref, liplow_ref, slide_c_ref, corner_l_ref, corner_r_ref):
 
         # center main controls
-        self.lips_C_upper_ctl = ghost.createGhostCtl(self.lips_C_upper_ctl, lipup_ref)
-        self.lips_C_lower_ctl = ghost.createGhostCtl(self.lips_C_lower_ctl, liplow_ref)
+        # self.lips_C_upper_ctl = ghost.createGhostCtl(self.lips_C_upper_ctl, lipup_ref)
+        # self.lips_C_lower_ctl = ghost.createGhostCtl(self.lips_C_lower_ctl, liplow_ref)
+        self.lips_C_upper_ctl = createGhostWithParentConstraint(self.lips_C_upper_ctl, lipup_ref)
+        self.lips_C_lower_ctl = createGhostWithParentConstraint(self.lips_C_lower_ctl, liplow_ref)
 
         # unlock all the attributes in the upper and lower lip control
         attribute.setKeyableAttributes(self.lips_C_upper_ctl)
@@ -680,16 +684,16 @@ class Component(component.Main):
             # rigbits.connectLocalTransform([master_ctl, c])
 
         # Left side controls
-        self.lips_L_upInner_ctl = ghost.createGhostCtl(self.lips_L_upInner_ctl, self.lips_C_upper_ctl)
-        self.lips_L_upOuter_ctl = ghost.createGhostCtl(self.lips_L_upOuter_ctl, self.cornerL_ctl)
-        self.lips_L_lowInner_ctl = ghost.createGhostCtl(self.lips_L_lowInner_ctl, self.lips_C_lower_ctl)
-        self.lips_L_lowOuter_ctl = ghost.createGhostCtl(self.lips_L_lowOuter_ctl, self.cornerL_ctl)
+        self.lips_L_upInner_ctl = createGhostWithParentConstraint(self.lips_L_upInner_ctl, self.lips_C_upper_ctl)
+        self.lips_L_upOuter_ctl = createGhostWithParentConstraint(self.lips_L_upOuter_ctl, self.cornerL_ctl)
+        self.lips_L_lowInner_ctl = createGhostWithParentConstraint(self.lips_L_lowInner_ctl, self.lips_C_lower_ctl)
+        self.lips_L_lowOuter_ctl = createGhostWithParentConstraint(self.lips_L_lowOuter_ctl, self.cornerL_ctl)
 
         # Right side controls
-        self.lips_R_upInner_ctl = ghost.createGhostCtl(self.lips_R_upInner_ctl, self.lips_C_upper_ctl)
-        self.lips_R_upOuter_ctl = ghost.createGhostCtl(self.lips_R_upOuter_ctl, self.cornerR_ctl)
-        self.lips_R_lowInner_ctl = ghost.createGhostCtl(self.lips_R_lowInner_ctl, self.lips_C_lower_ctl)
-        self.lips_R_lowOuter_ctl = ghost.createGhostCtl(self.lips_R_lowOuter_ctl, self.cornerR_ctl)
+        self.lips_R_upInner_ctl = createGhostWithParentConstraint(self.lips_R_upInner_ctl, self.lips_C_upper_ctl)
+        self.lips_R_upOuter_ctl = createGhostWithParentConstraint(self.lips_R_upOuter_ctl, self.cornerR_ctl)
+        self.lips_R_lowInner_ctl = createGhostWithParentConstraint(self.lips_R_lowInner_ctl, self.lips_C_lower_ctl)
+        self.lips_R_lowOuter_ctl = createGhostWithParentConstraint(self.lips_R_lowOuter_ctl, self.cornerR_ctl)
 
         # pm.parentConstraint(corner_l_ref, self.lips_L_Corner_npo, mo=True)
         # pm.parentConstraint(corner_r_ref, self.lips_R_Corner_npo, mo=True)
@@ -821,6 +825,60 @@ def ghostSlider(ghostControls, surface, sliderParent):
                             worldUpObject=gDriver)
 
         pm.parent(ctlGhost.getParent(), slider)
+
+
+def createGhostWithParentConstraint(ctl, parent=None, connect=True):
+    """Create a duplicated Ghost control
+
+    Create a duplicate of the control and rename the original with _ghost.
+    Later connect the local transforms and the Channels.
+    This is useful to connect local rig controls with the final rig control.
+
+    Args:
+        ctl (dagNode): Original Control to duplicate
+        parent (dagNode): Parent for the new created control
+
+    Returns:
+       pyNode: The new created control
+
+    """
+    if isinstance(ctl, basestring):
+        ctl = pm.PyNode(ctl)
+    if parent:
+        if isinstance(parent, basestring):
+            parent = pm.PyNode(parent)
+    grps = ctl.listConnections(t="objectSet")
+    for grp in grps:
+        grp.remove(ctl)
+    oName = ctl.name()
+    pm.rename(ctl, oName + "_ghost")
+    newCtl = pm.duplicate(ctl, po=True)[0]
+    pm.rename(newCtl, oName)
+    source2 = pm.duplicate(ctl)[0]
+    for shape in source2.getShapes():
+        pm.parent(shape, newCtl, r=True, s=True)
+        pm.rename(shape, newCtl.name() + "Shape")
+        pm.parent(shape, newCtl, r=True, s=True)
+    pm.delete(source2)
+    if parent:
+        pm.parent(newCtl, parent)
+        oTra = pm.createNode("transform",
+                             n=newCtl.name() + "_npo",
+                             p=parent, ss=True)
+        oTra.setMatrix(ctl.getParent().getMatrix(worldSpace=True),
+                       worldSpace=True)
+        pm.parent(newCtl, oTra)
+    if connect:
+        pm.parentConstraint(newCtl, ctl, mo=True)
+        # rigbits.connectLocalTransform([newCtl, ctl])
+        rigbits.connectUserDefinedChannels(newCtl, ctl)
+    for grp in grps:
+        grp.add(newCtl)
+
+    # add control tag
+    node.add_controller_tag(newCtl, parent)
+
+    return newCtl
 
 
 if __name__ == "__main__":
