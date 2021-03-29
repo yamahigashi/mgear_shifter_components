@@ -648,8 +648,9 @@ class Component(component.Main):
         # attribute.setKeyableAttributes(self.lips_R_Corner_npo)
 
         # slide system
-        ghostSlider(
+        ghostSliderForMouth(
             [slide_c_ref, corner_l_ref, corner_r_ref],
+            intTra,
             self.sliding_surface,
             self.root)
 
@@ -673,30 +674,22 @@ class Component(component.Main):
         self.lips_C_lower_ctl = createGhostWithParentConstraint(self.lips_C_lower_ctl, liplow_ref)
 
         # unlock all the attributes in the upper and lower lip control
-        attribute.setKeyableAttributes(self.lips_C_upper_ctl)
-        attribute.setKeyableAttributes(self.lips_C_lower_ctl)
+        # attribute.setKeyableAttributes(self.lips_C_upper_ctl)
+        # attribute.setKeyableAttributes(self.lips_C_lower_ctl)
 
         # add slider offset
         npos = rigbits.addNPO([self.lips_C_upper_ctl, self.lips_C_lower_ctl])
         for c in npos:
-            # master_ctl = self.mouthSlide_ctl
-            pm.parentConstraint(slide_c_ref, c, mo=True)
-            # rigbits.connectLocalTransform([master_ctl, c])
+            rigbits.connectLocalTransform([self.mouthSlide_ctl, c])
+            # pm.parentConstraint(slide_c_ref, c, mo=True)
 
         # Left side controls
         self.lips_L_upInner_ctl = createGhostWithParentConstraint(self.lips_L_upInner_ctl, self.lips_C_upper_ctl)
-        self.lips_L_upOuter_ctl = createGhostWithParentConstraint(self.lips_L_upOuter_ctl, self.cornerL_ctl)
         self.lips_L_lowInner_ctl = createGhostWithParentConstraint(self.lips_L_lowInner_ctl, self.lips_C_lower_ctl)
-        self.lips_L_lowOuter_ctl = createGhostWithParentConstraint(self.lips_L_lowOuter_ctl, self.cornerL_ctl)
 
         # Right side controls
         self.lips_R_upInner_ctl = createGhostWithParentConstraint(self.lips_R_upInner_ctl, self.lips_C_upper_ctl)
-        self.lips_R_upOuter_ctl = createGhostWithParentConstraint(self.lips_R_upOuter_ctl, self.cornerR_ctl)
         self.lips_R_lowInner_ctl = createGhostWithParentConstraint(self.lips_R_lowInner_ctl, self.lips_C_lower_ctl)
-        self.lips_R_lowOuter_ctl = createGhostWithParentConstraint(self.lips_R_lowOuter_ctl, self.cornerR_ctl)
-
-        # pm.parentConstraint(corner_l_ref, self.lips_L_Corner_npo, mo=True)
-        # pm.parentConstraint(corner_r_ref, self.lips_R_Corner_npo, mo=True)
 
     def connect_averageParentCns(self, parents, target):
         """
@@ -771,7 +764,7 @@ def draw_eye_guide_mesh_plane(points, t):
     return mesh
 
 
-def ghostSlider(ghostControls, surface, sliderParent):
+def ghostSliderForMouth(ghostControls, intTra, surface, sliderParent):
     """Modify the ghost control behaviour to slide on top of a surface
 
     Args:
@@ -784,7 +777,6 @@ def ghostSlider(ghostControls, surface, sliderParent):
 
 
     def conn(ctl, driver, ghost):
-        # TODO: support negate
         for attr in ["translate", "scale", "rotate"]:
             try:
                 pm.connectAttr("{}.{}".format(ctl, attr), "{}.{}".format(driver, attr))
@@ -792,14 +784,35 @@ def ghostSlider(ghostControls, surface, sliderParent):
             except RuntimeError:
                 pass
 
-    surfaceShape = surface.getShape()
+    def connCenter(ctl, driver, ghost):
+        mul_node1 = pm.createNode("multMatrix")
+        mul_node2 = pm.createNode("multMatrix")
+        intTra.attr("matrix") >> mul_node1.attr("matrixIn[0]")
+        mul_node1.attr("matrixIn[1]")
+        pm.setAttr(mul_node1 + ".matrixIn[1]",
+                   intTra.attr("inverseMatrix").get(),
+                   type="matrix")
+        ctl.attr("matrix") >> mul_node2.attr("matrixIn[0]")
+        mul_node1.attr("matrixSum") >> mul_node2.attr("matrixIn[1]")
+        dm_node = node.createDecomposeMatrixNode(mul_node2.attr("matrixSum"))
 
-    for ctlGhost in ghostControls:
+        for attr in ["translate", "scale", "rotate"]:
+            pm.connectAttr("{}.output{}".format(dm_node, attr.capitalize()), "{}.{}".format(driver, attr))
+            pm.disconnectAttr("{}.{}".format(ctl, attr), "{}.{}".format(ghost, attr))
+
+    surfaceShape = surface.getShape()
+    sliders = []
+
+    for i, ctlGhost in enumerate(ghostControls):
         ctl = pm.listConnections(ctlGhost, t="transform")[-1]
         t = ctl.getMatrix(worldSpace=True)
 
         gDriver = primitive.addTransform(ctlGhost.getParent(), "{}_slideDriver".format(ctl.name()), t)
-        conn(ctl, gDriver, ctlGhost)
+        if 0 == i:
+            connCenter(ctl, gDriver, ctlGhost)
+
+        else:
+            conn(ctl, gDriver, ctlGhost)
 
         oParent = ctlGhost.getParent()
         npoName = "_".join(ctlGhost.name().split("_")[:-1]) + "_npo"
@@ -808,9 +821,20 @@ def ghostSlider(ghostControls, surface, sliderParent):
         pm.parent(ctlGhost, oTra)
 
         slider = primitive.addTransform(sliderParent, ctl.name() + "_slideDriven", t)
+        sliders.append(slider)
 
         # connexion
-        dm_node = node.createDecomposeMatrixNode(gDriver.attr("matrix"))
+        if 0 == i:
+            dm_node = node.createDecomposeMatrixNode(gDriver.attr("matrix"))
+
+        else:
+            mul_node = pm.createNode("multMatrix")
+            gDriver.attr("matrix")             >> mul_node.attr("matrixIn[0]")
+            gDriver.getParent().attr("matrix") >> mul_node.attr("matrixIn[1]")
+            ghostControls[0].attr("matrix")    >> mul_node.attr("matrixIn[2]")
+            sliders[0].attr("matrix")          >> mul_node.attr("matrixIn[3]")
+            dm_node = node.createDecomposeMatrixNode(mul_node.attr("matrixSum"))
+
         cps_node = pm.createNode("closestPointOnSurface")
         dm_node.attr("outputTranslate") >> cps_node.attr("inPosition")
         surfaceShape.attr("local") >> cps_node.attr("inputSurface")
@@ -825,6 +849,9 @@ def ghostSlider(ghostControls, surface, sliderParent):
                             worldUpObject=gDriver)
 
         pm.parent(ctlGhost.getParent(), slider)
+
+    sliders[0].visibility.set(False)
+    attribute.setKeyableAttributes(sliders[0], [])
 
 
 def createGhostWithParentConstraint(ctl, parent=None, connect=True):
