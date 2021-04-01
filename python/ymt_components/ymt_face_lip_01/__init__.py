@@ -428,10 +428,10 @@ class Component(component.Main):
 
         upvec = self.upUpvs + self.lowUpvs
 
-        pm.parent(self.upNpos[1],  self.lowNpos[0],  self.upCtls[0])
-        pm.parent(self.upNpos[2],  self.upNpos[4],   self.upCtls[3])
-        pm.parent(self.upNpos[-2], self.lowNpos[-1], self.upCtls[-1])
-        pm.parent(self.lowNpos[1], self.lowNpos[3],  self.lowCtls[2])
+        pm.parent(self.lips_R_upOuter_npo,  self.lips_R_lowOuter_npo,  self.upCtls[0])
+        pm.parent(self.lips_R_upInner_npo,  self.lips_L_upInner_npo,   self.upCtls[3])
+        pm.parent(self.lips_L_lowInner_npo, self.lips_L_lowOuter_npo,  self.upCtls[-1])
+        pm.parent(self.lips_R_lowInner_npo, self.lips_L_lowInner_npo,  self.lowCtls[2])
 
         # Connecting control crvs with controls
         applyop.gear_curvecns_op(self.upCrv_ctl, self.upCtls)
@@ -829,10 +829,17 @@ def ghostSliderForMouth(ghostControls, intTra, surface, sliderParent):
 
         else:
             mul_node = pm.createNode("multMatrix")
-            gDriver.attr("matrix")             >> mul_node.attr("matrixIn[0]")
-            gDriver.getParent().attr("matrix") >> mul_node.attr("matrixIn[1]")
-            ghostControls[0].attr("matrix")    >> mul_node.attr("matrixIn[2]")
-            sliders[0].attr("matrix")          >> mul_node.attr("matrixIn[3]")
+            i = 0
+            parent = ctl
+            while parent != sliderParent:
+                parent.attr("matrix") >> mul_node.attr("matrixIn[{}]".format(i))
+                parent = parent.getParent()
+                print(parent)
+                i += 1
+                if 10 < i:
+                    logger.error("maximum recursion")
+                    break
+
             dm_node = node.createDecomposeMatrixNode(mul_node.attr("matrixSum"))
 
         cps_node = pm.createNode("closestPointOnSurface")
