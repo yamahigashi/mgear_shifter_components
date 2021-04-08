@@ -71,6 +71,6 @@ class Ui_Dialog(object):
         self.direction_comboBox.setItemText(3, gqt.fakeTranslate("Dialog", "-X", None, -1))
         self.direction_comboBox.setItemText(4, gqt.fakeTranslate("Dialog", "-Y", None, -1))
         self.direction_comboBox.setItemText(5, gqt.fakeTranslate("Dialog", "-Z", None, -1))
-        self.direction_comboBox.setCurrentIndex(1)
+        self.direction_comboBox.setCurrentIndex(0)
         self.spacing_label.setText(gqt.fakeTranslate("Dialog", "Spacing", None, -1))
 
