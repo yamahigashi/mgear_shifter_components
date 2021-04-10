@@ -139,8 +139,8 @@ class Component(component.Main):
         self.lowerVTrack = 0.02
         self.lowerHTrack = 0.01
 
-        self.thickness = 0.3
-        self.FRONT_OFFSET = .02
+        self.thickness = 0.003
+        self.FRONT_OFFSET = .0002
         self.NB_ROPE = 15
 
         # --------------------------------------------------------
