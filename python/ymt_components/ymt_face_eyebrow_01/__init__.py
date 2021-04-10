@@ -16,6 +16,7 @@ import exprespy.cmd
 from mgear.shifter import component
 from mgear.rigbits.facial_rigger import helpers
 from mgear.rigbits.facial_rigger import constraints
+from mgear.rigbits import ghost
 
 from mgear.core import (
     transform,
@@ -106,6 +107,8 @@ class Component(component.Main):
             self.mirror_conf = [0, 0, 0,
                                 0, 0, 0,
                                 0, 0, 0]
+
+        self.settings["connect_surface_slider"] = True
 
         # -------------------------------------------------------
         self.ctlName = "ctl"
@@ -199,20 +202,32 @@ class Component(component.Main):
         # for crv in self.mainCurves:
         #     pm.delete(crv)
 
+    def visi_off_lock(self, node):
+        node.visibility.set(False)
+        attribute.setKeyableAttributes(node, [])
+        cmds.setAttr("{}.visibility".format(node.name()), l=False)
+
     def addContainers(self):
 
         t = getTransform(self.root)
 
         self.crv_root = addTransform(self.root, self.getName("crvs"), t)
-        self.lipsRope_root = addTransform(self.root, self.getName("rope"), t)
+        self.rope_root = addTransform(self.root, self.getName("ropes"), t)
+        self.browsHooks_root = addTransform(self.root, self.getName("hooks"), t)
+
+        self.visi_off_lock(self.crv_root)
+        self.visi_off_lock(self.rope_root)
+        self.visi_off_lock(self.browsHooks_root)
+
+        if self.settings["connect_surface_slider"]:
+            self.slider_root = addTransform(self.root, self.getName("sliders"), t)
+            attribute.setKeyableAttributes(self.slider_root, [])
 
         # self.mainControlParentGrp = addTransform(self.root, self.getName("mainControls"), t)
         w = (self.outPos - self.inPos).length()
         d = (self.upPos - self.lowPos).length()
         self.mainControlParentGrp = self.addCtl( self.root, "mainControls", t, self.color_ik, "square", w=w, d=d, ro=datatypes.Vector(1.57079633, 0, 0), po=datatypes.Vector(0, 0, 1.0))
         self.secondaryControlsParentGrp = addTransform(self.root, self.getName("secondaryControls"), t)
-        self.browsHooks_root = addTransform(self.root, self.getName("hooks"), t)
-        self.browsRope_root = addTransform(self.root, self.getName("rope"), t)
 
     def getNumberOfLocators(self, query):
         # type: (Text) -> int
@@ -256,6 +271,7 @@ class Component(component.Main):
         name = "main_crv"
         crv = gen(edgeList, planeNode.verts[1], self.getName("{}Crv".format(name)), parent=crv_root, m=t)
         crv.attr("visibility").set(False)
+        attribute.setKeyableAttributes(crv, [])
 
         mainCtrlPos = helpers.divideSegment(crv, self.midDivisions)
         secCtrlPos = [self.inPos]
@@ -337,7 +353,7 @@ class Component(component.Main):
                 w=wd,
                 d=wd,
                 ro=rot_offset,
-                po=datatypes.Vector(0, 0, .07),
+                po=datatypes.Vector(0, 0, 0),
             )
 
         # Create buffer node instead
@@ -356,16 +372,18 @@ class Component(component.Main):
     def addMainCnsCurve(self, ctls):
         crv_degree = 2
 
-        crv = helpers.addCnsCurve(self.root, self.getName("mainCtl_crv"), ctls, crv_degree)
+        crv = helpers.addCnsCurve(self.crv_root, self.getName("mainCtl_crv"), ctls, crv_degree)
+        attribute.setKeyableAttributes(crv[0], [])
         v = self.root.getTranslation(space="world")
         crv[0].setTranslation(v, om.MSpace.kWorld)
         self.mainCtlCurves.append(crv[0])
 
         # create upvector curve to drive secondary control
         if self.secondary_ctl_check:
-            mainCtlUpv = helpers.addCurve(self.root, self.getName("mainCtl_upv"), ctls, crv_degree)
+            mainCtlUpv = helpers.addCurve(self.crv_root, self.getName("mainCtl_upv"), ctls, crv_degree)
+            attribute.setKeyableAttributes(mainCtlUpv, [])
             v = self.root.getTranslation(space="world")
-            mainCtlUpv .setTranslation(v, om.MSpace.kWorld)
+            mainCtlUpv.setTranslation(v, om.MSpace.kWorld)
             # connect upv curve to mainCrv_ctl driver node.
             pm.connectAttr(crv[1].attr("outputGeometry[0]"), mainCtlUpv.getShape().attr("create"))
 
@@ -380,17 +398,17 @@ class Component(component.Main):
     def addRope(self):
         v = self.root.getTranslation(space="world")
 
-        mainRope = curve.createCurveFromCurve(self.mainCurve, self.getName("mainRope"), nbPoints=self.NB_ROPE, parent=self.root)
+        mainRope = curve.createCurveFromCurve(self.mainCurve, self.getName("mainRope"), nbPoints=self.NB_ROPE, parent=self.rope_root)
         # mainRope.setTranslation(v, om.MSpace.kWorld)
         self.rigCurves.append(mainRope)
         self.mainRopes.append(mainRope)
 
-        mainRope_upv = curve.createCurveFromCurve(self.mainCurve, self.getName("mainRope_upv"), nbPoints=self.NB_ROPE, parent=self.root)
+        mainRope_upv = curve.createCurveFromCurve(self.mainCurve, self.getName("mainRope_upv"), nbPoints=self.NB_ROPE, parent=self.rope_root)
         # mainRope_upv.setTranslation(v, om.MSpace.kWorld)
         self.rigCurves.append(mainRope_upv)
         self.mainRopeUpvs.append(mainRope_upv)
 
-        mainCrv_upv = curve.createCurveFromCurve(self.mainCurve, self.getName("mainCrv_upv"), nbPoints=7, parent=self.root)
+        mainCrv_upv = curve.createCurveFromCurve(self.mainCurve, self.getName("mainCrv_upv"), nbPoints=7, parent=self.rope_root)
         # mainCrv_upv.setTranslation(v, om.MSpace.kWorld)
         self.rigCurves.append(mainCrv_upv)
         self.mainCurveUpvs.append(mainCrv_upv)
@@ -406,7 +424,8 @@ class Component(component.Main):
     def addSecondaryCnsCurve(self, ctls):
         crv_degree = 2
 
-        crv = helpers.addCnsCurve(self.root, self.getName("secCtl_crv"), ctls, crv_degree)
+        crv = helpers.addCnsCurve(self.crv_root, self.getName("secCtl_crv"), ctls, crv_degree)
+        attribute.setKeyableAttributes(crv[0], [])
         v = self.root.getTranslation(space="world")
         crv[0].setTranslation(v, om.MSpace.kWorld)
 
@@ -544,43 +563,8 @@ class Component(component.Main):
             wire(self.mainRopes[i],     drv)
             wire(self.mainRopeUpvs[i],  drv)
 
-    def addCurveBaseControllers(self, crv_root, plane):
-
-        def gen2(crv, name, nbPoints, tobe_offset):
-            t = getTransform(self.root)
-
-            new_crv = curve.createCurveFromCurve(crv, self.getName(name), nbPoints=nbPoints, parent=crv_root, m=t)
-            new_crv.attr("visibility").set(False)
-
-            # double translation denial
-            cvs = new_crv.getCVs(space="world")
-            for i, cv in enumerate(cvs):
-                x, y, z = transform.getTranslation(new_crv)
-                offset = [cv[0] - x, cv[1] - y, cv[2] - z]
-                new_crv.setCV(i, offset, space='world')
-
-            if not tobe_offset:
-                return new_crv
-
-            cvs = new_crv.getCVs(space="world")
-            for i, cv in enumerate(cvs):
-
-                # we populate the closest vertext list here to skipt the first
-                # and latest point
-                offset = [cv[0], cv[1], cv[2] + self.FRONT_OFFSET]
-
-                new_crv.setCV(i, offset, space='world')
-
-            return new_crv
-
-        # -------------------------------------------------------------------
-        self.upCrv_ctl   = gen2(self.mainCurve,  "upCtl_crv",   7, False)
-        self.upRope      = gen2(self.mainCurve,  "upRope_crv",  self.NB_ROPE, False)
-        self.upCrv_upv   = gen2(self.mainCurve,  "upCtl_upv",   7, True)
-        self.upRope_upv  = gen2(self.mainCurve,  "upRope_upv",  self.NB_ROPE, True)
-
     def addControlJoints(self):
-        self.upJoints = self._addControlJoints(self.mainCurve, "up", self.lipsRope_root, self.upRope, self.upRope_upv)
+        self.upJoints = self._addControlJoints(self.mainCurve, "up", self.rope_root, self.upRope, self.upRope_upv)
 
     def _addControlJoints(self, crv, name, rope_root, rope, rope_upv):
 
@@ -654,145 +638,6 @@ class Component(component.Main):
         pm.progressWindow(e=True, endProgress=True)
         return controls
 
-    def addControllers(self):
-        axis_list = ["sx", "sy", "sz", "ro"]
-        upCtlOptions = [["corner",  "R", "square",    4,  .05, axis_list],
-                        ["upOuter", "R", "circle",   14,  .03, []],
-                        ["upInner", "R", "circle",   14,  .03, []],
-                        ["upper",   "C", "square",   4,   .05, axis_list],
-                        ["upInner", "L", "circle",   14,  .03, []],
-                        ["upOuter", "L", "circle",   14,  .03, []],
-                        ["corner",  "L", "square",   4,   .05, axis_list]]
-
-        self.upNpos, self.upCtls, self.upUpvs = self._addControls(self.upCrv_ctl, upCtlOptions, False)
-
-        self.lips_R_Corner_ctl   = self.upCtls[0]
-        self.lips_R_upOuter_ctl  = self.upCtls[1]
-        self.lips_R_upInner_ctl  = self.upCtls[2]
-        self.lips_C_upper_ctl    = self.upCtls[3]
-        self.lips_L_upInner_ctl  = self.upCtls[4]
-        self.lips_L_upOuter_ctl  = self.upCtls[5]
-        self.lips_L_Corner_ctl   = self.upCtls[6]
-
-        self.lips_R_Corner_npo   = self.upNpos[0]
-        self.lips_R_upOuter_npo  = self.upNpos[1]
-        self.lips_R_upInner_npo  = self.upNpos[2]
-        self.lips_C_upper_npo    = self.upNpos[3]
-        self.lips_L_upInner_npo  = self.upNpos[4]
-        self.lips_L_upOuter_npo  = self.upNpos[5]
-        self.lips_L_Corner_npo   = self.upNpos[6]
-
-        upvec = self.upUpvs
-
-        # pm.parent(self.lips_R_upInner_npo,  self.lips_L_upInner_npo,   self.upCtls[3])
-
-        # Connecting control crvs with controls
-        applyop.gear_curvecns_op(self.upCrv_ctl, self.upCtls)
-        applyop.gear_curvecns_op(self.upCrv_upv, upvec)
-
-        raise
-        # adding wires
-        pm.wire(self.mainCurve, w=self.upCrv_ctl, dropoffDistance=[0, 1000])
-        pm.wire(self.upRope, w=self.upCrv_ctl, dropoffDistance=[0, 1000])
-
-        pm.wire(self.upRope_upv, w=self.upCrv_upv, dropoffDistance=[0, 1000])
-
-    def addConstraints(self):
-
-        def __upper(ctls, s1, s2, d, p1, p2):
-            s1o = ctls[s1]
-            s2o = ctls[s2]
-            do = ctls[d].getParent()
-
-            cns_node = pm.parentConstraint(s1o, s2o, do, mo=True, skipRotate=["x", "y", "z"])
-            cns_node.attr(ctls[s1].name() + "W0").set(p1)
-            cns_node.attr(ctls[s2].name() + "W1").set(p2)
-
-        __upper(self.upCtls, 0, 3, 1, 0.75, 0.25)
-        __upper(self.upCtls, 0, 3, 2, 0.25, 0.75)
-        __upper(self.upCtls, 3, 6, 4, 0.75, 0.25)
-        __upper(self.upCtls, 3, 6, 5, 0.25, 0.75)
-
-    def _addControls(self, crv_ctl, option, sidecut):
-
-        cvs = crv_ctl.getCVs(space="world")
-
-        pm.progressWindow(title='controls', progress=0, max=len(cvs))
-
-        v0 = transform.getTransformFromPos(cvs[0])
-        v1 = transform.getTransformFromPos(cvs[-1])
-        distSize = vector.getDistance(v0, v1) * 3
-
-        npos = []
-        ctls = []
-        upvs = []
-        params = ["tx", "ty", "tz", "rx", "ry", "rz"]
-        joints = self.upJoints
-
-        iterator = enumerate(cvs)
-        if sidecut:
-            iterator = enumerate(cvs[1:-1])
-
-        for i, cv in iterator:
-
-            pm.progressWindow(e=True, step=1, status='\nCreating control for%s' % cv)
-
-            t = transform.getTransformFromPos(cv)
-
-            # Get nearest joint for orientation of controls
-            nearest_joint = None
-            nearest_distance = None
-
-            for joint in joints:
-                distance = vector.getDistance(transform.getTranslation(joint), cv)
-                if distance < nearest_distance or nearest_distance is None:
-                    nearest_distance = distance
-                    nearest_joint = joint
-
-            if nearest_joint:
-
-                t = transform.setMatrixPosition(transform.getTransform(nearest_joint), cv)
-                temp = addTransform(self.root, self.getName("temp"), t)
-                temp.rx.set(0)
-                t = transform.getTransform(temp)
-                pm.delete(temp)
-
-            oName  = option[i][0]
-            oSide  = option[i][1]
-            o_icon = option[i][2]
-            color  = option[i][3]
-            wd     = option[i][4]
-            oPar   = option[i][5]
-
-            npo = addTransform(self.root, self.getName("%s_npo" % oName, oSide), t)
-            npos.append(npo)
-
-            ctl = self.addCtl(npo,
-                              self.getName("{}_{}".format(oName, self.ctlName), oSide),
-                              t,
-                              color,
-                              o_icon,
-                              w=wd * distSize,
-                              d=wd * distSize,
-                              ro=datatypes.Vector(1.57079633, 0, 0),
-                              po=datatypes.Vector(0, 0, .07 * distSize),
-                              )
-
-            ctls.append(ctl)
-
-            attribute.setKeyableAttributes(ctl, params + oPar)
-
-            upv = addTransform(ctl, self.getName("%s_upv" % oName, oSide), t)
-            upv.attr("tz").set(self.FRONT_OFFSET)
-            upvs.append(upv)
-
-            if oSide == "R":
-                npo.attr("sx").set(-1)
-
-        pm.progressWindow(e=True, endProgress=True)
-
-        return npos, ctls, upvs
-
     # =====================================================
     # ATTRIBUTES
     # =====================================================
@@ -821,28 +666,18 @@ class Component(component.Main):
     # CONNECTOR
     # =====================================================
     def addConnection(self):
-        self.connections["mouth_01"] = self.connect_mouth
-        self.connections["mouth_02"] = self.connect_mouth
-
-    def connect_mouth(self):
-
-        if self.parent is None:
-            return
-
-        self.parent.addChild(self.root)
-
-        try:
-            self.connect_ghosts()
-
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-
-            raise
+        pass
 
     def connect_standard(self):
 
         self.parent.addChild(self.root)
+
+        if self.settings["connect_surface_slider"]:
+            try:
+                self.connect_slide_ghost()
+            except:
+                import traceback
+                traceback.print_exc()
 
         return
 
@@ -850,6 +685,7 @@ class Component(component.Main):
 
         lipup_ref = self.parent_comp.lipup_ctl
         liplow_ref = self.parent_comp.liplow_ctl
+
         slide_c_ref = self.rig.findRelative("mouthSlide_C0_root")
         corner_l_ref = self.rig.findRelative("mouthCorner_L0_root")
         corner_r_ref = self.rig.findRelative("mouthCorner_R0_root")
@@ -857,88 +693,26 @@ class Component(component.Main):
         self.connect_slide_ghost(lipup_ref, liplow_ref, slide_c_ref, corner_l_ref, corner_r_ref)
         self.connect_mouth_ghost(lipup_ref, liplow_ref, slide_c_ref, corner_l_ref, corner_r_ref)
 
-    def connect_slide_ghost(self, lipup_ref, liplow_ref, slide_c_ref, corner_l_ref, corner_r_ref):
+    def connect_slide_ghost(self):
 
         self.sliding_surface = pm.duplicate(self.guide.getObjects(self.guide.root)["sliding_surface"])[0]
         pm.parent(self.sliding_surface, self.root)
         self.sliding_surface.visibility.set(False)
 
-        # create interpose lvl for the ctl
-        intTra = rigbits.createInterpolateTransform([lipup_ref, liplow_ref])
-        pm.rename(intTra, intTra.name() + "_int")
-
         # create ghost controls
-        self.mouthSlide_ctl = ghost.createGhostCtl(slide_c_ref, intTra)
-        self.cornerL_ctl = ghost.createGhostCtl(corner_l_ref, slide_c_ref)
-        self.cornerR_ctl = ghost.createGhostCtl(corner_r_ref, slide_c_ref)
-        # self.cornerL_ctl = createGhostWithParentConstraint(corner_l_ref, slide_c_ref)
-        # self.cornerR_ctl = createGhostWithParentConstraint(corner_r_ref, slide_c_ref)
-
-        # pm.parent(corner_l_ref.parent, slide_c_ref)
-        # pm.parent(corner_r_ref.parent, slide_c_ref)
-        # attribute.setKeyableAttributes(self.lips_L_Corner_npo)
-        # attribute.setKeyableAttributes(self.lips_R_Corner_npo)
+        ghosts = []
+        for sec in self.secondaryControls:
+            ghostCtl = ghost.createGhostCtl(sec, self.slider_root)
+            ghosts.append(ghostCtl)
+            ghostCtl.attr("isCtl").set(True)
+            self.visi_off_lock(sec)
+        self.visi_off_lock(self.secondaryControlsParentGrp)
 
         # slide system
-        ghostSliderForMouth(
-            [slide_c_ref, corner_l_ref, corner_r_ref],
-            intTra,
+        ghostSliderForEyeBrow(
+            ghosts,
             self.sliding_surface,
-            self.root)
-
-        # connect scale
-        pm.connectAttr(self.mouthSlide_ctl.scale, slide_c_ref.scale)
-        pm.connectAttr(self.cornerL_ctl.scale, corner_l_ref.scale)
-        pm.connectAttr(self.cornerR_ctl.scale, corner_r_ref.scale)
-
-        # connect pucker
-        pm.connectAttr(self.mouthSlide_ctl.tz, slide_c_ref.tz)
-
-        pm.parentConstraint(corner_l_ref, self.lips_L_Corner_npo, mo=True)
-        pm.parentConstraint(corner_r_ref, self.lips_R_Corner_npo, mo=True)
-
-    def connect_mouth_ghost(self, lipup_ref, liplow_ref, slide_c_ref, corner_l_ref, corner_r_ref):
-
-        # center main controls
-        # self.lips_C_upper_ctl = ghost.createGhostCtl(self.lips_C_upper_ctl, lipup_ref)
-        # self.lips_C_lower_ctl = ghost.createGhostCtl(self.lips_C_lower_ctl, liplow_ref)
-        self.lips_C_upper_ctl = createGhostWithParentConstraint(self.lips_C_upper_ctl, lipup_ref)
-        self.lips_C_lower_ctl = createGhostWithParentConstraint(self.lips_C_lower_ctl, liplow_ref)
-
-        # unlock all the attributes in the upper and lower lip control
-        # attribute.setKeyableAttributes(self.lips_C_upper_ctl)
-        # attribute.setKeyableAttributes(self.lips_C_lower_ctl)
-
-        # add slider offset
-        npos = rigbits.addNPO([self.lips_C_upper_ctl, self.lips_C_lower_ctl])
-        for c in npos:
-            rigbits.connectLocalTransform([self.mouthSlide_ctl, c])
-            # pm.parentConstraint(slide_c_ref, c, mo=True)
-
-        # Left side controls
-        self.lips_L_upInner_ctl = createGhostWithParentConstraint(self.lips_L_upInner_ctl, self.lips_C_upper_ctl)
-        self.lips_L_lowInner_ctl = createGhostWithParentConstraint(self.lips_L_lowInner_ctl, self.lips_C_lower_ctl)
-
-        # Right side controls
-        self.lips_R_upInner_ctl = createGhostWithParentConstraint(self.lips_R_upInner_ctl, self.lips_C_upper_ctl)
-        self.lips_R_lowInner_ctl = createGhostWithParentConstraint(self.lips_R_lowInner_ctl, self.lips_C_lower_ctl)
-
-    def connect_averageParentCns(self, parents, target):
-        """
-        Connection definition using average parent constraint.
-        """
-
-        if len(parents) == 1:
-            pm.parent(parents[0], target)
-
-        else:
-            parents.append(target)
-            cns_node = pm.parentConstraint(*parents, maintainOffset=True)
-            cns_attr = pm.parentConstraint(
-                cns_node, query=True, weightAliasList=True)
-
-            for i, attr in enumerate(cns_attr):
-                pm.setAttr(attr, 1.0)
+            self.slider_root)
 
     def setRelation(self):
         """Set the relation beetween object from guide to rig"""
@@ -996,7 +770,7 @@ def draw_eye_guide_mesh_plane(points, t):
     return mesh
 
 
-def ghostSliderForMouth(ghostControls, intTra, surface, sliderParent):
+def ghostSliderForEyeBrow(ghostControls, surface, sliderParent):
     """Modify the ghost control behaviour to slide on top of a surface
 
     Args:
@@ -1004,33 +778,14 @@ def ghostSliderForMouth(ghostControls, intTra, surface, sliderParent):
         surface (Surface): The NURBS surface
         sliderParent (dagNode): The parent for the slider.
     """
+
     if not isinstance(ghostControls, list):
         ghostControls = [ghostControls]
 
-
     def conn(ctl, driver, ghost):
         for attr in ["translate", "scale", "rotate"]:
-            try:
-                pm.connectAttr("{}.{}".format(ctl, attr), "{}.{}".format(driver, attr))
-                pm.disconnectAttr("{}.{}".format(ctl, attr), "{}.{}".format(ghost, attr))
-            except RuntimeError:
-                pass
-
-    def connCenter(ctl, driver, ghost):
-        mul_node1 = pm.createNode("multMatrix")
-        mul_node2 = pm.createNode("multMatrix")
-        intTra.attr("matrix") >> mul_node1.attr("matrixIn[0]")
-        mul_node1.attr("matrixIn[1]")
-        pm.setAttr(mul_node1 + ".matrixIn[1]",
-                   intTra.attr("inverseMatrix").get(),
-                   type="matrix")
-        ctl.attr("matrix") >> mul_node2.attr("matrixIn[0]")
-        mul_node1.attr("matrixSum") >> mul_node2.attr("matrixIn[1]")
-        dm_node = node.createDecomposeMatrixNode(mul_node2.attr("matrixSum"))
-
-        for attr in ["translate", "scale", "rotate"]:
-            pm.connectAttr("{}.output{}".format(dm_node, attr.capitalize()), "{}.{}".format(driver, attr))
-            pm.disconnectAttr("{}.{}".format(ctl, attr), "{}.{}".format(ghost, attr))
+            pm.connectAttr("{}.{}".format(ctl, attr), "{}.{}".format(driver, attr))
+            # pm.disconnectAttr("{}.{}".format(ctl, attr), "{}.{}".format(ghost, attr))
 
     surfaceShape = surface.getShape()
     sliders = []
@@ -1040,11 +795,8 @@ def ghostSliderForMouth(ghostControls, intTra, surface, sliderParent):
         t = ctl.getMatrix(worldSpace=True)
 
         gDriver = primitive.addTransform(ctlGhost.getParent(), "{}_slideDriver".format(ctl.name()), t)
-        if 0 == i:
-            connCenter(ctl, gDriver, ctlGhost)
-
-        else:
-            conn(ctl, gDriver, ctlGhost)
+        # conn(ctl, gDriver, ctlGhost)
+        print("ctl: {}, gDriver: {}, ctlGhost: {}".format(ctl, gDriver, ctlGhost))
 
         oParent = ctlGhost.getParent()
         npoName = "_".join(ctlGhost.name().split("_")[:-1]) + "_npo"
@@ -1055,24 +807,15 @@ def ghostSliderForMouth(ghostControls, intTra, surface, sliderParent):
         slider = primitive.addTransform(sliderParent, ctl.name() + "_slideDriven", t)
         sliders.append(slider)
 
-        # connexion
-        if 0 == i:
-            dm_node = node.createDecomposeMatrixNode(gDriver.attr("matrix"))
+        down, _, up = findPathAtoB(ctl, sliderParent)
+        mul_node = pm.createNode("multMatrix")
+        j = k = 0
+        for j, d in enumerate(down):
+            d.attr("matrix") >> mul_node.attr("matrixIn[{}]".format(j))
+        for k, u in enumerate(up):
+            u.attr("inverseMatrix") >> mul_node.attr("matrixIn[{}]".format(k + j))
 
-        else:
-            mul_node = pm.createNode("multMatrix")
-            i = 0
-            parent = ctl
-            while parent != sliderParent:
-                parent.attr("matrix") >> mul_node.attr("matrixIn[{}]".format(i))
-                parent = parent.getParent()
-                print(parent)
-                i += 1
-                if 10 < i:
-                    logger.error("maximum recursion")
-                    break
-
-            dm_node = node.createDecomposeMatrixNode(mul_node.attr("matrixSum"))
+        dm_node = node.createDecomposeMatrixNode(mul_node.attr("matrixSum"))
 
         cps_node = pm.createNode("closestPointOnSurface")
         dm_node.attr("outputTranslate") >> cps_node.attr("inPosition")
@@ -1089,65 +832,61 @@ def ghostSliderForMouth(ghostControls, intTra, surface, sliderParent):
 
         pm.parent(ctlGhost.getParent(), slider)
 
-    sliders[0].visibility.set(False)
-    attribute.setKeyableAttributes(sliders[0], [])
+
+def getFullPath(start, routes=None):
+    # type: (pm.nt.transform, List[pm.nt.transform]) -> List[pm.nt.transform]
+    if not routes:
+        routes = []
+
+    if not start.getParent():
+        return routes
+
+    else:
+        return getFullPath(start.getParent(), routes + [start, ])
 
 
-def createGhostWithParentConstraint(ctl, parent=None, connect=True):
-    """Create a duplicated Ghost control
+def findPathAtoB(a, b):
+    # type: (pm.nt.transform, pm.nt.transform) -> Tuple[List[pm.nt.transform], pm.nt.transform, List[pm.nt.transform]]
+    """Returns route of A to B in formed Tuple[down(to root), turning point, up(to leaf)]"""
+    # aPath = ["x", "a", "b", "c"]
+    # bPath = ["b", "c"]
+    # down [x, a]
+    # turn b
+    # up []
 
-    Create a duplicate of the control and rename the original with _ghost.
-    Later connect the local transforms and the Channels.
-    This is useful to connect local rig controls with the final rig control.
+    aPath = getFullPath(a)
+    bPath = getFullPath(b)
 
-    Args:
-        ctl (dagNode): Original Control to duplicate
-        parent (dagNode): Parent for the new created control
+    return _findPathAtoB(aPath, bPath)
 
-    Returns:
-       pyNode: The new created control
+
+def _findPathAtoB(aPath, bPath):
+    # type: (List, List) -> Tuple[List, Any, List]
+    """Returns route of A to B in formed Tuple[down(to root), turning point, up(to leaf)]
+
+    >>> aPath = ["x", "a", "b", "c"]
+    >>> bPath = ["b", "c"]
+    >>> d, c, u = _findPathAtoB(aPath, bPath)
+    >>> d == ["x", "a"]
+    True
+    >>> c == "b"
+    True
+    >>> u == []
+    True
 
     """
-    if isinstance(ctl, basestring):
-        ctl = pm.PyNode(ctl)
-    if parent:
-        if isinstance(parent, basestring):
-            parent = pm.PyNode(parent)
-    grps = ctl.listConnections(t="objectSet")
-    for grp in grps:
-        grp.remove(ctl)
-    oName = ctl.name()
-    pm.rename(ctl, oName + "_ghost")
-    newCtl = pm.duplicate(ctl, po=True)[0]
-    pm.rename(newCtl, oName)
-    source2 = pm.duplicate(ctl)[0]
-    for shape in source2.getShapes():
-        pm.parent(shape, newCtl, r=True, s=True)
-        pm.rename(shape, newCtl.name() + "Shape")
-        pm.parent(shape, newCtl, r=True, s=True)
-    pm.delete(source2)
-    if parent:
-        pm.parent(newCtl, parent)
-        oTra = pm.createNode("transform",
-                             n=newCtl.name() + "_npo",
-                             p=parent, ss=True)
-        oTra.setMatrix(ctl.getParent().getMatrix(worldSpace=True),
-                       worldSpace=True)
-        pm.parent(newCtl, oTra)
-    if connect:
-        pm.parentConstraint(newCtl, ctl, mo=True)
-        # rigbits.connectLocalTransform([newCtl, ctl])
-        rigbits.connectUserDefinedChannels(newCtl, ctl)
-    for grp in grps:
-        grp.add(newCtl)
+    down = []
+    up = []
+    sharedNode = None
 
-    # add control tag
-    node.add_controller_tag(newCtl, parent)
+    for u in aPath:
+        if u in bPath:
+            sharedNode = u
+            break
 
-    return newCtl
+        down.append(u)
 
+    idx = bPath.index(sharedNode)
+    up = list(reversed(bPath[:(idx)]))
 
-
-
-if __name__ == "__main__":
-    pass
+    return down, sharedNode, up
