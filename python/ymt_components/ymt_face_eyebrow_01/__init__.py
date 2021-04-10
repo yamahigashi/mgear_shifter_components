@@ -120,6 +120,7 @@ class Component(component.Main):
         self.midDivisions = 3
         self.secDivisions = 3
         self.secondary_ctl_check = True
+        self.secCtlColor = 13
 
         self.rigCurves = []
         self.mainCtlCurves = []
@@ -179,10 +180,6 @@ class Component(component.Main):
         self.rootPos = self.guide.apos[0]
 
         self.uplocsPos = self.guide.apos[2:self.num_uplocs + 2]
-        self.lowlocsPos = self.guide.apos[2 + self.num_uplocs:-5]
-
-        # print(len(self.uplocsPos), self.num_uplocs, self.uplocsPos)
-        # print(len(self.lowlocsPos),self.num_lowlocs,  self.lowlocsPos)
 
         self.offset = (self.frontPos - self.rootPos) * 0.3
         if self.negate:
@@ -199,8 +196,8 @@ class Component(component.Main):
         # self.addControlJoints()
         # self.addControllers()
         # self.addConstraints()
-        for crv in self.mainCurves:
-            pm.delete(crv)
+        # for crv in self.mainCurves:
+        #     pm.delete(crv)
 
     def addContainers(self):
 
@@ -209,14 +206,16 @@ class Component(component.Main):
         self.crv_root = addTransform(self.root, self.getName("crvs"), t)
         self.lipsRope_root = addTransform(self.root, self.getName("rope"), t)
 
-        self.mainControlParentGrp = addTransform(self.root, self.getName("mainControls"), t)
+        # self.mainControlParentGrp = addTransform(self.root, self.getName("mainControls"), t)
+        w = (self.outPos - self.inPos).length()
+        d = (self.upPos - self.lowPos).length()
+        self.mainControlParentGrp = self.addCtl( self.root, "mainControls", t, self.color_ik, "square", w=w, d=d, ro=datatypes.Vector(1.57079633, 0, 0), po=datatypes.Vector(0, 0, 1.0))
         self.secondaryControlsParentGrp = addTransform(self.root, self.getName("secondaryControls"), t)
         self.browsHooks_root = addTransform(self.root, self.getName("hooks"), t)
         self.browsRope_root = addTransform(self.root, self.getName("rope"), t)
 
     def getNumberOfLocators(self, query):
         # type: (Text) -> int
-        """ _uplocs."""
         num = 0
         for k, v in self.guide.tra.items():
             if query in k:
@@ -231,7 +230,6 @@ class Component(component.Main):
         positions = [self.inPos]
         positions.extend(self.uplocsPos)
         positions.append(self.outPos)
-        positions.extend(reversed(self.lowlocsPos))
 
         return draw_eye_guide_mesh_plane(positions, self.root)
         # return mgear_util.draw_eye_guide_mesh_plane(joint_points)
@@ -260,7 +258,9 @@ class Component(component.Main):
         crv.attr("visibility").set(False)
 
         mainCtrlPos = helpers.divideSegment(crv, self.midDivisions)
-        secCtrlPos = helpers.divideSegment(crv, self.secDivisions)
+        secCtrlPos = [self.inPos]
+        secCtrlPos.extend(self.uplocsPos)
+        secCtrlPos.append(self.outPos)
 
         self.mainCurve = crv
         self.mainCurves.append(crv)
@@ -286,26 +286,28 @@ class Component(component.Main):
                 iterator = enumerate(reversed(secCtrlPos))
             else:
                 iterator = enumerate(secCtrlPos)
+
             for i, ctlPos in iterator:
                 secCtrlOptions.append(self._foreachSecCtrlPos(i, ctlPos, sec_number_index))
 
+        # mainCtrl = self.addCtl(self.root, )
         self.mainControls = []
         self.mainUpvs = []
-        for j, ctlOptions in enumerate(mainCtrlOptions):
-            ctl, upv = self._foreachControlOption(self.mainControlParentGrp, i, ctlOptions)
+        for ctlOptions in mainCtrlOptions:
+            ctl, upv = self._foreachControlOption(self.mainControlParentGrp, ctlOptions)
             self.mainControls.append(ctl)
             self.mainUpvs.append(upv)
         self.addMainCnsCurve(self.mainControls)
 
         self.secondaryControls = []
         self.secUpvs = []
-        for j, ctlOptions in enumerate(secCtrlOptions):
-            ctl, upv = self._foreachControlOption(self.secondaryControlsParentGrp, i, ctlOptions)
+        for ctlOptions in secCtrlOptions:
+            ctl, upv = self._foreachControlOption(self.secondaryControlsParentGrp, ctlOptions)
             self.secondaryControls.append(ctl)
             self.secUpvs.append(upv)
         self.addSecondaryCnsCurve(self.secondaryControls)
 
-    def _foreachControlOption(self, controlParentGrp, i, ctlOptions):
+    def _foreachControlOption(self, controlParentGrp, ctlOptions):
 
         oName = ctlOptions[0]
         oSide = ctlOptions[1]
@@ -379,17 +381,17 @@ class Component(component.Main):
         v = self.root.getTranslation(space="world")
 
         mainRope = curve.createCurveFromCurve(self.mainCurve, self.getName("mainRope"), nbPoints=self.NB_ROPE, parent=self.root)
-        mainRope.setTranslation(v, om.MSpace.kWorld)
+        # mainRope.setTranslation(v, om.MSpace.kWorld)
         self.rigCurves.append(mainRope)
         self.mainRopes.append(mainRope)
 
         mainRope_upv = curve.createCurveFromCurve(self.mainCurve, self.getName("mainRope_upv"), nbPoints=self.NB_ROPE, parent=self.root)
-        mainRope_upv.setTranslation(v, om.MSpace.kWorld)
+        # mainRope_upv.setTranslation(v, om.MSpace.kWorld)
         self.rigCurves.append(mainRope_upv)
         self.mainRopeUpvs.append(mainRope_upv)
 
         mainCrv_upv = curve.createCurveFromCurve(self.mainCurve, self.getName("mainCrv_upv"), nbPoints=7, parent=self.root)
-        mainCrv_upv.setTranslation(v, om.MSpace.kWorld)
+        # mainCrv_upv.setTranslation(v, om.MSpace.kWorld)
         self.rigCurves.append(mainCrv_upv)
         self.mainCurveUpvs.append(mainCrv_upv)
 
@@ -412,14 +414,16 @@ class Component(component.Main):
         self.rigCurves.append(crv[0])
 
     def _foreachSecCtrlPos(self, i, ctlPos, sec_number_index):
+
         if self.side == "R":
             i_name = sec_number_index - i
         else:
             i_name = i
 
-        controlType = "square"
+        controlType = "circle"
         posPrefix = "sec_" + str(i_name).zfill(2)
-        options = [posPrefix, self.side, controlType, 13, 0.55, [], ctlPos]
+        options = [posPrefix, self.side, controlType, self.secCtlColor, 0.55, [], ctlPos]
+
         return options
 
     def _foreachMainCtrlPos(self, i, ctlPos, isLast):
@@ -445,15 +449,15 @@ class Component(component.Main):
         tPrefix = [posPrefix + "_tangent", posPrefix]
 
         if i == 0:
-            options.append([tPrefix[1], self.side, tControlType[1], 6, tControlSize[1], [], ctlPos])
-            options.append([tPrefix[0], self.side, tControlType[0], 6, tControlSize[0], [], ctlPos])
+            options.append([tPrefix[1], self.side, tControlType[1], self.color_ik, tControlSize[1], [], ctlPos])
+            options.append([tPrefix[0], self.side, tControlType[0], self.color_ik, tControlSize[0], [], ctlPos])
 
         elif isLast:
-            options.append([tPrefix[0], self.side, tControlType[0], 6, tControlSize[0], [], ctlPos])
-            options.append([tPrefix[1], self.side, tControlType[1], 6, tControlSize[1], [], ctlPos])
+            options.append([tPrefix[0], self.side, tControlType[0], self.color_ik, tControlSize[0], [], ctlPos])
+            options.append([tPrefix[1], self.side, tControlType[1], self.color_ik, tControlSize[1], [], ctlPos])
 
         else:
-            options.append([posPrefix, self.side, controlType, 6, 1.0, [], ctlPos])
+            options.append([posPrefix, self.side, controlType, self.color_ik, 1.0, [], ctlPos])
 
         return options
 
@@ -461,6 +465,9 @@ class Component(component.Main):
         pm.parent(self.mainControls[1].getParent(2), self.mainControls[0])
         pm.parent(self.mainControls[-2].getParent(2), self.mainControls[-1])
 
+        return
+
+        # TODO: fix later
         for ctl in self.mainControls:
             if "_tangent" not in ctl.name():
                 pm.parent(ctl.getParent(2), self.root)
@@ -485,21 +492,12 @@ class Component(component.Main):
         for j, crv in enumerate(self.secondaryCurves):
 
             lvlType = 'transform'
-            cvs = crv.getCVs(space="world")
+            cvs = crv.getCVs(space="object")
 
             for i, cv in enumerate(cvs):
 
-                oTransUpV = pm.PyNode(pm.createNode(
-                    lvlType,
-                    n=self.getName("secNpoUpv", str(i).zfill(3)),
-                    p=self.browsHooks_root,
-                    ss=True))
-
-                oTrans = pm.PyNode(pm.createNode(
-                    lvlType,
-                    n=self.getName("secNpo", str(i).zfill(3)),
-                    p=self.browsHooks_root,
-                    ss=True))
+                oTransUpV = pm.PyNode(pm.createNode(lvlType, n=self.getName("secNpoUpv", str(i).zfill(3)), p=self.browsHooks_root, ss=True))
+                oTrans = pm.PyNode(pm.createNode(lvlType, n=self.getName("secNpo", str(i).zfill(3)), p=self.browsHooks_root, ss=True))
 
                 oParam, oLength = curve.getCurveParamAtPosition(crv, cv)
                 uLength = curve.findLenghtFromParam(crv, oParam)
@@ -530,9 +528,8 @@ class Component(component.Main):
         # set drivers
         def wire(s, d):
             wire = pm.wire(s, w=d, dropoffDistance=[0, 1000])
-            print(wire)
             # pm.connectAttr(s.attr("local"),       wire[0].attr("baseWire[0]"),     f=True)  # tobe local space
-            pm.connectAttr(d.attr("local"), wire[0].attr("deformedWire[0]"), f=True)  # tobe local space
+            # pm.connectAttr(d.attr("local"), wire[0].attr("deformedWire[0]"), f=True)  # tobe local space
 
         crvDrivers = []
         if self.secondary_ctl_check is True:
