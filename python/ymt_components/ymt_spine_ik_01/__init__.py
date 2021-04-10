@@ -833,7 +833,10 @@ class Component(component.Main):
 
         self.relatives["root"] = self.fk_hip_ctl
         self.relatives["eff"] = self.fk_ctl[-1]
+
         self.controlRelatives["root"] = self.fk_hip_ctl
+        self.controlRelatives["eff"] = self.fk_ctl[-1]
+
         self.jointRelatives["root"] = 0
 
         # for i in range(0, len(self.fk_ctl) - 1):
