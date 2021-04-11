@@ -312,7 +312,7 @@ class Component(component.Main):
 
         self.over_npo = addTransform(self.root, self.getName("center_lookatRoot"), t)
         self.over_ctl = self.addCtl(self.over_npo,
-                                    self.getName("over_%s" % self.ctlName),
+                                    "over_%s" % self.ctlName,
                                     t,
                                     self.color_ik,
                                     "square",
@@ -354,7 +354,7 @@ class Component(component.Main):
         self.arrow_npo = addTransform(self.root, self.getName("aim_npo"), t_look)
         self.arrow_ctl = self.addCtl(
             self.arrow_npo,
-            self.getName("aim_%s" % self.ctlName),
+            "aim_%s" % self.ctlName,
             t_look,
             self.color_ik,
             "arrow",
@@ -435,7 +435,7 @@ class Component(component.Main):
                 self.trackLvl.append(npo)
 
             ctl = self.addCtl(npo,
-                              self.getName("%s_%s" % (ctlNames[i], self.ctlName)),
+                              "%s_%s" % (ctlNames[i], self.ctlName),
                               t,
                               color,
                               icon_shape,
@@ -496,7 +496,7 @@ class Component(component.Main):
             npo = addTransform(self.jnt_root, npo_name, xform)
             applyop.aimCns(npo, trn, axis="zy", wupObject=self.jnt_root)
 
-            ctl_name = self.getName("crvdetail%s_%s" % (i, self.ctlName))
+            ctl_name = "crvdetail%s_%s" % (i, self.ctlName)
             xform = setMatrixPosition(t, cv)
             ctl = self.addCtl(
                 npo,

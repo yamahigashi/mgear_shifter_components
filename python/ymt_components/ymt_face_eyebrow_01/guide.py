@@ -31,8 +31,8 @@ AUTHOR = "yamahigashi"
 EMAIL = "yamahigashi@gmail.com"
 URL = "github.com/yamahigashi"
 VERSION = [1, 0, 0]
-TYPE = "ymt_face_lip_01"
-NAME = "lip"
+TYPE = "ymt_face_eyebrow_01"
+NAME = "eyebrow"
 DESCRIPTION = ""
 
 ##########################################################
@@ -52,46 +52,24 @@ class Guide(guide.ComponentGuide):
     email = EMAIL
     version = VERSION
 
-    connectors = ["mouth_01"]
-
     def postInit(self):
         """Initialize the position for the guide"""
 
-        self.save_transform = ["root", "sliding_surface", "#_uploc", "#_lowloc", "inloc", "outloc", "uploc", "lowloc", "tan"]
+        self.save_transform = ["root", "sliding_surface", "#_uploc", "uploc", "lowloc", "tan"]
         self.save_blade = ["blade"]
         self.addMinMax("#_uploc", 1, -1)
-        self.addMinMax("#_lowloc", 1, -1)
 
     def addObjects(self):
         """Add the Guide Root, blade and locators"""
 
         self.root = self.addRoot()
         self.uplocs = self.addLocMulti("#_uploc", self.root)
-        self.lowlocs = self.addLocMulti("#_lowloc", self.root)
-
-        v = transform.getOffsetPosition(self.root, [-1, 0.0, 0.0])
-        self.inPos = self.addLoc("inloc", self.root, v)
-
-        v = transform.getOffsetPosition(self.root, [1., 0.0, 0.0])
-        self.outPos = self.addLoc("outloc", self.root, v)
 
         v = transform.getOffsetPosition(self.root, [0., 1.0, 0.0])
         self.upPos = self.addLoc("uploc", self.root, v)
 
-        v = transform.getOffsetPosition(self.root, [0., -1.0, 0.0])
+        v = transform.getOffsetPosition(self.root, [0., -0.1, 0.0])
         self.lowPos = self.addLoc("lowloc", self.root, v)
-
-        centers = [self.inPos]
-        centers.extend(self.uplocs)
-        centers.append(self.outPos)
-        self.dispcrv = self.addDispCurve("crv", centers)
-        self.addDispCurve("crvRef", centers, 3)
-
-        centers = [self.inPos]
-        centers.extend(self.lowlocs)
-        centers.append(self.outPos)
-        self.dispcrv = self.addDispCurve("crv", centers)
-        self.addDispCurve("crvRef", centers, 3)
 
         v = transform.getOffsetPosition(self.root, [0, 0.0000001, 2.5])
         self.tan = self.addLoc("tan", self.root, v)
@@ -108,26 +86,21 @@ class Guide(guide.ComponentGuide):
         pm.importFile(os.path.join(os.path.dirname(__file__), "assets", "surface.ma"))
         sliding_surface = pm.PyNode("sliding_surface")
         pm.rename(sliding_surface, self.getName("sliding_surface"))
-        # sliding_surface.visibility.set(False)
 
         sliding_surface.setTransformation(self.tra[name])
         pm.parent(sliding_surface, parent)
 
         return sliding_surface
 
-
     def addParameters(self):
         """Add the configurations settings"""
 
-        self.pNeutralPose = self.addParam("neutralpose", "bool", False)
-        self.pOverrideNegate = self.addParam("overrideNegate", "bool", False)
-
-        self.pIk0RefArray = self.addParam("ik0refarray", "string", "")
-        self.pIk1RefArray = self.addParam("ik1refarray", "string", "")
-
-        self.pUseIndex = self.addParam("useIndex", "bool", False)
-        self.pParentJointIndex = self.addParam(
-            "parentJointIndex", "long", -1, None, None)
+        self.pUseIndex         = self.addParam("useIndex",         "bool", False)
+        self.pNeutralPose      = self.addParam("neutralpose",      "bool", False)
+        self.pOverrideNegate   = self.addParam("overrideNegate",   "bool", False)
+        self.pAddJoints        = self.addParam("addJoints",        "bool", True)
+        self.pSlidingSurface   = self.addParam("isSlidingSurface", "bool", True)
+        self.pParentJointIndex = self.addParam("parentJointIndex", "long", -1, None, None)
 
     def modalPositions(self):
         """Launch a modal dialog to set position of the guide."""
@@ -139,38 +112,40 @@ class Guide(guide.ComponentGuide):
 
             if "#" in name:
 
-                print(name)
-
                 init_window = chain_guide_initializer.exec_window()
                 if init_window:
                     self.sections_number = init_window.sections_number
                     self.dir_axis = init_window.dir_axis
                     self.spacing = init_window.spacing
 
-                # None the action is cancel
                 else:
                     return False
 
                 if self.sections_number:
                     if self.dir_axis == 0:  # X
                         offVec = datatypes.Vector(self.spacing, 0, 0)
+
                     elif self.dir_axis == 3:  # -X
                         offVec = datatypes.Vector(self.spacing * -1, 0, 0)
+
                     elif self.dir_axis == 1:  # Y
                         offVec = datatypes.Vector(0, self.spacing, 0)
+
                     elif self.dir_axis == 4:  # -Y
                         offVec = datatypes.Vector(0, self.spacing * -1, 0)
+
                     elif self.dir_axis == 2:  # Z
                         offVec = datatypes.Vector(0, 0, self.spacing)
+
                     elif self.dir_axis == 5:  # -Z
                         offVec = datatypes.Vector(0, 0, self.spacing * -1)
 
-                    newPosition = datatypes.Vector(0, 0, 0)
+                    newPosition = datatypes.Vector(0, 0.0, 0)
                     for i in range(self.sections_number):
                         newPosition = offVec + newPosition
                         localName = string.replaceSharpWithPadding(name, i)
-                        self.tra[localName] = transform.getTransformFromPos(
-                            newPosition)
+                        self.tra[localName] = transform.getTransformFromPos(newPosition)
+
         return True
 
 
@@ -223,29 +198,8 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
 
         # populate component settings
         self.populateCheck(self.settingsTab.overrideNegate_checkBox, "overrideNegate")
-
-        ik0RefArrayItems = self.root.attr("ik0refarray").get().split(",")
-        for item in ik0RefArrayItems:
-            self.settingsTab.ik0RefArray_listWidget.addItem(item)
-
-        ik1RefArrayItems = self.root.attr("ik1refarray").get().split(",")
-        for item in ik1RefArrayItems:
-            self.settingsTab.ik1RefArray_listWidget.addItem(item)
-
-        for cnx in Guide.connectors:
-            self.mainSettingsTab.connector_comboBox.addItem(cnx)
-
-        cBox = self.mainSettingsTab.connector_comboBox
-        self.connector_items = [cBox.itemText(i) for i in range(cBox.count())]
-        currentConnector = self.root.attr("connector").get()
-        if currentConnector not in self.connector_items:
-            self.mainSettingsTab.connector_comboBox.addItem(currentConnector)
-            self.connector_items.append(currentConnector)
-            pm.displayWarning("The current connector: %s, is not a valid "
-                              "connector for this component. "
-                              "Build will Fail!!")
-        comboIndex = self.connector_items.index(currentConnector)
-        self.mainSettingsTab.connector_comboBox.setCurrentIndex(comboIndex)
+        self.populateCheck(self.settingsTab.addJoints_checkBox,      "addJoints")
+        self.populateCheck(self.settingsTab.isSlidingSurface,        "isSlidingSurface")
 
     def create_componentLayout(self):
 
@@ -262,21 +216,15 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
                     self.settingsTab.overrideNegate_checkBox,
                     "overrideNegate"))
 
-        self.settingsTab.ik0RefArrayAdd_pushButton.clicked.connect(
-            partial(self.addItem2listWidget,
-                    self.settingsTab.ik0RefArray_listWidget,
-                    "ik0refarray"))
+        self.settingsTab.addJoints_checkBox.stateChanged.connect(
+            partial(self.updateCheck,
+                    self.settingsTab.addJoints_checkBox,
+                    "addJoints"))
 
-        self.settingsTab.ik0RefArrayRemove_pushButton.clicked.connect(
-            partial(self.removeSelectedFromListWidget,
-                    self.settingsTab.ik0RefArray_listWidget,
-                    "ik0refarray"))
-
-        self.mainSettingsTab.connector_comboBox.currentIndexChanged.connect(
-            partial(self.updateConnector,
-                    self.mainSettingsTab.connector_comboBox,
-                    self.connector_items))
-
+        self.settingsTab.isSlidingSurface.stateChanged.connect(
+            partial(self.updateCheck,
+                    self.settingsTab.isSlidingSurface,
+                    "isSlidingSurface"))
 
     def updateMasterChain(self, lEdit, targetAttr):
         oType = pm.nodetypes.Transform
