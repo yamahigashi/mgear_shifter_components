@@ -622,6 +622,7 @@ class Component(component.Main):
         self.sliding_surface = pm.duplicate(self.guide.getObjects(self.guide.root)["sliding_surface"])[0]
         pm.parent(self.sliding_surface, self.root)
         self.sliding_surface.visibility.set(False)
+        pm.makeIdentity(self.sliding_surface, apply=True, t=1,  r=1, s=1, n=0, pn=1)
 
         # create interpose lvl for the ctl
         intTra = rigbits.createInterpolateTransform([lipup_ref, liplow_ref])
