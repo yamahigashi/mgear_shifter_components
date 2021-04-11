@@ -617,6 +617,29 @@ class Component(component.Main):
         self.connect_slide_ghost(lipup_ref, liplow_ref, slide_c_ref, corner_l_ref, corner_r_ref)
         self.connect_mouth_ghost(lipup_ref, liplow_ref, slide_c_ref, corner_l_ref, corner_r_ref)
 
+    def _createGhostCtl(self, t, p, invert):
+
+        ctl = ghost.createGhostCtl(t, p)
+        ctl.attr("isCtl") // t.attr("isCtl")
+        ctl.attr("isCtl").set(not invert)
+        t.attr("isCtl").set(invert)
+
+        print(ctl.name(), t.name())
+        if invert:
+            pass
+            # self._visi_off_lock(t)
+
+        return ctl
+
+    def _visi_off_lock(self, node):
+        """Short cuts."""
+        cmds.setAttr("{}.visibility".format(node.name()), l=False)
+        node.visibility.set(False)
+        try:
+            attribute.setKeyableAttributes(node, [])
+        except:
+            pass
+
     def connect_slide_ghost(self, lipup_ref, liplow_ref, slide_c_ref, corner_l_ref, corner_r_ref):
 
         self.sliding_surface = pm.duplicate(self.guide.getObjects(self.guide.root)["sliding_surface"])[0]
@@ -629,16 +652,9 @@ class Component(component.Main):
         pm.rename(intTra, intTra.name() + "_int")
 
         # create ghost controls
-        self.mouthSlide_ctl = ghost.createGhostCtl(slide_c_ref, intTra)
-        self.cornerL_ctl = ghost.createGhostCtl(corner_l_ref, slide_c_ref)
-        self.cornerR_ctl = ghost.createGhostCtl(corner_r_ref, slide_c_ref)
-        # self.cornerL_ctl = createGhostWithParentConstraint(corner_l_ref, slide_c_ref)
-        # self.cornerR_ctl = createGhostWithParentConstraint(corner_r_ref, slide_c_ref)
-
-        # pm.parent(corner_l_ref.parent, slide_c_ref)
-        # pm.parent(corner_r_ref.parent, slide_c_ref)
-        # attribute.setKeyableAttributes(self.lips_L_Corner_npo)
-        # attribute.setKeyableAttributes(self.lips_R_Corner_npo)
+        self.mouthSlide_ctl = self._createGhostCtl(slide_c_ref, intTra, False)
+        self.cornerL_ctl = self._createGhostCtl(corner_l_ref, slide_c_ref, True)
+        self.cornerR_ctl = self._createGhostCtl(corner_r_ref, slide_c_ref, True)
 
         # slide system
         ghostSliderForMouth(
@@ -653,6 +669,7 @@ class Component(component.Main):
         pm.connectAttr(self.cornerR_ctl.scale, corner_r_ref.scale)
 
         # connect pucker
+        cmds.setAttr("{}.tz".format(slide_c_ref.name()), l=False)
         pm.connectAttr(self.mouthSlide_ctl.tz, slide_c_ref.tz)
 
         pm.parentConstraint(corner_l_ref, self.lips_L_Corner_npo, mo=True)
@@ -661,14 +678,8 @@ class Component(component.Main):
     def connect_mouth_ghost(self, lipup_ref, liplow_ref, slide_c_ref, corner_l_ref, corner_r_ref):
 
         # center main controls
-        # self.lips_C_upper_ctl = ghost.createGhostCtl(self.lips_C_upper_ctl, lipup_ref)
-        # self.lips_C_lower_ctl = ghost.createGhostCtl(self.lips_C_lower_ctl, liplow_ref)
         self.lips_C_upper_ctl = createGhostWithParentConstraint(self.lips_C_upper_ctl, lipup_ref)
         self.lips_C_lower_ctl = createGhostWithParentConstraint(self.lips_C_lower_ctl, liplow_ref)
-
-        # unlock all the attributes in the upper and lower lip control
-        # attribute.setKeyableAttributes(self.lips_C_upper_ctl)
-        # attribute.setKeyableAttributes(self.lips_C_lower_ctl)
 
         # add slider offset
         npos = rigbits.addNPO([self.lips_C_upper_ctl, self.lips_C_lower_ctl])
@@ -676,6 +687,7 @@ class Component(component.Main):
             rigbits.connectLocalTransform([self.mouthSlide_ctl, c])
             # pm.parentConstraint(slide_c_ref, c, mo=True)
 
+        return
         # Left side controls
         self.lips_L_upInner_ctl = createGhostWithParentConstraint(self.lips_L_upInner_ctl, self.lips_C_upper_ctl)
         self.lips_L_lowInner_ctl = createGhostWithParentConstraint(self.lips_L_lowInner_ctl, self.lips_C_lower_ctl)
