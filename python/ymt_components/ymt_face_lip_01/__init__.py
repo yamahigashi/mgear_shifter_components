@@ -332,14 +332,8 @@ class Component(component.Main):
             uLength = curve.findLenghtFromParam(rope, oParam)
             u = uLength / oLength
 
-            cns = applyop.pathCns(upv, rope_upv, cnsType=False, u=u, tangent=False)
-            pm.connectAttr(rope_upv.attr("local"), cns.attr("geometryPath"), f=True)  # tobe local space
-
-            cns = applyop.pathCns(npo, rope, cnsType=False, u=u, tangent=False)
-            pm.connectAttr(rope.attr("local"), cns.attr("geometryPath"), f=True)  # tobe local space
-            cns.setAttr("worldUpType", 1)
-            cns.setAttr("frontAxis", 0)
-            cns.setAttr("upAxis", 1)
+            cns = applyPathCnsLocal(upv, rope_upv, u)
+            cns = applyPathCnsLocal(npo, rope, u)
 
             pm.connectAttr(upv.attr("worldMatrix[0]"), cns.attr("worldUpMatrix"))
 
@@ -608,8 +602,6 @@ class Component(component.Main):
             raise
 
     def connect_standard(self):
-        print("ccccccccccccccccccc")
-
         self.parent.addChild(self.root)
 
         return
@@ -915,5 +907,22 @@ def createGhostWithParentConstraint(ctl, parent=None, connect=True):
     return newCtl
 
 
-if __name__ == "__main__":
-    pass
+def applyPathCnsLocal(target, curve, u):
+    cns = applyop.pathCns(target, curve, cnsType=False, u=u, tangent=False)
+    pm.connectAttr(curve.attr("local"), cns.attr("geometryPath"), f=True)  # tobe local space
+
+    comp_node = pm.createNode("composeMatrix")
+    cns.attr("allCoordinates") >> comp_node.attr("inputTranslate")
+    cns.attr("rotate") >> comp_node.attr("inputRotate")
+    cns.attr("rotateOrder") >> comp_node.attr("inputRotateOrder")
+
+    mul_node = pm.createNode("multMatrix")
+    comp_node.attr("outputMatrix") >> mul_node.attr("matrixIn[0]")
+    curve.attr("matrix") >> mul_node.attr("matrixIn[1]")
+
+    decomp_node = pm.createNode("decomposeMatrix")
+    mul_node.attr("matrixSum") >> decomp_node.attr("inputMatrix")
+    decomp_node.attr("outputTranslate") >> target.attr("translate")
+    decomp_node.attr("outputRotate") >> target.attr("rotate")
+
+    return cns
