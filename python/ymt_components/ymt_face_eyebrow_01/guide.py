@@ -55,7 +55,7 @@ class Guide(guide.ComponentGuide):
     def postInit(self):
         """Initialize the position for the guide"""
 
-        self.save_transform = ["root", "sliding_surface", "#_uploc", "inloc", "outloc", "uploc", "lowloc", "tan"]
+        self.save_transform = ["root", "sliding_surface", "#_uploc", "uploc", "lowloc", "tan"]
         self.save_blade = ["blade"]
         self.addMinMax("#_uploc", 1, -1)
 
@@ -65,28 +65,11 @@ class Guide(guide.ComponentGuide):
         self.root = self.addRoot()
         self.uplocs = self.addLocMulti("#_uploc", self.root)
 
-        v = transform.getOffsetPosition(self.root, [-1, 0.0, 0.0])
-        self.inPos = self.addLoc("inloc", self.root, v)
-
-        v = transform.getOffsetPosition(self.root, [1., 0.0, 0.0])
-        self.outPos = self.addLoc("outloc", self.root, v)
-
         v = transform.getOffsetPosition(self.root, [0., 1.0, 0.0])
         self.upPos = self.addLoc("uploc", self.root, v)
 
-        v = transform.getOffsetPosition(self.root, [0., -1.0, 0.0])
+        v = transform.getOffsetPosition(self.root, [0., -0.1, 0.0])
         self.lowPos = self.addLoc("lowloc", self.root, v)
-
-        centers = [self.inPos]
-        centers.extend(self.uplocs)
-        centers.append(self.outPos)
-        self.dispcrv = self.addDispCurve("crv", centers)
-        self.addDispCurve("crvRef", centers, 3)
-
-        centers = [self.inPos]
-        centers.append(self.outPos)
-        self.dispcrv = self.addDispCurve("crv", centers)
-        self.addDispCurve("crvRef", centers, 3)
 
         v = transform.getOffsetPosition(self.root, [0, 0.0000001, 2.5])
         self.tan = self.addLoc("tan", self.root, v)
@@ -103,7 +86,6 @@ class Guide(guide.ComponentGuide):
         pm.importFile(os.path.join(os.path.dirname(__file__), "assets", "surface.ma"))
         sliding_surface = pm.PyNode("sliding_surface")
         pm.rename(sliding_surface, self.getName("sliding_surface"))
-        # sliding_surface.visibility.set(False)
 
         sliding_surface.setTransformation(self.tra[name])
         pm.parent(sliding_surface, parent)
@@ -113,22 +95,12 @@ class Guide(guide.ComponentGuide):
     def addParameters(self):
         """Add the configurations settings"""
 
-        self.pNeutralPose = self.addParam("neutralpose", "bool", False)
-        self.pOverrideNegate = self.addParam("overrideNegate", "bool", False)
-
-        self.pIk0RefArray = self.addParam("ik0refarray", "string", "")
-        self.pIk1RefArray = self.addParam("ik1refarray", "string", "")
-
-        self.pUseIndex = self.addParam("useIndex", "bool", False)
-        self.pParentJointIndex = self.addParam(
-            "parentJointIndex", "long", -1, None, None)
-
-    def get_divisions(self):
-        """ Returns correct segments divisions """
-
-        self.divisions = self.root.ikNb.get()
-
-        return self.divisions
+        self.pUseIndex         = self.addParam("useIndex",         "bool", False)
+        self.pNeutralPose      = self.addParam("neutralpose",      "bool", False)
+        self.pOverrideNegate   = self.addParam("overrideNegate",   "bool", False)
+        self.pAddJoints        = self.addParam("addJoints",        "bool", True)
+        self.pSlidingSurface   = self.addParam("isSlidingSurface", "bool", True)
+        self.pParentJointIndex = self.addParam("parentJointIndex", "long", -1, None, None)
 
     def modalPositions(self):
         """Launch a modal dialog to set position of the guide."""
@@ -168,7 +140,7 @@ class Guide(guide.ComponentGuide):
                     elif self.dir_axis == 5:  # -Z
                         offVec = datatypes.Vector(0, 0, self.spacing * -1)
 
-                    newPosition = datatypes.Vector(0, 0.5, 0)
+                    newPosition = datatypes.Vector(0, 0.0, 0)
                     for i in range(self.sections_number):
                         newPosition = offVec + newPosition
                         localName = string.replaceSharpWithPadding(name, i)
@@ -225,8 +197,9 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
         self.tabs.insertTab(1, self.settingsTab, "Component Settings")
 
         # populate component settings
-        self.populateCheck(self.settingsTab.overrideNegate_checkBox,
-                           "overrideNegate")
+        self.populateCheck(self.settingsTab.overrideNegate_checkBox, "overrideNegate")
+        self.populateCheck(self.settingsTab.addJoints_checkBox,      "addJoints")
+        self.populateCheck(self.settingsTab.isSlidingSurface,        "isSlidingSurface")
 
     def create_componentLayout(self):
 
@@ -243,8 +216,15 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
                     self.settingsTab.overrideNegate_checkBox,
                     "overrideNegate"))
 
-        self.settingsTab.ikProfile_pushButton.clicked.connect(
-            self.setProfile)
+        self.settingsTab.addJoints_checkBox.stateChanged.connect(
+            partial(self.updateCheck,
+                    self.settingsTab.addJoints_checkBox,
+                    "addJoints"))
+
+        self.settingsTab.isSlidingSurface.stateChanged.connect(
+            partial(self.updateCheck,
+                    self.settingsTab.isSlidingSurface,
+                    "isSlidingSurface"))
 
     def updateMasterChain(self, lEdit, targetAttr):
         oType = pm.nodetypes.Transform

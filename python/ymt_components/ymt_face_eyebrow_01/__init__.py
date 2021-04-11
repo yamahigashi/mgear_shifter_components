@@ -108,15 +108,10 @@ class Component(component.Main):
                                 0, 0, 0,
                                 0, 0, 0]
 
-        self.settings["connect_surface_slider"] = True
+        self.connect_surface_slider = self.settings["isSlidingSurface"]
 
         # -------------------------------------------------------
         self.ctlName = "ctl"
-        self.blinkH = 0.2
-        self.upperVTrack = 0.04
-        self.upperHTrack = 0.01
-        self.lowerVTrack = 0.02
-        self.lowerHTrack = 0.01
 
         self.FRONT_OFFSET = .02
         self.NB_ROPE = 15
@@ -138,44 +133,11 @@ class Component(component.Main):
         self.mainControls = []
         self.mainUpvs = []
         self.secondaryControls = []
-        self.secondaryUpvs = []
-        self.allJoints = []
-        self.closestVtxsList = []
-        # --------------------------------------------------------
-        self.ik_ctl = []
-        self.ik_npo = []
-        self.ik_roll_npo = []
-        self.ik_global_in = []
-        self.ik_local_in = []
-        self.ik_global_out = []
-        self.ik_global_ref = []
-        self.ik_uv_param = []
-        self.ik_decompose_rot = []
-
-        self.arrow_ctl = None
-        self.arrow_npo = None
-        self.upControls = []
-        self.lowControls = []
-        self.trackLvl = []
-
-        self.mainCurve = None
-        self.lowCrv = None
-        self.upCrv_ctl = None
-        self.lowCrv_ctl = None
-        self.upBlink = None
-        self.lowBlink = None
-        self.upTarget = None
-        self.lowTarget = None
-        self.midTarget = None
-        self.midTargetLower = None
-
-        self.previusTag = self.parentCtlTag
 
         # --------------------------------------------------------------------
         self.num_uplocs = self.getNumberOfLocators("_uploc")
-        self.num_lowlocs = self.getNumberOfLocators("_lowloc")
 
-        self.inPos = self.guide.apos[-5]
+        self.inPos = self.guide.apos[2]
         self.outPos = self.guide.apos[-4]
         self.upPos = self.guide.apos[-3]
         self.lowPos = self.guide.apos[-2]
@@ -196,13 +158,14 @@ class Component(component.Main):
         self.reparentControls()
         self.attachSecondaryControlsToMainCurve()
         self.connectWires()
-        # self.addControlJoints()
+
         # self.addControllers()
         # self.addConstraints()
         # for crv in self.mainCurves:
         #     pm.delete(crv)
 
-    def visi_off_lock(self, node):
+    def _visi_off_lock(self, node):
+        """Short cuts."""
         node.visibility.set(False)
         attribute.setKeyableAttributes(node, [])
         cmds.setAttr("{}.visibility".format(node.name()), l=False)
@@ -215,11 +178,11 @@ class Component(component.Main):
         self.rope_root = addTransform(self.root, self.getName("ropes"), t)
         self.browsHooks_root = addTransform(self.root, self.getName("hooks"), t)
 
-        self.visi_off_lock(self.crv_root)
-        self.visi_off_lock(self.rope_root)
-        self.visi_off_lock(self.browsHooks_root)
+        self._visi_off_lock(self.crv_root)
+        self._visi_off_lock(self.rope_root)
+        self._visi_off_lock(self.browsHooks_root)
 
-        if self.settings["connect_surface_slider"]:
+        if self.connect_surface_slider:
             self.slider_root = addTransform(self.root, self.getName("sliders"), t)
             attribute.setKeyableAttributes(self.slider_root, [])
 
@@ -242,11 +205,7 @@ class Component(component.Main):
     def addDummyPlane(self):
         # type: () -> om.MFnMesh
 
-        positions = [self.inPos]
-        positions.extend(self.uplocsPos)
-        positions.append(self.outPos)
-
-        return draw_eye_guide_mesh_plane(positions, self.root)
+        return draw_eye_guide_mesh_plane(self.uplocsPos, self.root)
         # return mgear_util.draw_eye_guide_mesh_plane(joint_points)
 
     def addCurve(self):
@@ -274,9 +233,7 @@ class Component(component.Main):
         attribute.setKeyableAttributes(crv, [])
 
         mainCtrlPos = helpers.divideSegment(crv, self.midDivisions)
-        secCtrlPos = [self.inPos]
-        secCtrlPos.extend(self.uplocsPos)
-        secCtrlPos.append(self.outPos)
+        secCtrlPos = self.uplocsPos
 
         self.mainCurve = crv
         self.mainCurves.append(crv)
@@ -556,75 +513,6 @@ class Component(component.Main):
             wire(self.mainRopes[i],     drv)
             wire(self.mainRopeUpvs[i],  drv)
 
-    def addControlJoints(self):
-        self.upJoints = self._addControlJoints(self.mainCurve, "up", self.rope_root, self.upRope, self.upRope_upv)
-
-    def _addControlJoints(self, crv, name, rope_root, rope, rope_upv):
-
-        lvlType = "transform"
-        cvs = crv.getCVs(space="world")
-        local_cvs = crv.getCVs(space="object")
-        controls = []
-        t = getTransform(self.root)
-
-        icon_shape = "sphere"
-        color = 4
-        wd = .3
-        po = self.offset * 0.3
-
-        pm.progressWindow(title='Creating Upper Joints', progress=0, max=len(cvs))
-
-        for i, cv in enumerate(cvs):
-            pm.progressWindow(e=True, step=1, status='\nCreating Joint for  %s' % cv)
-
-            upv = addTransform(rope_root, self.getName("{}LipRope_upv{}".format(name, str(i).zfill(3))))
-            npo = addTransform(rope_root, self.getName("{}LipRope_npo{}".format(name, str(i).zfill(3))))
-
-            oParam, oLength = curve.getCurveParamAtPosition(rope, local_cvs[i])
-            uLength = curve.findLenghtFromParam(rope, oParam)
-            u = uLength / oLength
-
-            cns = applyPathCnsLocal(upv, rope_upv, u)
-            cns = applyPathCnsLocal(npo, rope, u)
-
-            pm.connectAttr(upv.attr("worldMatrix[0]"), cns.attr("worldUpMatrix"))
-
-            ctl_name = self.getName("crvdetail%s_%s" % (i, self.ctlName))
-
-            if i == 0:
-                # we know the curv starts from right to left
-                offset = [cv[0], cv[1], cv[2]]
-
-            elif i == len(cvs) - 1:
-                offset = [cv[0], cv[1], cv[2]]
-
-            else:
-                offset = [cv[0], cv[1], cv[2]]
-
-            # offset = [cv[0], cv[1], cv[2] - self.FRONT_OFFSET]
-            xform = setMatrixPosition(t, offset)
-            # xform = setMatrixPosition(t, cv)
-            ctl = self.addCtl(
-                npo,
-                ctl_name,
-                xform,
-                color,
-                icon_shape,
-                w=wd,
-                d=wd,
-                ro=datatypes.Vector(1.57079633, 0, 0),
-                po=po
-            )
-
-            controls.append(ctl)
-
-            # getting joint parent
-            # jnt = rigbits.addJnt(npo, noReplace=True, parent=self.j_parent)
-            self.jnt_pos.append([ctl, "{}{}".format(name, i)])
-
-        pm.progressWindow(e=True, endProgress=True)
-        return controls
-
     # =====================================================
     # ATTRIBUTES
     # =====================================================
@@ -659,14 +547,17 @@ class Component(component.Main):
 
         self.parent.addChild(self.root)
 
-        if self.settings["connect_surface_slider"]:
+        if self.connect_surface_slider:
             try:
                 self.connect_slide_ghost()
-            except:
+
+            except Exception as _:
                 import traceback
                 traceback.print_exc()
 
-        return
+        if self.settings["addJoints"]:
+            for i, ctl in enumerate(self.secondaryControls):
+                self.jnt_pos.append([ctl, str(i).zfill(2)])
 
     def connect_ghosts(self):
 
@@ -692,14 +583,16 @@ class Component(component.Main):
             ghostCtl = ghost.createGhostCtl(sec, self.slider_root)
             ghosts.append(ghostCtl)
             ghostCtl.attr("isCtl").set(True)
-            self.visi_off_lock(sec)
-        self.visi_off_lock(self.secondaryControlsParentGrp)
+            self._visi_off_lock(sec)
+        self._visi_off_lock(self.secondaryControlsParentGrp)
 
         # slide system
         ghostSliderForEyeBrow(
             ghosts,
             self.sliding_surface,
             self.slider_root)
+
+        self.secondaryControls = ghosts
 
     def setRelation(self):
         """Set the relation beetween object from guide to rig"""
