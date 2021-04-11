@@ -242,11 +242,7 @@ class Component(component.Main):
         mainCtrlOptions = []
         secCtrlOptions = []
 
-        if self.negate:
-            iterator = enumerate(reversed(mainCtrlPos))
-        else:
-            iterator = enumerate(mainCtrlPos)
-
+        iterator = enumerate(mainCtrlPos)
         for i, ctlPos in iterator:
             isLast = (i == (len(mainCtrlPos) - 1))
             mainCtrlOptions.extend(self._foreachMainCtrlPos(i, ctlPos, isLast))
@@ -255,11 +251,7 @@ class Component(component.Main):
             sec_number_index = len(secCtrlPos) - 1
             controlType = "circle"
 
-            if self.negate:
-                iterator = enumerate(reversed(secCtrlPos))
-            else:
-                iterator = enumerate(secCtrlPos)
-
+            iterator = enumerate(secCtrlPos)
             for i, ctlPos in iterator:
                 secCtrlOptions.append(self._foreachSecCtrlPos(i, ctlPos, sec_number_index))
 
@@ -303,7 +295,7 @@ class Component(component.Main):
 
             ctl = self.addCtl(
                 npoBuffer,
-                oName,
+                "{}_ctl".format(oName),
                 position,
                 color,
                 o_icon,
@@ -391,12 +383,9 @@ class Component(component.Main):
 
     def _foreachSecCtrlPos(self, i, ctlPos, sec_number_index):
 
-        if self.side == "R":
-            i_name = sec_number_index - i
-        else:
-            i_name = i
+        i_name = i
 
-        controlType = "circle"
+        controlType = "sphere"
         posPrefix = "sec_" + str(i_name).zfill(2)
         options = [posPrefix, self.side, controlType, self.secCtlColor, 0.55, [], ctlPos]
 
@@ -420,20 +409,20 @@ class Component(component.Main):
             posPrefix = "mid_0" + str(i)
 
         controlType = "square"
-        tControlType = ["sphere", controlType]
+        tControlType = ["circle", controlType]
         tControlSize = [0.8, 1.0]
         tPrefix = [posPrefix + "_tangent", posPrefix]
 
         if i == 0:
             options.append([tPrefix[1], self.side, tControlType[1], self.color_ik, tControlSize[1], [], ctlPos])
-            options.append([tPrefix[0], self.side, tControlType[0], self.color_ik, tControlSize[0], [], ctlPos])
+            options.append([tPrefix[0], self.side, tControlType[0], self.color_fk, tControlSize[0], [], ctlPos])
 
         elif isLast:
-            options.append([tPrefix[0], self.side, tControlType[0], self.color_ik, tControlSize[0], [], ctlPos])
+            options.append([tPrefix[0], self.side, tControlType[0], self.color_fk, tControlSize[0], [], ctlPos])
             options.append([tPrefix[1], self.side, tControlType[1], self.color_ik, tControlSize[1], [], ctlPos])
 
         else:
-            options.append([posPrefix, self.side, controlType, self.color_ik, 1.0, [], ctlPos])
+            options.append([posPrefix, self.side, "circle", self.color_ik, 1.0, [], ctlPos])
 
         return options
 
