@@ -793,8 +793,10 @@ def ghostSliderForMouth(ghostControls, intTra, surface, sliderParent):
         mul_node1 = pm.createNode("multMatrix")
         mul_node2 = pm.createNode("multMatrix")
         intTra.attr("matrix") >> mul_node1.attr("matrixIn[0]")
-        mul_node1.attr("matrixIn[1]")
-        pm.setAttr(mul_node1 + ".matrixIn[1]",
+        intTra.getParent().attr("matrix") >> mul_node1.attr("matrixIn[1]")
+
+        mul_node1.attr("matrixIn[2]")
+        pm.setAttr(mul_node1 + ".matrixIn[2]",
                    intTra.attr("inverseMatrix").get(),
                    type="matrix")
         ctl.attr("matrix") >> mul_node2.attr("matrixIn[0]")
