@@ -729,6 +729,7 @@ class Component(component.Main):
 
     def setRelation(self):
         """Set the relation beetween object from guide to rig"""
+        self.relatives["root"] = self.root
         if self.settings["isGlobalMaster"]:
             return
 

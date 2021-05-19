@@ -586,9 +586,9 @@ class Component(component.Main):
 
     def setRelation(self):
         """Set the relation beetween object from guide to rig"""
-
-        pass
-        # self.relatives["root"] = self.fk_ctl[0]
+        self.relatives["root"] = self.root
+        self.controlRelatives["root"] = self.root
+        self.aliasRelatives["root"] = "ctl"
 
 
 def draw_eye_guide_mesh_plane(points, t):
