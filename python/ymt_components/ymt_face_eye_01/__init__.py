@@ -192,6 +192,10 @@ class Component(component.Main):
     def addCurve(self):
 
         t = getTransform(self.root)
+        scl = [1, 1, 1]
+        if self.negate:
+            scl = [-1, 1, 1]
+        t = transform.setMatrixScale(t, scl)
         crv_root = addTransform(self.root, self.getName("crvs"), t)
 
         plane = self.addDummyPlane()
@@ -287,19 +291,22 @@ class Component(component.Main):
 
         # averagePosition,
         t_arrow = setMatrixPosition(t, self.bboxCenter)
+        scl = [1, 1, 1]
+        t = transform.setMatrixScale(t, scl)
+        bt = transform.setMatrixPosition(t, self.bboxCenter)
 
         self.eyeTargets_root = addTransform(self.root, self.getName("targets"), t)
-        if self.negate:
-            # self.eyeTargets_root.attr("sx").set(-1.)
-            # self.eyeTargets_root.attr("sz").set(-1.)
-            pass
-        self.jnt_root = primitive.addTransformFromPos(self.root, self.getName("joints"), pos=self.bboxCenter)
+        self.jnt_root = addTransform(self.root, self.getName("joints"), bt)
+        # self.jnt_root = primitive.addTransformFromPos(self.root, self.getName("joints"), pos=self.bboxCenter)
         # TODO: implement later
         # if deformers_group:
         #     deformers_group = pm.PyNode(deformers_group)
         #     pm.parentConstraint(self.root, jnt_root, mo=True)
         #     pm.scaleConstraint(self.root, jnt_root, mo=True)
         #     deformers_group.addChild(jnt_root)
+        if self.negate:
+            scl = [-1, 1, 1]
+        t = transform.setMatrixScale(t, scl)
 
         self.addOverControllers(t)
         self.addLookAtControlers(t, t_arrow)

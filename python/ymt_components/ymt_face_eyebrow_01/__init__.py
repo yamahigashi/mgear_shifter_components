@@ -1,9 +1,6 @@
 """mGear shifter components"""
 # pylint: disable=import-error,W0201,C0111,C0112
 import re
-import inspect
-import textwrap
-import math
 
 import maya.cmds as cmds
 import maya.OpenMaya as om1
@@ -178,6 +175,10 @@ class Component(component.Main):
     def addContainers(self):
 
         t = getTransform(self.root)
+        scl = [1, 1, 1]
+        if self.negate:
+            scl = [-1, 1, 1]
+        t = transform.setMatrixScale(t, scl)
 
         self.crv_root = addTransform(self.root, self.getName("crvs"), t)
         self.rope_root = addTransform(self.root, self.getName("ropes"), t)
@@ -188,7 +189,8 @@ class Component(component.Main):
         self._visi_off_lock(self.browsHooks_root)
 
         if self.connect_surface_slider:
-            self.slider_root = addTransform(self.root, self.getName("sliders"), t)
+            bt = getTransform(self.root)
+            self.slider_root = addTransform(self.root, self.getName("sliders"), bt)
             attribute.setKeyableAttributes(self.slider_root, [])
 
         # self.mainControlParentGrp = addTransform(self.root, self.getName("mainControls"), t)
@@ -288,8 +290,12 @@ class Component(component.Main):
         point = ctlOptions[6]
 
         position = transform.getTransformFromPos(point)
-        npo = addTransform(controlParentGrp, self.getName("%s_npo" % oName, oSide), position)
-        npoBuffer = addTransform(npo, self.getName("%s_bufferNpo" % oName, oSide), position)
+        scl = [1, 1, 1]
+        if self.negate:
+            scl = [-1, 1, 1]
+        t = transform.setMatrixScale(position, scl)
+        npo = addTransform(controlParentGrp, self.getName("%s_npo" % oName, oSide), t)
+        npoBuffer = addTransform(npo, self.getName("%s_bufferNpo" % oName, oSide), t)
 
         # Create casual control
         if o_icon is not "npo":
@@ -301,7 +307,7 @@ class Component(component.Main):
             ctl = self.addCtl(
                 npoBuffer,
                 "{}_ctl".format(oName),
-                position,
+                t,
                 color,
                 o_icon,
                 w=wd,
@@ -315,10 +321,10 @@ class Component(component.Main):
             ctl = addTransform(
                 npoBuffer,
                 self.getName("%s_HookNpo" % oName, oSide),
-                position)
+                t)
 
         # Create up vectors for each control
-        upv = addTransform(ctl, self.getName("%s_upv" % oName, oSide), position)
+        upv = addTransform(ctl, self.getName("%s_upv" % oName, oSide), t)
         upv.attr("tz").set(self.FRONT_OFFSET)
 
         return ctl, upv
@@ -682,8 +688,9 @@ def ghostSliderForEyeBrow(ghostControls, surface, sliderParent):
         j = k = 0
         for j, d in enumerate(down):
             d.attr("matrix") >> mul_node.attr("matrixIn[{}]".format(j))
+        _.attr("matrix") >> mul_node.attr("matrixIn[{}]".format(j + 1))
         for k, u in enumerate(up):
-            u.attr("inverseMatrix") >> mul_node.attr("matrixIn[{}]".format(k + j))
+            u.attr("inverseMatrix") >> mul_node.attr("matrixIn[{}]".format(k + j + 1))
 
         dm_node = node.createDecomposeMatrixNode(mul_node.attr("matrixSum"))
 
