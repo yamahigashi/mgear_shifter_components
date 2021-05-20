@@ -634,6 +634,7 @@ class Component(component.Main):
         t.attr("isCtl").set(False)
 
         _visi_off_lock(t.getShape())
+        ctl.getShape().visibility.set(True)
 
         return ctl
 
