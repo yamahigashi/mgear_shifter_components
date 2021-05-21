@@ -304,10 +304,12 @@ class Component(component.Main):
         self.lowRope_upv = gen2(self.lowCrv, "lowRope_upv", self.NB_ROPE, True)
 
     def addControlJoints(self):
-        self.upJoints = self._addControlJoints(self.upCrv, "up", self.lipsRope_root, self.upRope, self.upRope_upv)
-        self.lowJoints = self._addControlJoints(self.lowCrv, "low", self.lipsRope_root, self.lowRope, self.lowRope_upv)
+        skip = not self.settings.get("isSplitCorners", False)
 
-    def _addControlJoints(self, crv, name, rope_root, rope, rope_upv):
+        self.upJoints = self._addControlJoints(self.upCrv, "up", self.lipsRope_root, self.upRope, self.upRope_upv)
+        self.lowJoints = self._addControlJoints(self.lowCrv, "low", self.lipsRope_root, self.lowRope, self.lowRope_upv, skipHeadAndTail=skip)
+
+    def _addControlJoints(self, crv, name, rope_root, rope, rope_upv, skipHeadAndTail=False):
 
         lvlType = "transform"
         cvs = crv.getCVs(space="world")
@@ -323,6 +325,12 @@ class Component(component.Main):
         pm.progressWindow(title='Creating Upper Joints', progress=0, max=len(cvs))
 
         for i, cv in enumerate(cvs):
+            if skipHeadAndTail and i == 0:
+                continue
+
+            if skipHeadAndTail and (i == len(cvs) - 1):
+                continue
+
             pm.progressWindow(e=True, step=1, status='\nCreating Joint for  %s' % cv)
 
             upv = addTransform(rope_root, self.getName("{}LipRope_upv{}".format(name, str(i).zfill(3))))
@@ -617,28 +625,18 @@ class Component(component.Main):
         self.connect_slide_ghost(lipup_ref, liplow_ref, slide_c_ref, corner_l_ref, corner_r_ref)
         self.connect_mouth_ghost(lipup_ref, liplow_ref, slide_c_ref, corner_l_ref, corner_r_ref)
 
-    def _createGhostCtl(self, t, p, invert):
+    def _createGhostCtl(self, t, p):
 
         ctl = ghost.createGhostCtl(t, p)
         ctl.attr("isCtl") // t.attr("isCtl")
-        ctl.attr("isCtl").set(not invert)
-        t.attr("isCtl").set(invert)
 
-        print(ctl.name(), t.name())
-        if invert:
-            pass
-            # self._visi_off_lock(t)
+        ctl.attr("isCtl").set(True)
+        t.attr("isCtl").set(False)
+
+        _visi_off_lock(t.getShape())
+        ctl.getShape().visibility.set(True)
 
         return ctl
-
-    def _visi_off_lock(self, node):
-        """Short cuts."""
-        cmds.setAttr("{}.visibility".format(node.name()), l=False)
-        node.visibility.set(False)
-        try:
-            attribute.setKeyableAttributes(node, [])
-        except:
-            pass
 
     def connect_slide_ghost(self, lipup_ref, liplow_ref, slide_c_ref, corner_l_ref, corner_r_ref):
 
@@ -652,9 +650,9 @@ class Component(component.Main):
         pm.rename(intTra, intTra.name() + "_int")
 
         # create ghost controls
-        self.mouthSlide_ctl = self._createGhostCtl(slide_c_ref, intTra, False)
-        self.cornerL_ctl = self._createGhostCtl(corner_l_ref, slide_c_ref, True)
-        self.cornerR_ctl = self._createGhostCtl(corner_r_ref, slide_c_ref, True)
+        self.mouthSlide_ctl = self._createGhostCtl(slide_c_ref, intTra)
+        self.cornerL_ctl = self._createGhostCtl(corner_l_ref, slide_c_ref)
+        self.cornerR_ctl = self._createGhostCtl(corner_r_ref, slide_c_ref)
 
         # slide system
         ghostSliderForMouth(
@@ -793,8 +791,10 @@ def ghostSliderForMouth(ghostControls, intTra, surface, sliderParent):
         mul_node1 = pm.createNode("multMatrix")
         mul_node2 = pm.createNode("multMatrix")
         intTra.attr("matrix") >> mul_node1.attr("matrixIn[0]")
-        mul_node1.attr("matrixIn[1]")
-        pm.setAttr(mul_node1 + ".matrixIn[1]",
+        intTra.getParent().attr("matrix") >> mul_node1.attr("matrixIn[1]")
+
+        mul_node1.attr("matrixIn[2]")
+        pm.setAttr(mul_node1 + ".matrixIn[2]",
                    intTra.attr("inverseMatrix").get(),
                    type="matrix")
         ctl.attr("matrix") >> mul_node2.attr("matrixIn[0]")
@@ -861,9 +861,10 @@ def ghostSliderForMouth(ghostControls, intTra, surface, sliderParent):
                             worldUpObject=gDriver)
 
         pm.parent(ctlGhost.getParent(), slider)
+        attribute.setKeyableAttributes(slider, [])
 
-    sliders[0].visibility.set(False)
-    attribute.setKeyableAttributes(sliders[0], [])
+    for slider in sliders[1:]:
+        _visi_off_lock(slider)
 
 
 def createGhostWithParentConstraint(ctl, parent=None, connect=True):
@@ -939,3 +940,13 @@ def applyPathCnsLocal(target, curve, u):
     decomp_node.attr("outputRotate") >> target.attr("rotate")
 
     return cns
+    
+
+def _visi_off_lock(node):
+    """Short cuts."""
+    cmds.setAttr("{}.visibility".format(node.name()), l=False)
+    node.visibility.set(False)
+    try:
+        attribute.setKeyableAttributes(node, [])
+    except:
+        pass

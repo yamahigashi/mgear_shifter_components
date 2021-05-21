@@ -192,6 +192,10 @@ class Component(component.Main):
     def addCurve(self):
 
         t = getTransform(self.root)
+        scl = [1, 1, 1]
+        if self.negate:
+            scl = [-1, 1, 1]
+        t = transform.setMatrixScale(t, scl)
         crv_root = addTransform(self.root, self.getName("crvs"), t)
 
         plane = self.addDummyPlane()
@@ -287,19 +291,22 @@ class Component(component.Main):
 
         # averagePosition,
         t_arrow = setMatrixPosition(t, self.bboxCenter)
+        scl = [1, 1, 1]
+        t = transform.setMatrixScale(t, scl)
+        bt = transform.setMatrixPosition(t, self.bboxCenter)
 
         self.eyeTargets_root = addTransform(self.root, self.getName("targets"), t)
-        if self.negate:
-            # self.eyeTargets_root.attr("sx").set(-1.)
-            # self.eyeTargets_root.attr("sz").set(-1.)
-            pass
-        self.jnt_root = primitive.addTransformFromPos(self.root, self.getName("joints"), pos=self.bboxCenter)
+        self.jnt_root = addTransform(self.root, self.getName("joints"), bt)
+        # self.jnt_root = primitive.addTransformFromPos(self.root, self.getName("joints"), pos=self.bboxCenter)
         # TODO: implement later
         # if deformers_group:
         #     deformers_group = pm.PyNode(deformers_group)
         #     pm.parentConstraint(self.root, jnt_root, mo=True)
         #     pm.scaleConstraint(self.root, jnt_root, mo=True)
         #     deformers_group.addChild(jnt_root)
+        if self.negate:
+            scl = [-1, 1, 1]
+        t = transform.setMatrixScale(t, scl)
 
         self.addOverControllers(t)
         self.addLookAtControlers(t, t_arrow)
@@ -393,16 +400,22 @@ class Component(component.Main):
         self.upControls = self._addCurveControllers(t, self.upCrv_ctl, upperCtlNames)
 
         lowerCtlNames = ["inCorner", "lowInMid", "lowMid", "lowOutMid", "outCorner"]
-        self.lowControls = self._addCurveControllers(t, self.lowCrv_ctl, lowerCtlNames)
+        if self.settings.get("isSplitCorners", False):
+            self.lowControls = self._addCurveControllers(t, self.lowCrv_ctl, lowerCtlNames)
+        else:
+            self.lowControls = self._addCurveControllers(t, self.lowCrv_ctl, lowerCtlNames, inCtl=self.upControls[0], outCtl=self.upControls[-1])
         self.lowControls.insert(0, self.upControls[0])
+        self.lowControls.append(self.upControls[-1])
 
     def addCurveJoints(self, t):
 
+        skip = not self.settings.get("isSplitCorners", False)
+
         # upper eyelid controls
         self.upDetailControllers = self._addCurveDetailControllers(t, self.upCrv, "upEyelid")
-        self.lowDetailControllers = self._addCurveDetailControllers(t, self.lowCrv, "lowEyelid")
+        self.lowDetailControllers = self._addCurveDetailControllers(t, self.lowCrv, "lowEyelid", skipHeadAndTail=skip)
 
-    def _addCurveControllers(self, t, crv, ctlNames):
+    def _addCurveControllers(self, t, crv, ctlNames, inCtl=None, outCtl=None):
 
         cvs = crv.getCVs(space="world")
         if self.negate:
@@ -411,6 +424,14 @@ class Component(component.Main):
 
         ctls = []
         for i, cv in enumerate(cvs):
+            if inCtl is not None and i == 0:
+                ctls.append(inCtl)
+                continue
+
+            if outCtl is not None and (i == len(cvs) - 1):
+                ctls.append(outCtl)
+                continue
+
             if utils.is_odd(i):
                 color = 14
                 wd = .5
@@ -456,15 +477,14 @@ class Component(component.Main):
         # adding parent average contrains to odd controls
         for i, ctl in enumerate(ctls):
             if utils.is_odd(i):
-                pm.parentConstraint(ctls[i - 1],
-                                    ctls[i + 1],
-                                    ctl.getParent(),
-                                    mo=True)
+                s = ctls[i - 1]
+                d = ctls[i + 1]
+                pm.parentConstraint(s, d, ctl.getParent(), mo=True)
 
         applyop.gear_curvecns_op(crv, ctls)
         return ctls
 
-    def _addCurveDetailControllers(self, t, crv, name):
+    def _addCurveDetailControllers(self, t, crv, name, skipHeadAndTail=False):
 
         controls = []
 
@@ -482,6 +502,12 @@ class Component(component.Main):
         offset = self.offset * 0.3
 
         for i, cv in enumerate(cvs):
+
+            if skipHeadAndTail and i == 0:
+                continue
+
+            if skipHeadAndTail and (i == len(cvs) - 1):
+                continue
 
             # aim targets
             trn_name = self.getName("{}_aimTarget{}".format(name, i))
@@ -721,7 +747,14 @@ class Component(component.Main):
 
     def connect_standard(self):
         self.parent.addChild(self.root)
+
+        if self.settings.get("isConnectAimToPupil", True):
+            self.connect_pupil()
         return
+
+    def connect_pupil(self):
+        pupil = self.rig.findComponent("pupil_{}0".format(self.side))
+        cns_node = pm.aimConstraint(pupil.lookat, self.arrow_npo, maintainOffset=True)
 
     # =====================================================
     # CONNECTOR
@@ -729,6 +762,7 @@ class Component(component.Main):
 
     def setRelation(self):
         """Set the relation beetween object from guide to rig"""
+        self.relatives["root"] = self.root
         if self.settings["isGlobalMaster"]:
             return
 
