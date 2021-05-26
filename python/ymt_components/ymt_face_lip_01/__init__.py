@@ -1,9 +1,7 @@
 """mGear shifter components"""
 # pylint: disable=import-error,W0201,C0111,C0112
 import re
-import inspect
-import textwrap
-import math
+import traceback
 
 import maya.cmds as cmds
 import maya.OpenMaya as om1
@@ -38,6 +36,7 @@ from mgear.core.transform import (
     # getTransformLookingAt,
     # getChainTransform2,
     setMatrixPosition,
+    setMatrixRotation,
 )
 
 from mgear.core.primitive import (
@@ -347,6 +346,7 @@ class Component(component.Main):
 
             ctl_name = self.getName("crvdetail%s_%s" % (i, self.ctlName))
 
+            self.thickness = 0.0
             if i == 0:
                 # we know the curv starts from right to left
                 offset = [cv[0] + self.thickness, cv[1], cv[2] + self.thickness]
@@ -358,7 +358,13 @@ class Component(component.Main):
                 offset = [cv[0], cv[1] - self.thickness, cv[2]]
 
             # offset = [cv[0], cv[1], cv[2] - self.FRONT_OFFSET]
+            m = getTransform(npo)
+            x = datatypes.Vector(m[0][0], m[0][1], m[0][2])
+            y = datatypes.Vector(m[1][0], m[1][1], m[1][2])
+            z = datatypes.Vector(m[2][0], m[2][1], m[2][2])
+            rot = [x, y, z]
             xform = setMatrixPosition(t, offset)
+            xform = setMatrixRotation(xform, rot)
             # xform = setMatrixPosition(t, cv)
             ctl = self.addCtl(
                 npo,
@@ -430,10 +436,10 @@ class Component(component.Main):
 
         upvec = self.upUpvs + self.lowUpvs
 
-        pm.parent(self.lips_R_upOuter_npo,  self.lips_R_lowOuter_npo,  self.upCtls[0])
-        pm.parent(self.lips_R_upInner_npo,  self.lips_L_upInner_npo,   self.upCtls[3])
-        pm.parent(self.lips_L_lowInner_npo, self.lips_L_lowOuter_npo,  self.upCtls[-1])
-        pm.parent(self.lips_R_lowInner_npo, self.lips_L_lowInner_npo,  self.lowCtls[2])
+        pm.parent(self.lips_R_upOuter_npo,  self.lips_R_lowOuter_npo,  self.lips_R_Corner_ctl)
+        pm.parent(self.lips_R_upInner_npo,  self.lips_L_upInner_npo,   self.lips_C_upper_ctl)
+        pm.parent(self.lips_L_upOuter_npo,  self.lips_L_lowOuter_npo,  self.lips_L_Corner_ctl)
+        pm.parent(self.lips_R_lowInner_npo, self.lips_L_lowInner_npo,  self.lips_C_lower_ctl)
 
         # Connecting control crvs with controls
         applyop.gear_curvecns_op(self.upCrv_ctl, self.upCtls)
@@ -533,6 +539,12 @@ class Component(component.Main):
             wd     = option[i][4]
             oPar   = option[i][5]
 
+            if oSide == "R":
+                scl = [1, 1, -1]
+            else:
+                scl = [1, 1, 1]
+            t = transform.setMatrixScale(t, scl)
+
             npo = addTransform(self.root, self.getName("%s_npo" % oName, oSide), t)
             npos.append(npo)
 
@@ -554,9 +566,6 @@ class Component(component.Main):
             upv = addTransform(ctl, self.getName("%s_upv" % oName, oSide), t)
             upv.attr("tz").set(self.FRONT_OFFSET)
             upvs.append(upv)
-
-            if oSide == "R":
-                npo.attr("sx").set(-1)
 
         pm.progressWindow(e=True, endProgress=True)
 
@@ -604,15 +613,12 @@ class Component(component.Main):
             self.connect_ghosts()
 
         except Exception as e:
-            import traceback
             traceback.print_exc()
 
             raise
 
     def connect_standard(self):
         self.parent.addChild(self.root)
-
-        return
 
     def connect_ghosts(self):
 
@@ -931,16 +937,27 @@ def applyPathCnsLocal(target, curve, u):
     cns.attr("rotateOrder") >> comp_node.attr("inputRotateOrder")
 
     mul_node = pm.createNode("multMatrix")
-    comp_node.attr("outputMatrix") >> mul_node.attr("matrixIn[0]")
-    curve.attr("matrix") >> mul_node.attr("matrixIn[1]")
+    comp_node2 = pm.createNode("composeMatrix")
+
+    pos = target.getTranslation(space="world")
+    if pos.x < -0.0001:
+        pm.setAttr(comp_node2.attr("inputScaleX"), -1.0)
+
+    pm.setAttr(comp_node2.attr("inputRotateX"), 90.0)
+    pm.setAttr(comp_node2.attr("inputRotateZ"), 90.0)
+
+    comp_node2.attr("outputMatrix") >> mul_node.attr("matrixIn[0]")
+    comp_node.attr("outputMatrix") >> mul_node.attr("matrixIn[1]")
+    curve.attr("matrix") >> mul_node.attr("matrixIn[2]")
 
     decomp_node = pm.createNode("decomposeMatrix")
     mul_node.attr("matrixSum") >> decomp_node.attr("inputMatrix")
     decomp_node.attr("outputTranslate") >> target.attr("translate")
     decomp_node.attr("outputRotate") >> target.attr("rotate")
+    decomp_node.attr("outputScale") >> target.attr("scale")
 
     return cns
-    
+
 
 def _visi_off_lock(node):
     """Short cuts."""
