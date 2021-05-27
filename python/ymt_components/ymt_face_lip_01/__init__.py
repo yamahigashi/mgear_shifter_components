@@ -624,9 +624,22 @@ class Component(component.Main):
 
         lipup_ref = self.parent_comp.lipup_ctl
         liplow_ref = self.parent_comp.liplow_ctl
+
         slide_c_ref = self.rig.findRelative("mouthSlide_C0_root")
         corner_l_ref = self.rig.findRelative("mouthCorner_L0_root")
         corner_r_ref = self.rig.findRelative("mouthCorner_R0_root")
+
+        slide_c_comp = self.rig.findComponent("mouthSlide_C0_root")
+        corner_l_comp = self.rig.findComponent("mouthCorner_L0_root")
+        corner_r_comp = self.rig.findComponent("mouthCorner_R0_root")
+
+        # remove elements from controllers group
+        for comp in [slide_c_comp, corner_l_comp, corner_r_comp]:
+            for k, v in comp.groups.items():
+                if "componentsRoots" in k:
+                    continue
+
+                comp.groups[k] = []
 
         self.connect_slide_ghost(lipup_ref, liplow_ref, slide_c_ref, corner_l_ref, corner_r_ref)
         self.connect_mouth_ghost(lipup_ref, liplow_ref, slide_c_ref, corner_l_ref, corner_r_ref)
@@ -641,6 +654,22 @@ class Component(component.Main):
 
         _visi_off_lock(t.getShape())
         ctl.getShape().visibility.set(True)
+
+        if self.settings["ctlGrp"]:
+            ctlGrp = self.settings["ctlGrp"]
+            self.addToGroup(ctl, ctlGrp, "controllers")
+
+        else:
+            ctlGrp = "controllers"
+            self.addToGroup(ctl, ctlGrp)
+
+        if ctlGrp not in self.groups.keys():
+            self.groups[ctlGrp] = []
+
+        try:
+            self.groups[ctlGrp].remove(t)
+        except:
+            pass
 
         return ctl
 
@@ -679,6 +708,10 @@ class Component(component.Main):
         pm.parentConstraint(corner_l_ref, self.lips_L_Corner_npo, mo=True)
         pm.parentConstraint(corner_r_ref, self.lips_R_Corner_npo, mo=True)
 
+        attribute.setKeyableAttributes(slide_c_ref, [])
+        attribute.setKeyableAttributes(corner_l_ref, [])
+        attribute.setKeyableAttributes(corner_r_ref, [])
+
     def connect_mouth_ghost(self, lipup_ref, liplow_ref, slide_c_ref, corner_l_ref, corner_r_ref):
 
         # center main controls
@@ -689,16 +722,8 @@ class Component(component.Main):
         npos = rigbits.addNPO([self.lips_C_upper_ctl, self.lips_C_lower_ctl])
         for c in npos:
             rigbits.connectLocalTransform([self.mouthSlide_ctl, c])
-            # pm.parentConstraint(slide_c_ref, c, mo=True)
 
         return
-        # Left side controls
-        self.lips_L_upInner_ctl = createGhostWithParentConstraint(self.lips_L_upInner_ctl, self.lips_C_upper_ctl)
-        self.lips_L_lowInner_ctl = createGhostWithParentConstraint(self.lips_L_lowInner_ctl, self.lips_C_lower_ctl)
-
-        # Right side controls
-        self.lips_R_upInner_ctl = createGhostWithParentConstraint(self.lips_R_upInner_ctl, self.lips_C_upper_ctl)
-        self.lips_R_lowInner_ctl = createGhostWithParentConstraint(self.lips_R_lowInner_ctl, self.lips_C_lower_ctl)
 
     def connect_averageParentCns(self, parents, target):
         """
@@ -845,7 +870,6 @@ def ghostSliderForMouth(ghostControls, intTra, surface, sliderParent):
             while parent != sliderParent:
                 parent.attr("matrix") >> mul_node.attr("matrixIn[{}]".format(i))
                 parent = parent.getParent()
-                print(parent)
                 i += 1
                 if 10 < i:
                     logger.error("maximum recursion")
