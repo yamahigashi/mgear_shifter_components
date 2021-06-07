@@ -18,7 +18,7 @@ if False:
 
 
 
-def hoge(rig, button):
+def hoge(rig, button, group_name=None):
 
     if button == QtCore.Qt.RightButton:
         hide_all()
@@ -45,6 +45,8 @@ def show_all():
 
 
 def toggle(rig):
+
+    print("rig is {}".format(rig))
 
     current = cmds.getAttr("{}.ctl_vis".format(rig.name()))
     cmds.setAttr("{}.ctl_vis".format(rig.name()), abs(current - 1))
