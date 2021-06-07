@@ -190,10 +190,6 @@ class Component(component.Main):
 
         if self.connect_surface_slider:
             bt = getTransform(self.root)
-            scl = [1, 1, 1]
-            if self.negate:
-                scl = [-1, 1, 1]
-            bt = transform.setMatrixScale(bt, scl)
             self.slider_root = addTransform(self.root, self.getName("sliders"), bt)
             attribute.setKeyableAttributes(self.slider_root, [])
 
@@ -573,6 +569,12 @@ class Component(component.Main):
             ghosts.append(ghostCtl)
             ghostCtl.attr("isCtl").set(True)
             self._visi_off_lock(sec)
+            self.addToSubGroup(ghostCtl, self.detailControllersGroupName)
+            ghostCtl.attr("isCtl") // sec.attr("isCtl")
+            ghostCtl.attr("translate") // sec.attr("translate")
+            ghostCtl.attr("rotate") // sec.attr("rotate")
+            ghostCtl.attr("scale") // sec.attr("scale")
+
         self._visi_off_lock(self.secondaryControlsParentGrp)
 
         # slide system
@@ -612,6 +614,10 @@ class Component(component.Main):
         for i, ctlGhost in enumerate(ghostControls):
             ctl = pm.listConnections(ctlGhost, t="transform")[-1]
             t = ctl.getMatrix(worldSpace=True)
+            scl = [1, 1, 1]
+            if self.negate:
+                scl = [-1, 1, 1]
+            # t = transform.setMatrixScale(t, scl)
 
             gDriver = primitive.addTransform(ctlGhost.getParent(), "{}_slideDriver".format(ctl.name()), t)
             # conn(ctl, gDriver, ctlGhost)
@@ -620,6 +626,7 @@ class Component(component.Main):
             oParent = ctlGhost.getParent()
             npoName = "_".join(ctlGhost.name().split("_")[:-1]) + "_npo"
             npo = pm.PyNode(pm.createNode("transform", n=npoName, p=oParent, ss=True))
+
             npo.setTransformation(ctlGhost.getMatrix())
             attribute.setKeyableAttributes(npo, [])
             pm.parent(ctlGhost, npo)
@@ -643,9 +650,13 @@ class Component(component.Main):
             surfaceShape.attr("local") >> cps_node.attr("inputSurface")
             cps_node.attr("position") >> slider.attr("translate")
 
+            if self.negate:
+                aim = [0, 0, -1]
+            else:
+                aim = [0, 0, 1]
             pm.normalConstraint(surfaceShape,
                                 slider,
-                                aimVector=[0, 0, 1],
+                                aimVector=aim,
                                 upVector=[0, 1, 0],
                                 worldUpType="objectrotation",
                                 worldUpVector=[0, 1, 0],
