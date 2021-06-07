@@ -582,10 +582,27 @@ class Component(component.Main):
             ghostCtl.attr("isCtl").set(True)
             self._visi_off_lock(sec)
             self.addToSubGroup(ghostCtl, self.detailControllersGroupName)
+
             ghostCtl.attr("isCtl") // sec.attr("isCtl")
             ghostCtl.attr("translate") // sec.attr("translate")
             ghostCtl.attr("rotate") // sec.attr("rotate")
             ghostCtl.attr("scale") // sec.attr("scale")
+
+            sec.attr("isCtl").set(False)
+
+            if self.settings["ctlGrp"]:
+                ctlGrp = self.settings["ctlGrp"]
+
+            else:
+                ctlGrp = "controllers"
+
+            if ctlGrp not in self.groups.keys():
+                self.groups[ctlGrp] = []
+
+            try:
+                self.groups[ctlGrp].remove(sec)
+            except:
+                pass
 
         self._visi_off_lock(self.secondaryControlsParentGrp)
 
