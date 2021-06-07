@@ -344,7 +344,7 @@ class Component(component.Main):
 
             pm.connectAttr(upv.attr("worldMatrix[0]"), cns.attr("worldUpMatrix"))
 
-            ctl_name = self.getName("crvdetail%s_%s" % (i, self.ctlName))
+            ctl_name = self.getName("%s_crvdetail%s_%s" % (name, i, self.ctlName))
 
             self.thickness = 0.0
             if i == 0:
@@ -476,17 +476,15 @@ class Component(component.Main):
             cns_node.attr(s1.name() + "W0").set(p1)
             cns_node.attr(s2.name() + "W1").set(p2)
 
-        __upper(self.upCtls, 0, 3, 1, 0.75, 0.25)
+        __upper(self.upCtls, 0, 3, 1, 0.33, 0.67)
         __upper(self.upCtls, 0, 3, 2, 0.25, 0.75)
         __upper(self.upCtls, 3, 6, 4, 0.75, 0.25)
-        __upper(self.upCtls, 3, 6, 5, 0.25, 0.75)
+        __upper(self.upCtls, 3, 6, 5, 0.67, 0.33)
 
-        __lower(self.upCtls[0], self.lowCtls[2], self.lowCtls[0], 0.75, 0.25)
-        __lower(self.upCtls[0], self.lowCtls[2], self.lowCtls[1], 0.25, 0.75)
-        __lower(self.lowCtls[2], self.upCtls[6], self.lowCtls[3], 0.75, 0.25)
-        __lower(self.lowCtls[2], self.upCtls[6], self.lowCtls[4], 0.25, 0.75)
-
-        return
+        __lower(self.lips_R_Corner_ctl, self.lips_C_lower_ctl, self.lips_R_lowOuter_ctl, 0.33, 0.67)
+        __lower(self.lips_R_Corner_ctl, self.lips_C_lower_ctl, self.lips_R_lowInner_ctl, 0.25, 0.75)
+        __lower(self.lips_L_Corner_ctl, self.lips_C_lower_ctl, self.lips_L_lowInner_ctl, 0.25, 0.75)
+        __lower(self.lips_L_Corner_ctl, self.lips_C_lower_ctl, self.lips_L_lowOuter_ctl, 0.33, 0.67)
 
     def _addControls(self, crv_ctl, option, sidecut):
 
@@ -528,9 +526,10 @@ class Component(component.Main):
 
                 t = transform.setMatrixPosition(transform.getTransform(nearest_joint), cv)
                 temp = addTransform(self.root, self.getName("temp"), t)
-                temp.rx.set(0)
+                # temp.rx.set(0)
                 t = transform.getTransform(temp)
                 pm.delete(temp)
+                # print(i, nearest_joint, temp)
 
             oName  = option[i][0]
             oSide  = option[i][1]
@@ -633,6 +632,12 @@ class Component(component.Main):
         corner_l_comp = self.rig.findComponent("mouthCorner_L0_root")
         corner_r_comp = self.rig.findComponent("mouthCorner_R0_root")
 
+        self.connect_slide_ghost(lipup_ref, liplow_ref, slide_c_ref, corner_l_ref, corner_r_ref)
+        self.connect_mouth_ghost(lipup_ref, liplow_ref, slide_c_ref, corner_l_ref, corner_r_ref)
+
+        pm.parent(corner_l_comp.ik_cns, self.mouthSlide_ctl)
+        pm.parent(corner_r_comp.ik_cns, self.mouthSlide_ctl)
+
         # remove elements from controllers group
         for comp in [slide_c_comp, corner_l_comp, corner_r_comp]:
             for k, v in comp.groups.items():
@@ -640,9 +645,6 @@ class Component(component.Main):
                     continue
 
                 comp.groups[k] = []
-
-        self.connect_slide_ghost(lipup_ref, liplow_ref, slide_c_ref, corner_l_ref, corner_r_ref)
-        self.connect_mouth_ghost(lipup_ref, liplow_ref, slide_c_ref, corner_l_ref, corner_r_ref)
 
     def _createGhostCtl(self, t, p):
 
@@ -964,7 +966,7 @@ def applyPathCnsLocal(target, curve, u):
     comp_node2 = pm.createNode("composeMatrix")
 
     pos = target.getTranslation(space="world")
-    if pos.x < -0.0001:
+    if pos.x < -0.001:
         pm.setAttr(comp_node2.attr("inputScaleX"), -1.0)
 
     pm.setAttr(comp_node2.attr("inputRotateX"), 90.0)
