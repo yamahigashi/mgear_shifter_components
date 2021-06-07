@@ -109,6 +109,8 @@ class Component(component.Main):
 
         # -------------------------------------------------------
         self.ctlName = "ctl"
+        self.detailControllersGroupName = "controllers_detail"  # TODO: extract to settings
+        self.primaryControllersGroupName = "controllers_primary"  # TODO: extract to settings
 
         self.FRONT_OFFSET = .02
         self.NB_ROPE = 15
@@ -198,6 +200,7 @@ class Component(component.Main):
         d = (self.upPos - self.lowPos).length()
         self.mainControlParentGrp = addTransform(self.root, self.getName("mainControls"), t)
         self.mainControl = self.addCtl(self.mainControlParentGrp, "main_ctl", t, self.color_ik, "square", w=w, d=d, ro=datatypes.Vector(1.57079633, 0, 0), po=datatypes.Vector(0, 0, 1.0))
+        self.addToSubGroup(self.mainControl, self.primaryControllersGroupName)
         self.secondaryControlsParentGrp = addTransform(self.root, self.getName("secondaryControls"), t)
 
     def getNumberOfLocators(self, query):
@@ -513,6 +516,15 @@ class Component(component.Main):
             wire(self.mainCurveUpvs[i], drv)
             wire(self.mainRopes[i],     drv)
             wire(self.mainRopeUpvs[i],  drv)
+
+    def addToSubGroup(self, obj, group_name):
+
+        if self.settings["ctlGrp"]:
+            ctlGrp = self.settings["ctlGrp"]
+        else:
+            ctlGrp = "controllers"
+
+        self.addToGroup(obj, group_name, parentGrp=ctlGrp)
 
     # =====================================================
     # ATTRIBUTES

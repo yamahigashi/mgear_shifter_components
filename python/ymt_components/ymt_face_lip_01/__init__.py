@@ -132,6 +132,8 @@ class Component(component.Main):
 
         # -------------------------------------------------------
         self.ctlName = "ctl"
+        self.detailControllersGroupName = "controllers_detail"  # TODO: extract to settings
+        self.primaryControllersGroupName = "controllers_primary"  # TODO: extract to settings
         self.blinkH = 0.2
         self.upperVTrack = 0.04
         self.upperHTrack = 0.01
@@ -383,9 +385,19 @@ class Component(component.Main):
             # getting joint parent
             # jnt = rigbits.addJnt(npo, noReplace=True, parent=self.j_parent)
             self.jnt_pos.append([ctl, "{}{}".format(name, i)])
+            self.addToSubGroup(ctl, self.detailControllersGroupName)
 
         pm.progressWindow(e=True, endProgress=True)
         return controls
+
+    def addToSubGroup(self, obj, group_name):
+
+        if self.settings["ctlGrp"]:
+            ctlGrp = self.settings["ctlGrp"]
+        else:
+            ctlGrp = "controllers"
+
+        self.addToGroup(obj, group_name, parentGrp=ctlGrp)
 
     def addControllers(self):
         axis_list = ["sx", "sy", "sz", "ro"]
@@ -565,6 +577,7 @@ class Component(component.Main):
             upv = addTransform(ctl, self.getName("%s_upv" % oName, oSide), t)
             upv.attr("tz").set(self.FRONT_OFFSET)
             upvs.append(upv)
+            self.addToSubGroup(ctl, self.primaryControllersGroupName)
 
         pm.progressWindow(e=True, endProgress=True)
 

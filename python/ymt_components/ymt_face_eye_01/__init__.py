@@ -127,6 +127,8 @@ class Component(component.Main):
 
         # -------------------------------------------------------
         self.ctlName = "ctl"
+        self.detailControllersGroupName = "controllers_detail"  # TODO: extract to settings
+        self.primaryControllersGroupName = "controllers_primary"  # TODO: extract to settings
         self.blinkH = 0.2
         self.upperVTrack = 0.04
         self.upperHTrack = 0.01
@@ -328,6 +330,7 @@ class Component(component.Main):
                                     ro=datatypes.Vector(1.57079633, 0, 0),
                                     po=self.offset,
                                     )
+        self.addToSubGroup(self.over_ctl, self.primaryControllersGroupName)
 
         if self.negate:
             # TODO: implement later
@@ -369,6 +372,7 @@ class Component(component.Main):
             ro=ro,
             po=po,
         )
+        self.addToSubGroup(self.over_ctl, self.primaryControllersGroupName)
 
         attribute.setKeyableAttributes(self.arrow_ctl, params=["rx", "ry", "rz"])
         # self.addAnimParam(self.arrow_ctl, "isCtl", "bool", keyable=False)
@@ -466,6 +470,7 @@ class Component(component.Main):
                               po=offset
                               )
 
+            self.addToSubGroup(self.over_ctl, self.primaryControllersGroupName)
             attribute.setKeyableAttributes(ctl, params)
             if self.negate:
                 pass
@@ -483,6 +488,15 @@ class Component(component.Main):
 
         applyop.gear_curvecns_op(crv, ctls)
         return ctls
+
+    def addToSubGroup(self, obj, group_name):
+
+        if self.settings["ctlGrp"]:
+            ctlGrp = self.settings["ctlGrp"]
+        else:
+            ctlGrp = "controllers"
+
+        self.addToGroup(obj, group_name, parentGrp=ctlGrp)
 
     def _addCurveDetailControllers(self, t, crv, name, skipHeadAndTail=False):
 
@@ -536,6 +550,7 @@ class Component(component.Main):
                 po=offset
             )
 
+            self.addToSubGroup(self.over_ctl, self.primaryControllersGroupName)
             controls.append(ctl)
 
             jnt_name = "{}{}".format(name, i)
