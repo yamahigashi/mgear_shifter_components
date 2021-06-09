@@ -333,17 +333,6 @@ class Component(component.Main):
                                     po=self.offset,
                                     )
         self.addToSubGroup(self.over_ctl, self.primaryControllersGroupName)
-
-        if self.negate:
-            # TODO: implement later
-            # self.over_npo.attr("rx").set(self.over_npo.attr("rx").get() * -1)
-            # self.over_npo.attr("sx").set(-1)
-            # self.over_npo.attr("sz").set(-1)
-            pass
-
-        # node.add_controller_tag(over_ctl)
-        # self.addAnimParam(over_ctl, "isCtl", "bool", keyable=False)
-        # attribute.add_mirror_config_channels(over_ctl)
         ymt_util.setKeyableAttributesDontLockVisibility(
             self.over_ctl,
             params=["tx", "ty", "tz", "ro", "rx", "ry", "rz", "sx", "sy", "sz"])
@@ -473,11 +462,6 @@ class Component(component.Main):
                               )
 
             self.addToSubGroup(self.over_ctl, self.primaryControllersGroupName)
-            if self.negate:
-                pass
-                # npoBase.attr("ry").set(180)
-                # npoBase.attr("sz").set(-1)
-
             ymt_util.setKeyableAttributesDontLockVisibility(ctl, params)
             ctls.append(ctl)
 
@@ -552,7 +536,7 @@ class Component(component.Main):
                 po=offset
             )
 
-            self.addToSubGroup(self.over_ctl, self.primaryControllersGroupName)
+            self.addToSubGroup(ctl, self.detailControllersGroupName)
             controls.append(ctl)
 
             jnt_name = "{}{}".format(name, i)
