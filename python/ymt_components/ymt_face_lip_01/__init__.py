@@ -42,6 +42,7 @@ from mgear.core.transform import (
 from mgear.core.primitive import (
     addTransform,
 )
+import ymt_shifter_utility as ymt_util
 
 if False:  # pylint: disable=using-constant-test, wrong-import-order
     # For type annotation
@@ -572,7 +573,7 @@ class Component(component.Main):
 
             ctls.append(ctl)
 
-            attribute.setKeyableAttributes(ctl, params + oPar)
+            ymt_util.setKeyableAttributesDontLockVisibility(ctl, params + oPar)
 
             upv = addTransform(ctl, self.getName("%s_upv" % oName, oSide), t)
             upv.attr("tz").set(self.FRONT_OFFSET)
@@ -723,9 +724,9 @@ class Component(component.Main):
         pm.parentConstraint(corner_l_ref, self.lips_L_Corner_npo, mo=True)
         pm.parentConstraint(corner_r_ref, self.lips_R_Corner_npo, mo=True)
 
-        attribute.setKeyableAttributes(slide_c_ref, [])
-        attribute.setKeyableAttributes(corner_l_ref, [])
-        attribute.setKeyableAttributes(corner_r_ref, [])
+        ymt_util.setKeyableAttributesDontLockVisibility(slide_c_ref, [])
+        ymt_util.setKeyableAttributesDontLockVisibility(corner_l_ref, [])
+        ymt_util.setKeyableAttributesDontLockVisibility(corner_r_ref, [])
 
     def connect_mouth_ghost(self, lipup_ref, liplow_ref, slide_c_ref, corner_l_ref, corner_r_ref):
 
@@ -906,7 +907,7 @@ def ghostSliderForMouth(ghostControls, intTra, surface, sliderParent):
                             worldUpObject=gDriver)
 
         pm.parent(ctlGhost.getParent(), slider)
-        attribute.setKeyableAttributes(slider, [])
+        ymt_util.setKeyableAttributesDontLockVisibility(slider, [])
 
     for slider in sliders[1:]:
         _visi_off_lock(slider)
@@ -1003,6 +1004,6 @@ def _visi_off_lock(node):
     cmds.setAttr("{}.visibility".format(node.name()), l=False)
     node.visibility.set(False)
     try:
-        attribute.setKeyableAttributes(node, [])
+        ymt_util.setKeyableAttributesDontLockVisibility(node, [])
     except:
         pass

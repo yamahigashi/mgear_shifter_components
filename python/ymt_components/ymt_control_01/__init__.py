@@ -4,6 +4,7 @@ from mgear.shifter import component
 
 from mgear.core import attribute, transform, primitive
 
+import ymt_shifter_utility as ymt_util
 
 #############################################
 # COMPONENT
@@ -54,7 +55,7 @@ class Component(component.Main):
         params = [s for s in
                   ["tx", "ty", "tz", "ro", "rx", "ry", "rz", "sx", "sy", "sz"]
                   if self.settings["k_" + s]]
-        attribute.setKeyableAttributes(self.ctl, params)
+        ymt_util.setKeyableAttributesDontLockVisibility(self.ctl, params)
 
         if self.settings["joint"]:
             self.jnt_pos.append([self.ctl, 0, None, self.settings["uniScale"]])

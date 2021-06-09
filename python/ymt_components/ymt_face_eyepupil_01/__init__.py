@@ -39,6 +39,7 @@ from mgear.core.transform import (
 from mgear.core.primitive import (
     addTransform,
 )
+import ymt_shifter_utility as ymt_util
 
 if False:  # pylint: disable=using-constant-test, wrong-import-order
     # For type annotation
@@ -129,7 +130,7 @@ class Component(component.Main):
         params = [s for s in
                   ["tx", "ty", "tz", "ro", "rx", "ry", "rz", "sx", "sy", "sz"]
                   if self.settings["k_" + s]]
-        attribute.setKeyableAttributes(self.ctl, params)
+        ymt_util.setKeyableAttributesDontLockVisibility(self.ctl, params)
 
         if self.settings["joint"]:
             self.jnt_pos.append([self.ctl, 0, None, self.settings["uniScale"]])
@@ -187,7 +188,7 @@ class Component(component.Main):
 
         return
         node.visibility.set(False)
-        attribute.setKeyableAttributes(node, [])
+        ymt_util.setKeyableAttributesDontLockVisibility(node, [])
         cmds.setAttr("{}.visibility".format(node.name()), l=False)
 
     def connect_slide_ghost(self):

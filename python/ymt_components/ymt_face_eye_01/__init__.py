@@ -41,6 +41,8 @@ from mgear.core.primitive import (
     addTransform,
 )
 
+import ymt_shifter_utility as ymt_util
+
 if False:  # pylint: disable=using-constant-test, wrong-import-order
     # For type annotation
     from typing import (  # NOQA: F401 pylint: disable=unused-import
@@ -342,7 +344,7 @@ class Component(component.Main):
         # node.add_controller_tag(over_ctl)
         # self.addAnimParam(over_ctl, "isCtl", "bool", keyable=False)
         # attribute.add_mirror_config_channels(over_ctl)
-        attribute.setKeyableAttributes(
+        ymt_util.setKeyableAttributesDontLockVisibility(
             self.over_ctl,
             params=["tx", "ty", "tz", "ro", "rx", "ry", "rz", "sx", "sy", "sz"])
 
@@ -374,7 +376,7 @@ class Component(component.Main):
         )
         self.addToSubGroup(self.over_ctl, self.primaryControllersGroupName)
 
-        attribute.setKeyableAttributes(self.arrow_ctl, params=["rx", "ry", "rz"])
+        ymt_util.setKeyableAttributesDontLockVisibility(self.arrow_ctl, params=["rx", "ry", "rz"])
         # self.addAnimParam(self.arrow_ctl, "isCtl", "bool", keyable=False)
 
     def addAimControllers(self, t):
@@ -471,12 +473,12 @@ class Component(component.Main):
                               )
 
             self.addToSubGroup(self.over_ctl, self.primaryControllersGroupName)
-            attribute.setKeyableAttributes(ctl, params)
             if self.negate:
                 pass
                 # npoBase.attr("ry").set(180)
                 # npoBase.attr("sz").set(-1)
 
+            ymt_util.setKeyableAttributesDontLockVisibility(ctl, params)
             ctls.append(ctl)
 
         # adding parent average contrains to odd controls

@@ -7,6 +7,7 @@ from mgear.shifter import component
 
 from mgear.core import attribute, transform, primitive
 
+import ymt_shifter_utility as ymt_util
 #############################################
 # COMPONENT
 #############################################
@@ -37,7 +38,7 @@ class Component(component.Main):
             ro=datatypes.Vector([1.5708, 0, 0]),
             tp=self.parentCtlTag)
 
-        attribute.setKeyableAttributes(self.jaw_ctl, ["tx", "ty", "tz", "rz"])
+        ymt_util.setKeyableAttributesDontLockVisibility(self.jaw_ctl, ["tx", "ty", "tz", "rz"])
 
         # mouth center
         t = transform.getTransformFromPos(self.guide.pos["rotcenter"])

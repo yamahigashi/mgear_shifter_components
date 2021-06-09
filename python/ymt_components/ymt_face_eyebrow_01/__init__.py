@@ -40,6 +40,7 @@ from mgear.core.transform import (
 from mgear.core.primitive import (
     addTransform,
 )
+import ymt_shifter_utility as ymt_util
 
 if False:  # pylint: disable=using-constant-test, wrong-import-order
     # For type annotation
@@ -171,7 +172,7 @@ class Component(component.Main):
     def _visi_off_lock(self, node):
         """Short cuts."""
         node.visibility.set(False)
-        attribute.setKeyableAttributes(node, [])
+        ymt_util.setKeyableAttributesDontLockVisibility(node, [])
         cmds.setAttr("{}.visibility".format(node.name()), l=False)
 
     def addContainers(self):
@@ -193,7 +194,7 @@ class Component(component.Main):
         if self.connect_surface_slider:
             bt = getTransform(self.root)
             self.slider_root = addTransform(self.root, self.getName("sliders"), bt)
-            attribute.setKeyableAttributes(self.slider_root, [])
+            ymt_util.setKeyableAttributesDontLockVisibility(self.slider_root, [])
 
         # self.mainControlParentGrp = addTransform(self.root, self.getName("mainControls"), t)
         w = (self.outPos - self.inPos).length()
@@ -241,7 +242,7 @@ class Component(component.Main):
         name = "main_crv"
         crv = gen(edgeList, planeNode.verts[1], self.getName("{}Crv".format(name)), parent=crv_root, m=t)
         crv.attr("visibility").set(False)
-        attribute.setKeyableAttributes(crv, [])
+        ymt_util.setKeyableAttributesDontLockVisibility(crv, [])
 
         mainCtrlPos = helpers.divideSegment(crv, self.midDivisions)
         secCtrlPos = self.uplocsPos
@@ -337,7 +338,7 @@ class Component(component.Main):
         crv_degree = 2
 
         crv = helpers.addCnsCurve(self.crv_root, self.getName("mainCtl_crv"), ctls, crv_degree)
-        attribute.setKeyableAttributes(crv[0], [])
+        ymt_util.setKeyableAttributesDontLockVisibility(crv[0], [])
         v = self.root.getTranslation(space="world")
         crv[0].setTranslation(v, om.MSpace.kWorld)
         self.mainCtlCurves.append(crv[0])
@@ -345,7 +346,7 @@ class Component(component.Main):
         # create upvector curve to drive secondary control
         if self.secondary_ctl_check:
             mainCtlUpv = helpers.addCurve(self.crv_root, self.getName("mainCtl_upv"), ctls, crv_degree)
-            attribute.setKeyableAttributes(mainCtlUpv, [])
+            ymt_util.setKeyableAttributesDontLockVisibility(mainCtlUpv, [])
             v = self.root.getTranslation(space="world")
             mainCtlUpv.setTranslation(v, om.MSpace.kWorld)
             # connect upv curve to mainCrv_ctl driver node.
@@ -389,7 +390,7 @@ class Component(component.Main):
         crv_degree = 2
 
         crv = helpers.addCnsCurve(self.crv_root, self.getName("secCtl_crv"), ctls, crv_degree)
-        attribute.setKeyableAttributes(crv[0], [])
+        ymt_util.setKeyableAttributesDontLockVisibility(crv[0], [])
         v = self.root.getTranslation(space="world")
         crv[0].setTranslation(v, om.MSpace.kWorld)
 
@@ -657,7 +658,7 @@ class Component(component.Main):
             npo = pm.PyNode(pm.createNode("transform", n=npoName, p=oParent, ss=True))
 
             npo.setTransformation(ctlGhost.getMatrix())
-            attribute.setKeyableAttributes(npo, [])
+            ymt_util.setKeyableAttributesDontLockVisibility(npo, [])
             pm.parent(ctlGhost, npo)
 
             slider = primitive.addTransform(sliderParent, ctl.name() + "_slideDriven", t)
