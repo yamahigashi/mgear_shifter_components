@@ -84,6 +84,15 @@ class Component(component.Main):
     # =====================================================
     # OBJECTS
     # =====================================================
+    def addToSubGroup(self, obj, group_name):
+
+        if self.settings["ctlGrp"]:
+            ctlGrp = self.settings["ctlGrp"]
+        else:
+            ctlGrp = "controllers"
+
+        self.addToGroup(obj, group_name, parentGrp=ctlGrp)
+
     def addObjects(self):
         """Add all the objects needed to create the component."""
 
@@ -96,6 +105,8 @@ class Component(component.Main):
             else:
                 scl = [1, 1, 1]
             t = transform.setMatrixScale(t, scl)
+        self.detailControllersGroupName = "controllers_detail"  # TODO: extract to settings
+        self.primaryControllersGroupName = "controllers_primary"  # TODO: extract to settings
 
         self.ik_cns = primitive.addTransform(
             self.root, self.getName("ik_cns"), t)
@@ -109,6 +120,7 @@ class Component(component.Main):
                                h=self.settings["ctlSize"] * self.size,
                                d=self.settings["ctlSize"] * self.size,
                                tp=self.parentCtlTag)
+        self.addToSubGroup(self.ctl, self.primaryControllersGroupName)
 
         t = self.guide.tra["lookat"]
         self.lookat = self.addCtl(self.ik_cns,
@@ -120,6 +132,7 @@ class Component(component.Main):
                                   h=self.settings["ctlSize"] * self.size,
                                   d=self.settings["ctlSize"] * self.size,
                                   tp=self.parentCtlTag)
+        self.addToSubGroup(self.lookat, self.primaryControllersGroupName)
 
         # we need to set the rotation order before lock any rotation axis
         if self.settings["k_ro"]:

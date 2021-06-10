@@ -6,8 +6,8 @@ from pymel.core import datatypes
 from mgear.shifter import component
 
 from mgear.core import attribute, transform, primitive
-
 import ymt_shifter_utility as ymt_util
+
 #############################################
 # COMPONENT
 #############################################
@@ -19,8 +19,19 @@ class Component(component.Main):
     # =====================================================
     # OBJECTS
     # =====================================================
+    def addToSubGroup(self, obj, group_name):
+
+        if self.settings["ctlGrp"]:
+            ctlGrp = self.settings["ctlGrp"]
+        else:
+            ctlGrp = "controllers"
+
+        self.addToGroup(obj, group_name, parentGrp=ctlGrp)
+
     def addObjects(self):
         """Add all the objects needed to create the component."""
+        self.detailControllersGroupName = "controllers_detail"  # TODO: extract to settings
+        self.primaryControllersGroupName = "controllers_primary"  # TODO: extract to settings
 
         # jaw control
         t = transform.getTransformFromPos(self.guide.pos["jaw"])
@@ -65,15 +76,6 @@ class Component(component.Main):
         self.jawLow_rot = primitive.addTransform(
             self.jawLow_pos, self.getName("jawLow_rot"), t)
 
-        self.jawOfsset_ctl = self.addCtl(
-            self.jawLow_rot,
-            "jawOffset_ctl",
-            t,
-            self.color_fk,
-            "circle",
-            w=1*self.size,
-            tp=self.jaw_ctl)
-
         # lips
         t = transform.getTransformFromPos(self.guide.pos["lipup"])
 
@@ -89,12 +91,12 @@ class Component(component.Main):
             d=.15 * self.size,
             w=1 * self.size,
             ro=datatypes.Vector([1.5708, 0, 0]),
-            tp=self.jawOfsset_ctl)
+            tp=self.jaw_ctl)
 
         t = transform.getTransformFromPos(self.guide.pos["liplow"])
 
         self.liplow_npo = primitive.addTransform(
-            self.jawOfsset_ctl, self.getName("liplow_npo"), t)
+            self.jawLow_rot, self.getName("liplow_npo"), t)
 
         self.liplow_ctl = self.addCtl(
             self.liplow_npo,
@@ -104,7 +106,7 @@ class Component(component.Main):
             d=.15 * self.size,
             w=1 * self.size,
             ro=datatypes.Vector([1.5708, 0, 0]),
-            tp=self.jawOfsset_ctl)
+            tp=self.jaw_ctl)
 
         # teeth
         t = transform.getTransformFromPos(self.guide.pos["lipup"])
@@ -124,7 +126,7 @@ class Component(component.Main):
         t = transform.getTransformFromPos(self.guide.pos["liplow"])
 
         self.teethlow_npo = primitive.addTransform(
-            self.jawOfsset_ctl, self.getName("teethlow_npo"), t)
+            self.jawLow_rot, self.getName("teethlow_npo"), t)
 
         self.teethlow_ctl = self.addCtl(self.teethlow_npo,
                                         "teethlow_ctl",
@@ -137,7 +139,7 @@ class Component(component.Main):
                                         tp=self.liplow_ctl)
 
         self.jnt_pos.append(
-            [self.jawOfsset_ctl, "jaw", "parent_relative_jnt", False])
+            [self.jawLow_rot, "jaw", "parent_relative_jnt", False])
         self.jnt_pos.append(
             [self.lipup_ctl, "lipup", "parent_relative_jnt", False])
         # relative 0 is the jaw jnt
@@ -148,6 +150,11 @@ class Component(component.Main):
         self.jnt_pos.append(
             [self.teethlow_ctl, "teethlow", "jaw", False])
 
+        self.addToSubGroup(self.teethup_ctl, self.primaryControllersGroupName)
+        self.addToSubGroup(self.teethlow_ctl, self.primaryControllersGroupName)
+        self.addToSubGroup(self.lipup_ctl, self.primaryControllersGroupName)
+        self.addToSubGroup(self.liplow_ctl, self.primaryControllersGroupName)
+        self.addToSubGroup(self.jaw_ctl, self.primaryControllersGroupName)
     # =====================================================
     # ATTRIBUTES
     # =====================================================
@@ -155,17 +162,17 @@ class Component(component.Main):
         """Create the anim and setupr rig attributes for the component"""
 
         self.sideRotation_att = self.addAnimParam(
-            "siderot", "Sides Rotation", "double", self.settings["siderot"], 0, 10)
+            "siderot", "Sides Rotation", "double", 20, 0, 100)
         self.vertRotation_att = self.addAnimParam(
-            "vertrot", "Vertical Rotation", "double", self.settings["vertrot"], 0, 10)
+            "vertrot", "Vertical Rotation", "double", 40, 0, 100)
         self.frontalTranslation_att = self.addAnimParam(
-            "fronttrans", "Frontal Translation", "double", self.settings["fronttrans"], 0, 1)
+            "fronttrans", "Frontal Translation", "double", 1, 0, 1)
         self.verticalTranslation_att = self.addAnimParam(
-            "verttrans", "Vertical Translation", "double", self.settings["verttrans"], 0, 1)
+            "verttrans", "Vertical Translation", "double", 0.2, 0, 1)
         self.followLips_att = self.addAnimParam(
-            "followlips", "FollowLips", "double", self.settings["followlips"], 0, 1)
+            "floowlips", "FollowLips", "double", 0.05, 0, 1)
         self.lipsAlignSpeed_att = self.addAnimParam(
-            "lipsAlignSpeed", "Lips Align Speed", "double", self.settings["lipsAlignSpeed"], 0, 100)
+            "lipsAlignSpeed", "Lips Align Speed", "double", 10, 0, 100)
 
     # =====================================================
     # OPERATORS
@@ -238,7 +245,7 @@ class Component(component.Main):
         pm.connectAttr(clamp_node + ".outputR", md_node_7 + ".input2X")
 
         # md_node_8
-        # pm.connectAttr(cond_node_2 + ".outColorR", md_node_8 + ".input1X")
+        pm.connectAttr(cond_node_2 + ".outColorR", md_node_8 + ".input1X")
         pm.connectAttr(clamp_node + ".outputR", md_node_8 + ".input2X")
 
         # clamp_node
@@ -266,12 +273,12 @@ class Component(component.Main):
         pm.connectAttr(self.followLips_att, blend_node_1 + ".blender")
         pm.connectAttr(md_node_6 + ".outputX", blend_node_1 + ".color1R")
         pm.connectAttr(md_node_2 + ".outputX", blend_node_1 + ".color1G")
-        # pm.connectAttr(cond_node_1 + ".outColorR", blend_node_1 + ".color2R")
+        pm.connectAttr(cond_node_1 + ".outColorR", blend_node_1 + ".color2R")
         pm.connectAttr(md_node_8 + ".outputX", blend_node_1 + ".color2G")
 
         # blend_node_2
         pm.connectAttr(self.followLips_att, blend_node_2 + ".blender")
-        # pm.connectAttr(cond_node_3 + ".outColorR", blend_node_2 + ".color1R")
+        pm.connectAttr(cond_node_3 + ".outColorR", blend_node_2 + ".color1R")
         pm.connectAttr(md_node_5 + ".outputX", blend_node_2 + ".color1G")
         pm.connectAttr(md_node_7 + ".outputX", blend_node_2 + ".color2G")
 

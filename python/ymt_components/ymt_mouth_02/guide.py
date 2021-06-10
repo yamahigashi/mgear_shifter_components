@@ -8,13 +8,16 @@ from maya.app.general.mayaMixin import MayaQWidgetDockableMixin
 from maya.app.general.mayaMixin import MayaQDockWidget
 
 # guide info
-AUTHOR = "Jeremie Passerin, Miquel Campos"
-URL = "www.jeremiepasserin.com, www.miquletd.com"
-EMAIL = ""
-VERSION = [2, 0, 0]
+AUTHOR = "yamahigashi"
+URL = "github.com/yamahigashi"
+EMAIL = "yamahigashi@gmail.com"
+ORIGINAL_AUTHOR = "Jeremie Passerin, Miquel Campos"
+ORIGINAL_URL = "www.jeremiepasserin.com, www.miquletd.com"
+ORIGINAL_EMAIL = "geerem@hotmail.com, hello@miquel-campos.com"
+VERSION = [1, 0, 0]
 TYPE = "ymt_mouth_02"
 NAME = "mouth"
-DESCRIPTION = "Modified version of `mouth_02`, make default properties configuarble."
+DESCRIPTION = "mouth lips and jaw"
 
 ##########################################################
 # CLASS
@@ -70,18 +73,6 @@ class Guide(guide.ComponentGuide):
         self.pParentJointIndex = self.addParam(
             "parentJointIndex", "long", -1, None, None)
 
-        # self.pSiderot        = self.addParam("siderot", "Sides Rotation", 
-        # self.pVertrot        = self.addParam("vertrot", "Vertical Rotation
-        # self.pFronttrans     = self.addParam("fronttrans", "Frontal Translation
-        # self.pVerttrans      = self.addParam("verttrans", "Vertical Translation
-        # self.pFloowlips      = self.addParam("floowlips", "FollowLips
-        # self.pLipsAlignSpeed = self.addParam("lipsAlignSpeed", "Lips Align Speed
-        self.pSiderot        = self.addParam("siderot",        "double", 2, 0, 10)
-        self.pVertrot        = self.addParam("vertrot",        "double", 4, 0, 10)
-        self.pFronttrans     = self.addParam("fronttrans",     "double", 1, 0, 1)
-        self.pVerttrans      = self.addParam("verttrans",      "double", 0.2, 0, 1)
-        self.pFloowlips      = self.addParam("floowlips",      "double", 0.05, 0, 1)
-        self.pLipsAlignSpeed = self.addParam("lipsAlignSpeed", "double", 1, 0, 10)
         return
 
 

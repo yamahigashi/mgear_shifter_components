@@ -687,6 +687,7 @@ class Component(component.Main):
         except:
             pass
 
+        self.addToSubGroup(ctl, self.primaryControllersGroupName)
         return ctl
 
     def connect_slide_ghost(self, lipup_ref, liplow_ref, slide_c_ref, corner_l_ref, corner_r_ref):
@@ -733,6 +734,8 @@ class Component(component.Main):
         # center main controls
         self.lips_C_upper_ctl = createGhostWithParentConstraint(self.lips_C_upper_ctl, lipup_ref)
         self.lips_C_lower_ctl = createGhostWithParentConstraint(self.lips_C_lower_ctl, liplow_ref)
+        self.addToSubGroup(self.lips_C_upper_ctl, self.primaryControllersGroupName)
+        self.addToSubGroup(self.lips_C_lower_ctl, self.primaryControllersGroupName)
 
         # add slider offset
         npos = rigbits.addNPO([self.lips_C_upper_ctl, self.lips_C_lower_ctl])
