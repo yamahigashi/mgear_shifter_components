@@ -819,14 +819,13 @@ class toggleControllerVisibilityButton(QtWidgets.QPushButton):
         mouse_button = event.button()
         model = syn_utils.getModel(self)
 
+        obj = None
         try:
             obj = str(self.property("group_name")).split(",")
         except:
-            obj = ""
-            print("pass")
-        print(obj)
+            obj = None
 
-        l.hoge(model, mouse_button)
+        l.hoge(model, mouse_button, obj)
 
 
 if __name__ == "__main__":
