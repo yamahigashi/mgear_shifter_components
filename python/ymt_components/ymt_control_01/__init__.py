@@ -1,8 +1,9 @@
 """Component Control 01 module"""
-
+import math
 from mgear.shifter import component
-
 from mgear.core import attribute, transform, primitive
+
+import pymel.core as pm
 
 import ymt_shifter_utility as ymt_util
 
@@ -17,6 +18,19 @@ class Component(component.Main):
     # =====================================================
     # OBJECTS
     # =====================================================
+    def _needToMirror(self):
+        if self.settings["mirrorBehaviour"] and self.negate:
+            return True
+
+        if self.negate and (
+            self.settings["mirrorAxisX"] or
+            self.settings["mirrorAxisY"] or
+            self.settings["mirrorAxisZ"]
+        ):
+            return True
+
+        return False
+
     def addObjects(self):
         """Add all the objects needed to create the component."""
 
@@ -24,14 +38,22 @@ class Component(component.Main):
             t = transform.getTransformFromPos(self.guide.pos["root"])
         else:
             t = self.guide.tra["root"]
-            if self.settings["mirrorBehaviour"] and self.negate:
+            if self._needToMirror():
                 scl = [1, 1, 1]
                 scl[0] = -1 if self.settings["mirrorAxisX"] else 1
                 scl[1] = -1 if self.settings["mirrorAxisY"] else 1
                 scl[2] = -1 if self.settings["mirrorAxisZ"] else 1
+                t = transform.setMatrixScale(t, scl)
+
+                rx = self.settings["mirrorAxisX"] * math.pi
+                ry = self.settings["mirrorAxisY"] * math.pi
+                rz = self.settings["mirrorAxisZ"] * math.pi
+                # t = pm.datatypes.TransformationMatrix(t)
+                # t.addRotation((rx, ry, rz), 'XYZ', 'object')
+
             else:
                 scl = [1, 1, 1]
-            t = transform.setMatrixScale(t, scl)
+                t = transform.setMatrixScale(t, scl)
 
         self.ik_cns = primitive.addTransform(
             self.root, self.getName("ik_cns"), t)
