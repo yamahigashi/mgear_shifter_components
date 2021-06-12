@@ -7,6 +7,7 @@ from mgear.shifter import component
 
 from mgear.core import node, applyop, vector
 from mgear.core import attribute, transform, primitive
+import ymt_shifter_utility as ymt_util
 
 
 class Component(component.Main):
@@ -65,7 +66,7 @@ class Component(component.Main):
                                     w=self.size * .1,
                                     tp=self.parentCtlTag)
 
-        attribute.setKeyableAttributes(self.heel_ctl, self.r_params)
+        ymt_util.setKeyableAttributesDontLockVisibility(self.heel_ctl, self.r_params)
 
         # Tip ----------------------------------------------
         v = datatypes.Vector(self.guide.apos[1].x,
@@ -79,7 +80,7 @@ class Component(component.Main):
                                    "circle",
                                    w=self.size,
                                    tp=self.heel_ctl)
-        attribute.setKeyableAttributes(self.tip_ctl, self.r_params)
+        ymt_util.setKeyableAttributesDontLockVisibility(self.tip_ctl, self.r_params)
 
         # Roll ---------------------------------------------
         if self.settings["useRollCtl"]:
@@ -103,7 +104,7 @@ class Component(component.Main):
                                         ro=datatypes.Vector(3.1415 * .5, 0, 0),
                                         tp=self.tip_ctl)
 
-            attribute.setKeyableAttributes(self.roll_ctl, ["rx", "rz"])
+            ymt_util.setKeyableAttributesDontLockVisibility(self.roll_ctl, ["rx", "rz"])
 
         # Backward Controlers ------------------------------
         bk_pos = self.guide.apos[1:-3]
@@ -129,7 +130,7 @@ class Component(component.Main):
                               w=self.size * .15,
                               tp=self.previousTag)
 
-            attribute.setKeyableAttributes(ctl, self.r_params)
+            ymt_util.setKeyableAttributesDontLockVisibility(ctl, self.r_params)
             self.previousTag = ctl
             self.bk_ctl.append(ctl)
 
@@ -183,7 +184,7 @@ class Component(component.Main):
                                  tp=self.previousTag)
 
             self.previousTag = fk_ctl
-            attribute.setKeyableAttributes(fk_ctl)
+            ymt_util.setKeyableAttributesDontLockVisibility(fk_ctl)
             self.jnt_pos.append([fk_ctl, i])
 
             parent = fk_ctl

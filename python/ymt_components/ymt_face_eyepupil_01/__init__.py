@@ -39,6 +39,7 @@ from mgear.core.transform import (
 from mgear.core.primitive import (
     addTransform,
 )
+import ymt_shifter_utility as ymt_util
 
 if False:  # pylint: disable=using-constant-test, wrong-import-order
     # For type annotation
@@ -83,6 +84,15 @@ class Component(component.Main):
     # =====================================================
     # OBJECTS
     # =====================================================
+    def addToSubGroup(self, obj, group_name):
+
+        if self.settings["ctlGrp"]:
+            ctlGrp = self.settings["ctlGrp"]
+        else:
+            ctlGrp = "controllers"
+
+        self.addToGroup(obj, group_name, parentGrp=ctlGrp)
+
     def addObjects(self):
         """Add all the objects needed to create the component."""
 
@@ -95,6 +105,8 @@ class Component(component.Main):
             else:
                 scl = [1, 1, 1]
             t = transform.setMatrixScale(t, scl)
+        self.detailControllersGroupName = "controllers_detail"  # TODO: extract to settings
+        self.primaryControllersGroupName = "controllers_primary"  # TODO: extract to settings
 
         self.ik_cns = primitive.addTransform(
             self.root, self.getName("ik_cns"), t)
@@ -108,6 +120,7 @@ class Component(component.Main):
                                h=self.settings["ctlSize"] * self.size,
                                d=self.settings["ctlSize"] * self.size,
                                tp=self.parentCtlTag)
+        self.addToSubGroup(self.ctl, self.primaryControllersGroupName)
 
         t = self.guide.tra["lookat"]
         self.lookat = self.addCtl(self.ik_cns,
@@ -119,6 +132,7 @@ class Component(component.Main):
                                   h=self.settings["ctlSize"] * self.size,
                                   d=self.settings["ctlSize"] * self.size,
                                   tp=self.parentCtlTag)
+        self.addToSubGroup(self.lookat, self.primaryControllersGroupName)
 
         # we need to set the rotation order before lock any rotation axis
         if self.settings["k_ro"]:
@@ -129,7 +143,7 @@ class Component(component.Main):
         params = [s for s in
                   ["tx", "ty", "tz", "ro", "rx", "ry", "rz", "sx", "sy", "sz"]
                   if self.settings["k_" + s]]
-        attribute.setKeyableAttributes(self.ctl, params)
+        ymt_util.setKeyableAttributesDontLockVisibility(self.ctl, params)
 
         if self.settings["joint"]:
             self.jnt_pos.append([self.ctl, 0, None, self.settings["uniScale"]])
@@ -187,7 +201,7 @@ class Component(component.Main):
 
         return
         node.visibility.set(False)
-        attribute.setKeyableAttributes(node, [])
+        ymt_util.setKeyableAttributesDontLockVisibility(node, [])
         cmds.setAttr("{}.visibility".format(node.name()), l=False)
 
     def connect_slide_ghost(self):

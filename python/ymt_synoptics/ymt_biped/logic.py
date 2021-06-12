@@ -18,14 +18,14 @@ if False:
 
 
 
-def hoge(rig, button):
+def hoge(rig, button, group_name=None):
 
     if button == QtCore.Qt.RightButton:
         hide_all()
     elif button == QtCore.Qt.MiddleButton:
         show_all()
     else:
-        toggle(rig)
+        toggle(rig, group_name)
 
 
 def hide_all():
@@ -44,7 +44,35 @@ def show_all():
         cmds.setAttr("{}.ctl_vis".format(_rig.name()), 1)
 
 
-def toggle(rig):
+def toggle(rig, group_name=None):
 
-    current = cmds.getAttr("{}.ctl_vis".format(rig.name()))
-    cmds.setAttr("{}.ctl_vis".format(rig.name()), abs(current - 1))
+    ns = ":".join(rig.name().split(":")[:-1])
+    group_items = []
+
+    if group_name:
+        print(group_name)
+        if isinstance(group_name, list):
+            for gn in group_name:
+                set_fullpath = "{}:{}".format(ns, gn)
+                if cmds.ls(set_fullpath):
+                    group_items.extend(cmds.sets(set_fullpath, q=True) or [])
+        else:
+            set_fullpath = "{}:{}".format(ns, group_name)
+            if cmds.ls(set_fullpath):
+                group_items = cmds.sets(set_fullpath, q=True)
+
+    if group_items:
+        for item in group_items:
+            visible = cmds.getAttr("{}.visibility".format(item))
+            try:
+                cmds.setAttr("{}.visibility".format(item), lock=False)
+            except RuntimeError:
+                pass
+            try:
+                cmds.setAttr("{}.visibility".format(item), not visible)
+            except RuntimeError:
+                pass
+
+    else:
+        current = cmds.getAttr("{}.ctl_vis".format(rig.name()))
+        cmds.setAttr("{}.ctl_vis".format(rig.name()), abs(current - 1))

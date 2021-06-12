@@ -24,6 +24,7 @@ from mgear.core.transform import getChainTransform2
 from mgear.core.transform import setMatrixPosition
 from mgear.core.primitive import addTransform
 
+import ymt_shifter_utility as ymt_util
 
 ##########################################################
 # COMPONENT
@@ -196,8 +197,8 @@ class Component(component.Main):
             ro=datatypes.Vector([-math.pi / 2., 0., 0.])
         )
 
-        attribute.setKeyableAttributes(self.scale_ctl, self.s_params)
-        attribute.setKeyableAttributes(self.length_ctl, ["tx", "ty", "tz"])
+        ymt_util.setKeyableAttributesDontLockVisibility(self.scale_ctl, self.s_params)
+        ymt_util.setKeyableAttributesDontLockVisibility(self.length_ctl, ["tx", "ty", "tz"])
 
     def addObjectsChainIk(self, i, crv):
 
@@ -296,8 +297,8 @@ class Component(component.Main):
                                       )
         self.ik_roll_npo.append(ik_roll_npo)
 
-        attribute.setKeyableAttributes(ik_ctl, self.tr_params)
-        attribute.setKeyableAttributes(ik_roll_npo, [])
+        ymt_util.setKeyableAttributesDontLockVisibility(ik_ctl, self.tr_params)
+        ymt_util.setKeyableAttributesDontLockVisibility(ik_roll_npo, [])
         self.ik_ctl.append(ik_ctl)
 
         # ik global ref
@@ -306,7 +307,7 @@ class Component(component.Main):
             self.getName("ik%s_global_ref" % i),
             global_t)
         self.ik_global_ref.append(ik_global_ref)
-        attribute.setKeyableAttributes(ik_global_ref, [])
+        ymt_util.setKeyableAttributesDontLockVisibility(ik_global_ref, [])
 
     def _getTransformWithRollByBlade(self, t):
         # t = getTransform(self.guide.root)
@@ -386,7 +387,7 @@ class Component(component.Main):
             tp=self.preiviousCtlTag,
             mirrorConf=self.mirror_conf)
 
-        attribute.setKeyableAttributes(self.fk_ctl)
+        ymt_util.setKeyableAttributesDontLockVisibility(self.fk_ctl)
         attribute.setRotOrder(fk_ctl, "ZXY")
         self.fk_ctl.append(fk_ctl)
         self.preiviousCtlTag = fk_ctl
@@ -1011,7 +1012,7 @@ class Component(component.Main):
             additional_code += "\n{}.translateZ = {}.translateZ".format(upv, self.length_ctl)
         self.length_ctl.setTranslation(datatypes.Vector(0.0, self.slv_crv.length(), 0), space="preTransform")
         self.exprespy = create_exprespy_node(self.length_control_expression_archtype, self.getName("exprespy"), rewrite_map, additional_code)
-        attribute.setKeyableAttributes(self.fk_upvectors, [])
+        ymt_util.setKeyableAttributesDontLockVisibility(self.fk_upvectors, [])
 
     def length_control_expression_archtype(curve_length, scale_ctl, fk0_npo, curve_op, scale_cns):
         from maya.api.OpenMaya import MVector

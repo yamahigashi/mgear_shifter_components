@@ -41,6 +41,8 @@ from mgear.core.primitive import (
     addTransform,
 )
 
+import ymt_shifter_utility as ymt_util
+
 if False:  # pylint: disable=using-constant-test, wrong-import-order
     # For type annotation
     from typing import (  # NOQA: F401 pylint: disable=unused-import
@@ -127,6 +129,8 @@ class Component(component.Main):
 
         # -------------------------------------------------------
         self.ctlName = "ctl"
+        self.detailControllersGroupName = "controllers_detail"  # TODO: extract to settings
+        self.primaryControllersGroupName = "controllers_primary"  # TODO: extract to settings
         self.blinkH = 0.2
         self.upperVTrack = 0.04
         self.upperHTrack = 0.01
@@ -328,18 +332,8 @@ class Component(component.Main):
                                     ro=datatypes.Vector(1.57079633, 0, 0),
                                     po=self.offset,
                                     )
-
-        if self.negate:
-            # TODO: implement later
-            # self.over_npo.attr("rx").set(self.over_npo.attr("rx").get() * -1)
-            # self.over_npo.attr("sx").set(-1)
-            # self.over_npo.attr("sz").set(-1)
-            pass
-
-        # node.add_controller_tag(over_ctl)
-        # self.addAnimParam(over_ctl, "isCtl", "bool", keyable=False)
-        # attribute.add_mirror_config_channels(over_ctl)
-        attribute.setKeyableAttributes(
+        self.addToSubGroup(self.over_ctl, self.primaryControllersGroupName)
+        ymt_util.setKeyableAttributesDontLockVisibility(
             self.over_ctl,
             params=["tx", "ty", "tz", "ro", "rx", "ry", "rz", "sx", "sy", "sz"])
 
@@ -369,8 +363,9 @@ class Component(component.Main):
             ro=ro,
             po=po,
         )
+        self.addToSubGroup(self.over_ctl, self.primaryControllersGroupName)
 
-        attribute.setKeyableAttributes(self.arrow_ctl, params=["rx", "ry", "rz"])
+        ymt_util.setKeyableAttributesDontLockVisibility(self.arrow_ctl, params=["rx", "ry", "rz"])
         # self.addAnimParam(self.arrow_ctl, "isCtl", "bool", keyable=False)
 
     def addAimControllers(self, t):
@@ -466,12 +461,8 @@ class Component(component.Main):
                               po=offset
                               )
 
-            attribute.setKeyableAttributes(ctl, params)
-            if self.negate:
-                pass
-                # npoBase.attr("ry").set(180)
-                # npoBase.attr("sz").set(-1)
-
+            self.addToSubGroup(self.over_ctl, self.primaryControllersGroupName)
+            ymt_util.setKeyableAttributesDontLockVisibility(ctl, params)
             ctls.append(ctl)
 
         # adding parent average contrains to odd controls
@@ -483,6 +474,15 @@ class Component(component.Main):
 
         applyop.gear_curvecns_op(crv, ctls)
         return ctls
+
+    def addToSubGroup(self, obj, group_name):
+
+        if self.settings["ctlGrp"]:
+            ctlGrp = self.settings["ctlGrp"]
+        else:
+            ctlGrp = "controllers"
+
+        self.addToGroup(obj, group_name, parentGrp=ctlGrp)
 
     def _addCurveDetailControllers(self, t, crv, name, skipHeadAndTail=False):
 
@@ -522,7 +522,7 @@ class Component(component.Main):
             npo = addTransform(self.jnt_root, npo_name, xform)
             applyop.aimCns(npo, trn, axis="zy", wupObject=self.jnt_root)
 
-            ctl_name = "crvdetail%s_%s" % (i, self.ctlName)
+            ctl_name = "%s_crvdetail%s_%s" % (name, i, self.ctlName)
             xform = setMatrixPosition(t, cv)
             ctl = self.addCtl(
                 npo,
@@ -536,6 +536,7 @@ class Component(component.Main):
                 po=offset
             )
 
+            self.addToSubGroup(ctl, self.detailControllersGroupName)
             controls.append(ctl)
 
             jnt_name = "{}{}".format(name, i)

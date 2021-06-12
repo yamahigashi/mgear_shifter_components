@@ -17,6 +17,7 @@ from mgear.core.transform import setMatrixPosition
 # from mgear.core.transform import getPositionFromMatrix
 from mgear.core.primitive import addTransform
 
+import ymt_shifter_utility as ymt_util
 
 ##########################################################
 # COMPONENT
@@ -209,7 +210,7 @@ class Component(component.Main):
             tp=self.previusTag,
             mirrorConf=self.mirror_conf)
 
-        attribute.setKeyableAttributes(ik_ctl, self.tr_params)
+        ymt_util.setKeyableAttributesDontLockVisibility(ik_ctl, self.tr_params)
         self.ik_ctl.append(ik_ctl)
         attribute.setInvertMirror(ik_ctl, ["tx", "rz", "ry"])
 
@@ -219,7 +220,7 @@ class Component(component.Main):
             self.getName("ik%s_global_ref" % i),
             global_t)
         self.ik_global_ref.append(ik_global_ref)
-        attribute.setKeyableAttributes(ik_global_ref, [])
+        ymt_util.setKeyableAttributesDontLockVisibility(ik_global_ref, [])
 
     def _getTransformWithRollByBlade(self, t):
         # t = getTransform(self.guide.root)
@@ -288,7 +289,7 @@ class Component(component.Main):
             tp=self.preiviousCtlTag,
             mirrorConf=self.mirror_conf)
 
-        attribute.setKeyableAttributes(self.fk_ctl)
+        ymt_util.setKeyableAttributesDontLockVisibility(self.fk_ctl)
         attribute.setRotOrder(fk_ctl, "ZXY")
         self.fk_ctl.append(fk_ctl)
         self.preiviousCtlTag = fk_ctl

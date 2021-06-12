@@ -1,9 +1,7 @@
 """mGear shifter components"""
 # pylint: disable=import-error,W0201,C0111,C0112
 import re
-import inspect
-import textwrap
-import math
+import traceback
 
 import maya.cmds as cmds
 import maya.OpenMaya as om1
@@ -38,11 +36,13 @@ from mgear.core.transform import (
     # getTransformLookingAt,
     # getChainTransform2,
     setMatrixPosition,
+    setMatrixRotation,
 )
 
 from mgear.core.primitive import (
     addTransform,
 )
+import ymt_shifter_utility as ymt_util
 
 if False:  # pylint: disable=using-constant-test, wrong-import-order
     # For type annotation
@@ -133,6 +133,8 @@ class Component(component.Main):
 
         # -------------------------------------------------------
         self.ctlName = "ctl"
+        self.detailControllersGroupName = "controllers_detail"  # TODO: extract to settings
+        self.primaryControllersGroupName = "controllers_primary"  # TODO: extract to settings
         self.blinkH = 0.2
         self.upperVTrack = 0.04
         self.upperHTrack = 0.01
@@ -345,8 +347,9 @@ class Component(component.Main):
 
             pm.connectAttr(upv.attr("worldMatrix[0]"), cns.attr("worldUpMatrix"))
 
-            ctl_name = self.getName("crvdetail%s_%s" % (i, self.ctlName))
+            ctl_name = self.getName("%s_crvdetail%s_%s" % (name, i, self.ctlName))
 
+            self.thickness = 0.0
             if i == 0:
                 # we know the curv starts from right to left
                 offset = [cv[0] + self.thickness, cv[1], cv[2] + self.thickness]
@@ -358,7 +361,13 @@ class Component(component.Main):
                 offset = [cv[0], cv[1] - self.thickness, cv[2]]
 
             # offset = [cv[0], cv[1], cv[2] - self.FRONT_OFFSET]
+            m = getTransform(npo)
+            x = datatypes.Vector(m[0][0], m[0][1], m[0][2])
+            y = datatypes.Vector(m[1][0], m[1][1], m[1][2])
+            z = datatypes.Vector(m[2][0], m[2][1], m[2][2])
+            rot = [x, y, z]
             xform = setMatrixPosition(t, offset)
+            xform = setMatrixRotation(xform, rot)
             # xform = setMatrixPosition(t, cv)
             ctl = self.addCtl(
                 npo,
@@ -377,9 +386,19 @@ class Component(component.Main):
             # getting joint parent
             # jnt = rigbits.addJnt(npo, noReplace=True, parent=self.j_parent)
             self.jnt_pos.append([ctl, "{}{}".format(name, i)])
+            self.addToSubGroup(ctl, self.detailControllersGroupName)
 
         pm.progressWindow(e=True, endProgress=True)
         return controls
+
+    def addToSubGroup(self, obj, group_name):
+
+        if self.settings["ctlGrp"]:
+            ctlGrp = self.settings["ctlGrp"]
+        else:
+            ctlGrp = "controllers"
+
+        self.addToGroup(obj, group_name, parentGrp=ctlGrp)
 
     def addControllers(self):
         axis_list = ["sx", "sy", "sz", "ro"]
@@ -430,10 +449,10 @@ class Component(component.Main):
 
         upvec = self.upUpvs + self.lowUpvs
 
-        pm.parent(self.lips_R_upOuter_npo,  self.lips_R_lowOuter_npo,  self.upCtls[0])
-        pm.parent(self.lips_R_upInner_npo,  self.lips_L_upInner_npo,   self.upCtls[3])
-        pm.parent(self.lips_L_lowInner_npo, self.lips_L_lowOuter_npo,  self.upCtls[-1])
-        pm.parent(self.lips_R_lowInner_npo, self.lips_L_lowInner_npo,  self.lowCtls[2])
+        pm.parent(self.lips_R_upOuter_npo,  self.lips_R_lowOuter_npo,  self.lips_R_Corner_ctl)
+        pm.parent(self.lips_R_upInner_npo,  self.lips_L_upInner_npo,   self.lips_C_upper_ctl)
+        pm.parent(self.lips_L_upOuter_npo,  self.lips_L_lowOuter_npo,  self.lips_L_Corner_ctl)
+        pm.parent(self.lips_R_lowInner_npo, self.lips_L_lowInner_npo,  self.lips_C_lower_ctl)
 
         # Connecting control crvs with controls
         applyop.gear_curvecns_op(self.upCrv_ctl, self.upCtls)
@@ -470,17 +489,15 @@ class Component(component.Main):
             cns_node.attr(s1.name() + "W0").set(p1)
             cns_node.attr(s2.name() + "W1").set(p2)
 
-        __upper(self.upCtls, 0, 3, 1, 0.75, 0.25)
+        __upper(self.upCtls, 0, 3, 1, 0.33, 0.67)
         __upper(self.upCtls, 0, 3, 2, 0.25, 0.75)
         __upper(self.upCtls, 3, 6, 4, 0.75, 0.25)
-        __upper(self.upCtls, 3, 6, 5, 0.25, 0.75)
+        __upper(self.upCtls, 3, 6, 5, 0.67, 0.33)
 
-        __lower(self.upCtls[0], self.lowCtls[2], self.lowCtls[0], 0.75, 0.25)
-        __lower(self.upCtls[0], self.lowCtls[2], self.lowCtls[1], 0.25, 0.75)
-        __lower(self.lowCtls[2], self.upCtls[6], self.lowCtls[3], 0.75, 0.25)
-        __lower(self.lowCtls[2], self.upCtls[6], self.lowCtls[4], 0.25, 0.75)
-
-        return
+        __lower(self.lips_R_Corner_ctl, self.lips_C_lower_ctl, self.lips_R_lowOuter_ctl, 0.33, 0.67)
+        __lower(self.lips_R_Corner_ctl, self.lips_C_lower_ctl, self.lips_R_lowInner_ctl, 0.25, 0.75)
+        __lower(self.lips_L_Corner_ctl, self.lips_C_lower_ctl, self.lips_L_lowInner_ctl, 0.25, 0.75)
+        __lower(self.lips_L_Corner_ctl, self.lips_C_lower_ctl, self.lips_L_lowOuter_ctl, 0.33, 0.67)
 
     def _addControls(self, crv_ctl, option, sidecut):
 
@@ -522,9 +539,10 @@ class Component(component.Main):
 
                 t = transform.setMatrixPosition(transform.getTransform(nearest_joint), cv)
                 temp = addTransform(self.root, self.getName("temp"), t)
-                temp.rx.set(0)
+                # temp.rx.set(0)
                 t = transform.getTransform(temp)
                 pm.delete(temp)
+                # print(i, nearest_joint, temp)
 
             oName  = option[i][0]
             oSide  = option[i][1]
@@ -532,6 +550,12 @@ class Component(component.Main):
             color  = option[i][3]
             wd     = option[i][4]
             oPar   = option[i][5]
+
+            if oSide == "R":
+                scl = [1, 1, -1]
+            else:
+                scl = [1, 1, 1]
+            t = transform.setMatrixScale(t, scl)
 
             npo = addTransform(self.root, self.getName("%s_npo" % oName, oSide), t)
             npos.append(npo)
@@ -549,14 +573,12 @@ class Component(component.Main):
 
             ctls.append(ctl)
 
-            attribute.setKeyableAttributes(ctl, params + oPar)
+            ymt_util.setKeyableAttributesDontLockVisibility(ctl, params + oPar)
 
             upv = addTransform(ctl, self.getName("%s_upv" % oName, oSide), t)
             upv.attr("tz").set(self.FRONT_OFFSET)
             upvs.append(upv)
-
-            if oSide == "R":
-                npo.attr("sx").set(-1)
+            self.addToSubGroup(ctl, self.primaryControllersGroupName)
 
         pm.progressWindow(e=True, endProgress=True)
 
@@ -604,7 +626,6 @@ class Component(component.Main):
             self.connect_ghosts()
 
         except Exception as e:
-            import traceback
             traceback.print_exc()
 
             raise
@@ -612,18 +633,32 @@ class Component(component.Main):
     def connect_standard(self):
         self.parent.addChild(self.root)
 
-        return
-
     def connect_ghosts(self):
 
         lipup_ref = self.parent_comp.lipup_ctl
         liplow_ref = self.parent_comp.liplow_ctl
+
         slide_c_ref = self.rig.findRelative("mouthSlide_C0_root")
         corner_l_ref = self.rig.findRelative("mouthCorner_L0_root")
         corner_r_ref = self.rig.findRelative("mouthCorner_R0_root")
 
+        slide_c_comp = self.rig.findComponent("mouthSlide_C0_root")
+        corner_l_comp = self.rig.findComponent("mouthCorner_L0_root")
+        corner_r_comp = self.rig.findComponent("mouthCorner_R0_root")
+
         self.connect_slide_ghost(lipup_ref, liplow_ref, slide_c_ref, corner_l_ref, corner_r_ref)
         self.connect_mouth_ghost(lipup_ref, liplow_ref, slide_c_ref, corner_l_ref, corner_r_ref)
+
+        pm.parent(corner_l_comp.ik_cns, self.mouthSlide_ctl)
+        pm.parent(corner_r_comp.ik_cns, self.mouthSlide_ctl)
+
+        # remove elements from controllers group
+        for comp in [slide_c_comp, corner_l_comp, corner_r_comp]:
+            for k, v in comp.groups.items():
+                if "componentsRoots" in k:
+                    continue
+
+                comp.groups[k] = []
 
     def _createGhostCtl(self, t, p):
 
@@ -636,6 +671,23 @@ class Component(component.Main):
         _visi_off_lock(t.getShape())
         ctl.getShape().visibility.set(True)
 
+        if self.settings["ctlGrp"]:
+            ctlGrp = self.settings["ctlGrp"]
+            self.addToGroup(ctl, ctlGrp, "controllers")
+
+        else:
+            ctlGrp = "controllers"
+            self.addToGroup(ctl, ctlGrp)
+
+        if ctlGrp not in self.groups.keys():
+            self.groups[ctlGrp] = []
+
+        try:
+            self.groups[ctlGrp].remove(t)
+        except:
+            pass
+
+        self.addToSubGroup(ctl, self.primaryControllersGroupName)
         return ctl
 
     def connect_slide_ghost(self, lipup_ref, liplow_ref, slide_c_ref, corner_l_ref, corner_r_ref):
@@ -673,26 +725,24 @@ class Component(component.Main):
         pm.parentConstraint(corner_l_ref, self.lips_L_Corner_npo, mo=True)
         pm.parentConstraint(corner_r_ref, self.lips_R_Corner_npo, mo=True)
 
+        ymt_util.setKeyableAttributesDontLockVisibility(slide_c_ref, [])
+        ymt_util.setKeyableAttributesDontLockVisibility(corner_l_ref, [])
+        ymt_util.setKeyableAttributesDontLockVisibility(corner_r_ref, [])
+
     def connect_mouth_ghost(self, lipup_ref, liplow_ref, slide_c_ref, corner_l_ref, corner_r_ref):
 
         # center main controls
         self.lips_C_upper_ctl = createGhostWithParentConstraint(self.lips_C_upper_ctl, lipup_ref)
         self.lips_C_lower_ctl = createGhostWithParentConstraint(self.lips_C_lower_ctl, liplow_ref)
+        self.addToSubGroup(self.lips_C_upper_ctl, self.primaryControllersGroupName)
+        self.addToSubGroup(self.lips_C_lower_ctl, self.primaryControllersGroupName)
 
         # add slider offset
         npos = rigbits.addNPO([self.lips_C_upper_ctl, self.lips_C_lower_ctl])
         for c in npos:
             rigbits.connectLocalTransform([self.mouthSlide_ctl, c])
-            # pm.parentConstraint(slide_c_ref, c, mo=True)
 
         return
-        # Left side controls
-        self.lips_L_upInner_ctl = createGhostWithParentConstraint(self.lips_L_upInner_ctl, self.lips_C_upper_ctl)
-        self.lips_L_lowInner_ctl = createGhostWithParentConstraint(self.lips_L_lowInner_ctl, self.lips_C_lower_ctl)
-
-        # Right side controls
-        self.lips_R_upInner_ctl = createGhostWithParentConstraint(self.lips_R_upInner_ctl, self.lips_C_upper_ctl)
-        self.lips_R_lowInner_ctl = createGhostWithParentConstraint(self.lips_R_lowInner_ctl, self.lips_C_lower_ctl)
 
     def connect_averageParentCns(self, parents, target):
         """
@@ -839,7 +889,6 @@ def ghostSliderForMouth(ghostControls, intTra, surface, sliderParent):
             while parent != sliderParent:
                 parent.attr("matrix") >> mul_node.attr("matrixIn[{}]".format(i))
                 parent = parent.getParent()
-                print(parent)
                 i += 1
                 if 10 < i:
                     logger.error("maximum recursion")
@@ -861,7 +910,7 @@ def ghostSliderForMouth(ghostControls, intTra, surface, sliderParent):
                             worldUpObject=gDriver)
 
         pm.parent(ctlGhost.getParent(), slider)
-        attribute.setKeyableAttributes(slider, [])
+        ymt_util.setKeyableAttributesDontLockVisibility(slider, [])
 
     for slider in sliders[1:]:
         _visi_off_lock(slider)
@@ -931,22 +980,33 @@ def applyPathCnsLocal(target, curve, u):
     cns.attr("rotateOrder") >> comp_node.attr("inputRotateOrder")
 
     mul_node = pm.createNode("multMatrix")
-    comp_node.attr("outputMatrix") >> mul_node.attr("matrixIn[0]")
-    curve.attr("matrix") >> mul_node.attr("matrixIn[1]")
+    comp_node2 = pm.createNode("composeMatrix")
+
+    pos = target.getTranslation(space="world")
+    if pos.x < -0.001:
+        pm.setAttr(comp_node2.attr("inputScaleX"), -1.0)
+
+    pm.setAttr(comp_node2.attr("inputRotateX"), 90.0)
+    pm.setAttr(comp_node2.attr("inputRotateZ"), 90.0)
+
+    comp_node2.attr("outputMatrix") >> mul_node.attr("matrixIn[0]")
+    comp_node.attr("outputMatrix") >> mul_node.attr("matrixIn[1]")
+    curve.attr("matrix") >> mul_node.attr("matrixIn[2]")
 
     decomp_node = pm.createNode("decomposeMatrix")
     mul_node.attr("matrixSum") >> decomp_node.attr("inputMatrix")
     decomp_node.attr("outputTranslate") >> target.attr("translate")
     decomp_node.attr("outputRotate") >> target.attr("rotate")
+    decomp_node.attr("outputScale") >> target.attr("scale")
 
     return cns
-    
+
 
 def _visi_off_lock(node):
     """Short cuts."""
     cmds.setAttr("{}.visibility".format(node.name()), l=False)
     node.visibility.set(False)
     try:
-        attribute.setKeyableAttributes(node, [])
+        ymt_util.setKeyableAttributesDontLockVisibility(node, [])
     except:
         pass

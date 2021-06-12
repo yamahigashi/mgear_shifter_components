@@ -40,6 +40,7 @@ from mgear.core.transform import (
 from mgear.core.primitive import (
     addTransform,
 )
+import ymt_shifter_utility as ymt_util
 
 if False:  # pylint: disable=using-constant-test, wrong-import-order
     # For type annotation
@@ -109,6 +110,8 @@ class Component(component.Main):
 
         # -------------------------------------------------------
         self.ctlName = "ctl"
+        self.detailControllersGroupName = "controllers_detail"  # TODO: extract to settings
+        self.primaryControllersGroupName = "controllers_primary"  # TODO: extract to settings
 
         self.FRONT_OFFSET = .02
         self.NB_ROPE = 15
@@ -169,7 +172,7 @@ class Component(component.Main):
     def _visi_off_lock(self, node):
         """Short cuts."""
         node.visibility.set(False)
-        attribute.setKeyableAttributes(node, [])
+        ymt_util.setKeyableAttributesDontLockVisibility(node, [])
         cmds.setAttr("{}.visibility".format(node.name()), l=False)
 
     def addContainers(self):
@@ -191,12 +194,14 @@ class Component(component.Main):
         if self.connect_surface_slider:
             bt = getTransform(self.root)
             self.slider_root = addTransform(self.root, self.getName("sliders"), bt)
-            attribute.setKeyableAttributes(self.slider_root, [])
+            ymt_util.setKeyableAttributesDontLockVisibility(self.slider_root, [])
 
         # self.mainControlParentGrp = addTransform(self.root, self.getName("mainControls"), t)
         w = (self.outPos - self.inPos).length()
         d = (self.upPos - self.lowPos).length()
-        self.mainControlParentGrp = self.addCtl( self.root, "mainControls", t, self.color_ik, "square", w=w, d=d, ro=datatypes.Vector(1.57079633, 0, 0), po=datatypes.Vector(0, 0, 1.0))
+        self.mainControlParentGrp = addTransform(self.root, self.getName("mainControls"), t)
+        self.mainControl = self.addCtl(self.mainControlParentGrp, "main_ctl", t, self.color_ik, "square", w=w, d=d, ro=datatypes.Vector(1.57079633, 0, 0), po=datatypes.Vector(0, 0, 1.0))
+        self.addToSubGroup(self.mainControl, self.primaryControllersGroupName)
         self.secondaryControlsParentGrp = addTransform(self.root, self.getName("secondaryControls"), t)
 
     def getNumberOfLocators(self, query):
@@ -237,7 +242,7 @@ class Component(component.Main):
         name = "main_crv"
         crv = gen(edgeList, planeNode.verts[1], self.getName("{}Crv".format(name)), parent=crv_root, m=t)
         crv.attr("visibility").set(False)
-        attribute.setKeyableAttributes(crv, [])
+        ymt_util.setKeyableAttributesDontLockVisibility(crv, [])
 
         mainCtrlPos = helpers.divideSegment(crv, self.midDivisions)
         secCtrlPos = self.uplocsPos
@@ -266,7 +271,7 @@ class Component(component.Main):
         self.mainControls = []
         self.mainUpvs = []
         for ctlOptions in mainCtrlOptions:
-            ctl, upv = self._foreachControlOption(self.mainControlParentGrp, ctlOptions)
+            ctl, upv = self._foreachControlOption(self.mainControl, ctlOptions)
             self.mainControls.append(ctl)
             self.mainUpvs.append(upv)
         self.addMainCnsCurve(self.mainControls)
@@ -333,7 +338,7 @@ class Component(component.Main):
         crv_degree = 2
 
         crv = helpers.addCnsCurve(self.crv_root, self.getName("mainCtl_crv"), ctls, crv_degree)
-        attribute.setKeyableAttributes(crv[0], [])
+        ymt_util.setKeyableAttributesDontLockVisibility(crv[0], [])
         v = self.root.getTranslation(space="world")
         crv[0].setTranslation(v, om.MSpace.kWorld)
         self.mainCtlCurves.append(crv[0])
@@ -341,7 +346,7 @@ class Component(component.Main):
         # create upvector curve to drive secondary control
         if self.secondary_ctl_check:
             mainCtlUpv = helpers.addCurve(self.crv_root, self.getName("mainCtl_upv"), ctls, crv_degree)
-            attribute.setKeyableAttributes(mainCtlUpv, [])
+            ymt_util.setKeyableAttributesDontLockVisibility(mainCtlUpv, [])
             v = self.root.getTranslation(space="world")
             mainCtlUpv.setTranslation(v, om.MSpace.kWorld)
             # connect upv curve to mainCrv_ctl driver node.
@@ -385,7 +390,7 @@ class Component(component.Main):
         crv_degree = 2
 
         crv = helpers.addCnsCurve(self.crv_root, self.getName("secCtl_crv"), ctls, crv_degree)
-        attribute.setKeyableAttributes(crv[0], [])
+        ymt_util.setKeyableAttributesDontLockVisibility(crv[0], [])
         v = self.root.getTranslation(space="world")
         crv[0].setTranslation(v, om.MSpace.kWorld)
 
@@ -513,6 +518,15 @@ class Component(component.Main):
             wire(self.mainRopes[i],     drv)
             wire(self.mainRopeUpvs[i],  drv)
 
+    def addToSubGroup(self, obj, group_name):
+
+        if self.settings["ctlGrp"]:
+            ctlGrp = self.settings["ctlGrp"]
+        else:
+            ctlGrp = "controllers"
+
+        self.addToGroup(obj, group_name, parentGrp=ctlGrp)
+
     # =====================================================
     # ATTRIBUTES
     # =====================================================
@@ -559,18 +573,6 @@ class Component(component.Main):
             for i, ctl in enumerate(self.secondaryControls):
                 self.jnt_pos.append([ctl, str(i).zfill(2)])
 
-    def connect_ghosts(self):
-
-        lipup_ref = self.parent_comp.lipup_ctl
-        liplow_ref = self.parent_comp.liplow_ctl
-
-        slide_c_ref = self.rig.findRelative("mouthSlide_C0_root")
-        corner_l_ref = self.rig.findRelative("mouthCorner_L0_root")
-        corner_r_ref = self.rig.findRelative("mouthCorner_R0_root")
-
-        self.connect_slide_ghost(lipup_ref, liplow_ref, slide_c_ref, corner_l_ref, corner_r_ref)
-        self.connect_mouth_ghost(lipup_ref, liplow_ref, slide_c_ref, corner_l_ref, corner_r_ref)
-
     def connect_slide_ghost(self):
 
         # create ghost controls
@@ -580,10 +582,33 @@ class Component(component.Main):
             ghosts.append(ghostCtl)
             ghostCtl.attr("isCtl").set(True)
             self._visi_off_lock(sec)
+            self.addToSubGroup(ghostCtl, self.detailControllersGroupName)
+
+            ghostCtl.attr("isCtl") // sec.attr("isCtl")
+            ghostCtl.attr("translate") // sec.attr("translate")
+            ghostCtl.attr("rotate") // sec.attr("rotate")
+            ghostCtl.attr("scale") // sec.attr("scale")
+
+            sec.attr("isCtl").set(False)
+
+            if self.settings["ctlGrp"]:
+                ctlGrp = self.settings["ctlGrp"]
+
+            else:
+                ctlGrp = "controllers"
+
+            if ctlGrp not in self.groups.keys():
+                self.groups[ctlGrp] = []
+
+            try:
+                self.groups[ctlGrp].remove(sec)
+            except:
+                pass
+
         self._visi_off_lock(self.secondaryControlsParentGrp)
 
         # slide system
-        ghostSliderForEyeBrow(
+        self.ghostSliderForEyeBrow(
             ghosts,
             self.sliding_surface,
             self.slider_root)
@@ -595,6 +620,80 @@ class Component(component.Main):
         self.relatives["root"] = self.root
         self.controlRelatives["root"] = self.root
         self.aliasRelatives["root"] = "ctl"
+
+    def ghostSliderForEyeBrow(self, ghostControls, surface, sliderParent):
+        """Modify the ghost control behaviour to slide on top of a surface
+
+        Args:
+            ghostControls (dagNode): The ghost control
+            surface (Surface): The NURBS surface
+            sliderParent (dagNode): The parent for the slider.
+        """
+
+        if not isinstance(ghostControls, list):
+            ghostControls = [ghostControls]
+
+        def conn(ctl, driver, ghost):
+            for attr in ["translate", "scale", "rotate"]:
+                pm.connectAttr("{}.{}".format(ctl, attr), "{}.{}".format(driver, attr))
+                # pm.disconnectAttr("{}.{}".format(ctl, attr), "{}.{}".format(ghost, attr))
+
+        surfaceShape = surface.getShape()
+        sliders = []
+
+        for i, ctlGhost in enumerate(ghostControls):
+            ctl = pm.listConnections(ctlGhost, t="transform")[-1]
+            t = ctl.getMatrix(worldSpace=True)
+            scl = [1, 1, 1]
+            if self.negate:
+                scl = [-1, 1, 1]
+            # t = transform.setMatrixScale(t, scl)
+
+            gDriver = primitive.addTransform(ctlGhost.getParent(), "{}_slideDriver".format(ctl.name()), t)
+            # conn(ctl, gDriver, ctlGhost)
+            # print("ctlGhost.getParent: {}, ctl: {}, gDriver: {}, ctlGhost: {}".format(ctlGhost.getParent(), ctl, gDriver, ctlGhost))
+
+            oParent = ctlGhost.getParent()
+            npoName = "_".join(ctlGhost.name().split("_")[:-1]) + "_npo"
+            npo = pm.PyNode(pm.createNode("transform", n=npoName, p=oParent, ss=True))
+
+            npo.setTransformation(ctlGhost.getMatrix())
+            ymt_util.setKeyableAttributesDontLockVisibility(npo, [])
+            pm.parent(ctlGhost, npo)
+
+            slider = primitive.addTransform(sliderParent, ctl.name() + "_slideDriven", t)
+            sliders.append(slider)
+
+            down, _, up = findPathAtoB(ctl, sliderParent)
+            mul_node = pm.createNode("multMatrix")
+            j = k = 0
+            for j, d in enumerate(down):
+                d.attr("matrix") >> mul_node.attr("matrixIn[{}]".format(j))
+            _.attr("matrix") >> mul_node.attr("matrixIn[{}]".format(j + 1))
+            for k, u in enumerate(up):
+                u.attr("inverseMatrix") >> mul_node.attr("matrixIn[{}]".format(k + j + 1))
+
+            dm_node = node.createDecomposeMatrixNode(mul_node.attr("matrixSum"))
+
+            cps_node = pm.createNode("closestPointOnSurface")
+            dm_node.attr("outputTranslate") >> cps_node.attr("inPosition")
+            surfaceShape.attr("local") >> cps_node.attr("inputSurface")
+            cps_node.attr("position") >> slider.attr("translate")
+
+            if self.negate:
+                aim = [0, 0, -1]
+            else:
+                aim = [0, 0, 1]
+            pm.normalConstraint(surfaceShape,
+                                slider,
+                                aimVector=aim,
+                                upVector=[0, 1, 0],
+                                worldUpType="objectrotation",
+                                worldUpVector=[0, 1, 0],
+                                worldUpObject=gDriver)
+            pm.parent(ctlGhost.getParent(), slider)
+
+            pm.parent(gDriver.getParent(), self.mainControl)
 
 
 def draw_eye_guide_mesh_plane(points, t):
@@ -644,70 +743,6 @@ def draw_eye_guide_mesh_plane(points, t):
     n.setTranslation(v, om.MSpace.kWorld)
 
     return mesh
-
-
-def ghostSliderForEyeBrow(ghostControls, surface, sliderParent):
-    """Modify the ghost control behaviour to slide on top of a surface
-
-    Args:
-        ghostControls (dagNode): The ghost control
-        surface (Surface): The NURBS surface
-        sliderParent (dagNode): The parent for the slider.
-    """
-
-    if not isinstance(ghostControls, list):
-        ghostControls = [ghostControls]
-
-    def conn(ctl, driver, ghost):
-        for attr in ["translate", "scale", "rotate"]:
-            pm.connectAttr("{}.{}".format(ctl, attr), "{}.{}".format(driver, attr))
-            # pm.disconnectAttr("{}.{}".format(ctl, attr), "{}.{}".format(ghost, attr))
-
-    surfaceShape = surface.getShape()
-    sliders = []
-
-    for i, ctlGhost in enumerate(ghostControls):
-        ctl = pm.listConnections(ctlGhost, t="transform")[-1]
-        t = ctl.getMatrix(worldSpace=True)
-
-        gDriver = primitive.addTransform(ctlGhost.getParent(), "{}_slideDriver".format(ctl.name()), t)
-        # conn(ctl, gDriver, ctlGhost)
-        print("ctl: {}, gDriver: {}, ctlGhost: {}".format(ctl, gDriver, ctlGhost))
-
-        oParent = ctlGhost.getParent()
-        npoName = "_".join(ctlGhost.name().split("_")[:-1]) + "_npo"
-        oTra = pm.PyNode(pm.createNode("transform", n=npoName, p=oParent, ss=True))
-        oTra.setTransformation(ctlGhost.getMatrix())
-        pm.parent(ctlGhost, oTra)
-
-        slider = primitive.addTransform(sliderParent, ctl.name() + "_slideDriven", t)
-        sliders.append(slider)
-
-        down, _, up = findPathAtoB(ctl, sliderParent)
-        mul_node = pm.createNode("multMatrix")
-        j = k = 0
-        for j, d in enumerate(down):
-            d.attr("matrix") >> mul_node.attr("matrixIn[{}]".format(j))
-        _.attr("matrix") >> mul_node.attr("matrixIn[{}]".format(j + 1))
-        for k, u in enumerate(up):
-            u.attr("inverseMatrix") >> mul_node.attr("matrixIn[{}]".format(k + j + 1))
-
-        dm_node = node.createDecomposeMatrixNode(mul_node.attr("matrixSum"))
-
-        cps_node = pm.createNode("closestPointOnSurface")
-        dm_node.attr("outputTranslate") >> cps_node.attr("inPosition")
-        surfaceShape.attr("local") >> cps_node.attr("inputSurface")
-        cps_node.attr("position") >> slider.attr("translate")
-
-        pm.normalConstraint(surfaceShape,
-                            slider,
-                            aimVector=[0, 0, 1],
-                            upVector=[0, 1, 0],
-                            worldUpType="objectrotation",
-                            worldUpVector=[0, 1, 0],
-                            worldUpObject=gDriver)
-
-        pm.parent(ctlGhost.getParent(), slider)
 
 
 def getFullPath(start, routes=None):
