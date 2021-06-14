@@ -522,8 +522,12 @@ class Component(component.Main):
             npo = addTransform(self.jnt_root, npo_name, xform)
             applyop.aimCns(npo, trn, axis="zy", wupObject=self.jnt_root)
 
-            ctl_name = "%s_crvdetail%s_%s" % (name, i, self.ctlName)
             xform = setMatrixPosition(t, cv)
+
+            npo_name = self.getName("{}_jnt{}_npo".format(name, str(i)))
+            npo = addTransform(npo, npo_name, xform)
+
+            ctl_name = "%s_crvdetail%s_%s" % (name, i, self.ctlName)
             ctl = self.addCtl(
                 npo,
                 ctl_name,

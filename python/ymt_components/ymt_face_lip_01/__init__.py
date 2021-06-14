@@ -369,6 +369,10 @@ class Component(component.Main):
             xform = setMatrixPosition(t, offset)
             xform = setMatrixRotation(xform, rot)
             # xform = setMatrixPosition(t, cv)
+
+            npo_name = self.getName("{}LipRope_jnt{}_npo".format(name, str(i)))
+            npo = addTransform(npo, npo_name, xform)
+
             ctl = self.addCtl(
                 npo,
                 ctl_name,
