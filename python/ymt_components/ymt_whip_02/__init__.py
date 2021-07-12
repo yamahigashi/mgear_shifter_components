@@ -124,7 +124,7 @@ class Component(component.Main):
         self.division = len(self.guide.apos)
 
         tmpRes = self.convertToTwistSpline(self.guide.apos, self.dummy_crv, self.ikNb)
-        self.ik_ctl, self.in_ctl, self.out_ctl, self.bts_joints, self.master_ctl = tmpRes
+        self.ik_ctl, self.in_ctl, self.out_ctl, self.bts_joints, self.master_ctl, self.mst_crv = tmpRes
         self.ik_ctl = [pm.PyNode(x) for x in self.ik_ctl]
         self.in_ctl = [pm.PyNode(x) for x in self.in_ctl]
         self.out_ctl = [pm.PyNode(x) for x in self.out_ctl]
@@ -415,39 +415,6 @@ class Component(component.Main):
             100.,
         )
 
-        # Setup ------------------------------------------
-        # Eval Fcurve
-        ikname = "{}_ik_profile".format(self.guide.root.split("|")[-1])
-        self.ik_value = fcurve.getFCurveValues(ikname, self.ikNb)
-        self.ik_att = [self.addAnimParam("gravity_rate_ik%s" % i,
-                                         "Planetary Ik ratio %s" % i,
-                                         "double",
-                                         self.ik_value[i],
-                                         0,
-                                         1)
-                       for i in range(1, self.ikNb - 1)]
-
-        stname = "{}_st_profile".format(self.guide.root.split("|")[-1])
-        sqname = "{}_sq_profile".format(self.guide.root.split("|")[-1])
-        self.st_value = fcurve.getFCurveValues(stname, self.divisions)
-        self.sq_value = fcurve.getFCurveValues(sqname, self.divisions)
-
-        self.st_att = [self.addSetupParam("stretch_%s" % i,
-                                          "Stretch %s" % i,
-                                          "double",
-                                          self.st_value[i],
-                                          -1,
-                                          0)
-                       for i in range(self.divisions)]
-
-        self.sq_att = [self.addSetupParam("squash_%s" % i,
-                                          "Squash %s" % i,
-                                          "double",
-                                          self.sq_value[i],
-                                          0,
-                                          1)
-                       for i in range(self.divisions)]
-
     def convertToTwistSpline(self, positions, crv, ikNb, isClosed=False):
 
         crvShape = crv.getShape()
@@ -476,8 +443,6 @@ class Component(component.Main):
         for pos, cv in withCurvePos(bfrs):
             cmds.xform(cv, ws=True, a=True, t=pos)
 
-        # Pin all the controllers so no length preservation happens
-        # That way we can get the rotations at each param
         for cv in cvs:
             cmds.setAttr("{0}.Pin".format(cv), 1)
 
@@ -555,8 +520,31 @@ class Component(component.Main):
             param = _searchNearestParam(pos)
             cmds.setAttr("{0}.params[{1}].param".format(riderCnst, i), param)
 
+        self.root.addChild(group)
+        self.root.addChild(spline)
+        self.root.addChild(pm.PyNode(bfrs[0]).getParent())
+        self.root.addChild(master)
+        offset = cmds.xform(master, q=True, os=True, t=True)
+        cmds.setAttr("{0}.tx".format(master), 0.0)
+        cmds.setAttr("{0}.ty".format(master), 0.0)
+        cmds.setAttr("{0}.tz".format(master), 0.0)
+        cmds.setAttr("{0}.tx".format(group), 0.)
+        cmds.setAttr("{0}.ty".format(group), 0.)
+        cmds.setAttr("{0}.tz".format(group), 0.)
+
+        cmds.setAttr("{0}.visibility".format(spline), False)
+        cmds.setAttr("{0}.inheritsTransform".format(spline), False)
+
         # Lock the buffers
+        attribute.setKeyableAttributes(pm.PyNode(spline), [])
+        attribute.setKeyableAttributes(pm.PyNode(group), [])
+        # self.root.addChild(riderCnst)
+
         for bfr in bfrs:
+            cur = cmds.getAttr("{0}.t".format(bfr))[0]
+            cmds.setAttr("{0}.tx".format(bfr), cur[0] + offset[0])
+            cmds.setAttr("{0}.ty".format(bfr), cur[1] + offset[1])
+            cmds.setAttr("{0}.tz".format(bfr), cur[2] + offset[2])
             for att in [x+y for x in 'trs' for y in 'xyz']:
                 cmds.setAttr("{0}.{1}".format(bfr, att), lock=True)
 
@@ -574,17 +562,7 @@ class Component(component.Main):
             ctl = pm.PyNode(x)
             ymt_util.setKeyableAttributesDontLockVisibility(ctl, ["tx", "ty", "tz"])
             ymt_util.addCtlMetadata(self, ctl)
-
-        self.root.addChild(group)
-        self.root.addChild(spline)
-        self.root.addChild(pm.PyNode(bfrs[0]).getParent())
-        self.root.addChild(master)
-        cmds.setAttr("{0}.visibility".format(spline), False)
-        cmds.setAttr("{0}.inheritsTransform".format(spline), False)
-        attribute.setKeyableAttributes(pm.PyNode(spline), [])
-        attribute.setKeyableAttributes(pm.PyNode(group), [])
-        # self.root.addChild(riderCnst)
-        return cvs, oTans, iTans, joints, master
+        return cvs, oTans, iTans, joints, master, pm.PyNode(spline)
 
     # =====================================================
     # OPERATORS
@@ -606,7 +584,7 @@ class Component(component.Main):
         self.addOperatorLengthExpression()
 
         # TODO: optional for sine curve deformer
-        # self.addOperatorSineCurveExprespy()
+        self.addOperatorSineCurveExprespy()
 
     def addOperatorsNotGlobalMaster(self):
         # Curves -------------------------------------------
@@ -713,7 +691,7 @@ class Component(component.Main):
             ["__wave_offset_att", self.sinewave_offset_y_att],
             ["__wave_power_att", self.sinewave_power_y_att],
             ["__wave_length_att", self.sinewave_wavelength_y_att],
-            ["__mst_crv", "{}.worldSpace".format(self.mst_crv.name())],
+            ["__mst_crv", "{}.outputSpline".format(self.mst_crv.getShape().name())],
             ["__divisions", self.divisions],
             ["__negate", self.negate],
             ["__dropoff", self.sinewave_dropoff_att],
@@ -734,7 +712,7 @@ class Component(component.Main):
             ["__wave_offset_att", self.sinewave_offset_x_att],
             ["__wave_power_att", self.sinewave_power_x_att],
             ["__wave_length_att", self.sinewave_wavelength_x_att],
-            ["__mst_crv", "{}.worldSpace".format(self.mst_crv.name())],
+            ["__mst_crv", "{}.outputSpline".format(self.mst_crv.getShape().name())],
             ["__divisions", self.divisions],
             ["__negate", self.negate],
             ["__dropoff", self.sinewave_dropoff_att],
@@ -841,10 +819,6 @@ class Component(component.Main):
         self.parent.addChild(self.root)
         # self.connectRef(self.settings["ik0refarray"], self.ik_npo[0])
         # self.connectRef(self.settings["ik1refarray"], self.ik_npo[-1])
-
-        # if self.settings["isPlanetaryIkBindToGlobal"]:
-        #     for i in range(2, self.ikNb - 1):
-        #         self.connectRef(self.settings["ik0refarray"], self.ik_npo[i])
 
     # =====================================================
     # CONNECTOR
