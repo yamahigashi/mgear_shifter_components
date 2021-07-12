@@ -67,3 +67,62 @@ def setKeyableAttributesDontLockVisibility(nodes,
         nodes = [nodes]
         for n in nodes:
             n.setAttr("v", lock=False)
+
+
+def getFullPath(start, routes=None):
+    # type: (pm.nt.transform, List[pm.nt.transform]) -> List[pm.nt.transform]
+    if not routes:
+        routes = []
+
+    if not start.getParent():
+        return routes + [start, ]
+
+    else:
+        return getFullPath(start.getParent(), routes + [start, ])
+
+
+def findPathAtoB(a, b):
+    # type: (pm.nt.transform, pm.nt.transform) -> Tuple[List[pm.nt.transform], pm.nt.transform, List[pm.nt.transform]]
+    """Returns route of A to B in formed Tuple[down(to root), turning point, up(to leaf)]"""
+    # aPath = ["x", "a", "b", "c"]
+    # bPath = ["b", "c"]
+    # down [x, a]
+    # turn b
+    # up []
+
+    aPath = getFullPath(a)
+    bPath = getFullPath(b)
+
+    return _findPathAtoB(aPath, bPath)
+
+
+def _findPathAtoB(aPath, bPath):
+    # type: (List, List) -> Tuple[List, Any, List]
+    """Returns route of A to B in formed Tuple[down(to root), turning point, up(to leaf)]
+
+    >>> aPath = ["x", "a", "b", "c"]
+    >>> bPath = ["b", "c"]
+    >>> d, c, u = _findPathAtoB(aPath, bPath)
+    >>> d == ["x", "a"]
+    True
+    >>> c == "b"
+    True
+    >>> u == []
+    True
+
+    """
+    down = []
+    up = []
+    sharedNode = None
+
+    for u in aPath:
+        if u in bPath:
+            sharedNode = u
+            break
+
+        down.append(u)
+
+    idx = bPath.index(sharedNode)
+    up = list(reversed(bPath[:(idx)]))
+
+    return down, sharedNode, up
