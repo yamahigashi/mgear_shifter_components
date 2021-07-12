@@ -481,12 +481,14 @@ class Component(component.Main):
         # Re-set the tangent worldspace positions now that things have changed
         for pos, cv in withCurvePos(oTans, 0.4):
             # cmds.xform(cv, ws=True, a=True, t=pos)
+            cmds.setAttr("{0}.tz".format(cv), 0.0)
             cmds.setAttr("{0}.ty".format(cv), 0.0)
             cmds.setAttr("{0}.tx".format(cv), curveLen / numJoints * 1.1)
             cmds.setAttr("{0}.Auto".format(cv), 0)
 
         for pos, cv in withCurvePos(iTans, 0.6):
             # cmds.xform(cv, ws=True, a=True, t=pos)
+            cmds.setAttr("{0}.tz".format(cv), 0.0)
             cmds.setAttr("{0}.ty".format(cv), 0.0)
             cmds.setAttr("{0}.tx".format(cv), curveLen / numJoints * -1.1)
             cmds.setAttr("{0}.Auto".format(cv), 0)
