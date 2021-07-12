@@ -759,9 +759,9 @@ class Component(component.Main):
                         return math.atan(abs(b - a) / (__curve_length * s / __divisions))
 
         mst_crv = api.MFnNurbsCurve(__mst_crv)
-        s2 = mst_crv.length() / __curve_length
+        # s2 = mst_crv.length() / __curve_length
         s = __scale_ctl.ty / __curve_length
-        s = min(s, s2)
+        # s = min(s, s2)
 
     def connectRef(self, refArray, cns_obj, upVAttr=None, init_refNames=False):
         """Connect the cns_obj to a multiple object using parentConstraint.
