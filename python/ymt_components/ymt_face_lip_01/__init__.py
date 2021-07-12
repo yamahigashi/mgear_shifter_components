@@ -650,6 +650,14 @@ class Component(component.Main):
         corner_l_comp = self.rig.findComponent("mouthCorner_L0_root")
         corner_r_comp = self.rig.findComponent("mouthCorner_R0_root")
 
+        # temporally
+        original_parent_c = slide_c_comp.root
+        original_parent_l = corner_l_comp.root
+        original_parent_r = corner_r_comp.root
+        self.parent.addChild(slide_c_comp.root)
+        self.parent.addChild(corner_l_comp.root)
+        self.parent.addChild(corner_r_comp.root)
+
         self.connect_slide_ghost(lipup_ref, liplow_ref, slide_c_ref, corner_l_ref, corner_r_ref)
         self.connect_mouth_ghost(lipup_ref, liplow_ref, slide_c_ref, corner_l_ref, corner_r_ref)
 
@@ -663,6 +671,10 @@ class Component(component.Main):
                     continue
 
                 comp.groups[k] = []
+
+        original_parent_c.addChild(slide_c_comp.root)
+        original_parent_l.addChild(corner_l_comp.root)
+        original_parent_r.addChild(corner_r_comp.root)
 
     def _createGhostCtl(self, t, p):
 
@@ -842,18 +854,21 @@ def ghostSliderForMouth(ghostControls, intTra, surface, sliderParent):
                 pass
 
     def connCenter(ctl, driver, ghost):
-        mul_node1 = pm.createNode("multMatrix")
-        mul_node2 = pm.createNode("multMatrix")
-        intTra.attr("matrix") >> mul_node1.attr("matrixIn[0]")
-        intTra.getParent().attr("matrix") >> mul_node1.attr("matrixIn[1]")
+        # mul_node1 = pm.createNode("multMatrix")
+        # mul_node2 = pm.createNode("multMatrix")
 
-        mul_node1.attr("matrixIn[2]")
-        pm.setAttr(mul_node1 + ".matrixIn[2]",
-                   intTra.attr("inverseMatrix").get(),
-                   type="matrix")
-        ctl.attr("matrix") >> mul_node2.attr("matrixIn[0]")
-        mul_node1.attr("matrixSum") >> mul_node2.attr("matrixIn[1]")
-        dm_node = node.createDecomposeMatrixNode(mul_node2.attr("matrixSum"))
+        down, _, up = ymt_util.findPathAtoB(ctl, driver)
+        mult = pm.createNode("multMatrix")
+
+        for i, d in enumerate(down):
+            d.attr("matrix") >> mult.attr("matrixIn[{}]".format(i))
+
+        for j, u in enumerate(up[:-1]):
+            u.attr("inverseMatrix") >> mult.attr("matrixIn[{}]".format(i + j + 1))
+
+        decomp = pm.createNode("decomposeMatrix")
+
+        dm_node = node.createDecomposeMatrixNode(mult.attr("matrixSum"))
 
         for attr in ["translate", "scale", "rotate"]:
             pm.connectAttr("{}.output{}".format(dm_node, attr.capitalize()), "{}.{}".format(driver, attr))
@@ -866,7 +881,7 @@ def ghostSliderForMouth(ghostControls, intTra, surface, sliderParent):
         ctl = pm.listConnections(ctlGhost, t="transform")[-1]
         t = ctl.getMatrix(worldSpace=True)
 
-        gDriver = primitive.addTransform(ctlGhost.getParent(), "{}_slideDriver".format(ctl.name()), t)
+        gDriver = primitive.addTransform(surface.getParent(), "{}_slideDriver".format(ctl.name()), t)
         if 0 == i:
             connCenter(ctl, gDriver, ctlGhost)
 
