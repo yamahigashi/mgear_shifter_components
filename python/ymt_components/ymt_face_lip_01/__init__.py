@@ -1,6 +1,7 @@
 """mGear shifter components"""
 # pylint: disable=import-error,W0201,C0111,C0112
 import re
+import six
 import traceback
 
 import maya.cmds as cmds
@@ -18,21 +19,21 @@ from mgear.shifter import component
 
 from mgear.core import (
     transform,
-    curve,
+    # curve,
     applyop,
-    attribute,
-    icon,
-    fcurve,
+    # attribute,
+    # icon,
+    # fcurve,
     vector,
-    meshNavigation,
+    # meshNavigation,
     node,
     primitive,
-    utils,
+    # utils,
 )
 
 from mgear.core.transform import (
     getTransform,
-    resetTransform,
+    # resetTransform,
     # getTransformLookingAt,
     # getChainTransform2,
     setMatrixPosition,
@@ -536,7 +537,7 @@ class Component(component.Main):
 
             for joint in joints:
                 distance = vector.getDistance(transform.getTranslation(joint), cv)
-                if distance < nearest_distance or nearest_distance is None:
+                if nearest_distance is None or distance < nearest_distance:
                     nearest_distance = distance
                     nearest_joint = joint
 
@@ -951,11 +952,13 @@ def createGhostWithParentConstraint(ctl, parent=None, connect=True):
        pyNode: The new created control
 
     """
-    if isinstance(ctl, basestring):
+    if isinstance(ctl, (six.string_types, six.text_type)):
         ctl = pm.PyNode(ctl)
+
     if parent:
-        if isinstance(parent, basestring):
+        if isinstance(parent, (six.string_types, six.text_type)):
             parent = pm.PyNode(parent)
+
     grps = ctl.listConnections(t="objectSet")
     for grp in grps:
         grp.remove(ctl)
