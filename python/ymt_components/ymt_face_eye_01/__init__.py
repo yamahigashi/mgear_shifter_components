@@ -17,7 +17,7 @@ from mgear.shifter import component
 
 from mgear.core import (
     transform,
-    curve,
+    # curve,
     applyop,
     attribute,
     icon,
@@ -42,6 +42,7 @@ from mgear.core.primitive import (
 )
 
 import ymt_shifter_utility as ymt_util
+import ymt_shifter_utility.curve as curve
 
 if False:  # pylint: disable=using-constant-test, wrong-import-order
     # For type annotation
