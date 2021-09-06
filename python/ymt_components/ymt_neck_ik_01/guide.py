@@ -13,7 +13,7 @@ from mgear.shifter.component.guide import componentMainSettings
 import mgear.core.pyqt as gqt
 from maya.app.general.mayaMixin import MayaQWidgetDockableMixin
 from maya.app.general.mayaMixin import MayaQDockWidget
-import settingsUI as sui
+from . import settingsUI as sui
 QtGui, QtCore, QtWidgets, wrapInstance = gqt.qt_import()
 
 

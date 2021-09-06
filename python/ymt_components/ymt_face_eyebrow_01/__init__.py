@@ -41,6 +41,7 @@ from mgear.core.primitive import (
     addTransform,
 )
 import ymt_shifter_utility as ymt_util
+import ymt_shifter_utility.curve as curve
 
 if False:  # pylint: disable=using-constant-test, wrong-import-order
     # For type annotation

@@ -55,7 +55,3 @@ def exec_window(*args):
 if __name__ == "__main__":
 
     w = exec_window()
-    if w:
-        print w.sections_number
-        print w.dir_axis
-        print w.spacing
