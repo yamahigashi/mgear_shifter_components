@@ -9,7 +9,7 @@ from mgear.vendor.Qt import QtWidgets, QtCore
 from maya.app.general.mayaMixin import MayaQWidgetDockableMixin
 from maya.app.general.mayaMixin import MayaQDockWidget
 
-import settingsUI as sui
+from . import settingsUI as sui
 import pymel.core as pm
 from pymel.core import datatypes
 from mgear import shifter

@@ -40,7 +40,7 @@ from mgear.core import pyqt
 from maya.app.general.mayaMixin import MayaQWidgetDockableMixin
 from maya.app.general.mayaMixin import MayaQDockWidget
 from mgear.vendor.Qt import QtWidgets, QtCore
-import settingsUI as sui
+from . import settingsUI as sui
 
 
 # guide info
