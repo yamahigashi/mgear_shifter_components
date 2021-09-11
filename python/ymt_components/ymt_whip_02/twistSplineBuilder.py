@@ -382,7 +382,7 @@ def connectTwistSplineTangents(cvs, twBfrs, oTans, iTans, aoTans, aiTans, closed
 
 	for i in range(segments):
 		isFirst = (i == 0) and not closed
-		isLast = (i == len(cvs) - 2) and not closed
+		isLast = (i == len(cvs) - 2) and not closed and segments > 3
 
 		cur = cvs[i]
 		buf = twBfrs[i]
