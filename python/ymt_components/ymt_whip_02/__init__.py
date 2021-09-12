@@ -810,7 +810,8 @@ class Component(component.Main):
             additional_code += "\n{}.translateZ = get_sin_at_pos({}, s)".format(loc, rate)
 
             if i < self.divisions:
-                additional_code += "\n{}.rotateX = get_tan_at_pos({}, s)".format(loc, rate)
+                side_factor = -1.0 if self.negate else 1.0
+                additional_code += "\n{}.rotateX = {} * get_tan_at_pos({}, s)".format(loc, side_factor, rate)
         self.exprespy2 = create_exprespy_node(self.sinewave_expression_archtype, self.getName("exprespy"), rewrite_map, additional_code)
         # cmds.setAttr("{}.IN[4]".format(self.exprespy2), "{}.worldSpace".format(self.mst_crv.name()))
 
