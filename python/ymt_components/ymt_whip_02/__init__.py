@@ -509,6 +509,17 @@ class Component(component.Main):
     def alignControllers(self, bfrs, cvs, oTans, iTans, curveFn):
         curveLen = curveFn.length()
 
+        def insertNpo(obj):
+            # type: (Text) -> Text
+            obj_node = pm.PyNode(obj)
+            parent = obj_node.getParent()
+            t = getTransform(obj_node)
+            name = obj.replace("_ctl", "_npo")
+            npo = addTransform(parent, name, t)
+            pm.parent(obj_node, npo)
+            attribute.setKeyableAttributes(npo, [])
+            return npo
+
         # Set the positions
         for pos, cv in self.withCurvePos(curveFn, bfrs):
             cmds.xform(cv, ws=True, a=True, t=pos)
@@ -516,11 +527,12 @@ class Component(component.Main):
         for i, cv in enumerate(cvs):
             cmds.setAttr("{0}.Pin".format(cv), 1)
 
+            npo = re.sub(r"_ik(\d+)_ctl", r"_twistPart_\1_npo", cv)
             if i == (len(cvs) - 1):
                 roll = cv.replace("_ik", "_rot")
-                npo = re.sub(r"_ik(\d+)_ctl", r"_twistPart_\1_npo", cv)
                 cmds.setAttr("{0}.UseTwist".format(roll), 1)
                 cmds.setAttr("{0}.sz".format(npo), -1)
+            attribute.setKeyableAttributes(pm.PyNode(npo), [])
 
         for pos, cv in self.withCurvePos(curveFn, oTans, 0.4):
             cmds.xform(cv, ws=True, a=True, t=pos)
@@ -547,12 +559,14 @@ class Component(component.Main):
             cmds.setAttr("{0}.ty".format(cv), 0.0)
             cmds.setAttr("{0}.tz".format(cv), 0.0)
             cmds.setAttr("{0}.Auto".format(cv), 0)
+            insertNpo(cv)
 
         for pos, cv in self.withCurvePos(curveFn, iTans, 0.6):
             cmds.setAttr("{0}.tx".format(cv), curveLen / self.ikNb * -0.7)
             cmds.setAttr("{0}.ty".format(cv), 0.0)
             cmds.setAttr("{0}.tz".format(cv), 0.0)
             cmds.setAttr("{0}.Auto".format(cv), 0)
+            insertNpo(cv)
 
     def alignDeformers(self, ikNb, joints, positions, riderCnst, curveFn):
         # align deformer joints
