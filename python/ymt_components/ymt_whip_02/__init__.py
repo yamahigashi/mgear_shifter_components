@@ -558,10 +558,12 @@ class Component(component.Main):
         # align deformer joints
 
         curveLen = curveFn.length()
-        max_param = (ikNb - 1) * 3.0 * 2.
-        maximum_iteration = 1000
+        max_param = curveLen / 33.3333
+        maximum_iteration = 10000
+
         joint = getAsMFnNode(joints[0], om.MFnTransform)
         _positions = []
+
         for param in [(max_param / maximum_iteration) * x for x in range(maximum_iteration)]:
             cmds.setAttr("{0}.params[0].param".format(riderCnst), param)
             cmds.dgeval(riderCnst)
@@ -569,9 +571,11 @@ class Component(component.Main):
             _positions.append(p)
 
         def _searchNearestParam(pos):
+
             res = _positions[0]
             cur = None
             pos = om.MVector(pos)
+
             for i, p in enumerate(_positions):
                 d = (p - pos).length()
                 if not cur or cur > d:
@@ -599,7 +603,10 @@ class Component(component.Main):
 
         # Build the spline
         pfx = self.getName("twistSpline")
-        tempRet = tsBuilder.makeTwistSpline(pfx, ikNb, numJoints=numJoints, maxParam=None, spread=1.0, closed=isClosed)
+        # curveLen = curveFn.length()
+        # maxParam = curveLen / 3.0
+        max_param = (ikNb - 1) * 3.0 * 2.
+        tempRet = tsBuilder.makeTwistSpline(pfx, ikNb, numJoints=numJoints, maxParam=max_param, spread=1.0, closed=isClosed)
         cvs, bfrs, oTans, iTans, jPars, joints, group, spline, master, riderCnst = tempRet
 
         self.alignControllers(bfrs, cvs, oTans, iTans, curveFn)
