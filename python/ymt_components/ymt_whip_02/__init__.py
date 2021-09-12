@@ -1,12 +1,13 @@
 """mGear shifter components"""
 # pylint: disable=import-error,W0201,C0111,C0112
 import re
+import sys
+import six
 import inspect
 import textwrap
 import math
 
 import maya.cmds as cmds
-import maya.OpenMaya as om1
 import maya.api.OpenMaya as om
 
 import pymel.core as pm
@@ -15,17 +16,60 @@ from pymel.core import datatypes
 import exprespy.cmd
 from mgear.shifter import component
 
-from mgear.core import transform, primitive, curve, applyop
-from mgear.core import attribute, node, icon, fcurve, vector
+from mgear.core import (
+    # transform,
+    # primitive,
+    curve,
+    applyop,
+)
 
-from mgear.core.transform import getTransform
-from mgear.core.transform import getTransformLookingAt
-from mgear.core.transform import getChainTransform2
-from mgear.core.transform import setMatrixPosition
+from mgear.core import (
+    attribute,
+    node,
+    icon,
+    # fcurve,
+    vector,
+)
+
+from mgear.core.transform import (
+    getTransform,
+    setMatrixPosition,
+    getTransformLookingAt,
+)
+
 from mgear.core.primitive import addTransform
 
 import ymt_shifter_utility as ymt_util
 from . import twistSplineBuilder as tsBuilder
+
+from logging import (  # noqa:F401 pylint: disable=unused-import, wrong-import-order
+    StreamHandler,
+    getLogger,
+    WARN,
+    DEBUG,
+    INFO
+)
+
+if sys.version_info >= (3, 0):
+    # For type annotation
+    from typing import (  # NOQA: F401 pylint: disable=unused-import
+        Optional,
+        Dict,
+        List,
+        Tuple,
+        Pattern,
+        Callable,
+        Any,
+        Text,
+        Generator,
+        Union
+    )
+    import pathlib
+
+logger = getLogger(__name__)
+logger.setLevel(INFO)
+# logger.setLevel(WARN)
+# logger.setLevel(WARN)
 
 
 # Naming Convention
@@ -415,89 +459,125 @@ class Component(component.Main):
             100.,
         )
 
-    def convertToTwistSpline(self, positions, crv, ikNb, isClosed=False):
+    def _getRotationsAtEachPoint(self, bfrs):
+        # type: (List[Text]) -> List[Tuple[float, float, float]]
+        # pylint: disable=too-many-locals
 
-        crvShape = crv.getShape()
-        curveFn = getAsMFnNode(crvShape.name(), om.MFnNurbsCurve)
+        rotations = []
+        norm = self.guide.blades["blade"].y
+        for i, ctrl in enumerate(bfrs):
 
-        # Get the curve data
-        knots = curveFn.knots()
-        params = list(knots)[1::3]
-        numCVs = len(params)
+            c = pm.PyNode(ctrl).getTranslation(space="world")
+
+            if i == 0:
+                n = pm.PyNode(bfrs[1]).getTranslation(space="world")
+                t = getTransformLookingAt(c, n, norm, axis="xy")
+                rot = transform_to_euler(t)
+
+            elif i == (len(bfrs) - 1):
+                p = pm.PyNode(bfrs[i - 1]).getTranslation(space="world")
+                t = getTransformLookingAt(c, p, norm, axis="-xy")
+                rot = transform_to_euler(t)
+
+            else:
+                p = pm.PyNode(bfrs[i - 1]).getTranslation(space="world")
+                n = pm.PyNode(bfrs[i + 1]).getTranslation(space="world")
+
+                t1 = getTransformLookingAt(c, p, norm, axis="-xy")
+                t2 = getTransformLookingAt(c, n, norm, axis="xy")
+
+                q1 = om.MQuaternion(t1.rotate.x, t1.rotate.y, t1.rotate.z, t1.rotate.w)
+                q2 = om.MQuaternion(t2.rotate.x, t2.rotate.y, t2.rotate.z, t2.rotate.w)
+                q = om.MQuaternion.slerp(q1, q2, 0.5)
+
+                rot = q.asEulerRotation().asVector()
+                rot = (math.degrees(rot[0]), math.degrees(rot[1]), math.degrees(rot[2]))
+
+            rotations.append(rot)
+
+        return rotations
+
+    def withCurvePos(self, curveFn, it, offset=0.):
         curveLen = curveFn.length()
-        numJoints = numCVs + 2  # head and tail
 
-        # Build the spline
-        pfx = self.getName("twistSpline")
-        tempRet = tsBuilder.makeTwistSpline(pfx, ikNb, numJoints=numJoints, maxParam=None, spread=1.0, closed=isClosed)
-        cvs, bfrs, oTans, iTans, jPars, joints, group, spline, master, riderCnst = tempRet
+        for i, element in enumerate(it):
+            param = curveFn.findParamFromLength((curveLen / (len(it) - 1)) * (i + offset))
+            point = curveFn.getPointAtParam(param, om.MSpace.kObject)
+            pos = point[0], point[1], point[2]
+            yield pos, element
 
-        def withCurvePos(it, offset=0.):
-            for i, element in enumerate(it):
-                param = curveFn.findParamFromLength((curveLen / (len(it) - 1)) * (i + offset))
-                point = curveFn.getPointAtParam(param, om.MSpace.kObject)
-                pos = point[0], point[1], point[2]
-                yield pos, element
+    def alignControllers(self, bfrs, cvs, oTans, iTans, curveFn):
+        curveLen = curveFn.length()
+
+        def insertNpo(obj):
+            # type: (Text) -> Text
+            obj_node = pm.PyNode(obj)
+            parent = obj_node.getParent()
+            t = getTransform(obj_node)
+            name = obj.replace("_ctl", "_npo")
+            npo = addTransform(parent, name, t)
+            pm.parent(obj_node, npo)
+            attribute.setKeyableAttributes(npo, [])
+            return npo
 
         # Set the positions
-        for pos, cv in withCurvePos(bfrs):
+        for pos, cv in self.withCurvePos(curveFn, bfrs):
             cmds.xform(cv, ws=True, a=True, t=pos)
 
-        for cv in cvs:
+        for i, cv in enumerate(cvs):
             cmds.setAttr("{0}.Pin".format(cv), 1)
 
-        for pos, cv in withCurvePos(oTans, 0.4):
+            npo = re.sub(r"_ik(\d+)_ctl", r"_twistPart_\1_npo", cv)
+            if i == (len(cvs) - 1):
+                roll = cv.replace("_ik", "_rot")
+                cmds.setAttr("{0}.UseTwist".format(roll), 1)
+                cmds.setAttr("{0}.sz".format(npo), -1)
+            attribute.setKeyableAttributes(pm.PyNode(npo), [])
+
+        for pos, cv in self.withCurvePos(curveFn, oTans, 0.4):
             cmds.xform(cv, ws=True, a=True, t=pos)
             cmds.setAttr("{0}.Auto".format(cv), 0)
 
-        for pos, cv in withCurvePos(iTans, 0.6):
+        for pos, cv in self.withCurvePos(curveFn, iTans, 0.6):
             cmds.xform(cv, ws=True, a=True, t=pos)
             cmds.setAttr("{0}.Auto".format(cv), 0)
-
-        # Make sure there is a rider constraint so I can follow the twist all along the spline
-        tmpCnst = cmds.createNode("riderConstraint")
-        cmds.connectAttr("{}.outputSpline".format(spline), "{}.inputSplines[0].spline".format(tmpCnst))
 
         # Get the rotations at each CV point
-        newInd = 0
-        rotations = []
-        cmds.setAttr("{0}.normValue".format(tmpCnst), params[-1])
-        for i, ctrl in enumerate(bfrs):
-            param = curveFn.findParamFromLength((curveLen / (len(bfrs) - 1)) * (i))
-            cmds.setAttr("{0}.params[{1}].param".format(tmpCnst, i), param)
-            cmds.dgeval(tmpCnst)  # maybe a propagation bug somewhere in the constraint?
-            rot = cmds.getAttr("{0}.outputs[{1}].rotate".format(tmpCnst, i))
-            rotations.append(rot)
-        cmds.delete(tmpCnst)
+        rotations = self._getRotationsAtEachPoint(bfrs)
 
         for i, ctrl in enumerate(bfrs):
             rot = rotations[i]
-            cmds.setAttr("{0}.rotate".format(ctrl), *rot[0])
+            cmds.setAttr("{0}.rotate".format(ctrl), *rot)
 
         # Un-pin everything but the first, so back to length preservation
         for cv in cvs[1:]:
             cmds.setAttr("{0}.Pin".format(cv), 0)
 
         # Re-set the tangent worldspace positions now that things have changed
-        for pos, cv in withCurvePos(oTans, 0.4):
-            # cmds.xform(cv, ws=True, a=True, t=pos)
-            cmds.setAttr("{0}.tz".format(cv), 0.0)
+        for pos, cv in self.withCurvePos(curveFn, oTans, 0.4):
+            cmds.setAttr("{0}.tx".format(cv), curveLen / self.ikNb * 0.7)
             cmds.setAttr("{0}.ty".format(cv), 0.0)
-            cmds.setAttr("{0}.tx".format(cv), curveLen / numJoints * 1.1)
-            cmds.setAttr("{0}.Auto".format(cv), 0)
-
-        for pos, cv in withCurvePos(iTans, 0.6):
-            # cmds.xform(cv, ws=True, a=True, t=pos)
             cmds.setAttr("{0}.tz".format(cv), 0.0)
-            cmds.setAttr("{0}.ty".format(cv), 0.0)
-            cmds.setAttr("{0}.tx".format(cv), curveLen / numJoints * -1.1)
             cmds.setAttr("{0}.Auto".format(cv), 0)
+            insertNpo(cv)
 
+        for pos, cv in self.withCurvePos(curveFn, iTans, 0.6):
+            cmds.setAttr("{0}.tx".format(cv), curveLen / self.ikNb * -0.7)
+            cmds.setAttr("{0}.ty".format(cv), 0.0)
+            cmds.setAttr("{0}.tz".format(cv), 0.0)
+            cmds.setAttr("{0}.Auto".format(cv), 0)
+            insertNpo(cv)
+
+    def alignDeformers(self, ikNb, joints, positions, riderCnst, curveFn):
         # align deformer joints
-        max_param = (ikNb - 1) * 3.0 * 2.
-        maximum_iteration = 1000
+
+        curveLen = curveFn.length()
+        max_param = curveLen / 33.3333
+        maximum_iteration = 10000
+
         joint = getAsMFnNode(joints[0], om.MFnTransform)
         _positions = []
+
         for param in [(max_param / maximum_iteration) * x for x in range(maximum_iteration)]:
             cmds.setAttr("{0}.params[0].param".format(riderCnst), param)
             cmds.dgeval(riderCnst)
@@ -505,9 +585,11 @@ class Component(component.Main):
             _positions.append(p)
 
         def _searchNearestParam(pos):
+
             res = _positions[0]
             cur = None
             pos = om.MVector(pos)
+
             for i, p in enumerate(_positions):
                 d = (p - pos).length()
                 if not cur or cur > d:
@@ -522,6 +604,29 @@ class Component(component.Main):
             param = _searchNearestParam(pos)
             cmds.setAttr("{0}.params[{1}].param".format(riderCnst, i), param)
 
+    def convertToTwistSpline(self, positions, crv, ikNb, isClosed=False):
+
+        crvShape = crv.getShape()
+        curveFn = getAsMFnNode(crvShape.name(), om.MFnNurbsCurve)
+
+        # Get the curve data
+        knots = curveFn.knots()
+        params = list(knots)[1::3]
+        numCVs = len(params)
+        numJoints = numCVs + 2  # head and tail
+
+        # Build the spline
+        pfx = self.getName("twistSpline")
+        # curveLen = curveFn.length()
+        # maxParam = curveLen / 3.0
+        max_param = (ikNb - 1) * 3.0 * 2.
+        tempRet = tsBuilder.makeTwistSpline(pfx, ikNb, numJoints=numJoints, maxParam=max_param, spread=1.0, closed=isClosed)
+        cvs, bfrs, oTans, iTans, jPars, joints, group, spline, master, riderCnst = tempRet
+
+        self.alignControllers(bfrs, cvs, oTans, iTans, curveFn)
+        self.alignDeformers(ikNb, joints, positions, riderCnst, curveFn)
+
+        # grouping
         self.root.addChild(group)
         self.root.addChild(spline)
         self.root.addChild(pm.PyNode(bfrs[0]).getParent())
@@ -564,6 +669,7 @@ class Component(component.Main):
             ctl = pm.PyNode(x)
             ymt_util.setKeyableAttributesDontLockVisibility(ctl, ["tx", "ty", "tz"])
             ymt_util.addCtlMetadata(self, ctl)
+
         return cvs, oTans, iTans, joints, master, pm.PyNode(spline)
 
     # =====================================================
@@ -704,7 +810,8 @@ class Component(component.Main):
             additional_code += "\n{}.translateZ = get_sin_at_pos({}, s)".format(loc, rate)
 
             if i < self.divisions:
-                additional_code += "\n{}.rotateX = get_tan_at_pos({}, s)".format(loc, rate)
+                side_factor = -1.0 if self.negate else 1.0
+                additional_code += "\n{}.rotateX = {} * get_tan_at_pos({}, s)".format(loc, side_factor, rate)
         self.exprespy2 = create_exprespy_node(self.sinewave_expression_archtype, self.getName("exprespy"), rewrite_map, additional_code)
         # cmds.setAttr("{}.IN[4]".format(self.exprespy2), "{}.worldSpace".format(self.mst_crv.name()))
 
@@ -884,6 +991,14 @@ def getAsMFnNode(name, ctor):
     objects.add(name)
     dag = objects.getDagPath(0)
     return ctor(dag)
+
+
+def transform_to_euler(t):
+    # type: (om.MTransformationMatrix) -> Tuple[float, float, float]
+    rot = t.rotate.asEulerRotation().asVector()
+    rot = (math.degrees(rot[0]), math.degrees(rot[1]), math.degrees(rot[2]))
+
+    return rot
 
 
 if __name__ == "__main__":
