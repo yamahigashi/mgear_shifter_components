@@ -831,7 +831,8 @@ class Component(component.Main):
             rate = (i + 0.000000001) / self.divisions
             additional_code += "\n{}.translateX = get_sin_at_pos({}, s)".format(loc, rate)
             if i < self.divisions:
-                additional_code += "\n{}.rotateZ = -1. * get_tan_at_pos({}, s)".format(loc, rate)
+                side_factor = 1.0 if self.negate else -1.0
+                additional_code += "\n{}.rotateZ = {} * get_tan_at_pos({}, s)".format(loc, side_factor, rate)
         self.exprespy2 = create_exprespy_node(self.sinewave_expression_archtype,
                                               self.getName("exprespy"),
                                               rewrite_map,
