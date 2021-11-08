@@ -40,7 +40,7 @@ from mgear.core.transform import (
 from mgear.core.primitive import addTransform
 
 import ymt_shifter_utility as ymt_util
-from . import twistSplineBuilder as tsBuilder
+from ymt_shifter_utility import twistSplineBuilder as tsBuilder
 
 from logging import (  # noqa:F401 pylint: disable=unused-import, wrong-import-order
     StreamHandler,
@@ -104,6 +104,8 @@ class Component(component.Main):
 
         # FIXME: remove unneccessary guide.tan
         self.guide.apos.pop()
+        self.detailControllersGroupName = "controllers_detail"  # TODO: extract to settings
+        self.primaryControllersGroupName = "controllers_primary"  # TODO: extract to settings
 
         self.divisions = len(self.guide.apos)
 
@@ -184,6 +186,15 @@ class Component(component.Main):
         pm.delete(self.dummy_crv)
 
         # icon.connection_display_curve(self.getName("visualIKRef"), self.ik_ctl)
+
+    def addToSubGroup(self, obj, group_name):
+
+        if self.settings["ctlGrp"]:
+            ctlGrp = self.settings["ctlGrp"]
+        else:
+            ctlGrp = "controllers"
+
+        self.addToGroup(obj, group_name, parentGrp=ctlGrp)
 
     def addObjectsFkControl(self, joints):
 
@@ -317,12 +328,7 @@ class Component(component.Main):
         else:
             h = (self.guide.apos[-1] - self.guide.apos[0]).length() / (len(self.guide.apos) - 1)
 
-        # FIXME: rotate by blade
-        if self.negate:
-            po = datatypes.Vector([0, h / -2., 0])
-        else:
-            po = datatypes.Vector([0, h / 2., 0])
-
+        po = datatypes.Vector([0, h / 2., 0])
         fk_ctl = self.addCtl(
             fk_local_in2,
             "fk%s_ctl" % (i),
@@ -338,6 +344,7 @@ class Component(component.Main):
             tp=self.preiviousCtlTag,
             mirrorConf=self.mirror_conf)
 
+        self.addToSubGroup(fk_ctl, self.detailControllersGroupName)
         ymt_util.setKeyableAttributesDontLockVisibility(self.fk_ctl)
         attribute.setRotOrder(fk_ctl, "ZXY")
         self.fk_ctl.append(fk_ctl)
@@ -528,11 +535,12 @@ class Component(component.Main):
             cmds.setAttr("{0}.Pin".format(cv), 1)
 
             npo = re.sub(r"_ik(\d+)_ctl", r"_twistPart_\1_npo", cv)
+            roll = cv.replace("_ik", "_rot")
             if i == (len(cvs) - 1):
-                roll = cv.replace("_ik", "_rot")
-                cmds.setAttr("{0}.UseTwist".format(roll), 1)
                 cmds.setAttr("{0}.sz".format(npo), -1)
+            cmds.setAttr("{0}.UseTwist".format(roll), 1)
             attribute.setKeyableAttributes(pm.PyNode(npo), [])
+            insertNpo(cv)
 
         for pos, cv in self.withCurvePos(curveFn, oTans, 0.4):
             cmds.xform(cv, ws=True, a=True, t=pos)
@@ -627,6 +635,7 @@ class Component(component.Main):
         self.alignDeformers(ikNb, joints, positions, riderCnst, curveFn)
 
         # grouping
+        cmds.setAttr("{}.visibility".format(group), False)
         self.root.addChild(group)
         self.root.addChild(spline)
         self.root.addChild(pm.PyNode(bfrs[0]).getParent())
@@ -655,20 +664,31 @@ class Component(component.Main):
             for att in [x+y for x in 'trs' for y in 'xyz']:
                 cmds.setAttr("{0}.{1}".format(bfr, att), lock=True)
 
+        scl = self.length * (1. / self.division) * 1.3
+        col = self.color_ik
         for cv in cvs:
             ctl = pm.PyNode(cv)
             ymt_util.setKeyableAttributesDontLockVisibility(ctl, self.tr_params)
             ymt_util.addCtlMetadata(self, ctl)
+            ymt_util.edit_controller_shape(ctl.name(), scl=(scl, scl, scl), color=col)
+            roll = cv.replace("_ik", "_rot")
+            ymt_util.edit_controller_shape(roll, scl=(scl, scl, scl), color=self.color_fk)
+            self.addToSubGroup(roll, self.detailControllersGroupName)
+            self.addToSubGroup(ctl, self.primaryControllersGroupName)
 
         for x in oTans:
             ctl = pm.PyNode(x)
             ymt_util.setKeyableAttributesDontLockVisibility(ctl, ["tx", "ty", "tz"])
             ymt_util.addCtlMetadata(self, ctl)
+            ymt_util.edit_controller_shape(ctl.name(), scl=(scl, scl, scl), color=col)
+            self.addToSubGroup(ctl, self.detailControllersGroupName)
 
         for x in iTans:
             ctl = pm.PyNode(x)
             ymt_util.setKeyableAttributesDontLockVisibility(ctl, ["tx", "ty", "tz"])
             ymt_util.addCtlMetadata(self, ctl)
+            ymt_util.edit_controller_shape(ctl.name(), scl=(scl, scl, scl), color=col)
+            self.addToSubGroup(ctl, self.detailControllersGroupName)
 
         return cvs, oTans, iTans, joints, master, pm.PyNode(spline)
 
