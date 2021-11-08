@@ -21,7 +21,9 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 '''
+# pylint: disable=bad-indentation
 
+from itertools import product
 from maya import cmds, OpenMaya
 
 # Naming Convention
@@ -440,7 +442,30 @@ def buildTwistSpline(pfx, cvs, aoTans, aiTans, tws, maxParam, closed=False):
 			cmds.setAttr("{}.PinParam".format(cvs[i]), (u * maxParam) / (usedCVs - 1.0))
 
 		cmds.connectAttr("{}.UseTwist".format(tws[i]), "{}.vertexData[{}].twistWeight".format(spline, u))
-		cmds.connectAttr("{}.rotateX".format(tws[i]), "{}.vertexData[{}].twistValue".format(spline, u))
+		if i == 0 or i == (usedCVs - 1):
+			cmds.connectAttr("{}.rotateX".format(tws[i]), "{}.vertexData[{}].twistValue".format(spline, u))
+		else:
+			ratioA = float(i) / float(usedCVs)
+			ratioB = 1. - ratioA
+			multA = cmds.createNode("multiplyDivide")
+			multB = cmds.createNode("multiplyDivide")
+			add1 = cmds.createNode("addDoubleLinear")
+			add2 = cmds.createNode("addDoubleLinear")
+
+			cmds.setAttr("{0}.operation".format(multA), 1)
+			cmds.connectAttr("{}.rotateX".format(tws[0]), "{}.input1X".format(multA))
+			cmds.setAttr("{0}.input2".format(multA), ratioA, 1, 1)
+
+			cmds.setAttr("{0}.operation".format(multB), 1)
+			cmds.connectAttr("{}.rotateX".format(tws[-1]), "{}.input1X".format(multB))
+			cmds.setAttr("{0}.input2".format(multB), ratioB, 1, 1)
+
+			cmds.connectAttr("{}.outputX".format(multA), "{}.input1".format(add1))
+			cmds.connectAttr("{}.outputX".format(multB), "{}.input2".format(add1))
+			cmds.connectAttr("{}.output".format(add1), "{}.input1".format(add2))
+			cmds.connectAttr("{}.rotateX".format(tws[i]), "{}.input2".format(add2))
+
+			cmds.connectAttr("{}.output".format(add2), "{}.vertexData[{}].twistValue".format(spline, u))
 
 	cmds.setAttr("{}.Pin".format(cvs[0]), 1.0)
 	cmds.setAttr("{}.UseTwist".format(tws[0]), 1.0)
