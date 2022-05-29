@@ -635,10 +635,11 @@ class Component(component.Main):
         self.alignDeformers(ikNb, joints, positions, riderCnst, curveFn)
 
         # grouping
+        twistspline_ctrls = pm.PyNode(bfrs[0]).getParent()
         cmds.setAttr("{}.visibility".format(group), False)
         self.root.addChild(group)
         self.root.addChild(spline)
-        self.root.addChild(pm.PyNode(bfrs[0]).getParent())
+        self.root.addChild(twistspline_ctrls)
         self.root.addChild(master)
         offset = cmds.xform(master, q=True, os=True, t=True)
         cmds.setAttr("{0}.tx".format(master), 0.0)
@@ -757,7 +758,7 @@ class Component(component.Main):
             dm_node = node.createDecomposeMatrixNode(mulmat_node2 + ".output")
             pm.connectAttr(dm_node + ".outputTranslate", d.attr("t"))
 
-            check_list = (pm.Attribute, unicode, str)  # noqa
+            check_list = (pm.Attribute, six.string_types)  # noqa
             cond = pm.createNode("condition")
             pm.setAttr(cond + ".operation", 4)  # greater
             attribute.connectSet(self.fk_collapsed_att, cond + ".secondTerm", check_list)
@@ -785,6 +786,9 @@ class Component(component.Main):
         additional_code = ""
         self.length_ctl.setTranslation(datatypes.Vector(0.0, self.length, 0), space="preTransform")
         self.exprespy = create_exprespy_node(self.length_control_expression_archtype, self.getName("exprespy"), rewrite_map, additional_code)
+
+        twistspline_ctrls = pm.PyNode(self.ik_ctl[0]).getParent().getParent().getParent()
+        cmds.connectAttr("{0}.visibility".format(self.fk_npo[0]), "{0}.visibility".format(twistspline_ctrls))
 
     def length_control_expression_archtype(curve_length, scale_ctl, fk0_npo, scale_master, scale_cns):
         from maya.api.OpenMaya import MVector
@@ -864,6 +868,9 @@ class Component(component.Main):
         if not COUNT:
             import math
 
+            def near_zero(x):
+                return abs(x) <= 0.0001
+
             def sigmoid(x, mx):
                 # return mi + (mx-mi)*(lambda t: (1+(100.)**(-t+0.5))**(-1) )( (x-mi)/(mx-mi))
                 x = (x * 10) / mx - 5.
@@ -875,6 +882,9 @@ class Component(component.Main):
                 return sigmoid(pos, __dropoff / 100.0) * x
 
             def get_tan_at_pos(pos, s):
+                if near_zero(s):
+                    return 0.
+
                 a = get_sin_at_pos(pos, s)
                 b = get_sin_at_pos(pos + (1. / __divisions), s)
                 if (b - a) < 0.:
@@ -890,7 +900,10 @@ class Component(component.Main):
 
         mst_crv = api.MFnNurbsCurve(__mst_crv)
         # s2 = mst_crv.length() / __curve_length
-        s = __scale_ctl.ty / __curve_length
+        if near_zero(__scale_ctl.ty):
+            s = 0.
+        else:
+            s = __scale_ctl.ty / __curve_length
         # s = min(s, s2)
 
     def connectRef(self, refArray, cns_obj, upVAttr=None, init_refNames=False):
