@@ -10,6 +10,7 @@ import pymel.core as pm
 from pymel.core import datatypes
 
 import exprespy.cmd
+from pymel.util.arrays import real
 from mgear.shifter import component
 from mgear.rigbits.facial_rigger import helpers
 from mgear.rigbits.facial_rigger import constraints
@@ -136,7 +137,7 @@ class Component(component.Main):
         self.secondaryControls = []
 
         # --------------------------------------------------------------------
-        self.num_uplocs = self.getNumberOfLocators("_uploc")
+        self.num_uplocs = self.getNumberOfLocators("_loc")
 
         self.inPos = self.guide.apos[2]
         self.outPos = self.guide.apos[-4]
@@ -578,6 +579,7 @@ class Component(component.Main):
 
         # create ghost controls
         ghosts = []
+        real_ctls = []
         for sec in self.secondaryControls:
             ghostCtl = ghost.createGhostCtl(sec, self.slider_root)
             ghosts.append(ghostCtl)
@@ -591,6 +593,7 @@ class Component(component.Main):
             ghostCtl.attr("scale") // sec.attr("scale")
 
             sec.attr("isCtl").set(False)
+            sec.rename(sec.name().replace("ctl_ghost", "ghost"))
 
             if self.settings["ctlGrp"]:
                 ctlGrp = self.settings["ctlGrp"]
@@ -606,6 +609,8 @@ class Component(component.Main):
             except:
                 pass
 
+            real_ctls.append(ghostCtl)
+
         self._visi_off_lock(self.secondaryControlsParentGrp)
 
         # slide system
@@ -614,13 +619,22 @@ class Component(component.Main):
             self.sliding_surface,
             self.slider_root)
 
-        self.secondaryControls = ghosts
+        self.secondaryControls = real_ctls
+        self.setRelation()  # MUST re-setRelation, swapped ghost and real controls
 
     def setRelation(self):
         """Set the relation beetween object from guide to rig"""
         self.relatives["root"] = self.root
         self.controlRelatives["root"] = self.root
         self.aliasRelatives["root"] = "ctl"
+
+        for i, ctl in enumerate(self.secondaryControls):
+
+            self.relatives["%s_loc" % i] = ctl
+            self.controlRelatives["%s_loc" % i] = ctl
+
+            self.jointRelatives["%s_loc" % (i)] = (i + 1)
+            self.aliasRelatives["%s_ctl" % (i)] = (i + 1)
 
     def ghostSliderForEyeBrow(self, ghostControls, surface, sliderParent):
         """Modify the ghost control behaviour to slide on top of a surface
@@ -695,6 +709,8 @@ class Component(component.Main):
             pm.parent(ctlGhost.getParent(), slider)
 
             pm.parent(gDriver.getParent(), self.mainControl)
+            print("ctl.name(): %s", ctl.name())
+            print("ghost.name(): %s", ctlGhost.name())
 
 
 def draw_eye_guide_mesh_plane(points, t):

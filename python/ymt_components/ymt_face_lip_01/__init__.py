@@ -2,6 +2,7 @@
 # pylint: disable=import-error,W0201,C0111,C0112
 import re
 import six
+import sys
 import traceback
 
 import maya.cmds as cmds
@@ -46,7 +47,7 @@ from mgear.core.primitive import (
 import ymt_shifter_utility as ymt_util
 import ymt_shifter_utility.curve as curve
 
-if False:  # pylint: disable=using-constant-test, wrong-import-order
+if sys.version_info >= (3, 0):  # pylint: disable=using-constant-test  # pylint: disable=using-constant-test, wrong-import-order
     # For type annotation
     from typing import (  # NOQA: F401 pylint: disable=unused-import
         Optional,
@@ -76,6 +77,7 @@ handler = StreamHandler()
 handler.setLevel(DEBUG)
 logger = getLogger(__name__)
 logger.setLevel(INFO)
+logger.setLevel(DEBUG)
 logger.addHandler(handler)
 logger.propagate = False
 
@@ -660,11 +662,15 @@ class Component(component.Main):
         self.parent.addChild(corner_l_comp.root)
         self.parent.addChild(corner_r_comp.root)
 
-        self.connect_slide_ghost(lipup_ref, liplow_ref, slide_c_ref, corner_l_ref, corner_r_ref)
+        drivers = self.connect_slide_ghost(lipup_ref, liplow_ref, slide_c_ref, corner_l_ref, corner_r_ref)
         self.connect_mouth_ghost(lipup_ref, liplow_ref, slide_c_ref, corner_l_ref, corner_r_ref)
 
         pm.parent(corner_l_comp.ik_cns, self.mouthSlide_ctl)
         pm.parent(corner_r_comp.ik_cns, self.mouthSlide_ctl)
+
+        pm.parent(drivers[0], slide_c_comp.ik_cns)
+        pm.parent(drivers[1], corner_l_comp.ik_cns)
+        pm.parent(drivers[2], corner_r_comp.ik_cns)
 
         # remove elements from controllers group
         for comp in [slide_c_comp, corner_l_comp, corner_r_comp]:
@@ -678,16 +684,22 @@ class Component(component.Main):
         original_parent_l.addChild(corner_l_comp.root)
         original_parent_r.addChild(corner_r_comp.root)
 
-    def _createGhostCtl(self, t, p):
+    def _createGhostCtl(self, ghost_ctl, parent):
 
-        ctl = ghost.createGhostCtl(t, p)
-        ctl.attr("isCtl") // t.attr("isCtl")
+        ctl = ghost.createGhostCtl(ghost_ctl, parent)
+        ctl.attr("isCtl") // ghost_ctl.attr("isCtl")
+        # logger.error("ctl is %s, ghost_ctl: %s, parent: %s", ctl.name(), ghost_ctl.name(), parent.name())
 
         ctl.attr("isCtl").set(True)
-        t.attr("isCtl").set(False)
+        ghost_ctl.attr("isCtl").set(False)
 
-        _visi_off_lock(t.getShape())
-        ctl.getShape().visibility.set(True)
+        shape = ghost_ctl.getShape()
+        if shape:
+            _visi_off_lock(shape)
+
+        shape = ctl.getShape()
+        if shape:
+            ctl.getShape().visibility.set(True)
 
         if self.settings["ctlGrp"]:
             ctlGrp = self.settings["ctlGrp"]
@@ -700,13 +712,30 @@ class Component(component.Main):
         if ctlGrp not in self.groups.keys():
             self.groups[ctlGrp] = []
 
-        try:
-            self.groups[ctlGrp].remove(t)
-        except:
-            pass
-
+        self._removeFromCtrlGroup(ghost_ctl)
         self.addToSubGroup(ctl, self.primaryControllersGroupName)
+
         return ctl
+
+    def _removeFromCtrlGroup(self, obj):
+
+        if self.settings["ctlGrp"]:
+            ctlGrp = self.settings["ctlGrp"]
+            # self.addToGroup(ctl, ctlGrp, "controllers")
+
+        else:
+            ctlGrp = "controllers"
+            # self.addToGroup(ctl, ctlGrp)
+
+        if ctlGrp not in self.groups.keys():
+            return
+
+        for grp_name, grp in self.groups.items():
+            try:
+                grp.remove(obj)
+            except (ValueError) as e:
+                pass
+                # logger.error(e)
 
     def connect_slide_ghost(self, lipup_ref, liplow_ref, slide_c_ref, corner_l_ref, corner_r_ref):
 
@@ -725,7 +754,7 @@ class Component(component.Main):
         self.cornerR_ctl = self._createGhostCtl(corner_r_ref, slide_c_ref)
 
         # slide system
-        ghostSliderForMouth(
+        drivers = ghostSliderForMouth(
             [slide_c_ref, corner_l_ref, corner_r_ref],
             intTra,
             self.sliding_surface,
@@ -747,11 +776,15 @@ class Component(component.Main):
         ymt_util.setKeyableAttributesDontLockVisibility(corner_l_ref, [])
         ymt_util.setKeyableAttributesDontLockVisibility(corner_r_ref, [])
 
+        return drivers
+
     def connect_mouth_ghost(self, lipup_ref, liplow_ref, slide_c_ref, corner_l_ref, corner_r_ref):
 
         # center main controls
-        self.lips_C_upper_ctl = createGhostWithParentConstraint(self.lips_C_upper_ctl, lipup_ref)
-        self.lips_C_lower_ctl = createGhostWithParentConstraint(self.lips_C_lower_ctl, liplow_ref)
+        self.lips_C_upper_ctl, up_ghost_ctl = createGhostWithParentConstraint(self.lips_C_upper_ctl, lipup_ref)
+        self.lips_C_lower_ctl, lo_ghost_ctl = createGhostWithParentConstraint(self.lips_C_lower_ctl, liplow_ref)
+        self._removeFromCtrlGroup(up_ghost_ctl)
+        self._removeFromCtrlGroup(lo_ghost_ctl)
         self.addToSubGroup(self.lips_C_upper_ctl, self.primaryControllersGroupName)
         self.addToSubGroup(self.lips_C_lower_ctl, self.primaryControllersGroupName)
 
@@ -878,12 +911,15 @@ def ghostSliderForMouth(ghostControls, intTra, surface, sliderParent):
 
     surfaceShape = surface.getShape()
     sliders = []
+    drivers = []
 
     for i, ctlGhost in enumerate(ghostControls):
         ctl = pm.listConnections(ctlGhost, t="transform")[-1]
         t = ctl.getMatrix(worldSpace=True)
 
         gDriver = primitive.addTransform(surface.getParent(), "{}_slideDriver".format(ctl.name()), t)
+        drivers.append(gDriver)
+
         if 0 == i:
             connCenter(ctl, gDriver, ctlGhost)
 
@@ -932,9 +968,13 @@ def ghostSliderForMouth(ghostControls, intTra, surface, sliderParent):
 
         pm.parent(ctlGhost.getParent(), slider)
         ymt_util.setKeyableAttributesDontLockVisibility(slider, [])
+        for shape in ctlGhost.getShapes():
+            pm.delete(shape)
 
     for slider in sliders[1:]:
         _visi_off_lock(slider)
+
+    return drivers
 
 
 def createGhostWithParentConstraint(ctl, parent=None, connect=True):
@@ -989,8 +1029,10 @@ def createGhostWithParentConstraint(ctl, parent=None, connect=True):
 
     # add control tag
     node.add_controller_tag(newCtl, parent)
+    for shape in ctl.getShapes():
+        pm.delete(shape)
 
-    return newCtl
+    return newCtl, ctl
 
 
 def applyPathCnsLocal(target, curve, u):
@@ -1027,6 +1069,9 @@ def applyPathCnsLocal(target, curve, u):
 
 def _visi_off_lock(node):
     """Short cuts."""
+    if not node:
+        raise Exception("node is null")
+
     cmds.setAttr("{}.visibility".format(node.name()), l=False)
     node.visibility.set(False)
     try:

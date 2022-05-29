@@ -772,7 +772,20 @@ class Component(component.Main):
         if self.settings["isGlobalMaster"]:
             return
 
-        # self.relatives["root"] = self.fk_ctl[0]
+        # self.upDetailControllers = self._addCurveDetailControllers(t, self.upCrv, "upEyelid")
+        # self.lowDetailControllers = self._addCurveDetailControllers(t, self.lowCrv, "lowEyelid", skipHeadAndTail=skip)
+        for i, ctl in enumerate(self.upDetailControllers):
+
+            self.relatives["%s_uploc" % i] = ctl
+            self.controlRelatives["%s_uploc" % i] = ctl
+
+        for i, ctl in enumerate(self.lowDetailControllers):
+
+            self.relatives["%s_lowloc" % i] = ctl
+            self.controlRelatives["%s_lowloc" % i] = ctl
+
+        self.relatives["inloc"] = self.upDetailControllers[0]
+        self.relatives["outloc"] = self.upDetailControllers[-1]
 
 
 def draw_eye_guide_mesh_plane(points, t):

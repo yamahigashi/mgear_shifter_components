@@ -55,15 +55,15 @@ class Guide(guide.ComponentGuide):
     def postInit(self):
         """Initialize the position for the guide"""
 
-        self.save_transform = ["root", "sliding_surface", "#_uploc", "uploc", "lowloc", "tan"]
+        self.save_transform = ["root", "sliding_surface", "#_loc", "uploc", "lowloc", "tan"]
         self.save_blade = ["blade"]
-        self.addMinMax("#_uploc", 1, -1)
+        self.addMinMax("#_loc", 1, -1)
 
     def addObjects(self):
         """Add the Guide Root, blade and locators"""
 
         self.root = self.addRoot()
-        self.uplocs = self.addLocMulti("#_uploc", self.root)
+        self.uplocs = self.addLocMulti("#_loc", self.root)
 
         v = transform.getOffsetPosition(self.root, [0., 1.0, 0.0])
         self.upPos = self.addLoc("uploc", self.root, v)
