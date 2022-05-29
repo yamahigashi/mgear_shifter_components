@@ -1,14 +1,37 @@
 # -*- coding: utf-8 -*-
+import re
+import math
 import sys
+# import itertools
+
 from pymel.core import datatypes
 from pymel import versions
 import pymel.core as pm
+
 import maya.cmds as cmds
+import maya.OpenMaya as om1
+import maya.api.OpenMaya as om
+
 from Qt import QtWidgets
 
 import mgear.shifter.component as component
 import mgear.synoptic as synoptic
 
+from mgear.core import (
+    attribute,
+    node,
+    icon,
+    # fcurve,
+    vector,
+)
+
+from mgear.core.transform import (
+    getTransform,
+    setMatrixPosition,
+    getTransformLookingAt,
+)
+
+from mgear.core.primitive import addTransform
 # from mgear.shifter import naming
 
 from mgear.core import (
@@ -24,6 +47,8 @@ from mgear.core import (
     primitive,
     utils,
 )
+
+from ymt_shifter_utility import twistSplineBuilder as tsBuilder
 
 from logging import (  # noqa:F401 pylint: disable=unused-import, wrong-import-order
     StreamHandler,
@@ -450,17 +475,21 @@ def addJointTransformFromPos(parent, name, pos=datatypes.Vector(0, 0, 0)):
 
 
 def getAsMFnNode(name, ctor):
+
     objects = om.MSelectionList()
     objects.add(name)
     dag = objects.getDagPath(0)
+
     return ctor(dag)
 
 
+'''
 def get_nearest_axis_orient(a, b):
     # returns normalized axis of orientation of a to b
     ta = getTransform(a)
     tb = getTransform(b)
     tb - ta
+'''
 
 
 def transform_to_euler(t):
@@ -469,3 +498,304 @@ def transform_to_euler(t):
     rot = (math.degrees(rot[0]), math.degrees(rot[1]), math.degrees(rot[2]))
 
     return rot
+
+
+# norm = self.guide.blades["blade"].y
+# pfx = self.getName("twistSpline")
+def convertToTwistSpline(comp, prefix, positions, crv, ikNb, norm, isClosed=False, is_cv_ctl=True, is_roll_ctl=True, is_otans_ctl=True, is_itans_ctl=True):
+
+    crvShape = crv.getShape()
+    curveFn = getAsMFnNode(crvShape.name(), om.MFnNurbsCurve)
+
+    # Get the curve data
+    knots = curveFn.knots()
+    params = list(knots)[1::3]
+    numCVs = len(params)
+    numJoints = min(len(positions), numCVs + 2)  # head and tail
+
+    # Build the spline
+    # curveLen = curveFn.length()
+    # maxParam = curveLen / 3.0
+    max_param = (ikNb - 1) * 3.0 * 2.
+    tempRet = build_twist_spline(prefix, ikNb, numJoints, max_param, spread=1.0, closed=isClosed)
+    cvs, bfrs, oTans, iTans, jPars, joints, group, spline, master, riderCnst = tempRet
+
+    alignControllers(cvs, bfrs, oTans, iTans, curveFn, ikNb, norm)
+    alignDeformers(joints, positions, riderCnst, curveFn)
+
+    # grouping
+    twistspline_ctrls = pm.PyNode(bfrs[0]).getParent()
+    cmds.setAttr("{}.visibility".format(group), False)
+
+    comp.root.addChild(group)
+    comp.root.addChild(spline)
+    comp.root.addChild(twistspline_ctrls)
+    comp.root.addChild(master)
+    offset = cmds.xform(master, q=True, os=True, t=True)
+    if not isinstance(offset, list):
+        raise
+
+    cmds.setAttr("{0}.tx".format(master), 0.0)
+    cmds.setAttr("{0}.ty".format(master), 0.0)
+    cmds.setAttr("{0}.tz".format(master), 0.0)
+    cmds.setAttr("{0}.tx".format(group), 0.)
+    cmds.setAttr("{0}.ty".format(group), 0.)
+    cmds.setAttr("{0}.tz".format(group), 0.)
+
+    cmds.setAttr("{0}.visibility".format(spline), False)
+    cmds.setAttr("{0}.inheritsTransform".format(spline), False)
+
+    # Lock the buffers
+    attribute.setKeyableAttributes(pm.PyNode(spline), [])
+    attribute.setKeyableAttributes(pm.PyNode(group), [])
+    # comp.root.addChild(riderCnst)
+
+    for bfr in bfrs:
+        cur = cmds.getAttr("{0}.t".format(bfr))[0]
+        cmds.setAttr("{0}.tx".format(bfr), cur[0] + offset[0])
+        cmds.setAttr("{0}.ty".format(bfr), cur[1] + offset[1])
+        cmds.setAttr("{0}.tz".format(bfr), cur[2] + offset[2])
+        for att in [x+y for x in 'trs' for y in 'xyz']:
+            cmds.setAttr("{0}.{1}".format(bfr, att), lock=True)
+
+    scl = comp.length * (1. / comp.division) * 1.3
+    col = comp.color_ik
+    roll = [cv.replace("_ik", "_roll") for cv in cvs]
+
+    edit_twistspline_ctl_of_shifter_attributes(comp, cvs, is_cv_ctl, False, comp.tr_params, scl, col)
+    edit_twistspline_ctl_of_shifter_attributes(comp, roll, False, is_roll_ctl, ["ry"], scl, comp.color_fk)
+    edit_twistspline_ctl_of_shifter_attributes(comp, oTans, False, is_otans_ctl, ["tx", "ty", "tz"], scl, col)
+    edit_twistspline_ctl_of_shifter_attributes(comp, iTans, False, is_itans_ctl, ["tx", "ty", "tz"], scl, col)
+
+    return cvs, oTans, iTans, joints, master, pm.PyNode(spline)
+
+
+def edit_twistspline_ctl_of_shifter_attributes(comp, objects, is_primary_ctl, is_detail_ctl, ctl_params, scl, col):
+
+    for x in objects:
+        ctl = pm.PyNode(x)
+
+        if is_primary_ctl or is_detail_ctl:
+            setKeyableAttributesDontLockVisibility(ctl, ctl_params)
+            edit_controller_shape(ctl.name(), scl=(scl, scl, scl), color=col)
+            addCtlMetadata(comp, ctl)
+
+            if is_primary_ctl:
+                comp.addToSubGroup(ctl, comp.primaryControllersGroupName)
+
+            if is_detail_ctl:
+                comp.addToSubGroup(ctl, comp.detailControllersGroupName)
+
+        else:
+            attribute.setKeyableAttributes(ctl, [])
+            edit_controller_shape(ctl.name(), scl=(0., 0., 0.), color=col)
+
+
+def build_twist_spline(name, num_ik, num_joints, max_param, spread=1.0, closed=True):
+    # type: (Text, int, int, float, float, bool) -> Tuple[List[Text], List[Text], List[Text], List[Text], List[Text], List[Text], Text, Text, Text, Text]
+    """ Wrapper of tsBuilder.makeTwistSpline
+
+    Arguments:
+        pfx (str): The user name of the spline. Will be formatted into the given naming convention
+        numCVs (int): The number of CV's to make that control the spline
+        numJoints (int): The number of joints to make that ride the spline. Defaults to 10
+        maxParam (int): The U-Value of the last CV. Defaults to 3*spread*(numCVs - 1)
+        spread (float): The distance between each controller (including tangents). Defaults to 1
+        closed (bool): Whether the spline forms a closed loop
+
+    Returns:
+        [str, ...]: All the CV's
+        [str, ...]: All the CV's parent transforms
+        [str, ...]: All the Out-Tangents
+        [str, ...]: All the In-Tangents
+        [str, ...]: All the joint parents
+        [str, ...]: All the joints
+        str: The joint organizer object (None if no joints requested)
+        str: The spline object transform
+        str: The base controller
+        str: The rider constraint (None if no joints requested)
+    """
+
+    tempRet = tsBuilder.makeTwistSpline(
+        name,
+        num_ik,
+        numJoints=num_joints,
+        maxParam=max_param,
+        spread=1.0,
+        closed=closed
+    )
+
+    cvs, bfrs, oTans, iTans, jPars, joints, group, spline, master, riderCnst = tempRet
+    return cvs, bfrs, oTans, iTans, jPars, joints, group, spline, master, riderCnst  # type: ignore
+
+
+def alignControllers(cvs, bfrs, oTans, iTans, curveFn, ikNb, norm):
+    # type: (List[Text], List[Text], List[Text], List[Text], om.MFnNurbsCurve, int, om.MVector) -> None
+
+    curveLen = curveFn.length()
+
+    def insertNpo(obj):
+        # type: (Text) -> Text
+        obj_node = pm.PyNode(obj)
+        parent = obj_node.getParent()
+        t = getTransform(obj_node)
+        name = obj.replace("_ctl", "_npo")
+        npo = addTransform(parent, name, t)
+        pm.parent(obj_node, npo)
+        attribute.setKeyableAttributes(npo, [])
+
+        return npo
+
+    # Set the positions
+    for pos, cv in withCurvePos(curveFn, bfrs):
+        cmds.xform(cv, ws=True, a=True, t=pos)
+
+    for i, cv in enumerate(cvs):
+        cmds.setAttr("{0}.Pin".format(cv), 1)
+
+        npo = re.sub(r"_ik(\d+)_ctl", r"_twistPart_\1_npo", cv)
+        roll = cv.replace("_ik", "_roll")
+        if i == (len(cvs) - 1):
+            cmds.setAttr("{0}.sz".format(npo), -1)
+        cmds.setAttr("{0}.UseTwist".format(roll), 1)
+        attribute.setKeyableAttributes(pm.PyNode(npo), [])
+        insertNpo(cv)
+
+    for pos, cv in withCurvePos(curveFn, oTans, 0.4):
+        cmds.xform(cv, ws=True, a=True, t=pos)
+        cmds.setAttr("{0}.Auto".format(cv), 0)
+
+    for pos, cv in withCurvePos(curveFn, iTans, 0.6):
+        cmds.xform(cv, ws=True, a=True, t=pos)
+        cmds.setAttr("{0}.Auto".format(cv), 0)
+
+    # Get the rotations at each CV point
+    rotations = _getRotationsAtEachPoint(bfrs, norm)
+
+    for i, ctrl in enumerate(bfrs):
+        rot = rotations[i]
+        cmds.setAttr("{0}.rotate".format(ctrl), *rot)
+
+    # Un-pin everything but the first, so back to length preservation
+    for cv in cvs[1:]:
+        cmds.setAttr("{0}.Pin".format(cv), 0)
+
+    # Re-set the tangent worldspace positions now that things have changed
+    for pos, cv in withCurvePos(curveFn, oTans, 0.4):
+        cmds.setAttr("{0}.tx".format(cv), curveLen / ikNb * 0.7)
+        cmds.setAttr("{0}.ty".format(cv), 0.0)
+        cmds.setAttr("{0}.tz".format(cv), 0.0)
+        cmds.setAttr("{0}.Auto".format(cv), 0)
+        insertNpo(cv)
+
+    for pos, cv in withCurvePos(curveFn, iTans, 0.6):
+        cmds.setAttr("{0}.tx".format(cv), curveLen / ikNb * -0.7)
+        cmds.setAttr("{0}.ty".format(cv), 0.0)
+        cmds.setAttr("{0}.tz".format(cv), 0.0)
+        cmds.setAttr("{0}.Auto".format(cv), 0)
+        insertNpo(cv)
+
+
+def alignDeformers(joints, positions, riderCnst, curveFn):
+    # type: (List, List, Text, om.MFnNurbsCurve) -> None
+    # align deformer joints to the given positions
+
+    curveLen = curveFn.length()
+    max_param = curveLen / 33.3333
+    max_param = 1.0  # FIXME...
+    maximum_iteration = 10000
+
+    joint = getAsMFnNode(joints[0], om.MFnTransform)
+    _positions = []
+
+    for param in [(max_param / maximum_iteration) * x for x in range(maximum_iteration)]:
+        cmds.setAttr("{0}.params[0].param".format(riderCnst), param)
+        cmds.dgeval(riderCnst)
+        p = joint.translation(om.MSpace.kWorld)
+        _positions.append(p)
+
+    def _searchNearestParam(pos):
+
+        res = _positions[0]
+        cur = None
+        pos = om.MVector(pos)
+
+        for i, p in enumerate(_positions):
+            d = (p - pos).length()
+            if not cur or cur > d:
+                cur = d
+                res = p
+
+        return max_param / maximum_iteration * _positions.index(res)
+
+    cmds.setAttr("{0}.params[0].param".format(riderCnst), 0.0)
+    for i, pos in enumerate(positions[1:]):
+        i = i + 1  # skiped first
+        param = _searchNearestParam(pos)
+        cmds.setAttr("{0}.params[{1}].param".format(riderCnst, i), param)
+
+    
+def withCurvePos(curveFn, it, offset=0.):
+
+    curveLen = curveFn.length()
+
+    if len(it) == 1:
+        param = curveFn.findParamFromLength(curveLen * offset)
+        point = curveFn.getPointAtParam(param, om.MSpace.kObject)
+        pos = point[0], point[1], point[2]
+
+        yield pos, it[0]
+        return 
+
+    for i, element in enumerate(it):
+
+        param = curveFn.findParamFromLength((curveLen / (len(it) - 1)) * (i + offset))
+        point = curveFn.getPointAtParam(param, om.MSpace.kObject)
+        pos = point[0], point[1], point[2]
+
+        yield pos, element
+
+    
+def _getRotationsAtEachPoint(bfrs, norm):
+    # type: (List[Text], om.MVector) -> List[Tuple[float, float, float]]
+    # pylint: disable=too-many-locals
+
+    rotations = []
+    # norm = self.guide.blades["blade"].y
+    for i, ctrl in enumerate(bfrs):
+
+        c = pm.PyNode(ctrl).getTranslation(space="world")
+
+        if i == 0:
+            n = pm.PyNode(bfrs[1]).getTranslation(space="world")
+            t = getTransformLookingAt(c, n, norm, axis="xy")
+            rot = transform_to_euler(t)
+
+        elif i == (len(bfrs) - 1):
+            p = pm.PyNode(bfrs[i - 1]).getTranslation(space="world")
+            t = getTransformLookingAt(c, p, norm, axis="-xy")
+            rot = transform_to_euler(t)
+
+        else:
+            p = pm.PyNode(bfrs[i - 1]).getTranslation(space="world")
+            n = pm.PyNode(bfrs[i + 1]).getTranslation(space="world")
+
+            t1 = getTransformLookingAt(c, p, norm, axis="-xy")
+            t2 = getTransformLookingAt(c, n, norm, axis="xy")
+
+            q1 = om.MQuaternion(t1.rotate.x, t1.rotate.y, t1.rotate.z, t1.rotate.w)
+            q2 = om.MQuaternion(t2.rotate.x, t2.rotate.y, t2.rotate.z, t2.rotate.w)
+            q = om.MQuaternion.slerp(q1, q2, 0.5)
+
+            rot = q.asEulerRotation().asVector()
+            rot = (math.degrees(rot[0]), math.degrees(rot[1]), math.degrees(rot[2]))
+
+        rotations.append(rot)
+
+    return rotations
+
+
+def iter_tr_xyz(object_name):
+    for attr in ["t", "r"]:
+        for axis in ["x", "y", "z"]:
+            yield "{}.{}{}".format(object_name, attr, axis)
