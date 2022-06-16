@@ -150,9 +150,9 @@ class Component(component.Main):
                 is_otans_ctl=True,
                 is_itans_ctl=True
         )
-        cvs, oTans, iTans, joints, master, spline = tmpRes
-        # self.ik_ctl, self.in_ctl, self.out_ctl, self.bts_joints, self.master_ctl, self.mst_crv = tmpRes
-        # self.ik_ctl = [pm.PyNode(x) for x in self.ik_ctl]
+        cvs, oTans, iTans, joints, master_control, self.spline = tmpRes
+        cmds.delete(master_control)
+
         self.out_ctl = [pm.PyNode(x) for x in oTans]
         self.in_ctl = [pm.PyNode(x) for x in iTans]
         self.bts_joints = [pm.PyNode(x) for x in joints]
@@ -165,22 +165,6 @@ class Component(component.Main):
         centers = [x for x in self.ik_ctl]
         for _ in range(2):
             centers.insert(0, self.ik_ctl[0])
-
-        self.mst_crv = curve.addCnsCurve(
-            self.root,
-            self.getName("mst_crv"),
-            centers,
-            3)
-        self.slv_crv = curve.addCurve(
-            self.root,
-            self.getName("slv_crv"),
-            [datatypes.Vector()] * 10,
-            False,
-            3)
-
-        self.mst_crv.setAttr("visibility", False)
-        self.slv_crv.setAttr("visibility", False)
-        self.mst_crv = spline
 
         icon.connection_display_curve(self.getName("visualIKRef"), self.ik_ctl)
         self.fk_ctl = self.addObjectsFkControl(self.bts_joints)
@@ -281,11 +265,6 @@ class Component(component.Main):
         parentdiv = self.root
         parentctl = self.root
 
-        parent_twistRef = addTransform(
-            self.root,
-            self.getName("reference"),
-            getTransform(self.root))
-
         self.jointList = []
         self.preiviousCtlTag = self.parentCtlTag
         self.div_roll_npo = []
@@ -294,18 +273,18 @@ class Component(component.Main):
             jt = getTransform(pm.PyNode(j))
             pt = setMatrixPosition(jt, self.guide.apos[i])
 
-            parentdiv, parentctl = self._addObjectsFkControl(i, parentdiv, parentctl, jt, pt, parent_twistRef)
+            parentdiv, parentctl = self._addObjectsFkControl(i, parentdiv, parentctl, jt, pt)
 
         if self.surplusFkNb > 1:
             chain = getChainTransform2(self.guide.apos, self.normal, self.negate)
             for i, t in enumerate(chain[-(self.surplusFkNb - 1):]):
-                parentdiv, parentctl = self._addObjectsFkControl(i + len(joints), parentdiv, parentctl, t, t, parent_twistRef)
+                parentdiv, parentctl = self._addObjectsFkControl(i + len(joints), parentdiv, parentctl, t, t)
 
         # add visual reference
         icon.connection_display_curve(self.getName("visualFKRef"), self.fk_ctl)
         return self.fk_ctl
 
-    def _addObjectsFkControl(self, i, parentdiv, parentctl, t, pt, parent_twistRef):
+    def _addObjectsFkControl(self, i, parentdiv, parentctl, t, pt):
         # References
         tm = datatypes.TransformationMatrix(t)
         tm.addRotation([0., 0., math.pi / -2.], 'XYZ', om.MSpace.kObject)  # TODO: align with convention
@@ -448,38 +427,44 @@ class Component(component.Main):
                     0,
                     ref_names)
 
-        if not self.settings["isGlobalMaster"]:
-            # Anim -------------------------------------------
-            self.volume_att = self.addAnimParam(
-                "volume", "Volume", "double", 1, 0, 1)
+        # Anim -------------------------------------------
+        self.volume_att = self.addAnimParam(
+            "volume", "Volume", "double", 1, 0, 1)
 
-            self.maxstretch_att = self.addAnimParam(
-                "maxstretch",
-                "Max Stretch",
-                "double",
-                self.settings["maxstretch"],
-                0.1,
-                10.)
+        self.maxstretch_att = self.addAnimParam(
+            "maxstretch",
+            "Max Stretch",
+            "double",
+            self.settings["maxstretch"],
+            0.1,
+            10.)
 
-            self.maxsquash_att = self.addAnimParam(
-                "maxsquash",
-                "Max Squash",
-                "double",
-                self.settings["maxsquash"],
-                0.,
-                1.)
+        self.maxsquash_att = self.addAnimParam(
+            "maxsquash",
+            "Max Squash",
+            "double",
+            self.settings["maxsquash"],
+            0.,
+            1.)
 
-            self.softness_att = self.addAnimParam(
-                "softness",
-                "Softness",
-                "double",
-                self.settings["softness"],
-                0,
-                1)
+        self.softness_att = self.addAnimParam(
+            "softness",
+            "Softness",
+            "double",
+            self.settings["softness"],
+            0,
+            1)
 
-        self.fk_collapsed_att = self.addAnimParam(
-            "traditional_fk",
-            "Traditional FK",
+        self.fk_collapsed_att_rib = self.addAnimParam(
+            "rib_traditional_fk",
+            "Rib Traditional FK",
+            "bool",
+            True
+        )
+
+        self.fk_collapsed_att_belly = self.addAnimParam(
+            "belly_traditional_fk",
+            "Belly Traditional FK",
             "bool",
             False
         )
@@ -506,9 +491,7 @@ class Component(component.Main):
                 out_glob)
 
         pm.parentConstraint(self.bts_joints[0], self.fk_npo[0], maintainOffset=True, skipRotate=("x", "y", "z"))
-        self.addOperatorsNotGlobalMaster()
 
-    def addOperatorsNotGlobalMaster(self):
         # ensure plugin loaded
         if 0 == cmds.pluginInfo("rotationDriver", query=True, loaded=True):
             cmds.loadPlugin("rotationDriver")
@@ -525,7 +508,15 @@ class Component(component.Main):
         for i in range(len(self.guide.apos)):
             self.addFkOperator(i, rootWorld_node)
 
+        driver_shape = self.spline.getShape()
+        for attr in cmds.listAttr("{}.vertexData".format(driver_shape.getName()), multi=True) or []:
+                if "useOrient" in attr:
+                    cmds.setAttr("{}.{}".format(driver_shape.getName(), attr), True)
+
     def addFkOperator(self, i, rootWorld_node):
+
+        if i == 0 and self.settings["isSplitHip"]:
+            self.addFkHipOperator()
 
         fk_local_npo_xfoms = []
         if i not in [len(self.guide.apos), 0]:
@@ -566,17 +557,15 @@ class Component(component.Main):
             pm.setAttr(cond + ".operation", 4)  # greater
 
             if i >= tail_count:
-                attribute.connectSet(self.fk_collapsed_att, cond + ".secondTerm", check_list)
-                attribute.connectSet(dm_node + ".outputRotate", cond + ".colorIfTrue", check_list)
-                attribute.connectSet(dm_node + ".outputRotate", cond + ".colorIfFalse", check_list)
-
+                attribute.connectSet(self.fk_collapsed_att_rib, cond + ".secondTerm", check_list)
             else:
-                attribute.connectSet(self.fk_collapsed_att, cond + ".secondTerm", check_list)
-                attribute.connectSet(dm_node + ".outputRotate", cond + ".colorIfTrue", check_list)
+                attribute.connectSet(self.fk_collapsed_att_belly, cond + ".secondTerm", check_list)
 
-                pm.setAttr(cond + ".colorIfFalseR", 0.)
-                pm.setAttr(cond + ".colorIfFalseG", 0.)
-                pm.setAttr(cond + ".colorIfFalseB", 0.)
+            attribute.connectSet(dm_node + ".outputRotate", cond + ".colorIfTrue", check_list)
+
+            pm.setAttr(cond + ".colorIfFalseR", 0.)
+            pm.setAttr(cond + ".colorIfFalseG", 0.)
+            pm.setAttr(cond + ".colorIfFalseB", 0.)
 
             pm.connectAttr(cond + ".outColor", d.attr("r"))
             
@@ -595,6 +584,17 @@ class Component(component.Main):
 
         self.div_cns[i].attr("r") >> self.fk_npo[i].attr("r")
         self.div_cns[i].attr("t") >> self.fk_npo[i].attr("t")
+
+    def addFkHipOperator(self):
+        s = self.fk_hip_ctl
+        d = self.fk_local_npo[0],
+        # maintainOffset, skipRotate, skipTranslate
+        _ = pm.parentConstraint(s, d, mo=True, sr=("x", "y", "z"), st=())
+
+        s = self.ik_global_out[0]
+        d = self.hip_fk_local_in,
+        # maintainOffset, skipRotate, skipTranslate
+        pm.parentConstraint(s, d, mo=True)
 
     def connectRef(self, refArray, cns_obj, upVAttr=None, init_refNames=False):
         """Connect the cns_obj to a multiple object using parentConstraint.
@@ -659,8 +659,6 @@ class Component(component.Main):
 
     def setRelation(self):
         """Set the relation beetween object from guide to rig"""
-        if self.settings["isGlobalMaster"]:
-            return
 
         self.relatives["root"] = self.fk_hip_ctl
         self.relatives["eff"] = self.fk_ctl[-1]

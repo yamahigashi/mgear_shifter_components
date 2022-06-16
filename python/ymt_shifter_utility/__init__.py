@@ -483,15 +483,6 @@ def getAsMFnNode(name, ctor):
     return ctor(dag)
 
 
-'''
-def get_nearest_axis_orient(a, b):
-    # returns normalized axis of orientation of a to b
-    ta = getTransform(a)
-    tb = getTransform(b)
-    tb - ta
-'''
-
-
 def transform_to_euler(t):
     # type: (om.MTransformationMatrix) -> Tuple[float, float, float]
     rot = t.rotate.asEulerRotation().asVector()
@@ -548,6 +539,8 @@ def convertToTwistSpline(comp, prefix, positions, crv, ikNb, norm, isClosed=Fals
     # Lock the buffers
     attribute.setKeyableAttributes(pm.PyNode(spline), [])
     attribute.setKeyableAttributes(pm.PyNode(group), [])
+    cmds.setAttr("{}.visibility".format(spline), lock=False)
+    cmds.setAttr("{}.visibility".format(group), lock=False)
     # comp.root.addChild(riderCnst)
 
     for bfr in bfrs:
@@ -701,8 +694,7 @@ def alignDeformers(joints, positions, riderCnst, curveFn):
     # align deformer joints to the given positions
 
     curveLen = curveFn.length()
-    max_param = curveLen / 33.3333
-    max_param = 1.0  # FIXME...
+    max_param = curveLen * len(positions) / 33.3
     maximum_iteration = 10000
 
     joint = getAsMFnNode(joints[0], om.MFnTransform)

@@ -77,21 +77,17 @@ class Guide(guide.ComponentGuide):
         self.pNeutralPose = self.addParam("neutralpose", "bool", False)
         self.pOverrideNegate = self.addParam("overrideNegate", "bool", False)
         self.pfkNb = self.addParam("fkNb", "long", 3, 2)
-        self.psurplusFkNb = self.addParam("surplusFkNb", "long", 3, 0)
+        self.psurplusFkNb = self.addParam("surplusFkNb", "long", 1, 1)
+        self.pSplitHip = self.addParam("isSplitHip", "bool", True)
 
         self.pIk0RefArray = self.addParam("ik0refarray", "string", "")
         self.pIk1RefArray = self.addParam("ik1refarray", "string", "")
-        self.pSplitHip = self.addParam("isSplitHip", "bool", True)
         self.pPosition = self.addParam("position", "double", 0, 0, 1)
         self.pMaxStretch = self.addParam("maxstretch", "double", 1, 1)
         self.pMaxSquash = self.addParam("maxsquash", "double", 1, 0, 1)
         self.pSoftness = self.addParam("softness", "double", 0, 0, 1)
-        self.pIsGlobalMaster = self.addParam("addJoints", "bool", True)
-        self.pAddJoints = self.addParam("isGlobalMaster", "bool", False)
-        self.pBoundFk = self.addParam("isBoundFkToCurve", "bool", True)
-        self.pMasterChain = self.addParam("masterChainLocal", "string", "")
-        self.pMasterChain = self.addParam("masterChainGlobal", "string", "")
-        self.pCnxOffset = self.addParam("cnxOffset", "long", 0, 0)
+        self.pAddJoints = self.addParam("addJoints", "bool", True)
+
         # FCurves
         self.pSt_profile = self.addFCurveParam(
             "st_profile", [[0, 0], [.5, -1], [1, 0]])
