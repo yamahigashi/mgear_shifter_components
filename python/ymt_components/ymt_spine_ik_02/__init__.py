@@ -1,4 +1,6 @@
 import math
+import six
+
 import maya.OpenMaya as om1
 import maya.api.OpenMaya as om
 
@@ -611,7 +613,7 @@ class Component(component.Main):
             dm_node = node.createDecomposeMatrixNode(mulmat_node2 + ".output")
             pm.connectAttr(dm_node + ".outputTranslate", d.attr("t"))
 
-            check_list = (pm.Attribute, unicode, str)  # noqa
+            check_list = (pm.Attribute, six.string_types)  # noqa
             cond = pm.createNode("condition")
             pm.setAttr(cond + ".operation", 4)  # greater
             attribute.connectSet(self.fk_collapsed_att, cond + ".secondTerm", check_list)
