@@ -1,5 +1,5 @@
 # import re
-
+import six
 import maya.cmds as cmds
 import pymel.core as pm
 
@@ -12,7 +12,10 @@ import mgear.synoptic.utils as syn_utils
 import mgear.core.utils as utils
 
 import gml_maya.decorator as deco
-import gml_maya.node as node_utils
+try:
+    import gml_maya.node as node_utils
+except ImportError:
+    import gml_maya.util.node_util as node_utils
 
 if False:
     # For type annotation
@@ -144,7 +147,7 @@ def applyMirror(nameSpace, mirrorEntry):
         if (
             pm.attributeQuery(attr, node=node, shortName=True, exists=True, keyable=True) and not node.attr(attr).isLocked()
         ):
-            if isinstance(val, str) or isinstance(val, unicode):
+            if isinstance(val, (six.string_types, six.text_type)):
                 return
 
             node.attr(attr).set(val)
@@ -273,6 +276,17 @@ def getPivotCheckButtonAttrName(str):
     return "invPivot{0}".format(str.lower().capitalize())
 
 
+def getMatrix(obj):
+    # type: (pm.datatypes.Transform) -> List[float]
+    xform = cmds.xform("{}".format(obj.name()), q=True, ws=True, matrix=True)
+    return xform
+
+
+def setMatrix(obj, mat):
+    # type: (pm.datatypes.Transform) -> None
+    cmds.xform("{}".format(obj.name()), ws=True, matrix=mat)
+
+
 @deco.autokey_off
 def ikFkMatch(namespace,
               ikfk_attr,
@@ -360,47 +374,43 @@ def ikFkMatch(namespace,
 
         world_matrices = []
         for src, _ in zip(fk_goals, fk_ctrls):
-            world_matrices.append(src.getMatrix(worldSpace=True))
+            world_matrices.append(getMatrix(src))
 
         o_attr.set(0.0)
 
         for mat, dst in zip(world_matrices, fk_ctrls):
-            dst.setMatrix(mat, worldSpace=True)
+            setMatrix(dst, mat)
 
         for mat, dst in zip(world_matrices, fk_ctrls):
-            dst.setMatrix(mat, worldSpace=True)
+            setMatrix(dst, mat)
 
     # if is FKw then sanp IK
     elif switch_to_ik:
 
-        shoulder_mat = fk_goals[0].getMatrix(worldSpace=True)
-        ik_mat = ik_goal.getMatrix(worldSpace=True)
+        shoulder_mat = getMatrix(fk_goals[0])
+        ik_mat = getMatrix(ik_goal)
 
         # transform.matchWorldTransform(ik_goal, ik_ctrl)
         if ik_rot:
-            rot_mat = ik_rot_goal.getMatrix(worldSpace=True)
+            rot_mat = getMatrix(ik_rot_goal)
             # transform.matchWorldTransform(ik_rot_goal, ik_rot_node)
 
         if is_leg:
-            upv_mat = fk_goals[1].getMatrix(worldSpace=True)
+            upv_mat = getMatrix(fk_goals[1])
         else:
-            upv_mat = fk_goals[2].getMatrix(worldSpace=True)
+            upv_mat = getMatrix(fk_goals[2])
 
         o_attr.set(1.0)
 
-        ik_ctrl.setMatrix(ik_mat, worldSpace=True)
-        if ik_rot:
-            ik_rot_node.setMatrix(rot_mat, worldSpace=True)
-        upv_ctrl.setMatrix(upv_mat, worldSpace=True)
+        setMatrix(ik_ctrl, ik_mat)
+        setMatrix(upv_ctrl, upv_mat)
         # for _ in range(10):
         #     fk_ctrls[0].setMatrix(shoulder_mat, worldSpace=True)
 
-        _m = []
-        for row in shoulder_mat:
-            for elem in row:
-                _m.append(elem)
         for _ in range(20):
-            cmds.xform(fk_ctrls[0].name(), ws=True, matrix=_m)
+            cmds.xform(fk_ctrls[0].name(), ws=True, matrix=shoulder_mat)
+        if ik_rot:
+            setMatrix(ik_rot_node, rot_mat)
 
         # transform.matchWorldTransform(fk_goals[1], upv_ctrl)
         # calculates new pole vector position
@@ -427,12 +437,12 @@ def ikFkMatch(namespace,
         roll_att = ui_node.attr(ikfk_attr.replace("blend", "roll"))
         roll_att.set(0.0)
 
-        ik_ctrl.setMatrix(ik_mat, worldSpace=True)
+        setMatrix(ik_ctrl, ik_mat)
         if ik_rot:
-            ik_rot_node.setMatrix(rot_mat, worldSpace=True)
+            setMatrix(ik_rot_node, rot_mat)
         # upv_ctrl.setMatrix(upv_mat, worldSpace=True)
         for _ in range(20):
-            cmds.xform(fk_ctrls[0].name(), ws=True, matrix=_m)
+            cmds.xform(fk_ctrls[0].name(), ws=True, matrix=shoulder_mat)
 
     # sets keyframes
     if key:
@@ -638,24 +648,15 @@ class IkFkTransfer(anim_utils.AbstractAnimationTransfer):
             # bake the stored transforms to the cotrols
             for j, n in enumerate(key_dst_nodes):
                 # n.setMatrix(worldMatrixList[i][j], worldSpace=True)
-
-                _m = []
-                for row in worldMatrixList[i][j]:
-                    for elem in row:
-                        _m.append(elem)
                 for _ in range(2):
-                    cmds.xform(n.name(), ws=True, matrix=_m)
+                    cmds.xform(n.name(), ws=True, matrix=worldMatrixList[i][j])
 
             # bake the stored transforms to the cotrols
             for j, n in enumerate(key_dst_nodes):
                 # n.setMatrix(worldMatrixList[i][j], worldSpace=True)
 
-                _m = []
-                for row in worldMatrixList[i][j]:
-                    for elem in row:
-                        _m.append(elem)
                 for _ in range(2):
-                    cmds.xform(n.name(), ws=True, matrix=_m)
+                    cmds.xform(n.name(), ws=True, matrix=worldMatrixList[i][j])
 
             pm.setKeyframe(key_dst_nodes, at=channels)
             pm.setKeyframe(switch_attr_name)
@@ -788,16 +789,15 @@ class IkFkTransfer(anim_utils.AbstractAnimationTransfer):
         IkFkTransfer.execute(model, ikfk_attr, uihost, fks, ik, upv, ikRot, **kwargs)
 
     def getWorldMatrices(self, start, end, val_src_nodes, keyframes):
-        # type: (int, int, List[pm.nodetypes.Transform]) -> \
-        # List[List[pm.datatypes.Matrix]]
+        # type: (int, int, List[pm.nodetypes.Transform]) -> List[List[float]]
         """ returns matrice List[frame][controller number]."""
 
         res = []
         for x in keyframes:
             tmp = []
-            pm.currentTime(x)
+            cmds.currentTime(x)
             for n in val_src_nodes:
-                tmp.append(pm.getAttr(n + '.worldMatrix', time=x))
+                tmp.append(cmds.xform(n.name(), q=True, matrix=True, ws=True))
 
             res.append(tmp)
 

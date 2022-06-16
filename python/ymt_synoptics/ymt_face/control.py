@@ -12,7 +12,10 @@ import mgear.synoptic.utils as syn_utils
 import mgear.core.utils as utils
 
 import gml_maya.decorator as deco
-import gml_maya.node as node_utils
+try:
+    import gml_maya.node as node_utils
+except ImportError:
+    import gml_maya.util.node_util as node_utils
 
 if False:
     # For type annotation
