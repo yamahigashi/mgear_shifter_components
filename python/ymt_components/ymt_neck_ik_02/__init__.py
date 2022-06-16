@@ -162,7 +162,6 @@ class Component(MainComponent):
         self.parent.addChild(self.root)
 
         # TODO: by settings gui
-        print(self.settings)
         if self.settings["useExprespy"]:
             try:
                 self.connect_with_exprespy()
