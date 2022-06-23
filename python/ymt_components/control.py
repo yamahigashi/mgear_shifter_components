@@ -20,11 +20,7 @@ QtGui, QtCore, QtWidgets, wrapInstance = gqt.qt_import()
 class AbstractControllerButton(QtWidgets.QPushButton):
 
     def __init__(self, *args, **kwargs):
-        print("a")
-        print(args)
-        print(kwargs)
         super(AbstractControllerButton, self).__init__(*args, **kwargs)
-        print(self.parentWidget())
         self.root = None
         self.side = "C"
         self.name = None
