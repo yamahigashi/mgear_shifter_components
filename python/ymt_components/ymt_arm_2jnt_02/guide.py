@@ -47,7 +47,7 @@ from . import settingsUI as sui
 AUTHOR = "Jeremie Passerin, Miquel Campos, Takayoshi MATSUMOTO"
 URL = "www.jeremiepasserin.com, www.miquel-campos.com"
 EMAIL = "geerem@hotmail.com, hello@miquel-campos.com, yamahigashi@gmail.com"
-VERSION = [0, 2, 0]
+VERSION = [0, 2, 1]
 TYPE = "ymt_arm_2jnt_02"
 NAME = "arm"
 DESCRIPTION = "Simple IK/FK chain, With IK space switch"

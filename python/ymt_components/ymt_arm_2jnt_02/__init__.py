@@ -51,6 +51,13 @@ class Component(arm_2jnt_04.Component):
     def addOperators(self):
         super(Component, self).addOperators()
 
+        for i, div_cns in enumerate(self.div_cns):
+
+            # Roll
+            if self.negate:
+                o_node = div_cns.attr("rotate").listConnections(s=True, d=False)[0].attr("inputMatrix").listConnections(s=True, d=False)[0]
+                if abs(o_node.getAttr("u") - 0.25) < 0.00001:
+                    o_node.setAttr("u", 0.2499)
         for shp in self.ikcns_ctl.getShapes():
             try:
                 pm.disconnectAttr(self.blend_att, shp.attr("visibility"))
