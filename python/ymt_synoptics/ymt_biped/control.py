@@ -1,4 +1,5 @@
 # import re
+import sys
 import six
 import maya.cmds as cmds
 import pymel.core as pm
@@ -17,10 +18,39 @@ try:
 except ImportError:
     import gml_maya.util.node_util as node_utils
 
-if False:
+from logging import (  # noqa:F401 pylint: disable=unused-import, wrong-import-order
+    StreamHandler,
+    getLogger,
+    WARN,
+    DEBUG,
+    INFO
+)
+
+if sys.version_info >= (3, 0):  # pylint: disable=using-constant-test  # pylint: disable=using-constant-test, wrong-import-order
     # For type annotation
-    from typing import Optional, Dict, List, Tuple, Pattern, Callable, Any, Text  # NOQA
-    from pm.notetypes import Transform
+    from typing import (  # NOQA: F401 pylint: disable=unused-import
+        Optional,
+        Dict,
+        List,
+        Tuple,
+        Pattern,
+        Callable,
+        Any,
+        Text,
+        Generator,
+        Union
+    )
+###############################################################################
+handler = StreamHandler()
+handler.setLevel(DEBUG)
+
+logger = getLogger(__name__)
+logger.setLevel(WARN)
+logger.setLevel(DEBUG)
+logger.setLevel(INFO)
+logger.addHandler(handler)
+logger.propagate = False
+# =============================================================================
 
 
 class MirrorEntry(object):
