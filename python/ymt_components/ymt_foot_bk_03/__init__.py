@@ -356,8 +356,8 @@ class Component(component.Main):
         pm.connectAttr(self.parent_comp.blend_att, self.blend_att)
         pm.parent(self.root, self.parent_comp.ik_ctl)
         pm.parent(self.parent_comp.ik_ref, self.bk_ctl[-1])
-        pm.parentConstraint(
-            self.parent_comp.tws2_rot, self.fk_ref, maintainOffset=True)
+        pm.parentConstraint(self.parent_comp.tws2_rot, self.fk_ref, maintainOffset=True)
+        pm.parent(self.parent_comp.match_fk2, self.fk_ref)
 
         return
 

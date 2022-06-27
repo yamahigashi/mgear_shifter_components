@@ -1,6 +1,7 @@
 ##################################################
 # GLOBAL
 ##################################################
+import sys
 import re
 import traceback
 
@@ -8,14 +9,53 @@ import maya.cmds as cmds
 import pymel.core as pm
 
 import mgear
-import mgear.core.pyqt as gqt
+from mgear.core import (
+    pyqt as gqt,
+    transform,
+    anim_utils,
+)
 
-import mgear.core.transform as tra
 import mgear.synoptic.utils as syn_uti
 # import mgear.core.synoptic.widgets as syn_widget
 
+import gml_maya.decorator as deco
+
 from ymt_components.control import AbstractControllerButton
 import ymt_components.ymt_arm_2jnt_02 as comp
+
+from logging import (  # noqa:F401 pylint: disable=unused-import, wrong-import-order
+    StreamHandler,
+    getLogger,
+    WARN,
+    DEBUG,
+    INFO
+)
+
+if sys.version_info >= (3, 0):  # pylint: disable=using-constant-test  # pylint: disable=using-constant-test, wrong-import-order
+    # For type annotation
+    from typing import (  # NOQA: F401 pylint: disable=unused-import
+        Optional,
+        Dict,
+        List,
+        Tuple,
+        Pattern,
+        Callable,
+        Any,
+        Text,
+        Generator,
+        Union
+    )
+###############################################################################
+handler = StreamHandler()
+handler.setLevel(DEBUG)
+
+logger = getLogger(__name__)
+logger.setLevel(WARN)
+logger.setLevel(DEBUG)
+logger.setLevel(INFO)
+logger.addHandler(handler)
+logger.propagate = False
+# =============================================================================
 
 QtGui, QtCore, QtWidgets, wrapInstance = gqt.qt_import()
 
@@ -243,59 +283,160 @@ class IkFkTransfer(syn_uti.IkFkTransfer):
         IkFkTransfer.execute(model, ikfk_attr, uihost, fks, ik, upv, **kwargs)
 
 
+def getMatrix(obj):
+    # type: (pm.datatypes.Transform) -> List[float]
+    xform = cmds.xform("{}".format(obj.name()), q=True, ws=True, matrix=True)
+    return xform
+
+
+def setMatrix(obj, mat):
+    # type: (pm.datatypes.Transform) -> None
+    cmds.xform("{}".format(obj.name()), ws=True, matrix=mat)
+
+
 ##################################################
 # IK FK switch match
 ##################################################
 # ================================================
-def ikFkMatch(model, ikfk_attr, uiHost_name, fks, ik, upv, ikRot=None):
-    # type: (pm.nodetypes.Transform, str, str, List[str], str, str, str) -> None
 
-    nameSpace = syn_uti.getNamespace(model)
+@deco.autokey_off
+def ikFkMatch(
+        namespace,
+        ikfk_attr,
+        ui_host,
+        fks,
+        ik,
+        upv,
+        ik_rot=None,
+        key=None):
+    """Switch IK/FK with matching functionality."""
 
-    fkCtrls = [_getNode(nameSpace, x) for x in fks]
-    fkTargets = [_getMth(nameSpace, x) for x in fks]
+    # returns a pymel node on the given name
+    def _get_node(name):
+        # type: (Text) -> pm.nodetypes.Transform
+        name = anim_utils.stripNamespace(name)
+        if namespace:
+            node = anim_utils.getNode(":".join([namespace, name]))
+        else:
+            node = anim_utils.getNode(name)
 
-    ikCtrl = _getNode(nameSpace, ik)
-    ikTarget = _getMth(nameSpace, ik)
+        if not node:
+            mgear.log("Can't find object : {0}".format(name), mgear.sev_error)
 
-    upvCtrl = _getNode(nameSpace, upv)
-    upvTarget = _getMth(nameSpace, upv)
+        return node
 
-    if ikRot:
-        ikRotNode = _getNode(nameSpace, ikRot)
-        ikRotTarget = ikTarget
+    # returns matching node
+    def _get_mth(name):
+        # type: (str) -> pm.nodetypes.Transform
+        tmp = name.split("_")
+        tmp[-1] = "mth"
+        query = "_".join(tmp)
+        n = _get_node(query)
 
-    uiNode = _getNode(nameSpace, uiHost_name)
-    oAttr = uiNode.attr(ikfk_attr)
-    val = oAttr.get()
+        if not n:
+            mgear.log("Can't find mth object : {0} for {1}".format(query, name), mgear.sev_comment)
+            return _get_node(name)
+        else:
+            return n
 
-    # if is IK change to FK
-    if val == 1.0:
+    # get things ready
+    fk_ctrls = [_get_node(x) for x in fks]
+    fk_goals = [_get_mth(x) for x in fks]
+    ik_ctrl = _get_node(ik)
+    ik_goal = _get_mth(ik)
+    upv_ctrl = _get_node(upv)
 
-        for target, ctl in zip(fkTargets, fkCtrls):
-            tra.matchWorldTransform(target, ctl)
+    if ik_rot:
+        ik_rot_node = _get_node(ik_rot)
+        ik_rot_goal = _get_mth(ik_rot)
 
-        if ikRot:
-            tra.matchWorldTransform(ikRotNode, fkCtrls[-1])
-            rot = cmds.xform(ikTarget.name(), query=True, ro=True)
+    ui_node = _get_node(ui_host)
+    o_attr = ui_node.attr(ikfk_attr)
 
-            if re.search(r"_L\d", ikCtrl.name()):
-                cmds.rotate(rot[0] * -1., rot[2], rot[1] * -1, fkCtrls[-1].name(), relative=True, objectSpace=True)
+    switch_to_fk = (o_attr.get() == 1.0)
+    switch_to_ik = (not switch_to_fk)
 
-            else:
-                cmds.rotate(rot[0] * -1., rot[2] * -1, rot[1], fkCtrls[-1].name(), relative=True, objectSpace=True)
+    # sets keyframes before snapping
+    if key:
+        _all_controls = []
+        _all_controls.extend(fk_ctrls)
+        _all_controls.extend([ik_ctrl, upv_ctrl, ui_node])
+        if ik_rot:
+            _all_controls.extend([ik_rot_node])
+        [cmds.setKeyframe("{}".format(elem),
+                          time=(cmds.currentTime(query=True) - 1.0))
+         for elem in _all_controls]
 
-        oAttr.set(0.0)
+    # if is IKw then snap FK
+    if switch_to_fk:
 
-    # if is FK change to IK
-    elif val == 0.0:
+        world_matrices = []
+        for src, _ in zip(fk_goals, fk_ctrls):
+            world_matrices.append(getMatrix(src))
 
-        tra.matchWorldTransform(ikTarget, ikCtrl)
-        if ikRot:
-            tra.matchWorldTransform(ikRotTarget, ikRotNode)
+        o_attr.set(0.0)
 
-        tra.matchWorldTransform(upvTarget, upvCtrl)
-        oAttr.set(1.0)
+        for mat, dst in zip(world_matrices, fk_ctrls):
+            setMatrix(dst, mat)
+
+        for mat, dst in zip(world_matrices, fk_ctrls):
+            setMatrix(dst, mat)
+
+    # if is FKw then sanp IK
+    elif switch_to_ik:
+
+        shoulder_mat = getMatrix(fk_goals[0])
+        ik_mat = getMatrix(ik_goal)
+
+        # transform.matchWorldTransform(ik_goal, ik_ctrl)
+        if ik_rot:
+            rot_mat = getMatrix(ik_rot_goal)
+            # transform.matchWorldTransform(ik_rot_goal, ik_rot_node)
+
+        upv_mat = getMatrix(fk_goals[2])
+
+        o_attr.set(1.0)
+
+        setMatrix(ik_ctrl, ik_mat)
+        setMatrix(upv_ctrl, upv_mat)
+        # for _ in range(10):
+        #     fk_ctrls[0].setMatrix(shoulder_mat, worldSpace=True)
+
+        for _ in range(20):
+            cmds.xform(fk_ctrls[0].name(), ws=True, matrix=shoulder_mat)
+        if ik_rot:
+            setMatrix(ik_rot_node, rot_mat)
+
+        # transform.matchWorldTransform(fk_goals[1], upv_ctrl)
+        # calculates new pole vector position
+        start_end = (fk_goals[-1].getTranslation(space="world") - fk_goals[1].getTranslation(space="world"))
+        start_mid = (fk_goals[2].getTranslation(space="world") - fk_goals[1].getTranslation(space="world"))
+
+        dot_p = start_mid * start_end
+        proj = float(dot_p) / float(start_end.length())
+        proj_vector = start_end.normal() * proj
+        arrow_vector = (start_mid - proj_vector) * 1.5
+        arrow_vector *= start_end.normal().length()
+        final_vector = (arrow_vector + fk_goals[2].getTranslation(space="world"))
+        upv_ctrl.setTranslation(final_vector, space="world")
+
+        # sets blend attribute new value
+        # o_attr.set(1.0)
+        roll_att = ui_node.attr(ikfk_attr.replace("blend", "roll"))
+        roll_att.set(0.0)
+
+        setMatrix(ik_ctrl, ik_mat)
+        if ik_rot:
+            setMatrix(ik_rot_node, rot_mat)
+        # upv_ctrl.setMatrix(upv_mat, worldSpace=True)
+        for _ in range(20):
+            cmds.xform(fk_ctrls[0].name(), ws=True, matrix=shoulder_mat)
+
+    # sets keyframes
+    if key:
+        [cmds.setKeyframe("{}".format(elem),
+                          time=(cmds.currentTime(query=True)))
+         for elem in _all_controls]
 
 
 def ikRotSpaceMatch(model, uiHost_name, ikRot, rotSpaceAttr="arm_rot_space"):
@@ -322,6 +463,10 @@ def ikRotSpaceMatch(model, uiHost_name, ikRot, rotSpaceAttr="arm_rot_space"):
 
 def _getNode(nameSpace, name):
     # type: (str, str) -> pm.nodetypes.Transform
+    node = syn_uti.getNode(name)
+
+    if node:
+        return node
 
     node = syn_uti.getNode(":".join([nameSpace, name]))
 
