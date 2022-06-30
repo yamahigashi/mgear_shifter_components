@@ -2,6 +2,7 @@ import math
 
 # Maya
 import maya.cmds as cmds
+import maya.api.OpenMaya as om
 
 import pymel.core as pm
 import pymel.core.datatypes as dt
@@ -221,9 +222,21 @@ class Component(MainComponent):
         cmds.connectAttr('{}.outColorB'.format(cond), '{}.translateZ'.format(self.softdummy_npo))
 
         # apply offset to rest angle
-        cmds.setAttr("{}.inputX".format(arm_comp.dummy_chain_offset), -1. * cmds.getAttr("{}.rx".format(arm_comp.dummy_chain[0])))
-        cmds.setAttr("{}.inputY".format(arm_comp.dummy_chain_offset), -1. * cmds.getAttr("{}.ry".format(arm_comp.dummy_chain[0])))
-        cmds.setAttr("{}.inputZ".format(arm_comp.dummy_chain_offset), -1. * cmds.getAttr("{}.rz".format(arm_comp.dummy_chain[0])))
+        rx = cmds.getAttr("{}.rx".format(arm_comp.dummy_chain[0]))
+        ry = cmds.getAttr("{}.ry".format(arm_comp.dummy_chain[0]))
+        rz = cmds.getAttr("{}.rz".format(arm_comp.dummy_chain[0]))
+        r1 = om.MEulerRotation(rx, ry, rz)
+
+        rx = cmds.getAttr("{}.jointOrientX".format(arm_comp.dummy_chain[0]))
+        ry = cmds.getAttr("{}.jointOrientY".format(arm_comp.dummy_chain[0]))
+        rz = cmds.getAttr("{}.jointOrientZ".format(arm_comp.dummy_chain[0]))
+        r2 = om.MEulerRotation(rx, ry, rz)
+
+        r3 = r1 * r2
+
+        cmds.setAttr("{}.inputX".format(arm_comp.dummy_chain_offset), -1. * r3.x)
+        cmds.setAttr("{}.inputY".format(arm_comp.dummy_chain_offset), -1. * r3.y)
+        cmds.setAttr("{}.inputZ".format(arm_comp.dummy_chain_offset), -1. * r3.z)
         cmds.setAttr("{}.rotationOrder".format(arm_comp.dummy_chain_offset), cmds.getAttr("{}.rotateOrder".format(arm_comp.dummy_chain[0])))
 
     def add_arm_connection_attr(self, arm_comp):
