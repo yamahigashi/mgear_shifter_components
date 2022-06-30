@@ -108,6 +108,10 @@ def initialize():
     import ymt_shifter_utility.rmbmenus.leg as leg
     reload(leg)
     add_to_menu("leg", leg.ShifterMarkingMenu, 20)
+    import ymt_shifter_utility.rmbmenus.finger as finger
+    reload(finger)
+    add_to_menu("finger", finger.ShifterMarkingMenu, 20)
+
 
 
 def add_to_menu(name, klass, priority):
