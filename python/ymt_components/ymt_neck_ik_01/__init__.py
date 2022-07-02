@@ -39,13 +39,15 @@ class Component(MainComponent):
         t = tra.getTransform(self.root)
         t = tra.setMatrixPosition(t, self.guide.pos["neck"])
         self.neck_cns = pri.addTransform(self.root, self.getName("neck_cns"), t)
+
         t = tra.getTransformLookingAt(self.guide.pos["neck"], self.guide.pos["eff0"], self.normal, "yx", self.negate)
         t = tra.setMatrixPosition(t, self.guide.pos["neck"])
         self.neck_npo = pri.addTransform(self.neck_cns, self.getName("neck_npo"), t)
+        self.neck_off = pri.addTransform(self.neck_npo, self.getName("neck_off"), t)
 
         w = self.size * 0.5
         # for compatibility reason, this name is not neck_ctl, but ik_ctl
-        self.neck_ctl = self.addCtl(self.neck_npo, "ik_ctl", t, self.color_ik, "compas", w=w)
+        self.neck_ctl = self.addCtl(self.neck_off, "ik_ctl", t, self.color_ik, "compas", w=w)
         att.setKeyableAttributes(self.neck_ctl)
         att.setRotOrder(self.neck_ctl, "ZXY")
         self.jnt_pos.append([self.neck_ctl, 0])
@@ -62,6 +64,7 @@ class Component(MainComponent):
 
         t = tra.getTransformLookingAt(self.guide.pos["head"], self.guide.pos["eff1"], self.normal, "yx", self.negate)
         self.head_npo = pri.addTransform(self.head_cns, self.getName("head_npo"), t)
+        self.head_off = pri.addTransform(self.head_npo, self.getName("head_off"), t)
 
         dist = vec.getDistance(self.guide.pos["head"], self.guide.pos["eff1"])
         w = self.size * 0.5
@@ -69,7 +72,7 @@ class Component(MainComponent):
         d = self.size * 0.5
         po = dt.Vector(0, dist * 0.5, 0)
 
-        self.head_ctl = self.addCtl(self.head_npo, "head_ctl", t, self.color_fk, "cube", w=w, h=h, d=d, po=po)
+        self.head_ctl = self.addCtl(self.head_off, "head_ctl", t, self.color_fk, "cube", w=w, h=h, d=d, po=po)
         att.setRotOrder(self.head_ctl, "ZXY")
         att.setInvertMirror(self.neck_ctl, ["tx", "ry", "rz"])
         att.setInvertMirror(self.head_ctl, ["tx", "ry", "rz"])
@@ -242,7 +245,7 @@ class Component(MainComponent):
         pm.setAttr("{}.secondTerm".format(neck_ref_cond_pos), 0)
         pm.setAttr("{}.operation".format(neck_ref_cond_pos), 0)
         pm.connectAttr("{}.outputTranslate".format(decomp), "{}.colorIfTrue".format(neck_ref_cond_pos))
-        pm.connectAttr("{}.outColor".format(neck_ref_cond_pos), "{}.translate".format(self.head_cns))
+        pm.connectAttr("{}.outColor".format(neck_ref_cond_pos), "{}.translate".format(self.head_off))
 
         # Head ref switch
         head_ref_cond = pm.createNode("condition")
@@ -275,7 +278,9 @@ class Component(MainComponent):
         pm.connectAttr("{}.outColorG".format(head_ref_cond), "{}.inputRotateY".format(comp))
         pm.connectAttr("{}.outColorB".format(head_ref_cond), "{}.inputRotateZ".format(comp))
         pm.connectAttr("{}.matrix".format(self.head_ctl), "{}.matrixIn[0]".format(mult))
-        pm.connectAttr("{}.outputMatrix".format(comp), "{}.matrixIn[1]".format(mult))
+        pm.connectAttr("{}.matrix".format(self.head_npo), "{}.matrixIn[1]".format(mult))
+        pm.connectAttr("{}.inverseMatrix".format(self.neck_npo), "{}.matrixIn[2]".format(mult))
+        pm.connectAttr("{}.outputMatrix".format(comp), "{}.matrixIn[3]".format(mult))
 
         toQuat = pm.createNode("eulerToQuat")
         decomp = pm.createNode("decomposeMatrix")
@@ -296,10 +301,9 @@ class Component(MainComponent):
         pm.connectAttr("{}.outputRotateY".format(toEul), "{}.colorIfFalseG".format(neck_ref_cond))
         pm.connectAttr("{}.outputRotateZ".format(toEul), "{}.colorIfFalseB".format(neck_ref_cond))
 
-        pm.connectAttr("{}.outColor".format(neck_ref_cond), "{}.rotate".format(self.neck_cns))
+        pm.connectAttr("{}.outColor".format(neck_ref_cond), "{}.rotate".format(self.neck_off))
 
         # Head pos2
-
         comp = pm.createNode("composeMatrix")
         pm.connectAttr("{}.outputQuat".format(slerp), "{}.inputQuat".format(comp))
         pm.setAttr("{}.useEulerRotation".format(comp), False)
@@ -310,10 +314,12 @@ class Component(MainComponent):
         pm.connectAttr("{}.outputMatrix".format(comp), "{}.inputMatrix".format(inv))
 
         mult = pm.createNode("multMatrix")
-        pm.connectAttr("{}.outputMatrix".format(inv), "{}.matrixIn[0]".format(mult))
-        pm.connectAttr("{}.inverseMatrix".format(self.neck_npo), "{}.matrixIn[1]".format(mult))
-        pm.connectAttr("{}.inverseMatrix".format(self.neck_ctl), "{}.matrixIn[2]".format(mult))
-        pm.connectAttr("{}.inverseMatrix".format(self.head_pos_ref), "{}.matrixIn[3]".format(mult))
+        pm.connectAttr("{}.matrix".format(self.head_pos_ref),    "{}.matrixIn[0]".format(mult))
+        pm.connectAttr("{}.matrix".format(self.neck_ctl),        "{}.matrixIn[1]".format(mult))
+        pm.connectAttr("{}.outputMatrix".format(inv),            "{}.matrixIn[2]".format(mult))
+        pm.connectAttr("{}.matrix".format(self.neck_npo),        "{}.matrixIn[3]".format(mult))
+        pm.connectAttr("{}.inverseMatrix".format(self.head_cns), "{}.matrixIn[4]".format(mult))
+
         inv = pm.createNode("inverseMatrix")
         pm.connectAttr("{}.matrixSum".format(mult), "{}.inputMatrix".format(inv))
         decomp = pm.createNode("decomposeMatrix")
