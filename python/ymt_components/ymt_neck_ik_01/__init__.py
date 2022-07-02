@@ -277,10 +277,15 @@ class Component(MainComponent):
         pm.connectAttr("{}.outColorR".format(head_ref_cond), "{}.inputRotateX".format(comp))
         pm.connectAttr("{}.outColorG".format(head_ref_cond), "{}.inputRotateY".format(comp))
         pm.connectAttr("{}.outColorB".format(head_ref_cond), "{}.inputRotateZ".format(comp))
-        pm.connectAttr("{}.matrix".format(self.head_ctl), "{}.matrixIn[0]".format(mult))
-        pm.connectAttr("{}.matrix".format(self.head_npo), "{}.matrixIn[1]".format(mult))
+        pm.connectAttr("{}.matrix".format(self.head_ctl),        "{}.matrixIn[0]".format(mult))
+        pm.connectAttr("{}.matrix".format(self.head_npo),        "{}.matrixIn[1]".format(mult))
         pm.connectAttr("{}.inverseMatrix".format(self.neck_npo), "{}.matrixIn[2]".format(mult))
-        pm.connectAttr("{}.outputMatrix".format(comp), "{}.matrixIn[3]".format(mult))
+        pm.connectAttr("{}.outputMatrix".format(comp),           "{}.matrixIn[3]".format(mult))
+        comp_off = pm.createNode("composeMatrix")
+        inv_off = pm.createNode("inverseMatrix")
+        pm.connectAttr("{}.outputMatrix".format(comp_off), "{}.inputMatrix".format(inv_off))
+        pm.connectAttr("{}.outputMatrix".format(inv_off),           "{}.matrixIn[4]".format(mult))
+        pm.connectAttr("{}.outputMatrix".format(inv_off),           "{}.matrixIn[5]".format(mult))
 
         toQuat = pm.createNode("eulerToQuat")
         decomp = pm.createNode("decomposeMatrix")
@@ -310,20 +315,17 @@ class Component(MainComponent):
         pm.setAttr("{}.inputTranslateX".format(comp), cmds.getAttr("{}.translateX".format(self.neck_cns)))
         pm.setAttr("{}.inputTranslateY".format(comp), cmds.getAttr("{}.translateY".format(self.neck_cns)))
         pm.setAttr("{}.inputTranslateZ".format(comp), cmds.getAttr("{}.translateZ".format(self.neck_cns)))
-        inv = pm.createNode("inverseMatrix")
-        pm.connectAttr("{}.outputMatrix".format(comp), "{}.inputMatrix".format(inv))
 
         mult = pm.createNode("multMatrix")
         pm.connectAttr("{}.matrix".format(self.head_pos_ref),    "{}.matrixIn[0]".format(mult))
         pm.connectAttr("{}.matrix".format(self.neck_ctl),        "{}.matrixIn[1]".format(mult))
-        pm.connectAttr("{}.outputMatrix".format(inv),            "{}.matrixIn[2]".format(mult))
+        pm.connectAttr("{}.outputMatrix".format(comp),           "{}.matrixIn[2]".format(mult))
         pm.connectAttr("{}.matrix".format(self.neck_npo),        "{}.matrixIn[3]".format(mult))
         pm.connectAttr("{}.inverseMatrix".format(self.head_cns), "{}.matrixIn[4]".format(mult))
+        pm.connectAttr("{}.inverseMatrix".format(self.head_npo), "{}.matrixIn[5]".format(mult))
 
-        inv = pm.createNode("inverseMatrix")
-        pm.connectAttr("{}.matrixSum".format(mult), "{}.inputMatrix".format(inv))
         decomp = pm.createNode("decomposeMatrix")
-        pm.connectAttr("{}.outputMatrix".format(inv), "{}.inputMatrix".format(decomp))
+        pm.connectAttr("{}.matrixSum".format(mult), "{}.inputMatrix".format(decomp))
 
         pm.connectAttr("{}.outputTranslate".format(decomp), "{}.colorIfFalse".format(neck_ref_cond_pos))
 
@@ -358,6 +360,10 @@ class Component(MainComponent):
                 pm.connectAttr("{}.outputRotateX".format(decomp), "{}.colorIfTrueR".format(head_ref_cond))
                 pm.connectAttr("{}.outputRotateY".format(decomp), "{}.colorIfTrueG".format(head_ref_cond))
                 pm.connectAttr("{}.outputRotateZ".format(decomp), "{}.colorIfTrueB".format(head_ref_cond))
+
+        pm.setAttr("{}.inputRotateX".format(comp_off), cmds.getAttr("{}.rx".format(self.neck_off)))
+        pm.setAttr("{}.inputRotateY".format(comp_off), cmds.getAttr("{}.ry".format(self.neck_off)))
+        pm.setAttr("{}.inputRotateZ".format(comp_off), cmds.getAttr("{}.rz".format(self.neck_off)))
 
 
 def getFullPath(start, routes=None):
