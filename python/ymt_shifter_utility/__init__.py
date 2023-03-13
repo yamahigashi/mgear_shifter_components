@@ -556,7 +556,7 @@ def convertToTwistSpline(comp, prefix, positions, crv, ikNb, norm, isClosed=Fals
     roll = [cv.replace("_ik", "_roll") for cv in cvs]
 
     edit_twistspline_ctl_of_shifter_attributes(comp, cvs, is_cv_ctl, False, comp.tr_params, scl, col)
-    edit_twistspline_ctl_of_shifter_attributes(comp, roll, False, is_roll_ctl, ["ry"], scl, comp.color_fk)
+    edit_twistspline_ctl_of_shifter_attributes(comp, roll, False, is_roll_ctl, ["rx"], scl, comp.color_fk)
     edit_twistspline_ctl_of_shifter_attributes(comp, oTans, False, is_otans_ctl, ["tx", "ty", "tz"], scl, col)
     edit_twistspline_ctl_of_shifter_attributes(comp, iTans, False, is_itans_ctl, ["tx", "ty", "tz"], scl, col)
 
@@ -726,7 +726,7 @@ def alignDeformers(joints, positions, riderCnst, curveFn):
         param = _searchNearestParam(pos)
         cmds.setAttr("{0}.params[{1}].param".format(riderCnst, i), param)
 
-    
+
 def withCurvePos(curveFn, it, offset=0.):
 
     curveLen = curveFn.length()
@@ -791,3 +791,48 @@ def iter_tr_xyz(object_name):
     for attr in ["t", "r"]:
         for axis in ["x", "y", "z"]:
             yield "{}.{}{}".format(object_name, attr, axis)
+
+
+def add3DChain(parent, name, positions, normal, negate=False, vis=True):
+    """Create a 2D joint chain. And then align given positions to the chain.
+
+    Warning:
+        This function will create un expected results if all the
+        positions are not in the same 2D plane.
+
+    Arguments:
+        parent (dagNode): The parent for the chain.
+        name (str): The node name.
+        positions(list of vectors): the positons to define the chain.
+        normal (vector): The normal vector to define the direction of
+            the chain.
+        negate (bool): If True will negate the direction of the chain
+
+    Returns;
+        list of dagNodes: The list containg all the joints of the chain
+
+    >>> self.rollRef = pri.add2DChain(
+        self.root,
+        self.getName("rollChain"),
+        self.guide.apos[:2],
+        self.normal,
+        self.negate)
+
+    """
+
+    joints = primitive.add2DChain(parent, name, positions, normal, negate, vis)
+    jointNames = [x.longName() for x in joints]
+    for i, joint in enumerate(jointNames[:-1]):
+        nextPos  = positions[i + 1]
+        dummy = cmds.spaceLocator(n="{}_dummy".format(joint))[0]
+        cmds.xform(dummy, ws=True, t=nextPos)
+        if parent is not None:
+            cmds.aimConstraint(dummy, joint, aimVector=[1, 0, 0], upVector=[0, 0, 1], worldUpType="vector", worldUpObject=parent.longName(), worldUpVector=normal)
+        else:
+            cmds.aimConstraint(dummy, joint, aimVector=[1, 0, 0], upVector=[0, 0, 1], worldUpType="vector", worldUpVector=normal)
+        cmds.delete(dummy)
+
+    for joint in jointNames:
+        cmds.makeIdentity(joint, apply=True, t=1, r=1, s=1, n=0, pn=1)
+
+    return joints

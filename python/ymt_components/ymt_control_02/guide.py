@@ -18,7 +18,7 @@ AUTHOR = "Jeremie Passerin, Miquel Campos"
 URL = "www.jeremiepasserin.com, www.miquel-campos.com"
 EMAIL = ""
 VERSION = [1, 3, 0]
-TYPE = "ymt_control_01"
+TYPE = "ymt_control_02"
 NAME = "control"
 DESCRIPTION = "Simple controler with space switch and Rot order selection. \n"\
               "This component can use the root rotation to place  the "\
@@ -81,9 +81,6 @@ class Guide(guide.ComponentGuide):
             "default_rotorder", "long", 0, 0, 5)
         self.pNeutralRotation = self.addParam("neutralRotation", "bool", True)
         self.pMirrorBehaviour = self.addParam("mirrorBehaviour", "bool", False)
-        self.pMirrorAxis = self.addParam("mirrorAxisX", "bool", True)
-        self.pMirrorAxis = self.addParam("mirrorAxisY", "bool", False)
-        self.pMirrorAxis = self.addParam("mirrorAxisZ", "bool", False)
         self.pCtlSize = self.addParam("ctlSize", "double", 1, None, None)
         self.pUseIndex = self.addParam("useIndex", "bool", False)
         self.pParentJointIndex = self.addParam(
@@ -168,13 +165,12 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
 
         self.populateCheck(self.settingsTab.joint_checkBox, "joint")
         self.populateCheck(self.settingsTab.uniScale_checkBox, "uniScale")
-        self.populateCheck(self.settingsTab.neutralRotation_checkBox, "neutralRotation")
-        self.populateCheck(self.settingsTab.mirrorBehaviour_checkBox, "mirrorBehaviour")
-        self.populateCheck(self.settingsTab.mirrorAxisX_checkBox, "mirrorAxisX")
-        self.populateCheck(self.settingsTab.mirrorAxisY_checkBox, "mirrorAxisY")
-        self.populateCheck(self.settingsTab.mirrorAxisZ_checkBox, "mirrorAxisZ")
-
-        self.settingsTab.ctlSize_doubleSpinBox.setValue(self.root.attr("ctlSize").get())
+        self.populateCheck(self.settingsTab.neutralRotation_checkBox,
+                           "neutralRotation")
+        self.populateCheck(self.settingsTab.mirrorBehaviour_checkBox,
+                           "mirrorBehaviour")
+        self.settingsTab.ctlSize_doubleSpinBox.setValue(
+            self.root.attr("ctlSize").get())
         sideIndex = self.iconsList.index(self.root.attr("icon").get())
         self.settingsTab.controlShape_comboBox.setCurrentIndex(sideIndex)
 
@@ -237,20 +233,6 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
             partial(self.updateCheck,
                     self.settingsTab.mirrorBehaviour_checkBox,
                     "mirrorBehaviour"))
-
-        self.settingsTab.mirrorAxisX_checkBox.stateChanged.connect(
-            partial(self.updateCheck,
-                    self.settingsTab.mirrorAxisX_checkBox,
-                    "mirrorAxisX"))
-        self.settingsTab.mirrorAxisY_checkBox.stateChanged.connect(
-            partial(self.updateCheck,
-                    self.settingsTab.mirrorAxisY_checkBox,
-                    "mirrorAxisY"))
-        self.settingsTab.mirrorAxisZ_checkBox.stateChanged.connect(
-            partial(self.updateCheck,
-                    self.settingsTab.mirrorAxisZ_checkBox,
-                    "mirrorAxisZ"))
-
         self.settingsTab.ctlSize_doubleSpinBox.valueChanged.connect(
             partial(self.updateSpinBox,
                     self.settingsTab.ctlSize_doubleSpinBox,

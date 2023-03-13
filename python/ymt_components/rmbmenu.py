@@ -82,6 +82,9 @@ if sys.version_info >= (3, 0):  # pylint: disable=using-constant-test  # pylint:
         Union
     )
 
+    import importlib
+    reload = importlib.reload
+
 PY2 = sys.version_info[0] == 2
 __MENU_CLASSES__ = {}  # type: Dict[Text, Tuple[ShifterMarkingMenu, int]]
 

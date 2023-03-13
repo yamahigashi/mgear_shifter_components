@@ -82,7 +82,7 @@ tsBuilder.CTRL_ORG_FMT = "{0}_Ctrls"  # Control organizer
 tsBuilder.BFR_CV_FMT = "{0}_splinePartBuffer{1:02d}"  # CV Buffer
 tsBuilder.CTRL_CV_FMT = "{0}_ik{1:02d}_ctl"  # CV
 tsBuilder.BFR_TWIST_FMT = "{0}_twistPart_{1:02d}_npo"  # Twist Buffer
-tsBuilder.CTRL_TWIST_FMT = "{0}_rot{1:02d}_ctl"  # Twist
+tsBuilder.CTRL_TWIST_FMT = "{0}_roll{1:02d}_ctl"  # Twist
 tsBuilder.CTRL_INTAN_FMT = "{0}_in{1:02d}_ctl"  # In-Tangent
 tsBuilder.CTRL_OUTTAN_FMT = "{0}_out{1:02d}_ctl"  # Out-Tangent
 tsBuilder.BFR_AINTAN_FMT = "{0}_autoIn{1:02d}"  # Auto In-Tangent Buffer
@@ -172,6 +172,7 @@ class Component(component.Main):
         tmpRes = self.convertToTwistSpline(self.guide.apos, self.dummy_crv, self.ikNb)
         self.ik_ctl, self.in_ctl, self.out_ctl, self.bts_joints, self.master_ctl, self.mst_crv = tmpRes
         self.ik_ctl = [pm.PyNode(x) for x in self.ik_ctl]
+        self.ik_npo = [x.getParent() for x in self.ik_ctl]
         self.in_ctl = [pm.PyNode(x) for x in self.in_ctl]
         self.out_ctl = [pm.PyNode(x) for x in self.out_ctl]
         self.bts_joints = [pm.PyNode(x) for x in self.bts_joints]
@@ -403,6 +404,13 @@ class Component(component.Main):
             False
         )
 
+        self.follow_ik_att = self.addAnimParam(
+            "follow_ik",
+            "Follow IK",
+            "bool",
+            True
+        )
+
         self.sinewave_power_y_att = self.addAnimParam(
             "sinewave_power_y",
             "SineWave Power Y",
@@ -535,7 +543,7 @@ class Component(component.Main):
             cmds.setAttr("{0}.Pin".format(cv), 1)
 
             npo = re.sub(r"_ik(\d+)_ctl", r"_twistPart_\1_npo", cv)
-            roll = cv.replace("_ik", "_rot")
+            roll = cv.replace("_ik", "_roll")
             if i == (len(cvs) - 1):
                 cmds.setAttr("{0}.sz".format(npo), -1)
             cmds.setAttr("{0}.UseTwist".format(roll), 1)
@@ -672,7 +680,7 @@ class Component(component.Main):
             ymt_util.setKeyableAttributesDontLockVisibility(ctl, self.tr_params)
             ymt_util.addCtlMetadata(self, ctl)
             ymt_util.edit_controller_shape(ctl.name(), scl=(scl, scl, scl), color=col)
-            roll = cv.replace("_ik", "_rot")
+            roll = cv.replace("_ik", "_roll")
             ymt_util.edit_controller_shape(roll, scl=(scl, scl, scl), color=self.color_fk)
             self.addToSubGroup(roll, self.detailControllersGroupName)
             self.addToSubGroup(ctl, self.primaryControllersGroupName)
@@ -714,6 +722,11 @@ class Component(component.Main):
 
         # TODO: optional for sine curve deformer
         self.addOperatorSineCurveExprespy()
+
+        driver_shape = self.mst_crv.getShape()
+        for attr in cmds.listAttr("{}.vertexData".format(driver_shape.getName()), multi=True) or []:
+                if "useOrient" in attr:
+                    cmds.setAttr("{}.{}".format(driver_shape.getName(), attr), True)
 
     def addOperatorsNotGlobalMaster(self):
         # Curves -------------------------------------------
@@ -960,8 +973,24 @@ class Component(component.Main):
 
     def connect_standard(self):
         self.parent.addChild(self.root)
-        # self.connectRef(self.settings["ik0refarray"], self.ik_npo[0])
-        # self.connectRef(self.settings["ik1refarray"], self.ik_npo[-1])
+
+        if self.settings["ik0refarray"]:
+
+            for attr in ymt_util.iter_tr_xyz(self.ik_npo[0].getName()):
+                cmds.setAttr(attr, lock=False)
+            self.connectRef(self.settings["ik0refarray"], self.ik_npo[0])
+            for attr in ymt_util.iter_tr_xyz(self.ik_npo[0].getName()):
+                cmds.setAttr(attr, lock=True)
+
+        if self.settings["ik1refarray"]:
+            for npo in self.ik_npo[1:]:
+                for attr in ymt_util.iter_tr_xyz(npo.getName()):
+                    cmds.setAttr(attr, lock=False)
+
+                self.connectRef(self.settings["ik1refarray"], npo)
+
+                for attr in ymt_util.iter_tr_xyz(npo.getName()):
+                    cmds.setAttr(attr, lock=True)
 
     # =====================================================
     # CONNECTOR

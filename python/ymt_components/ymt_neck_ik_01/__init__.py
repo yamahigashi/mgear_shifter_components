@@ -45,9 +45,15 @@ class Component(MainComponent):
         self.neck_npo = pri.addTransform(self.neck_cns, self.getName("neck_npo"), t)
         self.neck_off = pri.addTransform(self.neck_npo, self.getName("neck_off"), t)
 
+        # Size
+        dist = vec.getDistance(self.guide.pos["head"], self.guide.pos["eff1"])
         w = self.size * 0.5
+        h = dist
+        d = self.size * 0.5
+        po = dt.Vector(0, dist * 0.5, 0)
+
         # for compatibility reason, this name is not neck_ctl, but ik_ctl
-        self.neck_ctl = self.addCtl(self.neck_off, "ik_ctl", t, self.color_ik, "compas", w=w)
+        self.neck_ctl = self.addCtl(self.neck_off, "ik_ctl", t, self.color_fk, "cube", w=w, h=h, d=d, po=po)
         att.setKeyableAttributes(self.neck_ctl)
         att.setRotOrder(self.neck_ctl, "ZXY")
         self.jnt_pos.append([self.neck_ctl, 0])
@@ -66,18 +72,16 @@ class Component(MainComponent):
         self.head_npo = pri.addTransform(self.head_cns, self.getName("head_npo"), t)
         self.head_off = pri.addTransform(self.head_npo, self.getName("head_off"), t)
 
-        dist = vec.getDistance(self.guide.pos["head"], self.guide.pos["eff1"])
-        w = self.size * 0.5
-        h = dist
-        d = self.size * 0.5
-        po = dt.Vector(0, dist * 0.5, 0)
-
-        self.head_ctl = self.addCtl(self.head_off, "head_ctl", t, self.color_fk, "cube", w=w, h=h, d=d, po=po)
+        self.head_ctl = self.addCtl(self.head_off, "head_ctl", t, self.color_ik, "compas", w=w, h=h, d=d, po=po)
         att.setRotOrder(self.head_ctl, "ZXY")
         att.setInvertMirror(self.neck_ctl, ["tx", "ry", "rz"])
         att.setInvertMirror(self.head_ctl, ["tx", "ry", "rz"])
 
-        self.jnt_pos.append([self.head_ctl, "head"])
+        if self.settings["headFk"]:
+            self.head_fk = self.addCtl(self.head_ctl, "head_fk", t, self.color_fk, "cube", w=w, h=h, d=d, po=po)
+            self.jnt_pos.append([self.head_fk, "head"])
+        else:
+            self.jnt_pos.append([self.head_ctl, "head"])
 
     # =====================================================
     # PROPERTY

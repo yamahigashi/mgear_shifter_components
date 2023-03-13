@@ -180,9 +180,13 @@ class Component(component.Main):
         space = om.MSpace.kWorld
         pos = crv.getPointAtParam(u, space)
 
-        t = getTransform(self.guide.root)
-        global_t = self._getTransformWithRollByBlade(t)
+        if i < self.ikNb - 1:
+            t = getTransform(self.guide.root)
+        else:
+            t = getTransform(self.guide.root)
+            t = self.guide.atra[-2]
 
+        global_t = self._getTransformWithRollByBlade(t)
         global_t = setMatrixPosition(global_t, pos)
         local_t = global_t
 
@@ -252,8 +256,12 @@ class Component(component.Main):
 
         x = vecProjection(a, x)[0]
         z = vecProjection(a, z)[2]
-        theta = math.atan2(x, z)
-        roll = theta + math.pi
+
+        if abs(x) < 0.001 or abs(z) < 0.001:
+            theta = 0.0
+        else:
+            theta = math.atan2(x, z)
+        roll = math.degrees(theta)
 
         tm = datatypes.TransformationMatrix(t)
         tm.addRotation([0., roll, 0], 'XYZ', om.MSpace.kObject)
@@ -505,6 +513,17 @@ class Component(component.Main):
         # Division -----------------------------------------
         rootWorld_node = node.createDecomposeMatrixNode(self.root.attr("worldMatrix"))
 
+        for i, jnt in enumerate(self.bts_joints[:-1]):
+            cmds.aimConstraint(
+                self.bts_joints[i + 1].getName(),
+                jnt.getName(),
+                mo=True,
+                aimVector=(1, 0, 0),
+                upVector=(1, 0, 0),
+                worldUpType="object",
+                worldUpObject=self.root.longName()
+            )
+
         for i in range(len(self.guide.apos)):
             self.addFkOperator(i, rootWorld_node)
 
@@ -660,35 +679,31 @@ class Component(component.Main):
     def setRelation(self):
         """Set the relation beetween object from guide to rig"""
 
-        self.relatives["root"] = self.fk_hip_ctl
+        self.relatives["root"] = self.fk_ctl[0]
         self.relatives["eff"] = self.fk_ctl[-1]
-        self.controlRelatives["root"] = self.fk_hip_ctl
+        self.controlRelatives["root"] = self.fk_ctl[0]
+
         self.jointRelatives["root"] = 0
 
         # for i in range(0, len(self.fk_ctl) - 1):
-        if self.settings["isSplitHip"]:
-            for i in range(0, len(self.guide.apos) - 1):
 
-                self.relatives["%s_loc" % i] = self.fk_ctl[i + 1]
-                self.controlRelatives["%s_loc" % i] = self.fk_ctl[i + 1]
+        for i in range(0, len(self.guide.apos) - 1):
 
-                self.jointRelatives["%s_loc" % (i)] = (i + 2)
-                self.aliasRelatives["%s_ctl" % (i)] = (i + 2)
+            if self.settings["isSplitHip"]:
+                self.relatives["root"] = self.fk_hip_ctl
+                self.controlRelatives["root"] = self.fk_hip_ctl
+
+            self.relatives["%s_loc" % i] = self.fk_ctl[i + 1]
+            self.controlRelatives["%s_loc" % i] = self.fk_ctl[i + 1]
+
+            self.jointRelatives["%s_loc" % (i)] = (i + 2)
+            self.aliasRelatives["%s_ctl" % (i)] = (i + 2)
 
             self.relatives["0_loc"] = self.fk_ctl[1]
             self.controlRelatives["0_loc"] = self.fk_ctl[1]
 
             self.jointRelatives["0_loc"] = (2)
             self.aliasRelatives["0_ctl"] = (2)
-
-        else:
-            for i, ctl in enumerate(self.fk_ctl):
-
-                self.relatives["%s_loc" % i] = ctl
-                self.controlRelatives["%s_loc" % i] = ctl
-
-                self.jointRelatives["%s_loc" % (i)] = (i + 1)
-                self.aliasRelatives["%s_ctl" % (i)] = (i + 1)
 
     def addToSubGroup(self, obj, group_name):
 

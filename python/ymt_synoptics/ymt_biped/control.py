@@ -377,9 +377,16 @@ def ikFkMatch(namespace,
     ik_goal = _get_mth(ik)
     upv_ctrl = _get_node(upv)
 
+    print(ik_goal)
+
     if ik_rot:
         ik_rot_node = _get_node(ik_rot)
         ik_rot_goal = _get_mth(ik_rot)
+        print(ik_rot_node)
+        print(ik_rot_goal)
+
+        if not ik_rot_node or not ik_rot_goal:
+            ik_rot = None
 
     ui_node = _get_node(ui_host)
     o_attr = ui_node.attr(ikfk_attr)
@@ -424,7 +431,6 @@ def ikFkMatch(namespace,
         if ik_rot:
             rot_mat = getMatrix(ik_rot_goal)
             # transform.matchWorldTransform(ik_rot_goal, ik_rot_node)
-
         if is_leg:
             upv_mat = getMatrix(fk_goals[1])
         else:
@@ -442,25 +448,31 @@ def ikFkMatch(namespace,
         if ik_rot:
             setMatrix(ik_rot_node, rot_mat)
 
-        # transform.matchWorldTransform(fk_goals[1], upv_ctrl)
-        # calculates new pole vector position
-        if is_leg:
-            start_end = (fk_goals[-1].getTranslation(space="world") - fk_goals[0].getTranslation(space="world"))
-            start_mid = (fk_goals[1].getTranslation(space="world") - fk_goals[0].getTranslation(space="world"))
-        else:
-            start_end = (fk_goals[-1].getTranslation(space="world") - fk_goals[1].getTranslation(space="world"))
-            start_mid = (fk_goals[2].getTranslation(space="world") - fk_goals[1].getTranslation(space="world"))
+        upv_mth = _get_mth(upv)
+        if upv_mth:
+            final_vector = upv_mth.getTranslation(space="world")
+            upv_ctrl.setTranslation(final_vector, space="world")
 
-        dot_p = start_mid * start_end
-        proj = float(dot_p) / float(start_end.length())
-        proj_vector = start_end.normal() * proj
-        arrow_vector = (start_mid - proj_vector) * 1.5
-        arrow_vector *= start_end.normal().length()
-        if is_leg:
-            final_vector = (arrow_vector + fk_goals[1].getTranslation(space="world"))
         else:
-            final_vector = (arrow_vector + fk_goals[2].getTranslation(space="world"))
-        upv_ctrl.setTranslation(final_vector, space="world")
+            # calculates new pole vector position
+            if is_leg:
+                start_end = (fk_goals[-1].getTranslation(space="world") - fk_goals[0].getTranslation(space="world"))
+                start_mid = (fk_goals[1].getTranslation(space="world") - fk_goals[0].getTranslation(space="world"))
+            else:
+                start_end = (fk_goals[-1].getTranslation(space="world") - fk_goals[1].getTranslation(space="world"))
+                start_mid = (fk_goals[2].getTranslation(space="world") - fk_goals[1].getTranslation(space="world"))
+
+            dot_p = start_mid * start_end
+            proj = float(dot_p) / float(start_end.length())
+            proj_vector = start_end.normal() * proj
+            arrow_vector = (start_mid - proj_vector) * 1.5
+            arrow_vector *= start_end.normal().length()
+            if is_leg:
+                final_vector = (arrow_vector + fk_goals[1].getTranslation(space="world"))
+            else:
+                final_vector = (arrow_vector + fk_goals[2].getTranslation(space="world"))
+
+            upv_ctrl.setTranslation(final_vector, space="world")
 
         # sets blend attribute new value
         # o_attr.set(1.0)
@@ -473,6 +485,8 @@ def ikFkMatch(namespace,
         # upv_ctrl.setMatrix(upv_mat, worldSpace=True)
         for _ in range(20):
             cmds.xform(fk_ctrls[0].name(), ws=True, matrix=shoulder_mat)
+        if ik_rot:
+            setMatrix(ik_rot_node, rot_mat)
 
     # sets keyframes
     if key:

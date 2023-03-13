@@ -1,13 +1,9 @@
-# MGEAR is under the terms of the MIT License
-
-# Copyright (c) 2016 Jeremie Passerin, Miquel Campos
-"""Guide Foot banking 01 module"""
+"""Guide Scale FK 01 module"""
 
 from functools import partial
-import pymel.core as pm
 
 from mgear.shifter.component import guide
-from mgear.core import transform, pyqt
+from mgear.core import pyqt
 from mgear.vendor.Qt import QtWidgets, QtCore
 
 from maya.app.general.mayaMixin import MayaQWidgetDockableMixin
@@ -15,14 +11,15 @@ from maya.app.general.mayaMixin import MayaQDockWidget
 
 from . import settingsUI as sui
 
+
 # guide info
-AUTHOR = "Jeremie Passerin, Miquel Campos"
-URL = "www.jeremiepasserin.com, www.miquel-campos.com"
-EMAIL = "geerem@hotmail.com, hello@miquel-campos.com"
+AUTHOR = "Takayoshi MATSUMOTO"
+URL = "https://github.com/yamahigashi/mgear_shifter_components"
+EMAIL = "yamahigashi@gmail.com"
 VERSION = [1, 0, 0]
-TYPE = "ymt_foot_bk_03"
-NAME = "foot"
-DESCRIPTION = "Foot with reversed controllers to control foot roll."
+TYPE = "ymt_scale_FK_01"
+NAME = "chain"
+DESCRIPTION = "FK chain, With Supporitng hierarchical sacaling"
 
 ##########################################################
 # CLASS
@@ -41,11 +38,11 @@ class Guide(guide.ComponentGuide):
     email = EMAIL
     version = VERSION
 
-    connectors = ["leg_2jnt_01", "leg_ms_2jnt_01", "leg_3jnt_01", "arm_2jnt_01"]
-
     def postInit(self):
         """Initialize the position for the guide"""
-        self.save_transform = ["root", "#_loc", "heel", "outpivot", "inpivot", "toepivot"]
+
+        self.save_transform = ["root", "#_loc"]
+        self.save_blade = ["blade"]
         self.addMinMax("#_loc", 1, -1)
 
     def addObjects(self):
@@ -53,39 +50,34 @@ class Guide(guide.ComponentGuide):
 
         self.root = self.addRoot()
         self.locs = self.addLocMulti("#_loc", self.root)
+        self.blade = self.addBlade("blade", self.root, self.locs[0])
 
         centers = [self.root]
         centers.extend(self.locs)
         self.dispcrv = self.addDispCurve("crv", centers)
 
-        # Heel and pivots
-        vTemp = transform.getOffsetPosition(self.root, [0, -1, -1])
-        self.heel = self.addLoc("heel", self.root, vTemp)
-        vTemp = transform.getOffsetPosition(self.root, [1, -1, -1])
-        self.outpivot = self.addLoc("outpivot", self.root, vTemp)
-        vTemp = transform.getOffsetPosition(self.root, [-1, -1, -1])
-        self.inpivot = self.addLoc("inpivot", self.root, vTemp)
-        vTemp = transform.getOffsetPosition(self.root, [0, -1, 1])
-        self.toepivot = self.addLoc("toepivot", self.root, vTemp)
-
-        cnt = [self.root, self.heel, self.outpivot, self.heel, self.inpivot, self.toepivot]
-        self.dispcrv = self.addDispCurve("1", cnt)
-
     def addParameters(self):
         """Add the configurations settings"""
 
-        self.pRoll = self.addParam("useRollCtl", "bool", True)
+        self.pType = self.addParam("mode", "long", 0, 0)
+        self.pBlend = self.addParam("blend", "double", 1, 0, 1)
+        self.pNeutralPose = self.addParam("neutralpose", "bool", False)
+        self.pIkRefArray = self.addParam("ikrefarray", "string", "")
         self.pUseIndex = self.addParam("useIndex", "bool", False)
         self.pParentJointIndex = self.addParam(
             "parentJointIndex", "long", -1, None, None)
 
+        # TODO: if have IK or IK/FK lock the axis position to
+        # force 2D Planar IK solver
+        # Create a a method to lock and unlock while changing
+        # options in the PYSIDE component Settings
 
 ##########################################################
 # Setting Page
 ##########################################################
 
+
 class settingsTab(QtWidgets.QDialog, sui.Ui_Form):
-    """The Component settings UI"""
 
     def __init__(self, parent=None):
         super(settingsTab, self).__init__(parent)
@@ -93,7 +85,6 @@ class settingsTab(QtWidgets.QDialog, sui.Ui_Form):
 
 
 class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
-    """Create the component setting window"""
 
     def __init__(self, parent=None):
         self.toolName = TYPE
@@ -131,22 +122,23 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
         self.tabs.insertTab(1, self.settingsTab, "Component Settings")
 
         # populate component settings
-        self.populateCheck(self.settingsTab.useRollCtl_checkBox, "useRollCtl")
+        self.settingsTab.ikfk_slider.setValue(
+            int(self.root.attr("blend").get() * 100))
+        self.settingsTab.ikfk_spinBox.setValue(
+            int(self.root.attr("blend").get() * 100))
+        self.settingsTab.mode_comboBox.setCurrentIndex(
+            self.root.attr("mode").get())
 
-        # populate connections in main settings
-        for cnx in Guide.connectors:
-            self.mainSettingsTab.connector_comboBox.addItem(cnx)
-        cBox = self.mainSettingsTab.connector_comboBox
-        self.connector_items = [cBox.itemText(i) for i in range(cBox.count())]
-        currentConnector = self.root.attr("connector").get()
-        if currentConnector not in self.connector_items:
-            self.mainSettingsTab.connector_comboBox.addItem(currentConnector)
-            self.connector_items.append(currentConnector)
-            pm.displayWarning("The current connector: %s, is not a valid "
-                              "connector for this component. "
-                              "Build will Fail!!")
-        comboIndex = self.connector_items.index(currentConnector)
-        self.mainSettingsTab.connector_comboBox.setCurrentIndex(comboIndex)
+        if self.root.attr("neutralpose").get():
+            self.settingsTab.neutralPose_checkBox.setCheckState(
+                QtCore.Qt.Checked)
+        else:
+            self.settingsTab.neutralPose_checkBox.setCheckState(
+                QtCore.Qt.Unchecked)
+
+        ikRefArrayItems = self.root.attr("ikrefarray").get().split(",")
+        for item in ikRefArrayItems:
+            self.settingsTab.ikRefArray_listWidget.addItem(item)
 
     def create_componentLayout(self):
 
@@ -158,14 +150,38 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
 
     def create_componentConnections(self):
 
-        self.settingsTab.useRollCtl_checkBox.stateChanged.connect(
+        self.settingsTab.ikfk_slider.valueChanged.connect(
+            partial(self.updateSlider, self.settingsTab.ikfk_slider, "blend"))
+        self.settingsTab.ikfk_spinBox.valueChanged.connect(
+            partial(self.updateSlider, self.settingsTab.ikfk_spinBox, "blend"))
+
+        self.settingsTab.mode_comboBox.currentIndexChanged.connect(
+            partial(self.updateComboBox,
+                    self.settingsTab.mode_comboBox,
+                    "mode"))
+
+        self.settingsTab.neutralPose_checkBox.stateChanged.connect(
             partial(self.updateCheck,
-                    self.settingsTab.useRollCtl_checkBox,
-                    "useRollCtl"))
-        self.mainSettingsTab.connector_comboBox.currentIndexChanged.connect(
-            partial(self.updateConnector,
-                    self.mainSettingsTab.connector_comboBox,
-                    self.connector_items))
+                    self.settingsTab.neutralPose_checkBox,
+                    "neutralpose"))
+
+        self.settingsTab.ikRefArrayAdd_pushButton.clicked.connect(
+            partial(self.addItem2listWidget,
+                    self.settingsTab.ikRefArray_listWidget,
+                    "ikrefarray"))
+        self.settingsTab.ikRefArrayRemove_pushButton.clicked.connect(
+            partial(self.removeSelectedFromListWidget,
+                    self.settingsTab.ikRefArray_listWidget,
+                    "ikrefarray"))
+        self.settingsTab.ikRefArray_listWidget.installEventFilter(self)
+
+    def eventFilter(self, sender, event):
+        if event.type() == QtCore.QEvent.ChildRemoved:
+            if sender == self.settingsTab.ikRefArray_listWidget:
+                self.updateListAttr(sender, "ikrefarray")
+            return True
+        else:
+            return QtWidgets.QDialog.eventFilter(self, sender, event)
 
     def dockCloseEventTriggered(self):
         pyqt.deleteInstances(self, MayaQDockWidget)
