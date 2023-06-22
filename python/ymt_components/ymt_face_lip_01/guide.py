@@ -24,6 +24,7 @@ from . import settingsUI as sui
 import pymel.core as pm
 from pymel.core import datatypes
 
+import ymt_shifter_utility as ymt_utility
 from . import chain_guide_initializer
 
 # guide info
@@ -53,6 +54,28 @@ class Guide(guide.ComponentGuide):
     version = VERSION
 
     connectors = ["mouth_01"]
+
+    def get_guide_template_dict(self):
+        """Override the base class method to add more data to the guide template dict"""
+        c_dict = super(Guide, self).get_guide_template_dict()
+
+        self.sliding_surface = pm.PyNode(self.getName("sliding_surface"))
+        c_dict["sliding_surface"] = ymt_utility.serialize_nurbs_surface(self.sliding_surface.name())
+
+        return c_dict
+
+    def set_from_dict(self, c_dict):
+        """Override the base class method to add more data to the guide template dict"""
+
+        super(Guide, self).set_from_dict(c_dict)
+        try:
+            if self.sliding_surface is not None:
+                pm.delete(self.sliding_surface)
+        except AttributeError:
+            pass
+
+        sliding_surface = ymt_utility.deserialize_nurbs_surface(self.getName("sliding_surface"), c_dict["sliding_surface"])
+        self.sliding_surface = pm.PyNode(sliding_surface)
 
     def postInit(self):
         """Initialize the position for the guide"""
@@ -98,7 +121,10 @@ class Guide(guide.ComponentGuide):
         self.blade = self.addBlade("blade", self.root, self.tan)
 
         v = transform.getTranslation(self.root)
-        self.sliding_surface = self.addSliderSurface("sliding_surface", self.root, v)
+        if not hasattr(self, "sliding_surface") or self.sliding_surface is None:
+            self.sliding_surface = self.addSliderSurface("sliding_surface", self.root, v)
+        else:
+            pm.parent(self.sliding_surface, self.root, absolute=False, relative=True)
 
     def addSliderSurface(self, name, parent, position=None):
         """pass."""

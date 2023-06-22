@@ -2,6 +2,10 @@
 from functools import partial
 import os
 
+import maya.cmds as cmds
+from maya.app.general.mayaMixin import MayaQWidgetDockableMixin
+from maya.app.general.mayaMixin import MayaQDockWidget
+
 from mgear.shifter.component import guide
 from mgear.core import pyqt
 from mgear.core import string
@@ -10,10 +14,6 @@ from mgear.vendor.Qt import QtWidgets, QtCore
 from mgear import shifter
 from mgear.core import transform
 
-# from mgear.core.transform import getTransform
-# from mgear.core.transform import getTransformLookingAt
-# from mgear.core.transform import getChainTransform2
-# from mgear.core.transform import setMatrixPosition
 from mgear.core.primitive import addTransform
 
 from mgear.core import (
@@ -30,16 +30,12 @@ from mgear.core import (
     utils,
 )
 
-
-
-from maya.app.general.mayaMixin import MayaQWidgetDockableMixin
-from maya.app.general.mayaMixin import MayaQDockWidget
-
 from . import settingsUI as sui
 import pymel.core as pm
-from pymel.core import datatypes
+# from pymel.core import datatypes
 
-from . import chain_guide_initializer
+import ymt_shifter_utility as ymt_utility
+# from . import chain_guide_initializer
 
 # guide info
 AUTHOR = "yamahigashi"
@@ -88,7 +84,10 @@ class Guide(guide.ComponentGuide):
         self.lookat = self.addLoc("lookat", self.root, vTemp)
 
         v = transform.getTranslation(self.root)
-        self.sliding_surface = self.addSliderSurface("sliding_surface", self.root, v)
+        if not hasattr(self, "sliding_surface") or self.sliding_surface is None:
+            self.sliding_surface = self.addSliderSurface("sliding_surface", self.root, v)
+        else:
+            pm.parent(self.sliding_surface, self.root, absolute=False, relative=True)
 
     def addSliderSurface(self, name, parent, position=None):
         """pass."""
@@ -138,6 +137,29 @@ class Guide(guide.ComponentGuide):
                           self.root.neutralRotation,
                           inverted=True,
                           width=.5 / size)
+
+    def get_guide_template_dict(self):
+        """Override the base class method to add more data to the guide template dict"""
+        c_dict = super(Guide, self).get_guide_template_dict()
+
+        self.sliding_surface = pm.PyNode(self.getName("sliding_surface"))
+        c_dict["sliding_surface"] = ymt_utility.serialize_nurbs_surface(self.sliding_surface.name())
+
+        return c_dict
+
+    def set_from_dict(self, c_dict):
+        """Override the base class method to add more data to the guide template dict"""
+
+        super(Guide, self).set_from_dict(c_dict)
+        try:
+            if self.sliding_surface is not None:
+                pm.delete(self.sliding_surface)
+        except AttributeError:
+            pass
+
+        sliding_surface = ymt_utility.deserialize_nurbs_surface(self.getName("sliding_surface"), c_dict["sliding_surface"])
+        self.sliding_surface = pm.PyNode(sliding_surface)
+
 
 ##########################################################
 # Setting Page

@@ -58,20 +58,22 @@ from logging import (  # noqa:F401 pylint: disable=unused-import, wrong-import-o
     INFO
 )
 
-if sys.version_info >= (3, 0):  # pylint: disable=using-constant-test  # pylint: disable=using-constant-test, wrong-import-order
-    # For type annotation
-    from typing import (  # NOQA: F401 pylint: disable=unused-import
-        Optional,
-        Dict,
-        List,
-        Tuple,
-        Pattern,
-        Callable,
-        Any,
-        Text,
-        Generator,
-        Union
-    )
+if sys.version_info > (3, 0):
+    unicode = str
+    from typing import TYPE_CHECKING
+    if TYPE_CHECKING:
+        from typing import (
+            Optional,  # noqa: F401
+            Dict,  # noqa: F401
+            List,  # noqa: F401
+            Tuple,  # noqa: F401
+            Pattern,  # noqa: F401
+            Callable,  # noqa: F401
+            Any,  # noqa: F401
+            Text,  # noqa: F401
+            Generator,  # noqa: F401
+            Union  # noqa: F401
+        )
 
 
 def collect_synoptic_windows(parent=None):
@@ -836,3 +838,108 @@ def add3DChain(parent, name, positions, normal, negate=False, vis=True):
         cmds.makeIdentity(joint, apply=True, t=1, r=1, s=1, n=0, pn=1)
 
     return joints
+
+
+def __has_make_nurbs_surface_hostory(surface_name):
+    # type: (str) -> bool
+    """Return True if the surface has makeNurbSurface history"""
+    for history in cmds.listHistory(surface_name) or []:
+        if cmds.nodeType(history) == "makeNurbPlane":
+            return True
+
+    return False
+
+
+def serialize_nurbs_surface(surface_name):
+    # type: (str) -> str
+    if not isinstance(surface_name, (str, unicode)):
+        raise TypeError("surface_name must be a string")
+
+    # if has make history, then freeze history
+    if __has_make_nurbs_surface_hostory(surface_name):
+        temp_surface = cmds.duplicate(surface_name, name="temp_surface")[0]
+        cmds.delete(temp_surface, constructionHistory=True)
+        surface_name = temp_surface
+    else:
+        temp_surface = None
+
+    # Get the control vertices of the NURBS surface
+    control_vertices_names = cmds.ls("{0}.cv[*][*]".format(surface_name), flatten=True)
+    control_vertices = {}
+
+    for path in control_vertices_names:
+        cv = path.split(".")[-1]
+        control_vertices[cv] = cmds.getAttr(path)[0]
+
+    # Get other relevant attributes
+    degreeU = cmds.getAttr("{0}.degreeU".format(surface_name))
+    degreeV = cmds.getAttr("{0}.degreeV".format(surface_name))
+    patchU = cmds.getAttr("{0}.spansU".format(surface_name))
+    patchV = cmds.getAttr("{0}.spansV".format(surface_name))
+
+    # Create a dictionary to hold the serialized data
+    serialized_data = {
+        "controlVertices": control_vertices,
+        "degreeU": degreeU,
+        "degreeV": degreeV,
+        "patchU": patchU,
+        "patchV": patchV,
+        "localRotatePivot": cmds.xform(surface_name, q=True, os=True, rp=True),
+        "localScalePivot": cmds.xform(surface_name, q=True, os=True, sp=True),
+        "rotate": cmds.xform(surface_name, q=True, os=True, ro=True),
+        "scale": cmds.xform(surface_name, q=True, os=True, s=True),
+        "translate": cmds.xform(surface_name, q=True, os=True, t=True)
+    }
+
+    # Convert the dictionary to a string
+    serialized_text = str(serialized_data)
+
+    if temp_surface:
+        cmds.delete(temp_surface)
+
+    return serialized_text
+
+
+def deserialize_nurbs_surface(surface_name, serialized_data):
+    # type: (str, str) -> str
+    if not isinstance(surface_name, (str, unicode)):
+        raise TypeError("surface_name must be a string but got {0}".format(type(surface_name)))
+
+    deserializedData = eval(serialized_data)
+
+    # Retrieve the necessary information from the deserialized data
+    control_vertices = deserializedData["controlVertices"]
+    degreeU = deserializedData["degreeU"]
+    degreeV = deserializedData["degreeV"]
+    patchU = deserializedData["patchU"]
+    patchV = deserializedData["patchV"]
+    localRotatePivot = deserializedData["localRotatePivot"]
+    localScalePivot = deserializedData["localScalePivot"]
+    rotate = deserializedData["rotate"]
+    scale = deserializedData["scale"]
+    translate = deserializedData["translate"]
+
+    # Create a new NURBS surface
+    new_surface = cmds.nurbsPlane(
+        n=surface_name,
+        d=3,
+        u=patchU,
+        v=patchV,
+        width=0,
+        lengthRatio=0,
+        constructionHistory=False)[0]  # type: str
+
+    cmds.xform(new_surface, os=True, rp=localRotatePivot)
+    cmds.xform(new_surface, os=True, sp=localScalePivot)
+    cmds.xform(new_surface, os=True, ro=rotate)
+    cmds.xform(new_surface, os=True, s=scale)
+    cmds.xform(new_surface, os=True, t=translate)
+
+    cmds.setAttr("{0}.degreeU".format(new_surface), degreeU)
+    cmds.setAttr("{0}.degreeV".format(new_surface), degreeV)
+    # Set the control point positions
+    for cv, pos in control_vertices.items():
+        posX, posY, posZ = pos
+        cmds.setAttr("{0}.{1}".format(new_surface, cv), posX, posY, posZ, type="double3")
+
+    return new_surface
