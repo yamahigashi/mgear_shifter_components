@@ -168,14 +168,13 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
 
         self.populateCheck(self.settingsTab.joint_checkBox, "joint")
         self.populateCheck(self.settingsTab.uniScale_checkBox, "uniScale")
-        self.populateCheck(self.settingsTab.neutralRotation_checkBox,
-                           "neutralRotation")
-        self.populateCheck(self.settingsTab.mirrorBehaviour_checkBox,
-                           "mirrorBehaviour")
-        self.populateCheck(self.settingsTab.mirrorAxisX_checkBox,
-                           "mirrorAxisX")
-        self.settingsTab.ctlSize_doubleSpinBox.setValue(
-            self.root.attr("ctlSize").get())
+        self.populateCheck(self.settingsTab.neutralRotation_checkBox, "neutralRotation")
+        self.populateCheck(self.settingsTab.mirrorBehaviour_checkBox, "mirrorBehaviour")
+        self.populateCheck(self.settingsTab.mirrorAxisX_checkBox, "mirrorAxisX")
+        self.populateCheck(self.settingsTab.mirrorAxisY_checkBox, "mirrorAxisY")
+        self.populateCheck(self.settingsTab.mirrorAxisZ_checkBox, "mirrorAxisZ")
+
+        self.settingsTab.ctlSize_doubleSpinBox.setValue(self.root.attr("ctlSize").get())
         sideIndex = self.iconsList.index(self.root.attr("icon").get())
         self.settingsTab.controlShape_comboBox.setCurrentIndex(sideIndex)
 

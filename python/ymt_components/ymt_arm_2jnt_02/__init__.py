@@ -4,6 +4,7 @@
 
 # Maya
 import maya.cmds as cmds
+import maya.cmds as mel
 import pymel.core as pm
 
 # import maya.OpenMaya as om
@@ -192,14 +193,22 @@ class Component(arm_2jnt_04.Component):
 
                 src = self.rig.findRelative(ref_name)
 
+                decomp = pm.createNode("decomposeMatrix")
+                comp = pm.createNode("composeMatrix")
+                pm.connectAttr("{}.worldInverseMatrix".format(src), "{}.inputMatrix".format(decomp))
+                pm.connectAttr("{}.outputRotate".format(decomp), "{}.inputRotate".format(comp))
+                pm.disconnectAttr("{}.outputRotate".format(decomp), "{}.inputRotate".format(comp))
+                cmds.evalDeferred("""cmds.delete("{}")""".format(decomp))
+
                 down, _, up = findPathAtoB(src, self.root)
                 mult = pm.createNode("multMatrix")
+                pm.connectAttr("{}.outputMatrix".format(comp), "{}.matrixIn[0]".format(mult))
 
                 for i, d in enumerate(down):
-                    pm.connectAttr("{}.matrix".format(d), "{}.matrixIn[{}]".format(mult, i))
+                    pm.connectAttr("{}.matrix".format(d), "{}.matrixIn[{}]".format(mult, i + 1))
 
                 for j, u in enumerate(up):
-                    pm.connectAttr("{}.inverseMatrix".format(u), "{}.matrixIn[{}]".format(mult, i + j + 1))
+                    pm.connectAttr("{}.inverseMatrix".format(u), "{}.matrixIn[{}]".format(mult, i + j + 2))
 
                 decomp = pm.createNode("decomposeMatrix")
                 pm.connectAttr("{}.matrixSum".format(mult), "{}.inputMatrix".format(decomp))

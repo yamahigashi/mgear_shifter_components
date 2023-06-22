@@ -41,7 +41,7 @@ class Guide(guide.ComponentGuide):
     email = EMAIL
     version = VERSION
 
-    connectors = ["leg_2jnt_01", "leg_ms_2jnt_01", "leg_3jnt_01"]
+    connectors = ["leg_2jnt_01", "leg_ms_2jnt_01", "leg_3jnt_01", "arm_2jnt_01"]
 
     def postInit(self):
         """Initialize the position for the guide"""

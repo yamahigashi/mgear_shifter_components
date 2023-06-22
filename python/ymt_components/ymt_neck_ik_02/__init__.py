@@ -52,7 +52,7 @@ class Component(MainComponent):
             npo = pri.addTransform(cns, self.getName("neck{}_npo".format(i)), t)
 
             w = self.size * 0.5
-            ctl = self.addCtl(npo, "fk{}_ctl".format(i), t, self.color_ik, "compas", w=w)
+            ctl = self.addCtl(npo, "fk{}_ctl".format(i), t, self.color_ik, "cube", w=w)
             att.setKeyableAttributes(ctl)
             att.setRotOrder(ctl, "ZXY")
             att.setInvertMirror(ctl, ["tx", "ry", "rz"])
@@ -102,7 +102,7 @@ class Component(MainComponent):
         d = self.size * 0.5
         po = dt.Vector(0, dist * 0.5, 0)
 
-        self.head_ctl = self.addCtl(self.head_npo, "head_ctl", t, self.color_fk, "cube", w=w, h=h, d=d, po=po)
+        self.head_ctl = self.addCtl(self.head_npo, "head_ctl", t, self.color_fk, "compas", w=w, h=h, d=d, po=po)
         att.setRotOrder(self.head_ctl, "ZXY")
         att.setInvertMirror(self.head_ctl, ["tx", "ry", "rz"])
 
@@ -145,8 +145,7 @@ class Component(MainComponent):
         self.relatives["root"] = self.root
         self.relatives["eff0"] = self.root
         self.relatives["tan2"] = self.head_ctl
-        for i, ctl in enumerate(self.neck_ctls):
-            self.relatives["neck{}".format(i)] = ctl
+
         self.relatives["head"] = self.head_ctl
         self.relatives["eff1"] = self.head_ctl
 
@@ -156,6 +155,14 @@ class Component(MainComponent):
         self.jointRelatives["neck"] = len(self.jnt_pos) - 1
         self.jointRelatives["head"] = len(self.jnt_pos) - 1
         self.jointRelatives["eff1"] = len(self.jnt_pos) - 1
+
+        for i, ctl in enumerate(self.neck_ctls):
+            self.relatives["neck{}".format(i)] = ctl
+            self.relatives["%s_loc" % i] = ctl
+            self.controlRelatives["%s_loc" % i] = ctl
+
+            self.jointRelatives["%s_loc" % (i)] = (i + 2)
+            self.aliasRelatives["%s_ctl" % (i)] = (i + 2)
 
     def connect_standard(self):
 

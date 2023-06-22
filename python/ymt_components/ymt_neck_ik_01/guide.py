@@ -87,6 +87,7 @@ class Guide(ComponentGuide):
 
         self.pHeadRefArray = self.addParam("headrefarray", "string", "")
         self.pUseExprespy = self.addParam("useExprespy", "bool", False)
+        self.pHeadFk = self.addParam("headFk", "bool", False)
 
         # Default values
         self.pUseIndex = self.addParam("useIndex", "bool", False)

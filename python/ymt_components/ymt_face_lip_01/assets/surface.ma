@@ -3,8 +3,6 @@
 //Last modified: Thu, Mar 25, 2021 06:43:48 PM
 //Codeset: 932
 requires maya "2019";
-requires "mtoa" "4.0.2.1";
-requires "stereoCamera" "10.0";
 currentUnit -l centimeter -a degree -t film;
 fileInfo "application" "maya";
 fileInfo "product" "Maya 2019";

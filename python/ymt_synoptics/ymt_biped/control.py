@@ -1,4 +1,5 @@
 # import re
+import sys
 import six
 import maya.cmds as cmds
 import pymel.core as pm
@@ -17,10 +18,39 @@ try:
 except ImportError:
     import gml_maya.util.node_util as node_utils
 
-if False:
+from logging import (  # noqa:F401 pylint: disable=unused-import, wrong-import-order
+    StreamHandler,
+    getLogger,
+    WARN,
+    DEBUG,
+    INFO
+)
+
+if sys.version_info >= (3, 0):  # pylint: disable=using-constant-test  # pylint: disable=using-constant-test, wrong-import-order
     # For type annotation
-    from typing import Optional, Dict, List, Tuple, Pattern, Callable, Any, Text  # NOQA
-    from pm.notetypes import Transform
+    from typing import (  # NOQA: F401 pylint: disable=unused-import
+        Optional,
+        Dict,
+        List,
+        Tuple,
+        Pattern,
+        Callable,
+        Any,
+        Text,
+        Generator,
+        Union
+    )
+###############################################################################
+handler = StreamHandler()
+handler.setLevel(DEBUG)
+
+logger = getLogger(__name__)
+logger.setLevel(WARN)
+logger.setLevel(DEBUG)
+logger.setLevel(INFO)
+logger.addHandler(handler)
+logger.propagate = False
+# =============================================================================
 
 
 class MirrorEntry(object):
@@ -347,9 +377,16 @@ def ikFkMatch(namespace,
     ik_goal = _get_mth(ik)
     upv_ctrl = _get_node(upv)
 
+    print(ik_goal)
+
     if ik_rot:
         ik_rot_node = _get_node(ik_rot)
         ik_rot_goal = _get_mth(ik_rot)
+        print(ik_rot_node)
+        print(ik_rot_goal)
+
+        if not ik_rot_node or not ik_rot_goal:
+            ik_rot = None
 
     ui_node = _get_node(ui_host)
     o_attr = ui_node.attr(ikfk_attr)
@@ -394,7 +431,6 @@ def ikFkMatch(namespace,
         if ik_rot:
             rot_mat = getMatrix(ik_rot_goal)
             # transform.matchWorldTransform(ik_rot_goal, ik_rot_node)
-
         if is_leg:
             upv_mat = getMatrix(fk_goals[1])
         else:
@@ -412,25 +448,31 @@ def ikFkMatch(namespace,
         if ik_rot:
             setMatrix(ik_rot_node, rot_mat)
 
-        # transform.matchWorldTransform(fk_goals[1], upv_ctrl)
-        # calculates new pole vector position
-        if is_leg:
-            start_end = (fk_goals[-1].getTranslation(space="world") - fk_goals[0].getTranslation(space="world"))
-            start_mid = (fk_goals[1].getTranslation(space="world") - fk_goals[0].getTranslation(space="world"))
-        else:
-            start_end = (fk_goals[-1].getTranslation(space="world") - fk_goals[1].getTranslation(space="world"))
-            start_mid = (fk_goals[2].getTranslation(space="world") - fk_goals[1].getTranslation(space="world"))
+        upv_mth = _get_mth(upv)
+        if upv_mth:
+            final_vector = upv_mth.getTranslation(space="world")
+            upv_ctrl.setTranslation(final_vector, space="world")
 
-        dot_p = start_mid * start_end
-        proj = float(dot_p) / float(start_end.length())
-        proj_vector = start_end.normal() * proj
-        arrow_vector = (start_mid - proj_vector) * 1.5
-        arrow_vector *= start_end.normal().length()
-        if is_leg:
-            final_vector = (arrow_vector + fk_goals[1].getTranslation(space="world"))
         else:
-            final_vector = (arrow_vector + fk_goals[2].getTranslation(space="world"))
-        upv_ctrl.setTranslation(final_vector, space="world")
+            # calculates new pole vector position
+            if is_leg:
+                start_end = (fk_goals[-1].getTranslation(space="world") - fk_goals[0].getTranslation(space="world"))
+                start_mid = (fk_goals[1].getTranslation(space="world") - fk_goals[0].getTranslation(space="world"))
+            else:
+                start_end = (fk_goals[-1].getTranslation(space="world") - fk_goals[1].getTranslation(space="world"))
+                start_mid = (fk_goals[2].getTranslation(space="world") - fk_goals[1].getTranslation(space="world"))
+
+            dot_p = start_mid * start_end
+            proj = float(dot_p) / float(start_end.length())
+            proj_vector = start_end.normal() * proj
+            arrow_vector = (start_mid - proj_vector) * 1.5
+            arrow_vector *= start_end.normal().length()
+            if is_leg:
+                final_vector = (arrow_vector + fk_goals[1].getTranslation(space="world"))
+            else:
+                final_vector = (arrow_vector + fk_goals[2].getTranslation(space="world"))
+
+            upv_ctrl.setTranslation(final_vector, space="world")
 
         # sets blend attribute new value
         # o_attr.set(1.0)
@@ -443,6 +485,8 @@ def ikFkMatch(namespace,
         # upv_ctrl.setMatrix(upv_mat, worldSpace=True)
         for _ in range(20):
             cmds.xform(fk_ctrls[0].name(), ws=True, matrix=shoulder_mat)
+        if ik_rot:
+            setMatrix(ik_rot_node, rot_mat)
 
     # sets keyframes
     if key:
@@ -498,7 +542,7 @@ class IkFkTransfer(anim_utils.AbstractAnimationTransfer):
         node = anim_utils.getNode(":".join([self.nameSpace, name]))
 
         if not node:
-            mgear.log("Can't find object : {0}".format(name), mgear.sev_error)
+            mgear.log("Can't find object :{} {}".format(self.nameSpace, name), mgear.sev_error)
 
         return node
 
@@ -514,7 +558,7 @@ class IkFkTransfer(anim_utils.AbstractAnimationTransfer):
         m = self._getMth(name)
 
         if not n:
-            raise
+            raise Exception("Can't find object : {0}".format(name))
 
         if not m:
             return n, n
@@ -573,26 +617,26 @@ class IkFkTransfer(anim_utils.AbstractAnimationTransfer):
             else:  # to IK
                 to_fk = False
 
-            if to_fk:
+        if to_fk:
 
-                val_src_nodes = self.fkTargets
-                key_src_nodes = [self.ikCtrl, self.upvCtrl]
-                key_dst_nodes = self.fkCtrls
-                if ikRot:
-                    key_src_nodes.append(self.ikRotCtl)
+            val_src_nodes = self.fkTargets
+            key_src_nodes = [self.ikCtrl, self.upvCtrl]
+            key_dst_nodes = self.fkCtrls
+            if ikRot:
+                key_src_nodes.append(self.ikRotCtl)
 
-            else:
-                val_src_nodes = [self.ikTarget, self.upvTarget]
-                key_src_nodes = self.fkCtrls
-                key_dst_nodes = [self.ikCtrl, self.upvCtrl]
-                if ikRot:
-                    val_src_nodes.append(self.ikRotTarget)
-                    key_dst_nodes.append(self.ikRotCtl)
+        else:
+            val_src_nodes = [self.ikTarget, self.upvTarget]
+            key_src_nodes = self.fkCtrls
+            key_dst_nodes = [self.ikCtrl, self.upvCtrl]
+            if ikRot:
+                val_src_nodes.append(self.ikRotTarget)
+                key_dst_nodes.append(self.ikRotCtl)
 
-                # reset roll channel:
-                roll_att = self.getChangeRollAttrName()
-                pm.cutKey(roll_att, time=(startFrame, endFrame), cl=True)
-                pm.setAttr(roll_att, 0)
+            # reset roll channel:
+            roll_att = self.getChangeRollAttrName()
+            pm.cutKey(roll_att, time=(startFrame, endFrame), cl=True)
+            pm.setAttr(roll_att, 0)
 
         self.bakeAnimation(self.getChangeAttrName(),
                            val_src_nodes,
@@ -706,6 +750,12 @@ class IkFkTransfer(anim_utils.AbstractAnimationTransfer):
 
         except RuntimeError:
             pass
+        logger.debug("model: %s" % model)
+        logger.debug("ikfk_attr: %s" % ikfk_attr)
+        logger.debug("uihost: %s" % uihost)
+        logger.debug("fks: %s" % fks)
+        logger.debug("ik: %s" % ik)
+        logger.debug("upv: %s" % upv)
 
         # Create minimal UI object
         ui = IkFkTransfer()
@@ -742,6 +792,16 @@ class IkFkTransfer(anim_utils.AbstractAnimationTransfer):
                 switchTo=None):
         # type: (pm.nodetypes.Transform, str, str, List[str], str, str, int, int, bool, str) -> None
         """transfer without displaying UI"""
+        logger.debug("model: %s" % model)
+        logger.debug("ikfk_attr: %s" % ikfk_attr)
+        logger.debug("uihost: %s" % uihost)
+        logger.debug("fks: %s" % fks)
+        logger.debug("ik: %s" % ik)
+        logger.debug("upv: %s" % upv)
+        logger.debug("startFrame: %s" % startFrame)
+        logger.debug("endFrame: %s" % endFrame)
+        logger.debug("onlyKeyframes: %s" % onlyKeyframes)
+        logger.debug("switchTo: %s" % switchTo)
 
         if startFrame is None:
             startFrame = int(pm.playbackOptions(q=True, ast=True))
