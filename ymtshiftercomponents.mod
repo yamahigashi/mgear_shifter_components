@@ -8,3 +8,4 @@ MGEAR_SYNOPTIC_PATH +:= python/ymt_synoptics
 + MAYAVERSION:2020 PLATFORM:win64 ymtshifterplugins 3.0 ./platforms/win64_2020
 + MAYAVERSION:2022 PLATFORM:win64 ymtshifterplugins 3.0 ./platforms/win64_2022
 + MAYAVERSION:2023 PLATFORM:win64 ymtshifterplugins 3.0 ./platforms/win64_2023
++ MAYAVERSION:2024 PLATFORM:win64 ymtshifterplugins 3.0 ./platforms/win64_2024
