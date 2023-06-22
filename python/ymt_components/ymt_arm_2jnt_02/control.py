@@ -218,6 +218,17 @@ class IkFkTransfer(syn_uti.IkFkTransfer):
         except RuntimeError:
             pass
 
+        _fks = []
+        for fk in fks:
+            if isinstance(fk, str):
+                _fks.append(pm.PyNode(fk))
+            else:
+                _fks.append(fk)
+        if isinstance(ik, str):
+            ik = pm.PyNode(ik)
+        if isinstance(upv, str):
+            upv = pm.PyNode(upv)
+
         # Create minimal UI object
         ui = IkFkTransfer()
         ui.setModel(model)
@@ -259,11 +270,22 @@ class IkFkTransfer(syn_uti.IkFkTransfer):
         # Create minimal UI object
         ui = IkFkTransfer()
 
+        _fks = []
+        for fk in fks:
+            if isinstance(fk, str):
+                _fks.append(pm.PyNode(fk))
+            else:
+                _fks.append(fk)
+        if isinstance(ik, str):
+            ik = pm.PyNode(ik)
+        if isinstance(upv, str):
+            upv = pm.PyNode(upv)
+
         ui.setComboObj(None)
         ui.setModel(model)
         ui.setUiHost(uihost)
         ui.setSwitchedAttrShortName(ikfk_attr)
-        ui.setCtrls(fks, ik, upv)
+        ui.setCtrls(_fks, ik, upv)
         ui.setComboBoxItemsFormList(["IK", "FK"])
         ui.getValue = lambda: 0.0 if "fk" in switchTo.lower() else 1.0
         ui.transfer(startFrame, endFrame, onlyKeyframes, switchTo="fk")

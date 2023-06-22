@@ -542,7 +542,7 @@ class IkFkTransfer(anim_utils.AbstractAnimationTransfer):
         node = anim_utils.getNode(":".join([self.nameSpace, name]))
 
         if not node:
-            mgear.log("Can't find object : {0}".format(name), mgear.sev_error)
+            mgear.log("Can't find object :{} {}".format(self.nameSpace, name), mgear.sev_error)
 
         return node
 
@@ -558,7 +558,7 @@ class IkFkTransfer(anim_utils.AbstractAnimationTransfer):
         m = self._getMth(name)
 
         if not n:
-            raise
+            raise Exception("Can't find object : {0}".format(name))
 
         if not m:
             return n, n
@@ -617,26 +617,26 @@ class IkFkTransfer(anim_utils.AbstractAnimationTransfer):
             else:  # to IK
                 to_fk = False
 
-            if to_fk:
+        if to_fk:
 
-                val_src_nodes = self.fkTargets
-                key_src_nodes = [self.ikCtrl, self.upvCtrl]
-                key_dst_nodes = self.fkCtrls
-                if ikRot:
-                    key_src_nodes.append(self.ikRotCtl)
+            val_src_nodes = self.fkTargets
+            key_src_nodes = [self.ikCtrl, self.upvCtrl]
+            key_dst_nodes = self.fkCtrls
+            if ikRot:
+                key_src_nodes.append(self.ikRotCtl)
 
-            else:
-                val_src_nodes = [self.ikTarget, self.upvTarget]
-                key_src_nodes = self.fkCtrls
-                key_dst_nodes = [self.ikCtrl, self.upvCtrl]
-                if ikRot:
-                    val_src_nodes.append(self.ikRotTarget)
-                    key_dst_nodes.append(self.ikRotCtl)
+        else:
+            val_src_nodes = [self.ikTarget, self.upvTarget]
+            key_src_nodes = self.fkCtrls
+            key_dst_nodes = [self.ikCtrl, self.upvCtrl]
+            if ikRot:
+                val_src_nodes.append(self.ikRotTarget)
+                key_dst_nodes.append(self.ikRotCtl)
 
-                # reset roll channel:
-                roll_att = self.getChangeRollAttrName()
-                pm.cutKey(roll_att, time=(startFrame, endFrame), cl=True)
-                pm.setAttr(roll_att, 0)
+            # reset roll channel:
+            roll_att = self.getChangeRollAttrName()
+            pm.cutKey(roll_att, time=(startFrame, endFrame), cl=True)
+            pm.setAttr(roll_att, 0)
 
         self.bakeAnimation(self.getChangeAttrName(),
                            val_src_nodes,
@@ -750,6 +750,12 @@ class IkFkTransfer(anim_utils.AbstractAnimationTransfer):
 
         except RuntimeError:
             pass
+        logger.debug("model: %s" % model)
+        logger.debug("ikfk_attr: %s" % ikfk_attr)
+        logger.debug("uihost: %s" % uihost)
+        logger.debug("fks: %s" % fks)
+        logger.debug("ik: %s" % ik)
+        logger.debug("upv: %s" % upv)
 
         # Create minimal UI object
         ui = IkFkTransfer()
@@ -786,6 +792,16 @@ class IkFkTransfer(anim_utils.AbstractAnimationTransfer):
                 switchTo=None):
         # type: (pm.nodetypes.Transform, str, str, List[str], str, str, int, int, bool, str) -> None
         """transfer without displaying UI"""
+        logger.debug("model: %s" % model)
+        logger.debug("ikfk_attr: %s" % ikfk_attr)
+        logger.debug("uihost: %s" % uihost)
+        logger.debug("fks: %s" % fks)
+        logger.debug("ik: %s" % ik)
+        logger.debug("upv: %s" % upv)
+        logger.debug("startFrame: %s" % startFrame)
+        logger.debug("endFrame: %s" % endFrame)
+        logger.debug("onlyKeyframes: %s" % onlyKeyframes)
+        logger.debug("switchTo: %s" % switchTo)
 
         if startFrame is None:
             startFrame = int(pm.playbackOptions(q=True, ast=True))
