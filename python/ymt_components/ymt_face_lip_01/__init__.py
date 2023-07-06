@@ -127,9 +127,6 @@ class Component(component.Main):
         self.uplocsPos = self.guide.apos[2:self.num_uplocs + 2]
         self.lowlocsPos = self.guide.apos[2 + self.num_uplocs:-5]
 
-        # print(len(self.uplocsPos), self.num_uplocs, self.uplocsPos)
-        # print(len(self.lowlocsPos),self.num_lowlocs,  self.lowlocsPos)
-
         self.offset = (self.frontPos - self.rootPos) * 0.3
         if self.negate:
             pass
@@ -147,7 +144,18 @@ class Component(component.Main):
 
         self.thickness = 0.003
         self.FRONT_OFFSET = .0002
-        self.NB_ROPE = 15
+
+        if self.num_uplocs % 2 == 0:
+            # even
+            self.num_rope_up = self.num_uplocs * 20 + 1
+        else:
+            self.num_rope_up = self.num_uplocs * 20
+
+        if self.num_lowlocs % 2 == 0:
+            # even
+            self.num_rope_low = self.num_lowlocs * 20 + 1
+        else:
+            self.num_rope_low = self.num_lowlocs * 20
 
         # --------------------------------------------------------
         self.ik_ctl = []
@@ -300,14 +308,14 @@ class Component(component.Main):
         self.upCrv_ctl   = gen2(self.upCrv,  "upCtl_crv",   7, False)
         self.lowCrv_ctl  = gen2(self.lowCrv, "lowCtl_crv",  7, False)
 
-        self.upRope      = gen2(self.upCrv,  "upRope_crv",  self.NB_ROPE, False)
-        self.lowRope     = gen2(self.lowCrv, "lowRope_crv", self.NB_ROPE, False)
+        self.upRope      = gen2(self.upCrv,  "upRope_crv",  self.num_rope_up, False)
+        self.lowRope     = gen2(self.lowCrv, "lowRope_crv", self.num_rope_low, False)
 
         self.upCrv_upv   = gen2(self.upCrv,  "upCtl_upv",   7, True)
         self.lowCrv_upv  = gen2(self.lowCrv, "lowCtl_upv",  7, True)
 
-        self.upRope_upv  = gen2(self.upCrv,  "upRope_upv",  self.NB_ROPE, True)
-        self.lowRope_upv = gen2(self.lowCrv, "lowRope_upv", self.NB_ROPE, True)
+        self.upRope_upv  = gen2(self.upCrv,  "upRope_upv",  self.num_rope_up, True)
+        self.lowRope_upv = gen2(self.lowCrv, "lowRope_upv", self.num_rope_low, True)
 
     def addControlJoints(self):
         skip = not self.settings.get("isSplitCorners", False)
@@ -550,7 +558,6 @@ class Component(component.Main):
                 # temp.rx.set(0)
                 t = transform.getTransform(temp)
                 pm.delete(temp)
-                # print(i, nearest_joint, temp)
 
             oName  = option[i][0]
             oSide  = option[i][1]
@@ -815,8 +822,7 @@ class Component(component.Main):
     def setRelation(self):
         """Set the relation beetween object from guide to rig"""
 
-        pass
-        # self.relatives["root"] = self.fk_ctl[0]
+        self.relatives["root"] = self.root
 
 
 def draw_eye_guide_mesh_plane(points, t):
