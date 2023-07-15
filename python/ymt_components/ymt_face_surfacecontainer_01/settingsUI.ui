@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>Form</class>
+ <widget class="QWidget" name="Form">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>419</width>
+    <height>555</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Form</string>
+  </property>
+  <layout class="QVBoxLayout" name="verticalLayout">
+   <item>
+    <widget class="QGroupBox" name="groupBox_3">
+     <property name="title">
+      <string>Surface</string>
+     </property>
+     <layout class="QGridLayout" name="gridLayout_4">
+      <item row="0" column="0">
+       <widget class="QCheckBox" name="isSlidingSurface">
+        <property name="text">
+         <string>Sliding on Surface</string>
+        </property>
+        <property name="checked">
+         <bool>true</bool>
+        </property>
+        <property name="tristate">
+         <bool>false</bool>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="0">
+       <widget class="QGroupBox" name="surfaceReference_groupBox">
+        <property name="enabled">
+         <bool>true</bool>
+        </property>
+        <property name="title">
+         <string/>
+        </property>
+        <property name="flat">
+         <bool>false</bool>
+        </property>
+        <layout class="QGridLayout" name="gridLayout_7">
+         <item row="0" column="0">
+          <layout class="QHBoxLayout" name="surfaceReference_horizontalLayout_4">
+           <item>
+            <layout class="QVBoxLayout" name="surfaceReference_verticalLayout_7">
+             <item>
+              <widget class="QListWidget" name="surfaceReference_listWidget_4">
+               <property name="autoScroll">
+                <bool>false</bool>
+               </property>
+               <property name="showDropIndicator" stdset="0">
+                <bool>false</bool>
+               </property>
+               <property name="dragDropOverwriteMode">
+                <bool>false</bool>
+               </property>
+               <property name="dragDropMode">
+                <enum>QAbstractItemView::NoDragDrop</enum>
+               </property>
+               <property name="defaultDropAction">
+                <enum>Qt::CopyAction</enum>
+               </property>
+               <property name="alternatingRowColors">
+                <bool>true</bool>
+               </property>
+               <property name="selectionMode">
+                <enum>QAbstractItemView::ExtendedSelection</enum>
+               </property>
+               <property name="gridSize">
+                <size>
+                 <width>0</width>
+                 <height>0</height>
+                </size>
+               </property>
+               <property name="viewMode">
+                <enum>QListView::ListMode</enum>
+               </property>
+               <property name="selectionRectVisible">
+                <bool>false</bool>
+               </property>
+               <property name="currentRow">
+                <number>-1</number>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <layout class="QVBoxLayout" name="surfaceReference_verticalLayout_8">
+             <property name="spacing">
+              <number>3</number>
+             </property>
+             <item>
+              <widget class="QPushButton" name="surfaceReferenceAdd_pushButton_4">
+               <property name="text">
+                <string>&lt;&lt;</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="surfaceReferenceRemove_pushButton_4">
+               <property name="text">
+                <string>&gt;&gt;</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <spacer name="surfaceReference_verticalSpacer_4">
+               <property name="orientation">
+                <enum>Qt::Vertical</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>20</width>
+                 <height>20</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+            </layout>
+           </item>
+          </layout>
+         </item>
+        </layout>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="horizontalLayout"/>
+   </item>
+   <item>
+    <widget class="QGroupBox" name="groupBox">
+     <property name="title">
+      <string>GroupBox</string>
+     </property>
+     <layout class="QHBoxLayout" name="horizontalLayout_2">
+      <item>
+       <layout class="QVBoxLayout" name="verticalLayout_3">
+        <item>
+         <widget class="QCheckBox" name="overrideNegate_checkBox">
+          <property name="text">
+           <string notr="true">Override Negate Axis Direction For &quot;R&quot; Side</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QCheckBox" name="addJoints_checkBox">
+          <property name="text">
+           <string notr="true">Add Joints</string>
+          </property>
+          <property name="checked">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <spacer name="verticalSpacer">
+     <property name="orientation">
+      <enum>Qt::Vertical</enum>
+     </property>
+     <property name="sizeHint" stdset="0">
+      <size>
+       <width>20</width>
+       <height>40</height>
+      </size>
+     </property>
+    </spacer>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
