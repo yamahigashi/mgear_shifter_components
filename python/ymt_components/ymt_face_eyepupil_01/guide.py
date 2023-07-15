@@ -138,6 +138,14 @@ class Guide(guide.ComponentGuide):
                           inverted=True,
                           width=.5 / size)
 
+    def setFromHierarchy(self, root):
+        self.sliding_surface = pm.PyNode(self.getName("sliding_surface"))
+        info = ymt_utility.serialize_nurbs_surface(self.sliding_surface.name())
+        super(Guide, self).setFromHierarchy(root)
+        
+        sliding_surface = ymt_utility.deserialize_nurbs_surface(self.getName("sliding_surface"), info)
+        self.sliding_surface = pm.PyNode(sliding_surface)
+
     def get_guide_template_dict(self):
         """Override the base class method to add more data to the guide template dict"""
         c_dict = super(Guide, self).get_guide_template_dict()
