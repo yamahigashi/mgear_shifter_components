@@ -9,7 +9,6 @@ from mgear.shifter import component
 
 from mgear.core import (
     transform,
-    applyop,
     attribute,
     node,
     primitive,
@@ -79,34 +78,43 @@ class Component(component.Main):
             else:
                 scl = [1, 1, 1]
             t = transform.setMatrixScale(t, scl)
+
+        self.initialDist = self.size * .2
         self.detailControllersGroupName = "controllers_detail"  # TODO: extract to settings
         self.primaryControllersGroupName = "controllers_primary"  # TODO: extract to settings
         self.connect_surface_slider = self.settings["isSlidingSurface"]
 
-        self.ik_cns = primitive.addTransform(
-            self.root, self.getName("ik_cns"), t)
-
-        self.ctl = self.addCtl(self.ik_cns,
+        self.lookat_cns = primitive.addTransform(self.root, self.getName("lookat_cns"), t)
+        self.ctl = self.addCtl(self.lookat_cns,
                                "ctl",
                                t,
                                self.color_ik,
                                self.settings["icon"],
-                               w=self.settings["ctlSize"] * self.size,
-                               h=self.settings["ctlSize"] * self.size,
-                               d=self.settings["ctlSize"] * self.size,
+                               w=self.settings["ctlSize"],
+                               h=self.settings["ctlSize"],
+                               d=self.settings["ctlSize"] * 0.05,
                                tp=self.parentCtlTag)
         self.addToSubGroup(self.ctl, self.primaryControllersGroupName)
 
+        self.aim_cns = primitive.addTransform(self.root, self.getName("aim_cns"), t)
+
+        diff = self.guide.apos[2] - self.guide.apos[0]
+        offset = diff.normal() * self.initialDist + t.translate
+        offset_mat = transform.setMatrixPosition(t, offset)
+        self.proj_cns = primitive.addTransform(self.aim_cns, self.getName("proj_cns"), offset_mat)
+
         t = self.guide.tra["lookat"]
+        self.ik_cns = primitive.addTransform(self.root, self.getName("ik_cns"), t)
         self.lookat = self.addCtl(self.ik_cns,
                                   "lookat_ctl",
                                   t,
                                   self.color_ik,
-                                  self.settings["icon"],
-                                  w=self.settings["ctlSize"] * self.size,
-                                  h=self.settings["ctlSize"] * self.size,
-                                  d=self.settings["ctlSize"] * self.size,
+                                  "circle",
+                                  w=self.settings["ctlSize"],
+                                  h=self.settings["ctlSize"],
+                                  d=self.settings["ctlSize"],
                                   tp=self.parentCtlTag)
+
         self.addToSubGroup(self.lookat, self.primaryControllersGroupName)
 
         # we need to set the rotation order before lock any rotation axis
@@ -142,8 +150,21 @@ class Component(component.Main):
                     0,
                     ref_names)
 
+        # Anim -------------------------------------------
+        self.dist_att = self.addAnimParam(
+            "moverate", "Rate", "double", self.initialDist, 0, 100)
+
     def addOperators(self):
-        return
+        cmds.aimConstraint(
+                self.lookat.name(),
+                self.aim_cns.name(),
+                aim=[0, 0, 1],
+                u=[0, 1, 0],
+                wut="objectrotation",
+                wuo=self.root.name()
+        )
+
+        pm.connectAttr(self.dist_att, self.proj_cns.tz)
 
     # =====================================================
     # CONNECTOR
@@ -197,7 +218,7 @@ class Component(component.Main):
         # slide system
         try:
             ghostSliderForPupil(
-                self.lookat,
+                self.proj_cns,
                 self.ctl,
                 self.sliding_surface,
                 self.sliding_surface.getParent()
