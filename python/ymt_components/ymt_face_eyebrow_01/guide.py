@@ -140,6 +140,7 @@ class Guide(guide.ComponentGuide):
         self.pOverrideNegate   = self.addParam("overrideNegate",   "bool", False)
         self.pAddJoints        = self.addParam("addJoints",        "bool", True)
         self.pSlidingSurface   = self.addParam("isSlidingSurface", "bool", True)
+        self.pSurfaceReference = self.addParam("surfaceReference", "string", "")
         self.pParentJointIndex = self.addParam("parentJointIndex", "long", -1, None, None)
 
     def modalPositions(self):
@@ -241,6 +242,10 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
         self.populateCheck(self.settingsTab.addJoints_checkBox,      "addJoints")
         self.populateCheck(self.settingsTab.isSlidingSurface,        "isSlidingSurface")
 
+        self.populateCheck(self.settingsTab.isSlidingSurface,"isSlidingSurface")
+        surfaceReference = self.root.attr("surfaceReference").get()
+        self.settingsTab.surfaceReference_listWidget.addItem(surfaceReference)
+
     def create_componentLayout(self):
 
         self.settings_layout = QtWidgets.QVBoxLayout()
@@ -265,6 +270,22 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
             partial(self.updateCheck,
                     self.settingsTab.isSlidingSurface,
                     "isSlidingSurface"))
+
+        self.settingsTab.surfaceReferenceAdd_pushButton.clicked.connect(
+            partial(
+                self.addItem2listWidget,
+                self.settingsTab.surfaceReference_listWidget,
+                "surfaceReference"
+            )
+        )
+
+        self.settingsTab.surfaceReferenceRemove_pushButton.clicked.connect(
+            partial(
+                self.removeSelectedFromListWidget,
+                self.settingsTab.surfaceReference_listWidget,
+                "surfaceReference"
+            )
+        )
 
     def updateMasterChain(self, lEdit, targetAttr):
         oType = pm.nodetypes.Transform

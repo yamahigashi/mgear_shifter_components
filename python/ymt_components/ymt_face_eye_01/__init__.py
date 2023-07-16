@@ -769,11 +769,7 @@ class Component(component.Main):
     def setRelation(self):
         """Set the relation beetween object from guide to rig"""
         self.relatives["root"] = self.root
-        if self.settings["isGlobalMaster"]:
-            return
 
-        # self.upDetailControllers = self._addCurveDetailControllers(t, self.upCrv, "upEyelid")
-        # self.lowDetailControllers = self._addCurveDetailControllers(t, self.lowCrv, "lowEyelid", skipHeadAndTail=skip)
         for i, ctl in enumerate(self.upDetailControllers):
 
             self.relatives["%s_uploc" % i] = ctl

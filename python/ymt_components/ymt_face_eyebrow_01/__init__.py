@@ -1,16 +1,14 @@
 """mGear shifter components"""
 # pylint: disable=import-error,W0201,C0111,C0112
 import re
+import sys
 
 import maya.cmds as cmds
-import maya.OpenMaya as om1
 import maya.api.OpenMaya as om
 
 import pymel.core as pm
 from pymel.core import datatypes
 
-import exprespy.cmd
-from pymel.util.arrays import real
 from mgear.shifter import component
 from mgear.rigbits.facial_rigger import helpers
 from mgear.rigbits.facial_rigger import constraints
@@ -18,24 +16,13 @@ from mgear.rigbits import ghost
 
 from mgear.core import (
     transform,
-    curve,
     applyop,
-    attribute,
-    icon,
-    fcurve,
-    vector,
-    meshNavigation,
     node,
     primitive,
-    utils,
 )
 
 from mgear.core.transform import (
     getTransform,
-    resetTransform,
-    # getTransformLookingAt,
-    # getChainTransform2,
-    setMatrixPosition,
 )
 
 from mgear.core.primitive import (
@@ -44,28 +31,29 @@ from mgear.core.primitive import (
 import ymt_shifter_utility as ymt_util
 import ymt_shifter_utility.curve as curve
 
-if False:  # pylint: disable=using-constant-test, wrong-import-order
-    # For type annotation
-    from typing import (  # NOQA: F401 pylint: disable=unused-import
-        Optional,
-        Dict,
-        List,
-        Tuple,
-        Pattern,
-        Callable,
-        Any,
-        Text,
-        Generator,
-        Union
-    )
-    from pathlib import Path  # NOQA: F401, F811 pylint: disable=unused-import,reimported
-    from types import ModuleType  # NOQA: F401 pylint: disable=unused-import
-    from six.moves import reload_module as reload  # NOQA: F401 pylint: disable=unused-import
+if sys.version_info > (3, 0):
+    from typing import TYPE_CHECKING
+    if TYPE_CHECKING:
+        from typing import (
+            Optional,  # noqa: F401
+            Dict,  # noqa: F401
+            List,  # noqa: F401
+            Tuple,  # noqa: F401
+            Pattern,  # noqa: F401
+            Callable,  # noqa: F401
+            Any,  # noqa: F401
+            Text,  # noqa: F401
+            Generator,  # noqa: F401
+            Union  # noqa: F401
+        )
+        from pathlib import Path  # NOQA: F401, F811 pylint: disable=unused-import,reimported
+        from types import ModuleType  # NOQA: F401 pylint: disable=unused-import
+        from six.moves import reload_module as reload  # NOQA: F401 pylint: disable=unused-import
 
 from logging import (  # noqa:F401 pylint: disable=unused-import, wrong-import-order
     StreamHandler,
     getLogger,
-    WARN,
+    # WARN,
     DEBUG,
     INFO
 )
@@ -161,15 +149,12 @@ class Component(component.Main):
         self.attachSecondaryControlsToMainCurve()
         self.connectWires()
 
-        self.sliding_surface = pm.duplicate(self.guide.getObjects(self.guide.root)["sliding_surface"])[0]
-        pm.parent(self.sliding_surface, self.root)
-        self.sliding_surface.visibility.set(False)
-        pm.makeIdentity(self.sliding_surface, apply=True, t=1,  r=1, s=1, n=0, pn=1)
-
-        # self.addControllers()
-        # self.addConstraints()
-        # for crv in self.mainCurves:
-        #     pm.delete(crv)
+        self.surfRef = self.settings["surfaceReference"]
+        if not self.surfRef:
+            self.sliding_surface = pm.duplicate(self.guide.getObjects(self.guide.root)["sliding_surface"])[0]
+            pm.parent(self.sliding_surface.name(), self.root)
+            self.sliding_surface.visibility.set(False)
+            pm.makeIdentity(self.sliding_surface, apply=True, t=1,  r=1, s=1, n=0, pn=1)
 
     def _visi_off_lock(self, node):
         """Short cuts."""
@@ -487,8 +472,8 @@ class Component(component.Main):
                 u = uLength / oLength
 
                 # create motion paths transforms on main ctl curves
-                cns = applyPathCnsLocal(oTransUpV, tempMainUpvCurves[j], u)
-                cns = applyPathCnsLocal(oTrans, tempMainCtlCurves[j], u)
+                cns = ymt_util.applyPathCnsLocal(oTransUpV, tempMainUpvCurves[j], u)
+                cns = ymt_util.applyPathCnsLocal(oTrans, tempMainCtlCurves[j], u)
 
                 pm.connectAttr(oTransUpV.attr("worldMatrix[0]"),
                                cns.attr("worldUpMatrix"))
@@ -562,6 +547,9 @@ class Component(component.Main):
     def connect_standard(self):
 
         self.parent.addChild(self.root)
+        if self.surfRef:
+            ref = self.rig.findComponent(self.surfRef)
+            self.sliding_surface = ref.sliding_surface
 
         if self.connect_surface_slider:
             try:
@@ -617,7 +605,7 @@ class Component(component.Main):
         self.ghostSliderForEyeBrow(
             ghosts,
             self.sliding_surface,
-            self.slider_root)
+            self.sliding_surface.getParent())
 
         self.secondaryControls = real_ctls
         self.setRelation()  # MUST re-setRelation, swapped ghost and real controls
@@ -648,25 +636,18 @@ class Component(component.Main):
         if not isinstance(ghostControls, list):
             ghostControls = [ghostControls]
 
-        def conn(ctl, driver, ghost):
-            for attr in ["translate", "scale", "rotate"]:
-                pm.connectAttr("{}.{}".format(ctl, attr), "{}.{}".format(driver, attr))
-                # pm.disconnectAttr("{}.{}".format(ctl, attr), "{}.{}".format(ghost, attr))
-
         surfaceShape = surface.getShape()
         sliders = []
 
         for i, ctlGhost in enumerate(ghostControls):
             ctl = pm.listConnections(ctlGhost, t="transform")[-1]
             t = ctl.getMatrix(worldSpace=True)
-            scl = [1, 1, 1]
-            if self.negate:
-                scl = [-1, 1, 1]
+            # scl = [1, 1, 1]
+            # if self.negate:
+            #     scl = [-1, 1, 1]
             # t = transform.setMatrixScale(t, scl)
 
             gDriver = primitive.addTransform(ctlGhost.getParent(), "{}_slideDriver".format(ctl.name()), t)
-            # conn(ctl, gDriver, ctlGhost)
-            # print("ctlGhost.getParent: {}, ctl: {}, gDriver: {}, ctlGhost: {}".format(ctlGhost.getParent(), ctl, gDriver, ctlGhost))
 
             oParent = ctlGhost.getParent()
             npoName = "_".join(ctlGhost.name().split("_")[:-1]) + "_npo"
@@ -679,12 +660,12 @@ class Component(component.Main):
             slider = primitive.addTransform(sliderParent, ctl.name() + "_slideDriven", t)
             sliders.append(slider)
 
-            down, _, up = findPathAtoB(ctl, sliderParent)
+            down, _, up = ymt_util.findPathAtoB(ctl, sliderParent)
             mul_node = pm.createNode("multMatrix")
             j = k = 0
             for j, d in enumerate(down):
                 d.attr("matrix") >> mul_node.attr("matrixIn[{}]".format(j))
-            _.attr("matrix") >> mul_node.attr("matrixIn[{}]".format(j + 1))
+            # mid.attr("matrix") >> mul_node.attr("matrixIn[{}]".format(j + 1))
             for k, u in enumerate(up):
                 u.attr("inverseMatrix") >> mul_node.attr("matrixIn[{}]".format(k + j + 1))
 
@@ -709,8 +690,6 @@ class Component(component.Main):
             pm.parent(ctlGhost.getParent(), slider)
 
             pm.parent(gDriver.getParent(), self.mainControl)
-            print("ctl.name(): %s", ctl.name())
-            print("ghost.name(): %s", ctlGhost.name())
 
 
 def draw_eye_guide_mesh_plane(points, t):
@@ -760,83 +739,3 @@ def draw_eye_guide_mesh_plane(points, t):
     n.setTranslation(v, om.MSpace.kWorld)
 
     return mesh
-
-
-def getFullPath(start, routes=None):
-    # type: (pm.nt.transform, List[pm.nt.transform]) -> List[pm.nt.transform]
-    if not routes:
-        routes = []
-
-    if not start.getParent():
-        return routes
-
-    else:
-        return getFullPath(start.getParent(), routes + [start, ])
-
-
-def findPathAtoB(a, b):
-    # type: (pm.nt.transform, pm.nt.transform) -> Tuple[List[pm.nt.transform], pm.nt.transform, List[pm.nt.transform]]
-    """Returns route of A to B in formed Tuple[down(to root), turning point, up(to leaf)]"""
-    # aPath = ["x", "a", "b", "c"]
-    # bPath = ["b", "c"]
-    # down [x, a]
-    # turn b
-    # up []
-
-    aPath = getFullPath(a)
-    bPath = getFullPath(b)
-
-    return _findPathAtoB(aPath, bPath)
-
-
-def _findPathAtoB(aPath, bPath):
-    # type: (List, List) -> Tuple[List, Any, List]
-    """Returns route of A to B in formed Tuple[down(to root), turning point, up(to leaf)]
-
-    >>> aPath = ["x", "a", "b", "c"]
-    >>> bPath = ["b", "c"]
-    >>> d, c, u = _findPathAtoB(aPath, bPath)
-    >>> d == ["x", "a"]
-    True
-    >>> c == "b"
-    True
-    >>> u == []
-    True
-
-    """
-    down = []
-    up = []
-    sharedNode = None
-
-    for u in aPath:
-        if u in bPath:
-            sharedNode = u
-            break
-
-        down.append(u)
-
-    idx = bPath.index(sharedNode)
-    up = list(reversed(bPath[:(idx)]))
-
-    return down, sharedNode, up
-
-
-def applyPathCnsLocal(target, curve, u):
-    cns = applyop.pathCns(target, curve, cnsType=False, u=u, tangent=False)
-    pm.connectAttr(curve.attr("local"), cns.attr("geometryPath"), f=True)  # tobe local space
-
-    comp_node = pm.createNode("composeMatrix")
-    cns.attr("allCoordinates") >> comp_node.attr("inputTranslate")
-    cns.attr("rotate") >> comp_node.attr("inputRotate")
-    cns.attr("rotateOrder") >> comp_node.attr("inputRotateOrder")
-
-    mul_node = pm.createNode("multMatrix")
-    comp_node.attr("outputMatrix") >> mul_node.attr("matrixIn[0]")
-    curve.attr("matrix") >> mul_node.attr("matrixIn[1]")
-
-    decomp_node = pm.createNode("decomposeMatrix")
-    mul_node.attr("matrixSum") >> decomp_node.attr("inputMatrix")
-    decomp_node.attr("outputTranslate") >> target.attr("translate")
-    decomp_node.attr("outputRotate") >> target.attr("rotate")
-
-    return cns

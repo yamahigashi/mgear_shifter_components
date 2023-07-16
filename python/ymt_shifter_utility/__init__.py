@@ -17,6 +17,7 @@ from mgear.core import (
     attribute,
     primitive,
     icon,
+    applyop,
 )
 from mgear.core.transform import (
     getTransform,
@@ -163,10 +164,35 @@ def _findPathAtoB(aPath, bPath):
 
         down.append(u)
 
-    idx = bPath.index(sharedNode)
+    try:
+        idx = bPath.index(sharedNode)
+    except ValueError:
+        idx = 0
+        logger.warning("No shared node found in path {} and {}".format(aPath, bPath))
     up = list(reversed(bPath[:(idx)]))
 
     return down, sharedNode, up
+
+
+def applyPathCnsLocal(target, curve, u):
+    cns = applyop.pathCns(target, curve, cnsType=False, u=u, tangent=False)
+    pm.connectAttr(curve.attr("local"), cns.attr("geometryPath"), f=True)  # tobe local space
+
+    comp_node = pm.createNode("composeMatrix")
+    cns.attr("allCoordinates") >> comp_node.attr("inputTranslate")
+    cns.attr("rotate") >> comp_node.attr("inputRotate")
+    cns.attr("rotateOrder") >> comp_node.attr("inputRotateOrder")
+
+    mul_node = pm.createNode("multMatrix")
+    comp_node.attr("outputMatrix") >> mul_node.attr("matrixIn[0]")
+    curve.attr("matrix") >> mul_node.attr("matrixIn[1]")
+
+    decomp_node = pm.createNode("decomposeMatrix")
+    mul_node.attr("matrixSum") >> decomp_node.attr("inputMatrix")
+    decomp_node.attr("outputTranslate") >> target.attr("translate")
+    decomp_node.attr("outputRotate") >> target.attr("rotate")
+
+    return cns
 
 
 def addCtlMetadata(self, ctl):

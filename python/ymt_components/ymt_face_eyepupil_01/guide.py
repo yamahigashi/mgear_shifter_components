@@ -127,8 +127,8 @@ class Guide(guide.ComponentGuide):
         self.pUseIndex = self.addParam("useIndex", "bool", False)
         self.pParentJointIndex = self.addParam(
             "parentJointIndex", "long", -1, None, None)
-
-        return
+        self.pSlidingSurface   = self.addParam("isSlidingSurface", "bool", True)
+        self.pSurfaceReference = self.addParam("surfaceReference", "string", "")
 
     def postDraw(self):
         "Add post guide draw elements to the guide"
@@ -285,6 +285,9 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
                               "Build will Fail!!")
         comboIndex = self.connector_items.index(currentConnector)
         self.mainSettingsTab.connector_comboBox.setCurrentIndex(comboIndex)
+        self.populateCheck(self.settingsTab.isSlidingSurface,"isSlidingSurface")
+        surfaceReference = self.root.attr("surfaceReference").get()
+        self.settingsTab.surfaceReference_listWidget.addItem(surfaceReference)
 
     def create_componentLayout(self):
 
@@ -361,6 +364,27 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
             partial(self.updateConnector,
                     self.mainSettingsTab.connector_comboBox,
                     self.connector_items))
+
+        self.settingsTab.isSlidingSurface.stateChanged.connect(
+            partial(self.updateCheck,
+                    self.settingsTab.isSlidingSurface,
+                    "isSlidingSurface"))
+
+        self.settingsTab.surfaceReferenceAdd_pushButton.clicked.connect(
+            partial(
+                self.addItem2listWidget,
+                self.settingsTab.surfaceReference_listWidget,
+                "surfaceReference"
+            )
+        )
+
+        self.settingsTab.surfaceReferenceRemove_pushButton.clicked.connect(
+            partial(
+                self.removeSelectedFromListWidget,
+                self.settingsTab.surfaceReference_listWidget,
+                "surfaceReference"
+            )
+        )
 
     def eventFilter(self, sender, event):
         if event.type() == QtCore.QEvent.ChildRemoved:

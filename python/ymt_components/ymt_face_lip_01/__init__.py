@@ -354,8 +354,14 @@ class Component(component.Main):
             uLength = curve.findLenghtFromParam(rope, oParam)
             u = uLength / oLength
 
-            cns = applyPathCnsLocal(upv, rope_upv, u)
-            cns = applyPathCnsLocal(npo, rope, u)
+            if (i + 1) / float(len(cvs)) < 0.5:
+                negate = True
+            else:
+                negate = False
+
+            cns = applyPathCnsLocal(upv, rope_upv, u, negate=negate)
+            cns = applyPathCnsLocal(npo, rope, u, negate=negate)
+            print(i, negate, name, len(cvs))
 
             pm.connectAttr(upv.attr("worldMatrix[0]"), cns.attr("worldUpMatrix"))
 
@@ -765,7 +771,8 @@ class Component(component.Main):
             [slide_c_ref, corner_l_ref, corner_r_ref],
             intTra,
             self.sliding_surface,
-            self.root)
+            self.sliding_surface.getParent()
+        )
 
         # connect scale
         pm.connectAttr(self.mouthSlide_ctl.scale, slide_c_ref.scale)
@@ -1041,7 +1048,7 @@ def createGhostWithParentConstraint(ctl, parent=None, connect=True):
     return newCtl, ctl
 
 
-def applyPathCnsLocal(target, curve, u):
+def applyPathCnsLocal(target, curve, u, negate=False):
     cns = applyop.pathCns(target, curve, cnsType=False, u=u, tangent=False)
     pm.connectAttr(curve.attr("local"), cns.attr("geometryPath"), f=True)  # tobe local space
 
@@ -1053,8 +1060,7 @@ def applyPathCnsLocal(target, curve, u):
     mul_node = pm.createNode("multMatrix")
     comp_node2 = pm.createNode("composeMatrix")
 
-    pos = target.getTranslation(space="world")
-    if pos.x < -0.001:
+    if negate:
         pm.setAttr(comp_node2.attr("inputScaleX"), -1.0)
 
     pm.setAttr(comp_node2.attr("inputRotateX"), 90.0)
