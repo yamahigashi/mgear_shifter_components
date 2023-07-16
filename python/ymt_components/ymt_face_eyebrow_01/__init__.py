@@ -186,8 +186,21 @@ class Component(component.Main):
         # self.mainControlParentGrp = addTransform(self.root, self.getName("mainControls"), t)
         w = (self.outPos - self.inPos).length()
         d = (self.upPos - self.lowPos).length()
+        po_x = ((self.inPos - self.rootPos).x * 0.4 + (w * self.n_factor / 2.0)) * self.n_factor
+        po_y = ((self.upPos + self.outPos) / 2.0 - self.rootPos).y + (d / 2.0)
+
         self.mainControlParentGrp = addTransform(self.root, self.getName("mainControls"), t)
-        self.mainControl = self.addCtl(self.mainControlParentGrp, "main_ctl", t, self.color_ik, "square", w=w, d=d, ro=datatypes.Vector(1.57079633, 0, 0), po=datatypes.Vector(0, 0, 1.0))
+        self.mainControl = self.addCtl(
+                self.mainControlParentGrp,
+                "main_ctl",
+                t,
+                self.color_ik,
+                "square",
+                w=w,
+                d=d,
+                ro=datatypes.Vector(1.57079633, 0, 0),
+                po=datatypes.Vector(po_x, po_y, 1.0)
+        )
         self.addToSubGroup(self.mainControl, self.primaryControllersGroupName)
         self.secondaryControlsParentGrp = addTransform(self.root, self.getName("secondaryControls"), t)
 
@@ -472,8 +485,8 @@ class Component(component.Main):
                 u = uLength / oLength
 
                 # create motion paths transforms on main ctl curves
-                cns = ymt_util.applyPathCnsLocal(oTransUpV, tempMainUpvCurves[j], u)
-                cns = ymt_util.applyPathCnsLocal(oTrans, tempMainCtlCurves[j], u)
+                cns = applyPathCnsLocal(oTransUpV, tempMainUpvCurves[j], u)
+                cns = applyPathCnsLocal(oTrans, tempMainCtlCurves[j], u)
 
                 pm.connectAttr(oTransUpV.attr("worldMatrix[0]"),
                                cns.attr("worldUpMatrix"))
@@ -642,9 +655,9 @@ class Component(component.Main):
         for i, ctlGhost in enumerate(ghostControls):
             ctl = pm.listConnections(ctlGhost, t="transform")[-1]
             t = ctl.getMatrix(worldSpace=True)
-            # scl = [1, 1, 1]
-            # if self.negate:
-            #     scl = [-1, 1, 1]
+            scl = [1, 1, 1]
+            if self.negate:
+                scl = [-1, 1, 1]
             # t = transform.setMatrixScale(t, scl)
 
             gDriver = primitive.addTransform(ctlGhost.getParent(), "{}_slideDriver".format(ctl.name()), t)
@@ -739,3 +752,24 @@ def draw_eye_guide_mesh_plane(points, t):
     n.setTranslation(v, om.MSpace.kWorld)
 
     return mesh
+
+
+def applyPathCnsLocal(target, curve, u):
+    cns = applyop.pathCns(target, curve, cnsType=False, u=u, tangent=False)
+    pm.connectAttr(curve.attr("local"), cns.attr("geometryPath"), f=True)  # tobe local space
+
+    comp_node = pm.createNode("composeMatrix")
+    cns.attr("allCoordinates") >> comp_node.attr("inputTranslate")
+    cns.attr("rotate") >> comp_node.attr("inputRotate")
+    cns.attr("rotateOrder") >> comp_node.attr("inputRotateOrder")
+
+    mul_node = pm.createNode("multMatrix")
+    comp_node.attr("outputMatrix") >> mul_node.attr("matrixIn[0]")
+    curve.attr("matrix") >> mul_node.attr("matrixIn[1]")
+
+    decomp_node = pm.createNode("decomposeMatrix")
+    mul_node.attr("matrixSum") >> decomp_node.attr("inputMatrix")
+    decomp_node.attr("outputTranslate") >> target.attr("translate")
+    decomp_node.attr("outputRotate") >> target.attr("rotate")
+
+    return cns
