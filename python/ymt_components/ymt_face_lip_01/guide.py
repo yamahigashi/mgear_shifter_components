@@ -320,7 +320,6 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
             )
         )
 
-
     def updateMasterChain(self, lEdit, targetAttr):
         oType = pm.nodetypes.Transform
 

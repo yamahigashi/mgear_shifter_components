@@ -113,6 +113,8 @@ class Component(component.Main):
                                 0, 0, 0]
 
         # -------------------------------------------------------
+        self.surfRef = self.settings["surfaceReference"]
+        self.connect_surface_slider = self.settings["isSlidingSurface"]
 
         self.num_uplocs = self.getNumberOfLocators("_uploc")
         self.num_lowlocs = self.getNumberOfLocators("_lowloc")
@@ -230,6 +232,12 @@ class Component(component.Main):
         self.addCurves(self.crv_root, plane)
         self.addCurveBaseControllers(self.crv_root, plane)
         cmds.delete(cmds.listRelatives(plane.fullPathName(), parent=True))
+
+        if not self.surfRef:
+            self.sliding_surface = pm.duplicate(self.guide.getObjects(self.guide.root)["sliding_surface"])[0]
+            pm.parent(self.sliding_surface.name(), self.root)
+            self.sliding_surface.visibility.set(False)
+            pm.makeIdentity(self.sliding_surface, apply=True, t=1,  r=1, s=1, n=0, pn=1)
 
     def addCurves(self, crv_root, plane):
 
@@ -642,6 +650,9 @@ class Component(component.Main):
             return
 
         self.parent.addChild(self.root)
+        if self.surfRef:
+            ref = self.rig.findComponent(self.surfRef)
+            self.sliding_surface = ref.sliding_surface
 
         try:
             self.connect_ghosts()
@@ -653,6 +664,9 @@ class Component(component.Main):
 
     def connect_standard(self):
         self.parent.addChild(self.root)
+        if self.surfRef:
+            ref = self.rig.findComponent(self.surfRef)
+            self.sliding_surface = ref.sliding_surface
 
     def connect_ghosts(self):
 
@@ -751,11 +765,6 @@ class Component(component.Main):
                 # logger.error(e)
 
     def connect_slide_ghost(self, lipup_ref, liplow_ref, slide_c_ref, corner_l_ref, corner_r_ref):
-
-        self.sliding_surface = pm.duplicate(self.guide.getObjects(self.guide.root)["sliding_surface"])[0]
-        pm.parent(self.sliding_surface, self.root)
-        self.sliding_surface.visibility.set(False)
-        pm.makeIdentity(self.sliding_surface, apply=True, t=1,  r=1, s=1, n=0, pn=1)
 
         # create interpose lvl for the ctl
         intTra = rigbits.createInterpolateTransform([lipup_ref, liplow_ref])
