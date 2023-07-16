@@ -19,10 +19,7 @@
      <property name="title">
       <string>Surface</string>
      </property>
-     <layout class="QGridLayout" name="gridLayout_4" rowstretch="0,0,0,0">
-      <property name="sizeConstraint">
-       <enum>QLayout::SetDefaultConstraint</enum>
-      </property>
+     <layout class="QGridLayout" name="gridLayout_4">
       <item row="0" column="0">
        <widget class="QCheckBox" name="isSlidingSurface">
         <property name="text">
@@ -37,15 +34,9 @@
        </widget>
       </item>
       <item row="1" column="0">
-       <widget class="QGroupBox" name="ikRefArray_groupBox">
+       <widget class="QGroupBox" name="surfaceReference_groupBox">
         <property name="enabled">
          <bool>true</bool>
-        </property>
-        <property name="maximumSize">
-         <size>
-          <width>16777215</width>
-          <height>166</height>
-         </size>
         </property>
         <property name="title">
          <string/>
@@ -53,16 +44,13 @@
         <property name="flat">
          <bool>false</bool>
         </property>
-        <layout class="QGridLayout" name="gridLayout_7" rowstretch="0,0,0" columnstretch="0">
-         <property name="sizeConstraint">
-          <enum>QLayout::SetMaximumSize</enum>
-         </property>
-         <item row="1" column="0">
-          <layout class="QHBoxLayout" name="ikRefArray_horizontalLayout_4">
+        <layout class="QGridLayout" name="gridLayout_7">
+         <item row="0" column="0">
+          <layout class="QHBoxLayout" name="surfaceReference_horizontalLayout_4">
            <item>
-            <layout class="QVBoxLayout" name="ikRefArray_verticalLayout_7">
+            <layout class="QVBoxLayout" name="surfaceReference_verticalLayout_7">
              <item>
-              <widget class="QListWidget" name="surfaceReference_listWidget">
+              <widget class="QListWidget" name="surfaceReference_listWidget_4">
                <property name="autoScroll">
                 <bool>false</bool>
                </property>
@@ -104,26 +92,26 @@
             </layout>
            </item>
            <item>
-            <layout class="QVBoxLayout" name="ikRefArray_verticalLayout_8">
+            <layout class="QVBoxLayout" name="surfaceReference_verticalLayout_8">
              <property name="spacing">
               <number>3</number>
              </property>
              <item>
-              <widget class="QPushButton" name="surfaceReferenceAdd_pushButton">
+              <widget class="QPushButton" name="surfaceReferenceAdd_pushButton_4">
                <property name="text">
                 <string>&lt;&lt;</string>
                </property>
               </widget>
              </item>
              <item>
-              <widget class="QPushButton" name="surfaceReferenceRemove_pushButton">
+              <widget class="QPushButton" name="surfaceReferenceRemove_pushButton_4">
                <property name="text">
                 <string>&gt;&gt;</string>
                </property>
               </widget>
              </item>
              <item>
-              <spacer name="ikRefArray_verticalSpacer_4">
+              <spacer name="surfaceReference_verticalSpacer_4">
                <property name="orientation">
                 <enum>Qt::Vertical</enum>
                </property>
@@ -139,39 +127,6 @@
            </item>
           </layout>
          </item>
-         <item row="2" column="0">
-          <widget class="QTextEdit" name="textEdit">
-           <property name="maximumSize">
-            <size>
-             <width>16777215</width>
-             <height>66</height>
-            </size>
-           </property>
-           <property name="focusPolicy">
-            <enum>Qt::NoFocus</enum>
-           </property>
-           <property name="contextMenuPolicy">
-            <enum>Qt::NoContextMenu</enum>
-           </property>
-           <property name="acceptDrops">
-            <bool>false</bool>
-           </property>
-           <property name="readOnly">
-            <bool>true</bool>
-           </property>
-           <property name="html">
-            <string>&lt;!DOCTYPE HTML PUBLIC &quot;-//W3C//DTD HTML 4.0//EN&quot; &quot;http://www.w3.org/TR/REC-html40/strict.dtd&quot;&gt;
-&lt;html&gt;&lt;head&gt;&lt;meta name=&quot;qrichtext&quot; content=&quot;1&quot; /&gt;&lt;meta charset=&quot;utf-8&quot; /&gt;&lt;style type=&quot;text/css&quot;&gt;
-p, li { white-space: pre-wrap; }
-hr { height: 1px; border-width: 0; }
-li.unchecked::marker { content: &quot;\2610&quot;; }
-li.checked::marker { content: &quot;\2612&quot;; }
-&lt;/style&gt;&lt;/head&gt;&lt;body style=&quot; font-family:'Segoe UI'; font-size:9pt; font-weight:400; font-style:normal;&quot;&gt;
-&lt;p style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;Reference to the &amp;quot;sliding_surface&amp;quot; of other components.&lt;/p&gt;
-&lt;p style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;When setting this value, please ensure that the component comes before this component in the order on the outliner.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-           </property>
-          </widget>
-         </item>
         </layout>
        </widget>
       </item>
@@ -179,11 +134,14 @@ li.checked::marker { content: &quot;\2612&quot;; }
     </widget>
    </item>
    <item>
+    <layout class="QHBoxLayout" name="horizontalLayout"/>
+   </item>
+   <item>
     <widget class="QGroupBox" name="groupBox">
      <property name="title">
       <string>GroupBox</string>
      </property>
-     <layout class="QHBoxLayout" name="horizontalLayout_2" stretch="0">
+     <layout class="QHBoxLayout" name="horizontalLayout_2">
       <item>
        <layout class="QVBoxLayout" name="verticalLayout_3">
         <item>

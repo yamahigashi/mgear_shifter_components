@@ -2,61 +2,41 @@
 import re
 import math
 import sys
-# import itertools
 
 from pymel.core import datatypes
 from pymel import versions
 import pymel.core as pm
 
 import maya.cmds as cmds
-import maya.OpenMaya as om1
 import maya.api.OpenMaya as om
 
 from Qt import QtWidgets
 
-import mgear.shifter.component as component
 import mgear.synoptic as synoptic
-
 from mgear.core import (
     attribute,
-    node,
+    primitive,
     icon,
-    # fcurve,
-    vector,
+    applyop,
 )
-
 from mgear.core.transform import (
     getTransform,
-    setMatrixPosition,
     getTransformLookingAt,
 )
-
 from mgear.core.primitive import addTransform
-# from mgear.shifter import naming
 
-from mgear.core import (
-    transform,
-    curve,
-    applyop,
-    attribute,
-    icon,
-    fcurve,
-    vector,
-    meshNavigation,
-    node,
-    primitive,
-    utils,
-)
 
 from ymt_shifter_utility import twistSplineBuilder as tsBuilder
 
-from logging import (  # noqa:F401 pylint: disable=unused-import, wrong-import-order
-    StreamHandler,
+from logging import (
+    StreamHandler,  # noqa: F401
     getLogger,
-    WARN,
-    DEBUG,
-    INFO
+    WARN,  # noqa: F401
+    DEBUG,  # noqa: F401
+    INFO,  # noqa: F401
 )
+logger = getLogger(__name__)
+logger.setLevel(INFO)
 
 if sys.version_info > (3, 0):
     unicode = str
@@ -74,11 +54,13 @@ if sys.version_info > (3, 0):
             Generator,  # noqa: F401
             Union  # noqa: F401
         )
+        import mgear.shifter.component as component  # noqa: F401
 
 
+##########################################################
 def collect_synoptic_windows(parent=None):
     synoptics = []
-    active_window = None
+    # active_window = None
     for w in QtWidgets.QApplication.topLevelWidgets():
         if not w.isVisible():
             continue
@@ -87,7 +69,7 @@ def collect_synoptic_windows(parent=None):
         if not w.children():
             continue
         if w.isActiveWindow():
-            active_window = w
+            # active_window = w
             continue
 
         if not isinstance(w, synoptic.Synoptic):
@@ -131,15 +113,14 @@ def setKeyableAttributesDontLockVisibility(nodes, params=None):
 
 
 def getFullPath(start, routes=None):
-    # type: (pm.nt.transform, List[pm.nt.transform]) -> List[pm.nt.transform]
+    # type: (pm.nt.transform, List[pm.nt.transform]|None) -> List[pm.nt.transform]
     if not routes:
         routes = []
 
     if not start.getParent():
         return routes + [start, ]
 
-    else:
-        return getFullPath(start.getParent(), routes + [start, ])
+    return getFullPath(start.getParent(), routes + [start, ])
 
 
 def findPathAtoB(a, b):
@@ -183,10 +164,35 @@ def _findPathAtoB(aPath, bPath):
 
         down.append(u)
 
-    idx = bPath.index(sharedNode)
+    try:
+        idx = bPath.index(sharedNode)
+    except ValueError:
+        idx = 0
+        logger.warning("No shared node found in path {} and {}".format(aPath, bPath))
     up = list(reversed(bPath[:(idx)]))
 
     return down, sharedNode, up
+
+
+def applyPathCnsLocal(target, curve, u):
+    cns = applyop.pathCns(target, curve, cnsType=False, u=u, tangent=False)
+    pm.connectAttr(curve.attr("local"), cns.attr("geometryPath"), f=True)  # tobe local space
+
+    comp_node = pm.createNode("composeMatrix")
+    cns.attr("allCoordinates") >> comp_node.attr("inputTranslate")
+    cns.attr("rotate") >> comp_node.attr("inputRotate")
+    cns.attr("rotateOrder") >> comp_node.attr("inputRotateOrder")
+
+    mul_node = pm.createNode("multMatrix")
+    comp_node.attr("outputMatrix") >> mul_node.attr("matrixIn[0]")
+    curve.attr("matrix") >> mul_node.attr("matrixIn[1]")
+
+    decomp_node = pm.createNode("decomposeMatrix")
+    mul_node.attr("matrixSum") >> decomp_node.attr("inputMatrix")
+    decomp_node.attr("outputTranslate") >> target.attr("translate")
+    decomp_node.attr("outputRotate") >> target.attr("rotate")
+
+    return cns
 
 
 def addCtlMetadata(self, ctl):
@@ -550,7 +556,7 @@ def convertToTwistSpline(comp, prefix, positions, crv, ikNb, norm, isClosed=Fals
         cmds.setAttr("{0}.tx".format(bfr), cur[0] + offset[0])
         cmds.setAttr("{0}.ty".format(bfr), cur[1] + offset[1])
         cmds.setAttr("{0}.tz".format(bfr), cur[2] + offset[2])
-        for att in [x+y for x in 'trs' for y in 'xyz']:
+        for att in [x+y for x in "trs" for y in "xyz"]:
             cmds.setAttr("{0}.{1}".format(bfr, att), lock=True)
 
     scl = comp.length * (1. / comp.division) * 1.3
@@ -790,8 +796,8 @@ def _getRotationsAtEachPoint(bfrs, norm):
 
 
 def iter_tr_xyz(object_name):
-    for attr in ["t", "r"]:
-        for axis in ["x", "y", "z"]:
+    for attr in ("t", "r"):
+        for axis in ("x", "y", "z"):
             yield "{}.{}{}".format(object_name, attr, axis)
 
 
@@ -842,7 +848,7 @@ def add3DChain(parent, name, positions, normal, negate=False, vis=True):
 
 def __has_make_nurbs_surface_hostory(surface_name):
     # type: (str) -> bool
-    """Return True if the surface has makeNurbSurface history"""
+    """Return True if the surface has makeNurbPlane history"""
     for history in cmds.listHistory(surface_name) or []:
         if cmds.nodeType(history) == "makeNurbPlane":
             return True
@@ -852,6 +858,8 @@ def __has_make_nurbs_surface_hostory(surface_name):
 
 def serialize_nurbs_surface(surface_name):
     # type: (str) -> str
+    """Serialize a NURBS surface to a string"""
+
     if not isinstance(surface_name, (str, unicode)):
         raise TypeError("surface_name must be a string")
 
@@ -902,6 +910,8 @@ def serialize_nurbs_surface(surface_name):
 
 def deserialize_nurbs_surface(surface_name, serialized_data):
     # type: (str, str) -> str
+    """Deserialize a NURBS surface from a string"""
+
     if not isinstance(surface_name, (str, unicode)):
         raise TypeError("surface_name must be a string but got {0}".format(type(surface_name)))
 

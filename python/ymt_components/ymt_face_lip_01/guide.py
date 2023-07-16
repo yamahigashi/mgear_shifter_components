@@ -55,6 +55,20 @@ class Guide(guide.ComponentGuide):
 
     connectors = ["mouth_01"]
 
+    def setFromHierarchy(self, root):
+        self.root = root
+        self.model = self.root.getParent(generations=-1)
+        self.setParamDefValuesFromProperty(self.root)
+        self.sliding_surface = pm.PyNode(self.getName("sliding_surface"))
+        info = ymt_utility.serialize_nurbs_surface(self.sliding_surface.name())
+
+        super(Guide, self).setFromHierarchy(root)
+        pm.delete(self.sliding_surface)
+        
+        sliding_surface = ymt_utility.deserialize_nurbs_surface(self.getName("sliding_surface"), info)
+        self.sliding_surface = pm.PyNode(sliding_surface)
+        pm.parent(self.sliding_surface, self.root, absolute=False, relative=True)
+
     def get_guide_template_dict(self):
         """Override the base class method to add more data to the guide template dict"""
         c_dict = super(Guide, self).get_guide_template_dict()
@@ -148,12 +162,11 @@ class Guide(guide.ComponentGuide):
         self.pNeutralPose = self.addParam("neutralpose", "bool", False)
         self.pOverrideNegate = self.addParam("overrideNegate", "bool", False)
 
-        self.pIk0RefArray = self.addParam("ik0refarray", "string", "")
-        self.pIk1RefArray = self.addParam("ik1refarray", "string", "")
-
         self.pUseIndex = self.addParam("useIndex", "bool", False)
         self.pParentJointIndex = self.addParam(
             "parentJointIndex", "long", -1, None, None)
+        self.pSlidingSurface   = self.addParam("isSlidingSurface", "bool", True)
+        self.pSurfaceReference = self.addParam("surfaceReference", "string", "")
 
     def modalPositions(self):
         """Launch a modal dialog to set position of the guide."""
@@ -164,8 +177,6 @@ class Guide(guide.ComponentGuide):
         for name in self.save_transform:
 
             if "#" in name:
-
-                print(name)
 
                 init_window = chain_guide_initializer.exec_window()
                 if init_window:
@@ -250,14 +261,6 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
         # populate component settings
         self.populateCheck(self.settingsTab.overrideNegate_checkBox, "overrideNegate")
 
-        ik0RefArrayItems = self.root.attr("ik0refarray").get().split(",")
-        for item in ik0RefArrayItems:
-            self.settingsTab.ik0RefArray_listWidget.addItem(item)
-
-        ik1RefArrayItems = self.root.attr("ik1refarray").get().split(",")
-        for item in ik1RefArrayItems:
-            self.settingsTab.ik1RefArray_listWidget.addItem(item)
-
         for cnx in Guide.connectors:
             self.mainSettingsTab.connector_comboBox.addItem(cnx)
 
@@ -272,6 +275,9 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
                               "Build will Fail!!")
         comboIndex = self.connector_items.index(currentConnector)
         self.mainSettingsTab.connector_comboBox.setCurrentIndex(comboIndex)
+        self.populateCheck(self.settingsTab.isSlidingSurface,"isSlidingSurface")
+        surfaceReference = self.root.attr("surfaceReference").get()
+        self.settingsTab.surfaceReference_listWidget.addItem(surfaceReference)
 
     def create_componentLayout(self):
 
@@ -288,20 +294,31 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
                     self.settingsTab.overrideNegate_checkBox,
                     "overrideNegate"))
 
-        self.settingsTab.ik0RefArrayAdd_pushButton.clicked.connect(
-            partial(self.addItem2listWidget,
-                    self.settingsTab.ik0RefArray_listWidget,
-                    "ik0refarray"))
-
-        self.settingsTab.ik0RefArrayRemove_pushButton.clicked.connect(
-            partial(self.removeSelectedFromListWidget,
-                    self.settingsTab.ik0RefArray_listWidget,
-                    "ik0refarray"))
-
         self.mainSettingsTab.connector_comboBox.currentIndexChanged.connect(
             partial(self.updateConnector,
                     self.mainSettingsTab.connector_comboBox,
                     self.connector_items))
+
+        self.settingsTab.isSlidingSurface.stateChanged.connect(
+            partial(self.updateCheck,
+                    self.settingsTab.isSlidingSurface,
+                    "isSlidingSurface"))
+
+        self.settingsTab.surfaceReferenceAdd_pushButton.clicked.connect(
+            partial(
+                self.addItem2listWidget,
+                self.settingsTab.surfaceReference_listWidget,
+                "surfaceReference"
+            )
+        )
+
+        self.settingsTab.surfaceReferenceRemove_pushButton.clicked.connect(
+            partial(
+                self.removeSelectedFromListWidget,
+                self.settingsTab.surfaceReference_listWidget,
+                "surfaceReference"
+            )
+        )
 
 
     def updateMasterChain(self, lEdit, targetAttr):

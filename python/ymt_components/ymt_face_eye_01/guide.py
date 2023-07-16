@@ -131,44 +131,13 @@ class Guide(guide.ComponentGuide):
     def addParameters(self):
         """Add the configurations settings"""
 
+        self.pUseIndex = self.addParam("useIndex", "bool", False)
         self.pNeutralPose = self.addParam("neutralpose", "bool", False)
         self.pOverrideNegate = self.addParam("overrideNegate", "bool", False)
-        self.pikNb = self.addParam("ikNb", "long", 3, 2)
-
-        self.pIk0RefArray = self.addParam("ik0refarray", "string", "")
-        self.pIk1RefArray = self.addParam("ik1refarray", "string", "")
-        self.pSplitHip = self.addParam("isPlanetaryIkBindToGlobal", "bool", True)
-        self.pAimTip = self.addParam("isUpvectorAimToTip", "bool", False)
-        self.pPosition = self.addParam("position", "double", 0, 0, 1)
-        self.pMaxStretch = self.addParam("maxstretch", "double", 1, 1)
-        self.pMaxSquash = self.addParam("maxsquash", "double", 1, 0, 1)
-        self.pSoftness = self.addParam("softness", "double", 0, 0, 1)
-        self.pIsGlobalMaster = self.addParam("addJoints", "bool", True)
-        self.pAddJoints = self.addParam("isGlobalMaster", "bool", False)
-        self.pBoundFk = self.addParam("isBoundFkToCurve", "bool", True)
-        self.pMasterChain = self.addParam("masterChainLocal", "string", "")
-        self.pMasterChain = self.addParam("masterChainGlobal", "string", "")
-        self.pCnxOffset = self.addParam("cnxOffset", "long", 0, 0)
-        # FCurves
-        self.pSt_profile = self.addFCurveParam(
-            "st_profile", [[0, 0], [.5, -1], [1, 0]])
-
-        self.pSq_profile = self.addFCurveParam(
-            "sq_profile", [[0, 0], [.5, 1], [1, 0]])
-
-        self.pIk_profile = self.addFCurveParam(
-            "ik_profile", [[0, 0], [.5, .5], [1, 1]])
-
-        self.pUseIndex = self.addParam("useIndex", "bool", False)
-        self.pParentJointIndex = self.addParam(
-            "parentJointIndex", "long", -1, None, None)
-
-    def get_divisions(self):
-        """ Returns correct segments divisions """
-
-        self.divisions = self.root.ikNb.get()
-
-        return self.divisions
+        self.pSlidingSurface   = self.addParam("isSlidingSurface", "bool", True)
+        self.pSurfaceReference = self.addParam("surfaceReference", "string", "")
+        self.pParentJointIndex = self.addParam("parentJointIndex", "long", -1, None, None)
+        self.pAddJoints = self.addParam("addJoints", "bool", True)
 
     def modalPositions(self):
         """Launch a modal dialog to set position of the guide."""
@@ -263,47 +232,21 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
         self.tabs.insertTab(1, self.settingsTab, "Component Settings")
 
         # populate component settings
-        self.populateCheck(self.settingsTab.overrideNegate_checkBox,
-                           "overrideNegate")
+        self.populateCheck(self.settingsTab.overrideNegate_checkBox, "overrideNegate")
+        self.populateCheck(self.settingsTab.addJoints_checkBox, "addJoints")
 
-        ik0RefArrayItems = self.root.attr("ik0refarray").get().split(",")
-        for item in ik0RefArrayItems:
-            self.settingsTab.ik0RefArray_listWidget.addItem(item)
+        try:
+            self.root.attr("isSlidingSurface").get()
+        except Exception:
+            self.root.pSlidingSurface = self.root.addParam("isSlidingSurface", "bool", True)
+        self.populateCheck(self.settingsTab.isSlidingSurface,"isSlidingSurface")
 
-        ik1RefArrayItems = self.root.attr("ik1refarray").get().split(",")
-        for item in ik1RefArrayItems:
-            self.settingsTab.ik1RefArray_listWidget.addItem(item)
-
-        self.settingsTab.ikNb_spinBox.setValue(
-            self.root.attr("ikNb").get())
-        self.settingsTab.softness_slider.setValue(
-            int(self.root.attr("softness").get() * 100))
-        self.settingsTab.position_spinBox.setValue(
-            int(self.root.attr("position").get() * 100))
-        self.settingsTab.position_slider.setValue(
-            int(self.root.attr("position").get() * 100))
-        self.settingsTab.softness_spinBox.setValue(
-            int(self.root.attr("softness").get() * 100))
-        self.settingsTab.maxStretch_spinBox.setValue(
-            self.root.attr("maxstretch").get())
-        self.settingsTab.maxSquash_spinBox.setValue(
-            self.root.attr("maxsquash").get())
-        self.populateCheck(self.settingsTab.addJoints_checkBox,
-                           "addJoints")
-        self.populateCheck(self.settingsTab.isGlobalMaster_checkBox,
-                           "isGlobalMaster")
-        self.populateCheck(self.settingsTab.isBoundFkToCurve_checkBox,
-                           "isBoundFkToCurve")
-        self.populateCheck(self.settingsTab.isPlanetaryIkBindToGlobal_checkBox,
-                           "isPlanetaryIkBindToGlobal")
-        self.populateCheck(self.settingsTab.isUpvectorAimToTip_checkBox,
-                           "isUpvectorAimToTip")
-        self.settingsTab.masterLocal_lineEdit.setText(
-            self.root.attr("masterChainLocal").get())
-        self.settingsTab.masterGlobal_lineEdit.setText(
-            self.root.attr("masterChainGlobal").get())
-        self.settingsTab.cnxOffset_spinBox.setValue(
-            self.root.attr("cnxOffset").get())
+        try:
+            surfaceReference = self.root.attr("surfaceReference").get()
+        except Exception:
+            surfaceReference = ""
+            self.root.pSurfaceReference = self.root.addParam("surfaceReference", "string", "")
+        self.settingsTab.surfaceReference_listWidget.addItem(surfaceReference)
 
     def create_componentLayout(self):
 
@@ -319,95 +262,32 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
             partial(self.updateCheck,
                     self.settingsTab.overrideNegate_checkBox,
                     "overrideNegate"))
-        self.settingsTab.ikNb_spinBox.valueChanged.connect(
-            partial(self.updateSpinBox,
-                    self.settingsTab.ikNb_spinBox,
-                    "ikNb"))
 
-        self.settingsTab.ik0RefArrayAdd_pushButton.clicked.connect(
-            partial(self.addItem2listWidget,
-                    self.settingsTab.ik0RefArray_listWidget,
-                    "ik0refarray"))
-        self.settingsTab.ik0RefArrayRemove_pushButton.clicked.connect(
-            partial(self.removeSelectedFromListWidget,
-                    self.settingsTab.ik0RefArray_listWidget,
-                    "ik0refarray"))
-
-        self.settingsTab.ik1RefArrayAdd_pushButton.clicked.connect(
-            partial(self.addItem2listWidget,
-                    self.settingsTab.ik1RefArray_listWidget,
-                    "ik1refarray"))
-        self.settingsTab.ik1RefArrayRemove_pushButton.clicked.connect(
-            partial(self.removeSelectedFromListWidget,
-                    self.settingsTab.ik1RefArray_listWidget,
-                    "ik1refarray"))
-
-        self.settingsTab.softness_slider.valueChanged.connect(
-            partial(self.updateSlider,
-                    self.settingsTab.softness_slider,
-                    "softness"))
-        self.settingsTab.softness_spinBox.valueChanged.connect(
-            partial(self.updateSlider,
-                    self.settingsTab.softness_spinBox,
-                    "softness"))
-        self.settingsTab.position_slider.valueChanged.connect(
-            partial(self.updateSlider,
-                    self.settingsTab.position_slider,
-                    "position"))
-        self.settingsTab.position_spinBox.valueChanged.connect(
-            partial(self.updateSlider,
-                    self.settingsTab.position_spinBox,
-                    "position"))
-        self.settingsTab.maxStretch_spinBox.valueChanged.connect(
-            partial(self.updateSpinBox,
-                    self.settingsTab.maxStretch_spinBox,
-                    "maxstretch"))
-        self.settingsTab.maxSquash_spinBox.valueChanged.connect(
-            partial(self.updateSpinBox,
-                    self.settingsTab.maxSquash_spinBox,
-                    "maxsquash"))
         self.settingsTab.addJoints_checkBox.stateChanged.connect(
             partial(self.updateCheck,
                     self.settingsTab.addJoints_checkBox,
                     "addJoints"))
 
-        self.settingsTab.masterLocal_pushButton.clicked.connect(
-            partial(self.updateMasterChain,
-                    self.settingsTab.masterLocal_lineEdit,
-                    "masterChainLocal"))
-
-        self.settingsTab.masterGlobal_pushButton.clicked.connect(
-            partial(self.updateMasterChain,
-                    self.settingsTab.masterGlobal_lineEdit,
-                    "masterChainGlobal"))
-
-        self.settingsTab.cnxOffset_spinBox.valueChanged.connect(
-            partial(self.updateSpinBox,
-                    self.settingsTab.cnxOffset_spinBox,
-                    "cnxOffset"))
-
-        self.settingsTab.isGlobalMaster_checkBox.stateChanged.connect(
+        self.settingsTab.isSlidingSurface.stateChanged.connect(
             partial(self.updateCheck,
-                    self.settingsTab.isGlobalMaster_checkBox,
-                    "isGlobalMaster"))
+                    self.settingsTab.isSlidingSurface,
+                    "isSlidingSurface"))
 
-        self.settingsTab.isBoundFkToCurve_checkBox.stateChanged.connect(
-            partial(self.updateCheck,
-                    self.settingsTab.isBoundFkToCurve_checkBox,
-                    "isBoundFkToCurve"))
+        self.settingsTab.surfaceReferenceAdd_pushButton.clicked.connect(
+            partial(
+                self.addItem2listWidget,
+                self.settingsTab.surfaceReference_listWidget,
+                "surfaceReference"
+            )
+        )
 
-        self.settingsTab.isPlanetaryIkBindToGlobal_checkBox.stateChanged.connect(
-            partial(self.updateCheck,
-                    self.settingsTab.isPlanetaryIkBindToGlobal_checkBox,
-                    "isPlanetaryIkBindToGlobal"))
-
-        self.settingsTab.isUpvectorAimToTip_checkBox.stateChanged.connect(
-            partial(self.updateCheck,
-                    self.settingsTab.isUpvectorAimToTip_checkBox,
-                    "isUpvectorAimToTip"))
-
-        self.settingsTab.ikProfile_pushButton.clicked.connect(
-            self.setProfile)
+        self.settingsTab.surfaceReferenceRemove_pushButton.clicked.connect(
+            partial(
+                self.removeSelectedFromListWidget,
+                self.settingsTab.surfaceReference_listWidget,
+                "surfaceReference"
+            )
+        )
 
     def updateMasterChain(self, lEdit, targetAttr):
         oType = pm.nodetypes.Transform

@@ -273,8 +273,8 @@ class Component(component.Main):
         pm.connectAttr(self.followLips_att, blend_node_1 + ".blender")
         pm.connectAttr(md_node_6 + ".outputX", blend_node_1 + ".color1R")
         pm.connectAttr(md_node_2 + ".outputX", blend_node_1 + ".color1G")
-        pm.connectAttr(cond_node_1 + ".outColorR", blend_node_1 + ".color2R")
-        pm.connectAttr(md_node_8 + ".outputX", blend_node_1 + ".color2G")
+        # pm.connectAttr(cond_node_1 + ".outColorR", blend_node_1 + ".color2R")
+        # pm.connectAttr(md_node_8 + ".outputX", blend_node_1 + ".color2G")
 
         # blend_node_2
         pm.connectAttr(self.followLips_att, blend_node_2 + ".blender")

@@ -6,20 +6,40 @@
 # GLOBAL
 #############################################
 import six
+import sys
 import pymel.core as pm
 from pymel.core import datatypes
 import json
 
+import maya.cmds as cmds
 import maya.OpenMaya as om
+import maya.api.OpenMaya as om2
 
 from mgear.core import applyop
+
+if sys.version_info > (3, 0):
+    from typing import TYPE_CHECKING
+    if TYPE_CHECKING:
+        from typing import (
+            Optional,  # noqa: F401
+            Dict,  # noqa: F401
+            List,  # noqa: F401
+            Tuple,  # noqa: F401
+            Pattern,  # noqa: F401
+            Callable,  # noqa: F401
+            Any,  # noqa: F401
+            Text,  # noqa: F401
+            Generator,  # noqa: F401
+            Iterable,  # noqa: F401
+            Union  # noqa: F401
+        )
 
 #############################################
 # CURVE
 #############################################
 
 
-def addCnsCurve(parent, name, centers, degree=1, m=datatypes.Matrix()):
+def addCnsCurve(parent, name, centers, degree=1, m=datatypes.Matrix(), close=False):
     """Create a curve attached to given centers. One point per center
 
     Arguments:
@@ -42,7 +62,7 @@ def addCnsCurve(parent, name, centers, degree=1, m=datatypes.Matrix()):
 
     points = [datatypes.Vector() for center in centers]
 
-    node = addCurve(parent, name, points, False, degree, m=m)
+    node = addCurve(parent, name, points, False, degree, m=m, close=close)
 
     applyop.gear_curvecns_op(node, centers)
 
@@ -72,9 +92,11 @@ def addCurve(parent,
     if close:
         points.extend(points[:degree])
         knots = range(len(points) + degree - 1)
-        node = pm.curve(n=name, d=degree, p=points, per=close, k=knots)
+        res = cmds.curve(n=name, d=degree, p=points, per=close, k=knots)
     else:
-        node = pm.curve(n=name, d=degree, p=points)
+        res = cmds.curve(n=name, d=degree, p=points)
+
+    node = pm.PyNode(res)
 
     if m is not None:
         node.setTransformation(m)
@@ -90,7 +112,8 @@ def createCurveFromOrderedEdges(edgeLoop,
                                 name,
                                 parent=None,
                                 degree=3,
-                                m=datatypes.Matrix()):
+                                m=datatypes.Matrix(),
+                                close=False):
     """Create a curve for a edgeloop ordering the list from starting vertex
 
     Arguments:
@@ -132,7 +155,7 @@ def createCurveFromOrderedEdges(edgeLoop,
                 orderedVertex.append(v)
                 orderedVertexPos.append(v.getPosition(space='world'))
 
-    crv = addCurve(parent, name, orderedVertexPos, degree=degree, m=m)
+    crv = addCurve(parent, name, orderedVertexPos, degree=degree, m=m, close=close)
     return crv
 
 
@@ -141,6 +164,7 @@ def createCuveFromEdges(edgeList,
                         parent=None,
                         degree=3,
                         sortingAxis="x",
+                        close=False,
                         m=datatypes.Matrix()):
     """Create curve from a edge list.
 
@@ -179,11 +203,12 @@ def createCuveFromEdges(edgeList,
         i = xOrder.index(x)
         centersOrdered.append(centers[i])
 
-    crv = addCurve(parent, name, centersOrdered, degree=degree, m=m)
+    crv = addCurve(parent, name, centersOrdered, degree=degree, m=m, close=close)
     return crv
 
 
-def createCurveFromCurve(srcCrv, name, nbPoints, parent=None, m=datatypes.Matrix()):
+def createCurveFromCurve(srcCrv, name, nbPoints, parent=None, m=datatypes.Matrix(), close=False):
+    # type: (Union[str, pm.PyNode], str, int, Union[str, pm.PyNode, None], datatypes.Matrix, bool) -> pm.PyNode
     """Create a curve from a curve
 
     Arguments:
@@ -191,25 +216,49 @@ def createCurveFromCurve(srcCrv, name, nbPoints, parent=None, m=datatypes.Matrix
         name (str): The new curve name.
         nbPoints (int): Number of control points for the new curve.
         parent (dagNode): Parent of the new curve.
+        m (matrix): Global transform.
+        close (bool): True to close the curve.
 
     Returns:
         dagNode: The newly created curve.
     """
     if isinstance(srcCrv, six.string_types) or isinstance(srcCrv, six.text_type):
         srcCrv = pm.PyNode(srcCrv)
-    length = srcCrv.length()
-    parL = srcCrv.findParamFromLength(length)
-    param = []
-    increment = parL / (nbPoints - 1)
-    p = 0.0
+
+    sc = getMFnNurbsCurve(srcCrv)
+    length = sc.length()
+    paramStart = sc.findParamFromLength(0.0)
+    paramEnd = sc.findParamFromLength(length)
+    paramLength = paramEnd - paramStart
+    increment = paramLength / (nbPoints - 1)
+
+    p = paramStart
+    # if curve is close, we need to find start param to be offseted to find nearest point to 0
+    if close:
+        retry = 0
+        tolerance = 0.0001
+        while retry < 10000:
+            try:
+                p = sc.getParamAtPoint(sc.cvPosition(0), tolerance)
+                break
+            except RuntimeError:
+                pass
+            retry += 1
+            tolerance += length / 10000.0
+
+    positions = []
     for x in range(nbPoints):
-        # we need to check that the param value never exceed the parL
-        if p > parL:
-            p = parL
-        pos = srcCrv.getPointAtParam(p, space='world')
-        param.append(pos)
+        # we need to check that the positions value never exceed the paramEnd
+        if p > paramEnd:
+            p -= paramLength
+
+        point = sc.getPointAtParam(p, space=om2.MSpace.kWorld)
+        pos = (point[0], point[1], point[2])
+        positions.append(pos)
+
         p += increment
-    crv = addCurve(parent, name, param, close=False, degree=3, m=m)
+
+    crv = addCurve(parent, name, positions, close=close, degree=3, m=m)
     return crv
 
 
@@ -247,13 +296,14 @@ def getCurveParamAtPosition(crv, position):
     return param, length
 
 
-def findLenghtFromParam(crv, param):
+def findLenghtFromParam(crv, param, close=False):
     """
     Find lengtht from a curve parameter
 
     Arguments:
-        param (float): The parameter to get the legth
         crv (curve): The source curve.
+        param (float): The parameter to get the legth
+        close (bool): If the curve is close or not.
 
     Returns:
         float: Curve uLength
@@ -266,13 +316,20 @@ def findLenghtFromParam(crv, param):
             u = uLength / oLength
 
     """
-    node = pm.createNode("arcLengthDimension")
-    pm.connectAttr(crv.getShape().attr("worldSpace[0]"),
-                   node.attr("nurbsGeometry"))
-    node.attr("uParamValue").set(param)
-    uLength = node.attr("arcLength").get()
-    pm.delete(node.getParent())
-    return uLength
+
+    if close:
+        sc = getMFnNurbsCurve(crv.name())
+        return sc.findLengthFromParam(param)
+    else:
+        node = pm.createNode("arcLengthDimension")
+        pm.connectAttr(
+            crv.getShape().attr("worldSpace[0]"),
+            node.attr("nurbsGeometry")
+        )
+        node.attr("uParamValue").set(param)
+        uLength = node.attr("arcLength").get()
+        pm.delete(node.getParent())
+        return uLength
 
 
 # ========================================
@@ -693,3 +750,71 @@ def import_curve(filePath=None,
 def update_curve_from_file(filePath=None, rplStr=["", ""]):
     # update a curve data from json file
     update_curve_from_data(_curve_from_file(filePath), rplStr)
+
+
+def getMFnNurbsCurve(crv):
+
+    if isinstance(crv, six.string_types) or isinstance(crv, six.text_type):
+        dag = as_dagpath(crv)
+    else:
+        dag = as_dagpath(crv.name())
+
+    curveFn = om2.MFnNurbsCurve(dag)
+    return curveFn
+
+
+def as_selection_list(iterable):
+    # type: (Iterable) -> om2.MSelectionList
+
+    selectionList = om2.MSelectionList()
+    for each in iterable:
+        selectionList.add(each)
+    return selectionList
+
+
+def as_dagpath_list(iterable):
+    # type: (Iterable) -> Generator[om2.MDagPath, None, None]
+    selectionList = as_selection_list(iterable)
+    for i in range(selectionList.length()):
+        yield selectionList.getDagPath(i)
+
+
+def as_dagpath(name):
+    # type: (Text) -> om2.MDagPath
+    selectionList = as_selection_list([name])
+
+    try:
+        return selectionList.getDagPath(0)
+    except:
+        return selectionList.getDependNode(0)
+
+
+def as_dependnode(name):
+    # type: (Text) -> om2.MFnDependencyNode
+    selectionList = as_selection_list([name])
+    return om2.MFnDependencyNode(selectionList.getDependNode(0))
+
+
+def as_dependencynodes(iterable):
+    # type: (Iterable) -> List[om2.MFnDependencyNode]
+    selectionList = as_selection_list(iterable)
+    for i in range(selectionList.length()):
+        yield om2.MFnDependencyNode(selectionList.getDagPath(i).node())
+
+
+def as_dependencynode(name):
+    # type: (Text) -> om2.MFnDependencyNode
+    dagpath = as_dagpath(name)
+    return om2.MFnDependencyNode(dagpath.node())
+
+
+def as_mfn_mesh(name):
+    # type: (Text) -> om2.MFnMesh
+    dagpath = as_dagpath(name)
+    return om2.MFnMesh(dagpath.node())
+
+
+def as_mfnmesh(name):
+    # type: (Text) -> om2.MFnMesh
+    dagpath = as_dagpath(name)
+    return om2.MFnMesh(dagpath)
