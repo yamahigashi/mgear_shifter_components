@@ -205,7 +205,7 @@ class Component(component.Main):
 
         plane = self.addDummyPlane()
         self.addCurves(crv_root, plane)
-        pm.delete(pm.PyNode(plane.name()))
+        cmds.delete(cmds.listRelatives(plane.fullPathName(), parent=True))
 
     def addCurves(self, crv_root, plane):
 
