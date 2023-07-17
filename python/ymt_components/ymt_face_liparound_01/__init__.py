@@ -123,14 +123,9 @@ class Component(component.Main):
         self.ctlName = "ctl"
         self.detailControllersGroupName = "controllers_detail"  # TODO: extract to settings
         self.primaryControllersGroupName = "controllers_primary"  # TODO: extract to settings
-        self.blinkH = 0.2
-        self.upperVTrack = 0.04
-        self.upperHTrack = 0.01
-        self.lowerVTrack = 0.02
-        self.lowerHTrack = 0.01
 
-        self.thickness = 0.007
-        self.FRONT_OFFSET = .0002
+        self.thickness = 0.07
+        self.FRONT_OFFSET = 0.2
         self.NB_CVS = self.num_locs
         if self.num_locs % 2 == 0:
             # even
@@ -193,7 +188,7 @@ class Component(component.Main):
         self.addCurve()
         self.addControlJoints()
         self.addControllers()
-        # self.addConstraints()
+        self.addConstraints()
 
     def addContainers(self):
 
@@ -467,6 +462,8 @@ class Component(component.Main):
             s2o = ctls[s2].name()
             do = ctls[d].getParent().name()
 
+            print("applyMultiCns: {} {} {} {} {}".format(s1o, s2o, do, p1, p2))
+
             cns_node = cmds.parentConstraint(s1o, s2o, do, mo=True, skipRotate=("x", "y", "z"))[0]  # type: str
             attr_1 = cns_node + "." + ctls[s1].name().split("|")[-1] + "W0"
             attr_2 = cns_node + "." + ctls[s2].name().split("|")[-1] + "W1"
@@ -475,16 +472,16 @@ class Component(component.Main):
 
         # if 8 locs, : up is 0, left is 2, bottom is 4, right is 6
         for i in range(1, self.left_index):
-            print("top to left: {} {}".format(i, i + 1))
             applyMultiCns(self.upCtls, 0, self.left_index, i,  0.50, 0.25)
 
-        for i in range(self.left_index, self.bottom_index):
-            print("left to bottom: {} {}".format(i, i + 1))
-            applyMultiCns(self.upCtls, 0, self.left_index, i,  0.50, 0.25)
+        for i in range(self.left_index + 1, self.bottom_index):
+            applyMultiCns(self.upCtls, self.left_index, self.bottom_index, i,  0.50, 0.25)
 
-        for i in range(self.bottom_index, self.right_index):
-            print("bottom to right: {} {}".format(i, i + 1))
-            applyMultiCns(self.upCtls, 0, self.left_index, i,  0.50, 0.25)
+        for i in range(self.bottom_index + 1, self.right_index):
+            applyMultiCns(self.upCtls, self.bottom_index, self.right_index, i,  0.50, 0.25)
+
+        for i in range(self.right_index + 1, len(self.upCtls)):
+            applyMultiCns(self.upCtls, self.right_index, 0, i,  0.50, 0.25)
 
         # applyMultiCns(self.upCtls, 0, 3, 1,  0.50, 0.25)
         # applyMultiCns(self.upCtls, 0, 3, 2,  0.33, 0.67)
@@ -494,7 +491,7 @@ class Component(component.Main):
         # applyMultiCns(self.upCtls, 6, 9, 8,  0.25, 0.75)
         # applyMultiCns(self.upCtls, 9, 0, 10, 0.67, 0.33)
         # applyMultiCns(self.upCtls, 9, 0, 11, 0.25, 0.50)
-        # 
+
     def _addControls(self, crv_ctl, option):
 
         cvs = self.getCurveCVs(crv_ctl)
@@ -639,56 +636,51 @@ class Component(component.Main):
         outer_l_comp = self.rig.findComponent(outer_l_ref)
         outer_r_comp = self.rig.findComponent(outer_r_ref)
 
-        print(outer_r_ref, outer_r_comp)
-        print(outer_l_ref, outer_l_comp)
-
         if outer_l_comp is None or outer_r_comp is None:
             logger.error("No outer mouth component found: mouthOuter_L0_root or mouthOuter_R0_root")
             raise Exception("No outer mouth component found: mouthOuter_L0_root or mouthOuter_R0_root")
             
         # store temporally
-        original_parent_l = outer_l_comp.root
-        original_parent_r = outer_r_comp.root
-        self.root.addChild(outer_l_comp.root)
-        self.root.addChild(outer_r_comp.root)
+        # original_parent_l = outer_l_comp.root
+        # original_parent_r = outer_r_comp.root
+        # self.root.addChild(outer_l_comp.root)
+        # self.root.addChild(outer_r_comp.root)
 
         # lipup_ref = self.parent_comp.lipup_ctl
         liplow_ref = self.parent_comp.liplow_ctl
 
-        drivers = self.connect_slide_ghost(
-            jaw_ctl_ref,
-            liplow_ref,
+        int_c = rigbits.createInterpolateTransform([jaw_ctl_ref, liplow_ref])
+        int_l = rigbits.createInterpolateTransform([outer_l_ref, corner_l_ref])
+        int_r = rigbits.createInterpolateTransform([outer_r_ref, corner_r_ref])
+        pm.rename(int_c, int_c.name() + "_int")
+        pm.rename(int_l, int_l.name() + "_int")
+        pm.rename(int_r, int_r.name() + "_int")
+
+        _drivers = self.connect_slide_ghost(
+            int_c,
             self.lips_C_lower_ctl,
-            outer_l_ref,
-            outer_r_ref
+            int_l,
+            int_r 
         )
 
-        # self.connect_mouth_ghost(lipup_ref, liplow_ref, slide_c_ref, corner_l_ref, corner_r_ref)
-
-        # pm.parent(corner_l_comp.ik_cns, self.mouthSlide_ctl)
-        # pm.parent(corner_r_comp.ik_cns, self.mouthSlide_ctl)
-
-        # pm.parent(drivers[0], slide_c_comp.ik_cns)
-        # pm.parent(drivers[1], corner_l_comp.ik_cns)
-        # pm.parent(drivers[2], corner_r_comp.ik_cns)
+        self.connect_mouth_ghost(liplow_ref)
 
         # remove elements from controllers group
-        for comp in [slide_c_comp, corner_l_comp, corner_r_comp]:
+        for comp in (slide_c_comp, corner_l_comp, corner_r_comp):
             for k, v in comp.groups.items():
                 if "componentsRoots" in k:
                     continue
 
                 comp.groups[k] = []
 
-        cmds.parent(original_parent_l.name(), outer_l_comp.root.name())
-        cmds.parent(original_parent_r.name(), outer_r_comp.root.name())
+        # cmds.parent(original_parent_l.name(), outer_l_comp.root.name())
+        # cmds.parent(original_parent_r.name(), outer_r_comp.root.name())
 
     def _createGhostCtl(self, ghost_ctl, parent):
 
-        ctl = ghost.createGhostCtl(ghost_ctl, parent)
+        ctl = ghost.createGhostCtl(ghost_ctl, parent=parent, connect=True)
+        # rigbits.connectLocalTransform([ctl, ghost_ctl])
         ctl.attr("isCtl") // ghost_ctl.attr("isCtl")
-        # logger.error("ctl is %s, ghost_ctl: %s, parent: %s", ctl.name(), ghost_ctl.name(), parent.name())
-
         ctl.attr("isCtl").set(True)
         ghost_ctl.attr("isCtl").set(False)
 
@@ -720,51 +712,45 @@ class Component(component.Main):
 
         if self.settings["ctlGrp"]:
             ctlGrp = self.settings["ctlGrp"]
-            # self.addToGroup(ctl, ctlGrp, "controllers")
 
         else:
             ctlGrp = "controllers"
-            # self.addToGroup(ctl, ctlGrp)
 
         if ctlGrp not in self.groups.keys():
             return
 
         for grp_name, grp in self.groups.items():
-            try:
+            try:  # noqa: FURB107
                 grp.remove(obj)
-            except (ValueError) as e:
+            except ValueError:
                 pass
-                # logger.error(e)
 
-    def connect_slide_ghost(self, lipup_ref, liplow_ref, slide_c_ref, outer_l_ref, outer_r_ref):
-
-        # create interpose lvl for the ctl
-        intTra = rigbits.createInterpolateTransform([lipup_ref, liplow_ref])
-        pm.rename(intTra, intTra.name() + "_int")
+    def connect_slide_ghost(self, intTra, slide_c_ref, outer_l_ref, outer_r_ref):
 
         # create ghost controls
         self.mouthSlide_ctl = self._createGhostCtl(slide_c_ref, intTra)
-        self.outerL_ctl = self._createGhostCtl(outer_l_ref, self.root)
-        self.outerR_ctl = self._createGhostCtl(outer_r_ref, self.root)
 
         # slide system
         drivers = ghostSliderForMouth(
-            [slide_c_ref, outer_l_ref, outer_r_ref],
-            intTra,
+            slide_c_ref,
             self.sliding_surface,
-            self.root)
+            self.sliding_surface.getParent()
+        )
+        drivers = ghostSliderForMouth2(
+            [outer_l_ref, outer_r_ref],
+            [self.lips_L_Corner_npo, self.lips_R_Corner_npo],
+            self.sliding_surface,
+            self.sliding_surface.getParent()
+        )
 
         # connect scale
         pm.connectAttr(self.mouthSlide_ctl.scale, slide_c_ref.scale)
-        pm.connectAttr(self.outerL_ctl.scale, outer_l_ref.scale)
-        pm.connectAttr(self.outerR_ctl.scale, outer_r_ref.scale)
+        # pm.connectAttr(self.outerL_ctl.scale, outer_l_ref.scale)
+        # pm.connectAttr(self.outerR_ctl.scale, outer_r_ref.scale)
 
         # connect pucker
         cmds.setAttr("{}.tz".format(slide_c_ref.name()), l=False)
         pm.connectAttr(self.mouthSlide_ctl.tz, slide_c_ref.tz)
-
-        pm.parentConstraint(outer_l_ref, self.lips_L_Corner_npo, mo=True)
-        pm.parentConstraint(outer_r_ref, self.lips_R_Corner_npo, mo=True)
 
         ymt_util.setKeyableAttributesDontLockVisibility(slide_c_ref, [])
         ymt_util.setKeyableAttributesDontLockVisibility(outer_l_ref, [])
@@ -772,18 +758,15 @@ class Component(component.Main):
 
         return drivers
 
-    def connect_mouth_ghost(self, lipup_ref, liplow_ref, slide_c_ref, corner_l_ref, corner_r_ref):
+    def connect_mouth_ghost(self, liplow_ref):
 
         # center main controls
-        self.lips_C_upper_ctl, up_ghost_ctl = createGhostWithParentConstraint(self.lips_C_upper_ctl, lipup_ref)
         self.lips_C_lower_ctl, lo_ghost_ctl = createGhostWithParentConstraint(self.lips_C_lower_ctl, liplow_ref)
-        self._removeFromCtrlGroup(up_ghost_ctl)
         self._removeFromCtrlGroup(lo_ghost_ctl)
-        self.addToSubGroup(self.lips_C_upper_ctl, self.primaryControllersGroupName)
         self.addToSubGroup(self.lips_C_lower_ctl, self.primaryControllersGroupName)
 
         # add slider offset
-        npos = rigbits.addNPO([self.lips_C_upper_ctl, self.lips_C_lower_ctl])
+        npos = rigbits.addNPO([self.lips_C_lower_ctl])
         for c in npos:
             rigbits.connectLocalTransform([self.mouthSlide_ctl, c])
 
@@ -859,7 +842,7 @@ def draw_eye_guide_mesh_plane(points, t):
     return mesh
 
 
-def ghostSliderForMouth(ghostControls, intTra, surface, sliderParent):
+def ghostSliderForMouth(ctlGhost, surface, sliderParent):
     """Modify the ghost control behaviour to slide on top of a surface
 
     Args:
@@ -867,106 +850,95 @@ def ghostSliderForMouth(ghostControls, intTra, surface, sliderParent):
         surface (Surface): The NURBS surface
         sliderParent (dagNode): The parent for the slider.
     """
-    if not isinstance(ghostControls, list):
-        ghostControls = [ghostControls]
-
 
     def conn(ctl, driver, ghost):
-        for attr in ["translate", "scale", "rotate"]:
-            try:
+        for attr in ("translate", "scale", "rotate"):
+            try:  # noqa: FURB107
                 pm.connectAttr("{}.{}".format(ctl, attr), "{}.{}".format(driver, attr))
                 pm.disconnectAttr("{}.{}".format(ctl, attr), "{}.{}".format(ghost, attr))
             except RuntimeError:
                 pass
 
     def connCenter(ctl, driver, ghost):
-        # mul_node1 = pm.createNode("multMatrix")
-        # mul_node2 = pm.createNode("multMatrix")
 
-        down, _, up = ymt_util.findPathAtoB(ctl, driver)
-        mult = pm.createNode("multMatrix")
-
-        for i, d in enumerate(down):
-            d.attr("matrix") >> mult.attr("matrixIn[{}]".format(i))
-
-        for j, u in enumerate(up[:-1]):
-            u.attr("inverseMatrix") >> mult.attr("matrixIn[{}]".format(i + j + 1))
-
-        decomp = pm.createNode("decomposeMatrix")
-
-        dm_node = node.createDecomposeMatrixNode(mult.attr("matrixSum"))
+        dm_node = ymt_util.getDecomposeMatrixOfAtoB(ctl, driver)
 
         for attr in ("translate", "scale", "rotate"):
             pm.connectAttr("{}.output{}".format(dm_node, attr.capitalize()), "{}.{}".format(driver, attr))
-
             pm.disconnectAttr("{}.{}".format(ctl, attr), "{}.{}".format(ghost, attr))
 
     surfaceShape = surface.getShape()
     sliders = []
     drivers = []
 
-    for i, ctlGhost in enumerate(ghostControls):
-        ctl = pm.listConnections(ctlGhost, t="transform")[-1]
-        t = ctl.getMatrix(worldSpace=True)
+    ctl = pm.listConnections(ctlGhost, t="transform")[-1]
+    t = ctl.getMatrix(worldSpace=True)
 
-        gDriver = primitive.addTransform(surface.getParent(), "{}_slideDriver".format(ctl.name()), t)
-        drivers.append(gDriver)
+    gDriver = primitive.addTransform(surface.getParent(), "{}_slideDriver".format(ctl.name()), t)
+    drivers.append(gDriver)
 
-        if 0 == i:
-            connCenter(ctl, gDriver, ctlGhost)
+    connCenter(ctl, gDriver, ctlGhost)
 
-        else:
-            conn(ctl, gDriver, ctlGhost)
+    oParent = ctlGhost.getParent()
+    npoName = "_".join(ctlGhost.name().split("_")[:-1]) + "_npo"
+    oTra = pm.PyNode(pm.createNode("transform", n=npoName, p=oParent, ss=True))
+    oTra.setTransformation(ctlGhost.getMatrix())
+    pm.parent(ctlGhost, oTra)
 
-        oParent = ctlGhost.getParent()
-        npoName = "_".join(ctlGhost.name().split("_")[:-1]) + "_npo"
-        oTra = pm.PyNode(pm.createNode("transform", n=npoName, p=oParent, ss=True))
-        oTra.setTransformation(ctlGhost.getMatrix())
-        pm.parent(ctlGhost, oTra)
+    slider = primitive.addTransform(sliderParent, ctl.name() + "_slideDriven", t)
+    sliders.append(slider)
 
-        slider = primitive.addTransform(sliderParent, ctl.name() + "_slideDriven", t)
-        sliders.append(slider)
+    dm_node = node.createDecomposeMatrixNode(gDriver.attr("matrix"))
 
-        # connexion
-        if 0 == i:
-            dm_node = node.createDecomposeMatrixNode(gDriver.attr("matrix"))
+    cps_node = pm.createNode("closestPointOnSurface")
+    dm_node.attr("outputTranslate") >> cps_node.attr("inPosition")
+    surfaceShape.attr("local") >> cps_node.attr("inputSurface")
+    cps_node.attr("position") >> slider.attr("translate")
 
-        else:
-            mul_node = pm.createNode("multMatrix")
-            i = 0
-            parent = ctl
-            while parent != sliderParent:
-                parent.attr("matrix") >> mul_node.attr("matrixIn[{}]".format(i))
-                parent = parent.getParent()
-                i += 1
-                if 100 < i:
-                    logger.error("maximum recursion")
-                    break
+    pm.normalConstraint(surfaceShape,
+                        slider,
+                        aimVector=[0, 0, 1],
+                        upVector=[0, 1, 0],
+                        worldUpType="objectrotation",
+                        worldUpVector=[0, 1, 0],
+                        worldUpObject=gDriver)
 
-            dm_node = node.createDecomposeMatrixNode(mul_node.attr("matrixSum"))
-
-        cps_node = pm.createNode("closestPointOnSurface")
-        dm_node.attr("outputTranslate") >> cps_node.attr("inPosition")
-        surfaceShape.attr("local") >> cps_node.attr("inputSurface")
-        cps_node.attr("position") >> slider.attr("translate")
-
-        pm.normalConstraint(surfaceShape,
-                            slider,
-                            aimVector=[0, 0, 1],
-                            upVector=[0, 1, 0],
-                            worldUpType="objectrotation",
-                            worldUpVector=[0, 1, 0],
-                            worldUpObject=gDriver)
-
-        pm.parent(ctlGhost.getParent(), slider)
-        ymt_util.setKeyableAttributesDontLockVisibility(slider, [])
-        for shape in ctlGhost.getShapes():
-            pm.delete(shape)
+    pm.parent(ctlGhost.getParent(), slider)
+    ymt_util.setKeyableAttributesDontLockVisibility(slider, [])
+    for shape in ctlGhost.getShapes():
+        pm.delete(shape)
 
     for slider in sliders[1:]:
         _visi_off_lock(slider)
 
     return drivers
+
+
+def ghostSliderForMouth2(ghostControls, npos, surface, sliderParent):
+
+    surfaceShape = surface.getShape()
+    drivens = []
+
+    for (ctlGhost, npo) in zip(ghostControls, npos):
+        t = ctlGhost.getMatrix(worldSpace=True)
+
+        driven = primitive.addTransform(sliderParent, ctlGhost.name() + "_slideDriven", t)
+        drivens.append(driven)
+
+        down, _, up = ymt_util.findPathAtoB(ctlGhost, sliderParent)
+        dm_node = ymt_util.getDecomposeMatrixOfAtoB(ctlGhost, sliderParent)
+        cps_node = pm.createNode("closestPointOnSurface")
+        dm_node.attr("outputTranslate") >> cps_node.attr("inPosition")
+        surfaceShape.attr("local") >> cps_node.attr("inputSurface")
+        cps_node.attr("position") >> driven.attr("translate")
+        pm.parentConstraint(ctlGhost, npo, mo=True)
+
+        ymt_util.setKeyableAttributesDontLockVisibility(driven, [])
+        for shape in ctlGhost.getShapes():
+            pm.delete(shape)
+
+    for driven in drivens:
+        _visi_off_lock(driven)
 
 
 def createGhostWithParentConstraint(ctl, parent=None, connect=True):
@@ -1035,6 +1007,9 @@ def applyPathCnsLocal(target, curve, u):
     cns.attr("allCoordinates") >> comp_node.attr("inputTranslate")
     cns.attr("rotate") >> comp_node.attr("inputRotate")
     cns.attr("rotateOrder") >> comp_node.attr("inputRotateOrder")
+    pm.setAttr(cns.attr("worldUpVectorX"), 0.0)
+    pm.setAttr(cns.attr("worldUpVectorY"), 0.0)
+    pm.setAttr(cns.attr("worldUpVectorZ"), 1.0)
 
     mul_node = pm.createNode("multMatrix")
     comp_node2 = pm.createNode("composeMatrix")

@@ -169,8 +169,6 @@ class Guide(guide.ComponentGuide):
 
             if "#" in name:
 
-                print(name)
-
                 init_window = chain_guide_initializer.exec_window()
                 if init_window:
                     self.sections_number = init_window.sections_number
