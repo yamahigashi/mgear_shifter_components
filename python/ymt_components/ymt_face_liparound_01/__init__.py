@@ -562,10 +562,9 @@ class Component(component.Main):
     def addAttributes(self):
         """Create the anim and setupr rig attributes for the component"""
 
+        pass
         # if not self.settings["ui_host"]:
         #     self.uihost = self.over_ctl
-
-        return
 
     # =====================================================
     # OPERATORS
@@ -602,7 +601,6 @@ class Component(component.Main):
         try:
             self.connect_ghosts()
         except:
-            import traceback
             traceback.print_exc()
             raise
 
@@ -614,7 +612,6 @@ class Component(component.Main):
 
     def connect_ghosts(self):
 
-        slide_c_ref = self.rig.findRelative("mouthSlide_C0_root")
         corner_l_ref = self.rig.findRelative("mouthCorner_L0_root")
         corner_r_ref = self.rig.findRelative("mouthCorner_R0_root")
 
@@ -640,13 +637,6 @@ class Component(component.Main):
             logger.error("No outer mouth component found: mouthOuter_L0_root or mouthOuter_R0_root")
             raise Exception("No outer mouth component found: mouthOuter_L0_root or mouthOuter_R0_root")
             
-        # store temporally
-        # original_parent_l = outer_l_comp.root
-        # original_parent_r = outer_r_comp.root
-        # self.root.addChild(outer_l_comp.root)
-        # self.root.addChild(outer_r_comp.root)
-
-        # lipup_ref = self.parent_comp.lipup_ctl
         liplow_ref = self.parent_comp.liplow_ctl
 
         int_c = rigbits.createInterpolateTransform([jaw_ctl_ref, liplow_ref])
@@ -672,9 +662,6 @@ class Component(component.Main):
                     continue
 
                 comp.groups[k] = []
-
-        # cmds.parent(original_parent_l.name(), outer_l_comp.root.name())
-        # cmds.parent(original_parent_r.name(), outer_r_comp.root.name())
 
     def _createGhostCtl(self, ghost_ctl, parent):
 
@@ -745,8 +732,6 @@ class Component(component.Main):
 
         # connect scale
         pm.connectAttr(self.mouthSlide_ctl.scale, slide_c_ref.scale)
-        # pm.connectAttr(self.outerL_ctl.scale, outer_l_ref.scale)
-        # pm.connectAttr(self.outerR_ctl.scale, outer_r_ref.scale)
 
         # connect pucker
         cmds.setAttr("{}.tz".format(slide_c_ref.name()), l=False)
