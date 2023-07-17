@@ -123,7 +123,7 @@ class Component(component.Main):
         self.uplocsPos = self.guide.apos[2:self.num_uplocs + 2]
         self.lowlocsPos = self.guide.apos[2 + self.num_uplocs:-5]
 
-        self.offset = (self.frontPos - self.rootPos) * 0.3
+        self.offset = self.frontPos - self.rootPos
         if self.negate:
             pass
             # self.offset[2] = self.offset[2] * -1.0
@@ -205,7 +205,7 @@ class Component(component.Main):
 
         plane = self.addDummyPlane()
         self.addCurves(crv_root, plane)
-        pm.delete(pm.PyNode(plane.name()))
+        cmds.delete(cmds.listRelatives(plane.fullPathName(), parent=True))
 
     def addCurves(self, crv_root, plane):
 
@@ -321,18 +321,23 @@ class Component(component.Main):
         self.addWires()
 
     def addOverControllers(self, t):
+        po = self.offset + (self.outPos - self.inPos) * 1.1
+        po.z += self.offset.z * 0.5
+        if self.negate:
+            po.x *= -1.0
 
         self.over_npo = addTransform(self.root, self.getName("center_lookatRoot"), t)
-        self.over_ctl = self.addCtl(self.over_npo,
-                                    "over_%s" % self.ctlName,
-                                    t,
-                                    self.color_ik,
-                                    "square",
-                                    w=self.getBboxRadius()[0],
-                                    d=self.getBboxRadius()[1],
-                                    ro=datatypes.Vector(1.57079633, 0, 0),
-                                    po=self.offset,
-                                    )
+        self.over_ctl = self.addCtl(
+            self.over_npo,
+            "over_%s" % self.ctlName,
+            t,
+            self.color_ik,
+            "square",
+            w=self.getBboxRadius()[0] * 0.15,
+            d=self.getBboxRadius()[1] * 0.7,
+            ro=datatypes.Vector(1.57079633, 0, 0),
+            po=po,
+        )
         self.addToSubGroup(self.over_ctl, self.primaryControllersGroupName)
         ymt_util.setKeyableAttributesDontLockVisibility(
             self.over_ctl,
@@ -347,11 +352,11 @@ class Component(component.Main):
         radius = abs(self.getBboxRadius()[0] / 1.7)
         if True or not self.negate:
             ro = datatypes.Vector(0, 0, 0)
-            po = datatypes.Vector(0, 0, radius) + self.offset
+            po = datatypes.Vector(0, 0, radius) + self.offset * 0.3
 
         else:
             ro = datatypes.Vector(math.pi, 0, 0)
-            po = datatypes.Vector(0, 0, radius * -1.0) + self.offset
+            po = datatypes.Vector(0, 0, radius * -1.0) + self.offset * 0.3
 
         self.arrow_npo = addTransform(self.root, self.getName("aim_npo"), t_look)
         self.arrow_ctl = self.addCtl(
@@ -431,14 +436,14 @@ class Component(component.Main):
             if utils.is_odd(i):
                 color = 14
                 wd = .5
-                offset = self.offset * 1.1
+                offset = self.offset * 0.33
                 icon_shape = "circle"
                 params = ["tx", "ty", "tz"]
 
             else:
                 color = 4
                 wd = .7
-                offset = self.offset * 1.3
+                offset = self.offset * 0.4
                 icon_shape = "square"
                 params = ["tx", "ty", "tz", "ro", "rx", "ry", "rz", "sx", "sy", "sz"]
 
@@ -459,7 +464,7 @@ class Component(component.Main):
                               w=wd,
                               d=wd,
                               ro=datatypes.Vector(1.57079633, 0, 0),
-                              po=offset
+                              po=offset * 0.3
                               )
 
             self.addToSubGroup(self.over_ctl, self.primaryControllersGroupName)
@@ -500,7 +505,7 @@ class Component(component.Main):
         icon_shape = "sphere"
         color = 4
         wd = .3
-        offset = self.offset * 0.3
+        offset = self.offset * 0.1
 
         for i, cv in enumerate(cvs):
 
@@ -538,7 +543,7 @@ class Component(component.Main):
                 w=wd,
                 d=wd,
                 ro=datatypes.Vector(1.57079633, 0, 0),
-                po=offset
+                po=offset * 0.3
             )
 
             self.addToSubGroup(ctl, self.detailControllersGroupName)
@@ -754,17 +759,22 @@ class Component(component.Main):
     def connect_standard(self):
         self.parent.addChild(self.root)
 
-        if self.settings.get("isConnectAimToPupil", True):
-            self.connect_pupil()
-        return
-
     def connect_pupil(self):
-        pupil = self.rig.findComponent("pupil_{}0".format(self.side))
-        cns_node = pm.aimConstraint(pupil.lookat, self.arrow_npo, maintainOffset=True)
+        self.parent.addChild(self.root)
+
+        lookat = self.rig.findRelative("pupil_{}0_lookat".format(self.side))
+        if not lookat:
+            print("error: pupil_{}0_lookat not found".format(self.side))
+            raise Exception("pupil_{}0_lookat not found".format(self.side))
+
+        _cns_node = pm.aimConstraint(lookat, self.arrow_npo, maintainOffset=True)
 
     # =====================================================
     # CONNECTOR
     # =====================================================
+    def addConnection(self):
+        self.connections["standard"] = self.connect_standard
+        self.connections["pupil_01"] = self.connect_pupil
 
     def setRelation(self):
         """Set the relation beetween object from guide to rig"""

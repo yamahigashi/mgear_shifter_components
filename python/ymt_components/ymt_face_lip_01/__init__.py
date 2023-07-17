@@ -113,6 +113,8 @@ class Component(component.Main):
                                 0, 0, 0]
 
         # -------------------------------------------------------
+        self.surfRef = self.settings["surfaceReference"]
+        self.connect_surface_slider = self.settings["isSlidingSurface"]
 
         self.num_uplocs = self.getNumberOfLocators("_uploc")
         self.num_lowlocs = self.getNumberOfLocators("_lowloc")
@@ -229,7 +231,13 @@ class Component(component.Main):
 
         self.addCurves(self.crv_root, plane)
         self.addCurveBaseControllers(self.crv_root, plane)
-        pm.delete(pm.PyNode(plane.name()))
+        cmds.delete(cmds.listRelatives(plane.fullPathName(), parent=True))
+
+        if not self.surfRef:
+            self.sliding_surface = pm.duplicate(self.guide.getObjects(self.guide.root)["sliding_surface"])[0]
+            pm.parent(self.sliding_surface.name(), self.root)
+            self.sliding_surface.visibility.set(False)
+            pm.makeIdentity(self.sliding_surface, apply=True, t=1,  r=1, s=1, n=0, pn=1)
 
     def addCurves(self, crv_root, plane):
 
@@ -361,7 +369,6 @@ class Component(component.Main):
 
             cns = applyPathCnsLocal(upv, rope_upv, u, negate=negate)
             cns = applyPathCnsLocal(npo, rope, u, negate=negate)
-            print(i, negate, name, len(cvs))
 
             pm.connectAttr(upv.attr("worldMatrix[0]"), cns.attr("worldUpMatrix"))
 
@@ -642,6 +649,9 @@ class Component(component.Main):
             return
 
         self.parent.addChild(self.root)
+        if self.surfRef:
+            ref = self.rig.findComponent(self.surfRef)
+            self.sliding_surface = ref.sliding_surface
 
         try:
             self.connect_ghosts()
@@ -653,6 +663,9 @@ class Component(component.Main):
 
     def connect_standard(self):
         self.parent.addChild(self.root)
+        if self.surfRef:
+            ref = self.rig.findComponent(self.surfRef)
+            self.sliding_surface = ref.sliding_surface
 
     def connect_ghosts(self):
 
@@ -675,8 +688,17 @@ class Component(component.Main):
         self.parent.addChild(corner_l_comp.root)
         self.parent.addChild(corner_r_comp.root)
 
-        drivers = self.connect_slide_ghost(lipup_ref, liplow_ref, slide_c_ref, corner_l_ref, corner_r_ref)
-        self.connect_mouth_ghost(lipup_ref, liplow_ref, slide_c_ref, corner_l_ref, corner_r_ref)
+        # create interpose lvl for the ctl
+        intTra = rigbits.createInterpolateTransform([lipup_ref, liplow_ref])
+        pm.rename(intTra, intTra.name() + "_int")
+
+        drivers = self.connect_slide_ghost(
+            intTra,
+            slide_c_ref,
+            corner_l_ref,
+            corner_r_ref
+        )
+        self.connect_mouth_ghost(lipup_ref, liplow_ref)
 
         pm.parent(corner_l_comp.ik_cns, self.mouthSlide_ctl)
         pm.parent(corner_r_comp.ik_cns, self.mouthSlide_ctl)
@@ -750,16 +772,7 @@ class Component(component.Main):
                 pass
                 # logger.error(e)
 
-    def connect_slide_ghost(self, lipup_ref, liplow_ref, slide_c_ref, corner_l_ref, corner_r_ref):
-
-        self.sliding_surface = pm.duplicate(self.guide.getObjects(self.guide.root)["sliding_surface"])[0]
-        pm.parent(self.sliding_surface, self.root)
-        self.sliding_surface.visibility.set(False)
-        pm.makeIdentity(self.sliding_surface, apply=True, t=1,  r=1, s=1, n=0, pn=1)
-
-        # create interpose lvl for the ctl
-        intTra = rigbits.createInterpolateTransform([lipup_ref, liplow_ref])
-        pm.rename(intTra, intTra.name() + "_int")
+    def connect_slide_ghost(self, intTra, slide_c_ref, corner_l_ref, corner_r_ref):
 
         # create ghost controls
         self.mouthSlide_ctl = self._createGhostCtl(slide_c_ref, intTra)
@@ -792,7 +805,7 @@ class Component(component.Main):
 
         return drivers
 
-    def connect_mouth_ghost(self, lipup_ref, liplow_ref, slide_c_ref, corner_l_ref, corner_r_ref):
+    def connect_mouth_ghost(self, lipup_ref, liplow_ref):
 
         # center main controls
         self.lips_C_upper_ctl, up_ghost_ctl = createGhostWithParentConstraint(self.lips_C_upper_ctl, lipup_ref)
@@ -902,21 +915,7 @@ def ghostSliderForMouth(ghostControls, intTra, surface, sliderParent):
                 pass
 
     def connCenter(ctl, driver, ghost):
-        # mul_node1 = pm.createNode("multMatrix")
-        # mul_node2 = pm.createNode("multMatrix")
-
-        down, _, up = ymt_util.findPathAtoB(ctl, driver)
-        mult = pm.createNode("multMatrix")
-
-        for i, d in enumerate(down):
-            d.attr("matrix") >> mult.attr("matrixIn[{}]".format(i))
-
-        for j, u in enumerate(up[:-1]):
-            u.attr("inverseMatrix") >> mult.attr("matrixIn[{}]".format(i + j + 1))
-
-        decomp = pm.createNode("decomposeMatrix")
-
-        dm_node = node.createDecomposeMatrixNode(mult.attr("matrixSum"))
+        dm_node = ymt_util.getDecomposeMatrixOfAtoB(ctl, driver)
 
         for attr in ["translate", "scale", "rotate"]:
             pm.connectAttr("{}.output{}".format(dm_node, attr.capitalize()), "{}.{}".format(driver, attr))
@@ -953,18 +952,7 @@ def ghostSliderForMouth(ghostControls, intTra, surface, sliderParent):
             dm_node = node.createDecomposeMatrixNode(gDriver.attr("matrix"))
 
         else:
-            mul_node = pm.createNode("multMatrix")
-            i = 0
-            parent = ctl
-            while parent != sliderParent:
-                parent.attr("matrix") >> mul_node.attr("matrixIn[{}]".format(i))
-                parent = parent.getParent()
-                i += 1
-                if 10 < i:
-                    logger.error("maximum recursion")
-                    break
-
-            dm_node = node.createDecomposeMatrixNode(mul_node.attr("matrixSum"))
+            dm_node = ymt_util.getDecomposeMatrixOfAtoB(ctl, slider)
 
         cps_node = pm.createNode("closestPointOnSurface")
         dm_node.attr("outputTranslate") >> cps_node.attr("inPosition")
