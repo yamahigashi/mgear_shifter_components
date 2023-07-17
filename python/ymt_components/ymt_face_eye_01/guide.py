@@ -9,10 +9,6 @@ from mgear.vendor.Qt import QtWidgets, QtCore
 from mgear import shifter
 from mgear.core import transform
 
-# from mgear.core.transform import getTransform
-# from mgear.core.transform import getTransformLookingAt
-# from mgear.core.transform import getChainTransform2
-# from mgear.core.transform import setMatrixPosition
 from mgear.core.primitive import addTransform
 
 
@@ -50,6 +46,8 @@ class Guide(guide.ComponentGuide):
     url = URL
     email = EMAIL
     version = VERSION
+
+    connectors = ["pupil_01"]
 
     def postInit(self):
         """Initialize the position for the guide"""
@@ -248,6 +246,23 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
             self.root.pSurfaceReference = self.root.addParam("surfaceReference", "string", "")
         self.settingsTab.surfaceReference_listWidget.addItem(surfaceReference)
 
+        # populate connections in main settings
+        self.c_box = self.mainSettingsTab.connector_comboBox
+        for cnx in Guide.connectors:
+            self.c_box.addItem(cnx)
+        self.connector_items = [self.c_box.itemText(i) for i in
+                                range(self.c_box.count())]
+
+        currentConnector = self.root.attr("connector").get()
+        if currentConnector not in self.connector_items:
+            self.c_box.addItem(currentConnector)
+            self.connector_items.append(currentConnector)
+            pm.displayWarning(
+                "The current connector: %s, is not a valid connector for this"
+                " component. Build will Fail!!")
+        comboIndex = self.connector_items.index(currentConnector)
+        self.c_box.setCurrentIndex(comboIndex)
+
     def create_componentLayout(self):
 
         self.settings_layout = QtWidgets.QVBoxLayout()
@@ -257,6 +272,12 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
         self.setLayout(self.settings_layout)
 
     def create_componentConnections(self):
+
+        # populate component settings
+        self.mainSettingsTab.connector_comboBox.currentIndexChanged.connect(
+            partial(self.updateConnector,
+                    self.mainSettingsTab.connector_comboBox,
+                    self.connector_items))
 
         self.settingsTab.overrideNegate_checkBox.stateChanged.connect(
             partial(self.updateCheck,
