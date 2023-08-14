@@ -263,7 +263,7 @@ class Component(component.Main):
     def getBboxRadius(self):
         # localBBOX
 
-        localBBox = self.guide.eyeMesh.getBoundingBox(invisible=True, space='world')
+        localBBox = self.guide.eyeMesh.getBoundingBox(invisible=True, space="world")
         wRadius = abs((localBBox[0][0] - localBBox[1][0]))
         dRadius = abs((localBBox[0][1] - localBBox[1][1]) / 1.7)
 
@@ -378,7 +378,7 @@ class Component(component.Main):
 
         # For some unknown reason the right side gets scewed rotation values
         resetTransform(aimTrigger_lvl)
-        aimTrigger_lvl.attr("tz").set(1.0)
+        # aimTrigger_lvl.attr("tz").set(1.0)
         self.aimTrigger_ref = addTransform(aimTrigger_lvl, self.getName("self.aimTrigger_ref"), t)
 
         # For some unknown reason the right side gets scewed rotation values
@@ -749,9 +749,6 @@ class Component(component.Main):
         pm.connectAttr(self.midBlinkH_att, self.bs_midLower[0].attr(self.upTarget.name()))
 
     def addEyeTrackingAttributes(self):
-
-        up_ctl = self.upControls[2]
-        low_ctl = self.lowControls[3]
 
         # Adding channels for eye tracking
         # self.blink_att = self.addAnimParam("blink" + self.side, "Blink", "float", 0, minValue=0, maxValue=1)
