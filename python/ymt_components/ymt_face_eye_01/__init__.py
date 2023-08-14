@@ -1,9 +1,8 @@
 """mGear shifter components"""
 # pylint: disable=import-error,W0201,C0111,C0112
 import re
-import inspect
-import textwrap
 import math
+import functools
 
 import maya.cmds as cmds
 import maya.OpenMaya as om1
@@ -119,6 +118,7 @@ class Component(component.Main):
         self.lowPos = self.guide.apos[-2]
         self.frontPos = self.guide.apos[-1]
         self.rootPos = self.guide.apos[0]
+        self.normalVec = self.upPos - self.lowPos
 
         self.uplocsPos = self.guide.apos[2:self.num_uplocs + 2]
         self.lowlocsPos = self.guide.apos[2 + self.num_uplocs:-5]
@@ -133,10 +133,12 @@ class Component(component.Main):
         self.detailControllersGroupName = "controllers_detail"  # TODO: extract to settings
         self.primaryControllersGroupName = "controllers_primary"  # TODO: extract to settings
         self.blinkH = 0.2
-        self.upperVTrack = 0.04
-        self.upperHTrack = 0.01
-        self.lowerVTrack = 0.02
-        self.lowerHTrack = 0.01
+        self.upperVTrackUp = 0.33
+        self.upperVTrackLow = 0.10
+        self.upperHTrack = 0.10
+        self.lowerVTrackUp = 0.25
+        self.lowerVTrackLow = 0.10
+        self.lowerHTrack = 0.10
 
         # --------------------------------------------------------
         self.ik_ctl = []
@@ -268,28 +270,19 @@ class Component(component.Main):
         return wRadius, dRadius
 
     def addControllers(self):
+
         axis = "zy"
-
-        inPos = self.guide.apos[-5]
-        outPos = self.guide.apos[-4]
-        upPos = self.guide.apos[-3]
-        lowPos = self.guide.apos[-2]
-        frontPos = self.guide.apos[-1]
-
         self.bboxCenter = meshNavigation.bboxCenter(self.guide.eyeMesh)
-        averagePosition = ((upPos + lowPos + inPos + outPos) / 4)
 
         # normalPos = outPos
-        normalVec = upPos - lowPos
         if self.negate:
             pass
-            # normalVec = normalVec * -1.0
 
         t = transform.getTransformLookingAt(
             self.root.getTranslation(space="world"),
             # self.bboxCenter,
-            frontPos,
-            normalVec,
+            self.frontPos,
+            self.normalVec,
             axis=axis,
             # negate=self.negate
         ) 
@@ -319,6 +312,7 @@ class Component(component.Main):
         self.addCurveControllers(t)
         self.addCurveJoints(t)
         self.addWires()
+        self.addBlinkControllers(t)
 
     def addOverControllers(self, t):
         po = self.offset + (self.outPos - self.inPos) * 1.1
@@ -394,6 +388,43 @@ class Component(component.Main):
         # connect  trigger with arrow_ctl
         pm.parentConstraint(self.arrow_ctl, self.aimTrigger_ref, mo=True)
 
+    def addBlinkControllers(self, t):
+        blink_root = addTransform(self.root, self.getName("blink_root"), t)
+
+        inv = datatypes.EulerRotation(180.0, 0.0, 0.0)
+        upper_t = transform.setMatrixPosition(t, self.upPos)
+        upper_t *= inv.asMatrix()
+        upper_t = transform.setMatrixPosition(upper_t, self.upPos)
+        lower_t = transform.setMatrixPosition(t, self.lowPos)
+
+        blink_upper_npo = addTransform(blink_root, self.getName("blink_upper_npo"), upper_t)
+        blink_lower_npo = addTransform(blink_root, self.getName("blink_lower_npo"), lower_t)
+        height = (self.upPos - self.lowPos).length()
+        width = height * 0.3
+
+        self.blink_upper_ctl = self.addCtl(
+                blink_upper_npo,
+                self.getName("blink_upper"),
+                upper_t,
+                self.color_ik,
+                "arrow",
+                w=width,
+                po=datatypes.Vector(0.0, width * -0.5, 0.0),
+                ro=datatypes.Vector(0.0, 1.57079633, 1.57079633)
+        )
+        self.blink_lower_ctl = self.addCtl(
+                blink_lower_npo,
+                self.getName("blink_lower"),
+                lower_t,
+                self.color_ik,
+                "arrow",
+                w=width,
+                po=datatypes.Vector(0.0, width * -0.5, 0.0),
+                ro=datatypes.Vector(0.0, 1.57079633, 1.57079633)
+        )
+        ymt_util.setKeyableAttributesDontLockVisibility(self.blink_upper_ctl, params=["ty"])
+        ymt_util.setKeyableAttributesDontLockVisibility(self.blink_lower_ctl, params=["ty"])
+
     def addCurveControllers(self, t):
 
         # upper eyelid controls
@@ -449,6 +480,7 @@ class Component(component.Main):
 
             t = setMatrixPosition(t, cvs[i])
             npo = addTransform(self.center_lookat, self.getName("%s_npo" % ctlNames[i]), t)
+            self.ik_npo.append(npo)
             npoBase = npo
 
             if i == 2:
@@ -604,24 +636,106 @@ class Component(component.Main):
 
     def addBlinkAttributes(self):
 
-        # Adding and connecting attributes for the blinks
+        # shortcuts
+        addAttrNonAnim = functools.partial(
+                attribute.addAttribute,
+                minValue=0,
+                maxValue=1,
+                keyable=False,
+                channelBox=False
+        )
 
-        self.blink_att      = self.addAnimParam("blink",       "Blink",            "float", 0,           minValue=0, maxValue=1)
-        self.blinkUpper_att = self.addAnimParam("upperBlink",  "Upper Blink",      "float", 0,           minValue=0, maxValue=1)
-        self.blinkLower_att = self.addAnimParam("lowerBlink",  "Lower Blink",      "float", 0,           minValue=0, maxValue=1)
-        self.blinkMult_att  = self.addAnimParam("blinkMult",   "Blink Multiplyer", "float", 1,           minValue=1, maxValue=2)
-        self.midBlinkH_att  = self.addAnimParam("blinkHeight", "Blink Height",     "float", self.blinkH, minValue=0, maxValue=1)
+        # Adding and connecting attributes for the blinks
+        self.blink_att = self.addAnimParam("blink" + self.side, "Blink", "float", 0, minValue=0, maxValue=1)
+        self.blinkMult_att = self.addAnimParam("blinkMult", "Blink Multiplyer", "float", 1, minValue=1, maxValue=2)
+        self.blinkUpper_att = addAttrNonAnim(self.blink_upper_ctl, "upperBlink", "float", value=0)
+        self.blinkLower_att = addAttrNonAnim(self.blink_upper_ctl, "lowerBlink", "float", value=0)
+        self.midBlinkH_att = addAttrNonAnim(self.blink_upper_ctl, "blinkHeight", "float", value=self.blinkH)
+
+        height = (self.upPos - self.lowPos).length()
 
         # Add blink + upper and blink + lower so animator can use both.
         # But also clamp them so using both doesn't exceed 1.0
-        blinkAdd = pm.createNode('plusMinusAverage')
-        blinkClamp = pm.createNode('clamp')
+        blinkAdd = pm.createNode("plusMinusAverage")
+        blinkClamp = pm.createNode("clamp")
         blinkClamp.maxR.set(1.0)
         blinkClamp.maxG.set(1.0)
         self.blink_att.connect(blinkAdd.input2D[0].input2Dx)
         self.blink_att.connect(blinkAdd.input2D[0].input2Dy)
         self.blinkUpper_att.connect(blinkAdd.input2D[1].input2Dx)
         self.blinkLower_att.connect(blinkAdd.input2D[1].input2Dy)
+
+        # calculate mid blink height: (height + low - hi) / (height * 2.0)
+        midBlinkAdd1 = pm.createNode("plusMinusAverage")
+        midBlinkAdd1.operation.set(1)  # add
+        midBlinkAdd1.input1D[0].set(height)
+        self.blink_lower_ctl.attr("translateY").connect(midBlinkAdd1.input1D[1])
+
+        midBlinkAdd2 = pm.createNode("plusMinusAverage")
+        midBlinkAdd1.output1D.connect(midBlinkAdd2.input1D[0])
+        midBlinkAdd2.operation.set(2)  # sub
+        self.blink_upper_ctl.attr("translateY").connect(midBlinkAdd2.input1D[1])
+
+        div = pm.createNode("multiplyDivide")
+        div.operation.set(2)  # div
+        midBlinkAdd2.output1D.connect(div.input1X)
+        div.input2X.set(height * 2.0)
+        div.outputX.connect(self.midBlinkH_att)
+
+        # connect blink upper
+        sub = pm.createNode("plusMinusAverage")
+        sub.operation.set(2)  # sub
+        sub.input1D[0].set(1.0)
+        self.midBlinkH_att.connect(sub.input1D[1])
+        mult = pm.createNode("multiplyDivide")
+        mult.operation.set(1)  # mult
+        mult.input1Y.set(height)
+        pm.connectAttr(sub.output1D, mult.input2Y)
+        cond = pm.createNode("condition")
+        pm.connectAttr(mult.outputY, cond + ".firstTerm")
+        pm.setAttr(cond + ".secondTerm", 0.0)
+        pm.setAttr(cond + ".operation", 4)  # less than
+        pm.setAttr(cond + ".colorIfTrueR", 0.0001)
+        pm.connectAttr(mult.outputY, cond + ".colorIfFalseR")
+
+        div = pm.createNode("multiplyDivide")
+        div.operation.set(2)  # div
+        cond.outColorR.connect(div.input2Y)
+
+        cond = pm.createNode("condition")
+        pm.setAttr(cond + ".secondTerm", 0.0)
+        pm.setAttr(cond + ".operation", 4)  # less than
+        pm.setAttr(cond + ".colorIfTrueR", 0.0001)
+        self.blink_upper_ctl.attr("translateY").connect(cond.firstTerm)
+        pm.connectAttr(self.blink_upper_ctl.attr("translateY"), cond + ".colorIfFalseR")
+        cond.outColorR.connect(div.input1Y)
+        pm.connectAttr(div.outputY, self.blinkUpper_att)
+
+        # connect blink lower
+        mult = pm.createNode("multiplyDivide")
+        mult.input1Y.set(height)
+        mult.operation.set(1)  # mult
+        self.midBlinkH_att.connect(mult.input2Y)
+
+        cond = pm.createNode("condition")
+        pm.connectAttr(mult.outputY, cond + ".firstTerm")
+        pm.setAttr(cond + ".secondTerm", 0.0)
+        pm.setAttr(cond + ".operation", 4)  # less than
+        pm.setAttr(cond + ".colorIfTrueR", 0.0001)
+        pm.connectAttr(mult.outputY, cond + ".colorIfFalseR")
+
+        div = pm.createNode("multiplyDivide")
+        div.operation.set(2)  # div
+        cond.outColorR.connect(div.input2Y)
+        cond = pm.createNode("condition")
+        pm.setAttr(cond + ".secondTerm", 0.0)
+        pm.setAttr(cond + ".operation", 4)  # less than
+        pm.setAttr(cond + ".colorIfTrueR", 0.0001)
+        self.blink_lower_ctl.attr("translateY").connect(cond.firstTerm)
+        pm.connectAttr(self.blink_lower_ctl.attr("translateY"), cond + ".colorIfFalseR")
+        cond.outColorR.connect(div.input1Y)
+        pm.connectAttr(div.outputY, self.blinkLower_att)
+
         addOutput = blinkAdd.output2D
         addOutput.output2Dx.connect(blinkClamp.inputR)
         addOutput.output2Dy.connect(blinkClamp.inputG)
@@ -640,15 +754,35 @@ class Component(component.Main):
         low_ctl = self.lowControls[3]
 
         # Adding channels for eye tracking
-        upVTracking_att  = attribute.addAttribute(up_ctl,  "vTracking", "float", self.upperVTrack, minValue=0, keyable=False, channelBox=True)
-        upHTracking_att  = attribute.addAttribute(up_ctl,  "hTracking", "float", self.upperHTrack, minValue=0, keyable=False, channelBox=True)
+        # self.blink_att = self.addAnimParam("blink" + self.side, "Blink", "float", 0, minValue=0, maxValue=1)
+        self.upVTrackingUp_att = self.addAnimParam("vTrackingUpUp", "Lookat Tracking Vertical Up Upper", "float", self.upperVTrackUp, minValue=0, maxValue=1)
+        self.upVTrackingLow_att = self.addAnimParam("vTrackingUpLow", "Lookat Tracking Vertical Up Lower", "float", self.upperVTrackLow, minValue=0, maxValue=1)
+        self.upHTracking_att = self.addAnimParam("hTrackingUp", "Lookat Tracking Horizontal Up", "float", self.upperHTrack, minValue=0, maxValue=1)
 
-        lowVTracking_att = attribute.addAttribute(low_ctl, "vTracking", "float", self.lowerVTrack, minValue=0, keyable=False, channelBox=True)
-        lowHTracking_att = attribute.addAttribute(low_ctl, "hTracking", "float", self.lowerHTrack, minValue=0, keyable=False, channelBox=True)
+        self.lowVTrackingUp_att = self.addAnimParam("vTrackingLowUp", "Lookat Tracking Vertical Low Upper", "float", self.lowerVTrackUp, minValue=0, maxValue=1)
+        self.lowVTrackingLow_att = self.addAnimParam("vTrackingLowLow", "Lookat Tracking Vertical Low Lower", "float", self.lowerVTrackLow, minValue=0, maxValue=1)
+        self.lowHTracking_att = self.addAnimParam("hTrackingLow", "Lookat Tracking Horizontal Low", "float", self.lowerHTrack, minValue=0, maxValue=1)
 
-        mult_node = node.createMulNode(upVTracking_att, self.aimTrigger_ref.attr("ty"))
+        height = (self.upPos - self.lowPos).length()
+
+        cond_up_or_low = pm.createNode("condition")
+        pm.connectAttr(self.aimTrigger_ref.attr("ty"), cond_up_or_low + ".firstTerm")
+        pm.setAttr(cond_up_or_low + ".secondTerm", 0)
+        pm.setAttr(cond_up_or_low + ".operation", 2)  # greater than
+
+        mult_node = pm.createNode("multiplyDivide")
+        pm.setAttr(mult_node + ".input2X", height * 0.3)
+        pm.connectAttr(self.upVTrackingUp_att, mult_node + ".input1X")
+        pm.connectAttr(mult_node + ".outputX", cond_up_or_low + ".colorIfTrueR")
+
+        mult_node = pm.createNode("multiplyDivide")
+        pm.setAttr(mult_node + ".input2X", height * 0.3)
+        pm.connectAttr(self.upVTrackingLow_att, mult_node + ".input1X")
+        pm.connectAttr(mult_node + ".outputX", cond_up_or_low + ".colorIfFalseR")
+
+        mult_node = node.createMulNode(cond_up_or_low + ".outColorR", self.aimTrigger_ref.attr("ty"))
         pm.connectAttr(mult_node + ".outputX", self.trackLvl[0].attr("ty"))
-        mult_node = node.createMulNode(upHTracking_att, self.aimTrigger_ref.attr("tx"))
+        mult_node = node.createMulNode(self.upHTracking_att, self.aimTrigger_ref.attr("tx"))
 
         # Correct right side horizontal tracking
         if self.negate:
@@ -657,9 +791,24 @@ class Component(component.Main):
 
         pm.connectAttr(mult_node + ".outputX", self.trackLvl[0].attr("tx"))
 
-        mult_node = node.createMulNode(lowVTracking_att, self.aimTrigger_ref.attr("ty"))
+        cond_up_or_low = pm.createNode("condition")
+        pm.connectAttr(self.aimTrigger_ref.attr("ty"), cond_up_or_low + ".firstTerm")
+        pm.setAttr(cond_up_or_low + ".secondTerm", 0)
+        pm.setAttr(cond_up_or_low + ".operation", 2)  # greater than
+
+        mult_node = pm.createNode("multiplyDivide")
+        pm.setAttr(mult_node + ".input2X", height * 0.3)
+        pm.connectAttr(self.lowVTrackingUp_att, mult_node + ".input1X")
+        pm.connectAttr(mult_node + ".outputX", cond_up_or_low + ".colorIfTrueR")
+
+        mult_node = pm.createNode("multiplyDivide")
+        pm.setAttr(mult_node + ".input2X", height * 0.3)
+        pm.connectAttr(self.lowVTrackingLow_att, mult_node + ".input1X")
+        pm.connectAttr(mult_node + ".outputX", cond_up_or_low + ".colorIfFalseR")
+
+        mult_node = node.createMulNode(cond_up_or_low + ".outColorR", self.aimTrigger_ref.attr("ty"))
         pm.connectAttr(mult_node + ".outputX", self.trackLvl[1].attr("ty"))
-        mult_node = node.createMulNode(lowHTracking_att, self.aimTrigger_ref.attr("tx"))
+        mult_node = node.createMulNode(self.lowHTracking_att, self.aimTrigger_ref.attr("tx"))
 
         # Correct right side horizontal tracking
         if self.negate:
