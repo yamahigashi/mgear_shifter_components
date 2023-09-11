@@ -172,7 +172,7 @@ class Component(component.Main):
         self.followLips_att = self.addAnimParam(
             "floowlips", "FollowLips", "double", 0.05, 0, 1)
         self.lipsAlignSpeed_att = self.addAnimParam(
-            "lipsAlignSpeed", "Lips Align Speed", "double", 10, 0, 100)
+            "lipsAlignSpeed", "Lips Align Speed", "double", 0.05, 0, 10)
 
     # =====================================================
     # OPERATORS

@@ -630,8 +630,8 @@ class Component(component.Main):
         slide_c_comp = self.rig.findComponent("mouthSlide_C0_root")
         corner_l_comp = self.rig.findComponent("mouthCorner_L0_root")
         corner_r_comp = self.rig.findComponent("mouthCorner_R0_root")
-        outer_l_comp = self.rig.findComponent(outer_l_ref)
-        outer_r_comp = self.rig.findComponent(outer_r_ref)
+        outer_l_comp = self.rig.findComponent(outer_l_ref.split("|")[-1])
+        outer_r_comp = self.rig.findComponent(outer_r_ref.split("|")[-1])
 
         if outer_l_comp is None or outer_r_comp is None:
             logger.error("No outer mouth component found: mouthOuter_L0_root or mouthOuter_R0_root")

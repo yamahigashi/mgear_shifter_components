@@ -684,9 +684,15 @@ class Component(component.Main):
         original_parent_c = slide_c_comp.root
         original_parent_l = corner_l_comp.root
         original_parent_r = corner_r_comp.root
-        self.parent.addChild(slide_c_comp.root)
-        self.parent.addChild(corner_l_comp.root)
-        self.parent.addChild(corner_r_comp.root)
+
+        if slide_c_comp.root.parent(0) != self.parent:
+            self.parent.addChild(slide_c_comp.root)
+
+        if corner_l_comp.root.parent(0) != self.parent:
+            self.parent.addChild(corner_l_comp.root)
+
+        if corner_r_comp.root.parent(0) != self.parent:
+            self.parent.addChild(corner_r_comp.root)
 
         # create interpose lvl for the ctl
         intTra = rigbits.createInterpolateTransform([lipup_ref, liplow_ref])

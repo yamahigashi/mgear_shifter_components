@@ -315,8 +315,12 @@ class Component(component.Main):
         self.addBlinkControllers(t)
 
     def addOverControllers(self, t):
-        po = self.offset + (self.outPos - self.inPos) * 1.1
-        po.z += self.offset.z * 0.5
+        # po = self.offset + (self.outPos - self.inPos) * 1.1
+        # po.z += self.offset.z * 0.5
+
+        up_blink_pos = self.upPos
+        lo_blink_pos = self.lowPos
+        po = ((up_blink_pos + lo_blink_pos) / 2.0) - self.root.getTranslation(space="world")
         if self.negate:
             po.x *= -1.0
 
@@ -332,6 +336,7 @@ class Component(component.Main):
             ro=datatypes.Vector(1.57079633, 0, 0),
             po=po,
         )
+        self.jnt_pos.append([self.over_ctl, "base"])
         self.addToSubGroup(self.over_ctl, self.primaryControllersGroupName)
         ymt_util.setKeyableAttributesDontLockVisibility(
             self.over_ctl,
@@ -389,7 +394,7 @@ class Component(component.Main):
         pm.parentConstraint(self.arrow_ctl, self.aimTrigger_ref, mo=True)
 
     def addBlinkControllers(self, t):
-        blink_root = addTransform(self.root, self.getName("blink_root"), t)
+        blink_root = addTransform(self.over_ctl, self.getName("blink_root"), t)
 
         inv = datatypes.EulerRotation(180.0, 0.0, 0.0)
         upper_t = transform.setMatrixPosition(t, self.upPos)
@@ -648,8 +653,8 @@ class Component(component.Main):
         # Adding and connecting attributes for the blinks
         self.blink_att = self.addAnimParam("blink" + self.side, "Blink", "float", 0, minValue=0, maxValue=1)
         self.blinkMult_att = self.addAnimParam("blinkMult", "Blink Multiplyer", "float", 1, minValue=1, maxValue=2)
-        self.blinkUpper_att = addAttrNonAnim(self.blink_upper_ctl, "upperBlink", "float", value=0)
-        self.blinkLower_att = addAttrNonAnim(self.blink_upper_ctl, "lowerBlink", "float", value=0)
+        self.blinkUpper_att = addAttrNonAnim(self.blink_upper_ctl, "upperBlink", "float", value=0, minValue=-1.0, maxValue=1.0)
+        self.blinkLower_att = addAttrNonAnim(self.blink_upper_ctl, "lowerBlink", "float", value=0, minValue=-1.0, maxValue=1.0)
         self.midBlinkH_att = addAttrNonAnim(self.blink_upper_ctl, "blinkHeight", "float", value=self.blinkH)
 
         height = (self.upPos - self.lowPos).length()

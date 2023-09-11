@@ -538,14 +538,17 @@ class Component(component.Main):
         if not self.settings["ui_host"]:
             self.uihost = self.mainControl
 
-        self.follow_lookat_threshold_x_attr = self.addAnimParam("follow_lookat_threshold_x", "Follow LookAt threshold X", "double", 90.0, 0, 179.9999)
-        self.follow_lookat_threshold_y_attr = self.addAnimParam("follow_lookat_threshold_y", "Follow LookAt threshold Y", "double", 36, 0, 179.9999)
-        self.follow_lookat_0_x_attr = self.addAnimParam("follow_lookat_0_x", "Follow LookAt in X", "double", 0.010, 0, 1)
-        self.follow_lookat_1_x_attr = self.addAnimParam("follow_lookat_1_x", "Follow LookAt mid X", "double", 0.020, 0, 1)
-        self.follow_lookat_2_x_attr = self.addAnimParam("follow_lookat_2_x", "Follow LookAt out X", "double", 0.013, 0, 1)
-        self.follow_lookat_0_y_attr = self.addAnimParam("follow_lookat_0_y", "Follow LookAt in Y", "double", 0.066, 0, 1)
-        self.follow_lookat_1_y_attr = self.addAnimParam("follow_lookat_1_y", "Follow LookAt mid Y", "double", 0.133, 0, 1)
-        self.follow_lookat_2_y_attr = self.addAnimParam("follow_lookat_2_y", "Follow LookAt out Y", "double", 0.059, 0, 1)
+        self.follow_lookat_threshold_x_attr = self.addAnimParam(
+                "lookat_threshold_x", "LookAt threshold X", "double", 90.0, 0.0001, 179.9999)
+        self.follow_lookat_threshold_y_attr = self.addAnimParam(
+                "lookat_threshold_y", "LookAt threshold Y", "double", 36.0, 0.0001, 179.9999)
+
+        self.follow_lookat_0_x_attr = self.addAnimParam("lookat_0_x", "LookAt inner X", "double", 0.010, 0, 1)
+        self.follow_lookat_1_x_attr = self.addAnimParam("lookat_1_x", "LookAt mid X", "double", 0.020, 0, 1)
+        self.follow_lookat_2_x_attr = self.addAnimParam("lookat_2_x", "LookAt out X", "double", 0.013, 0, 1)
+        self.follow_lookat_0_y_attr = self.addAnimParam("lookat_0_y", "LookAt inner Y", "double", 0.066, 0, 1)
+        self.follow_lookat_1_y_attr = self.addAnimParam("lookat_1_y", "LookAt mid Y", "double", 0.133, 0, 1)
+        self.follow_lookat_2_y_attr = self.addAnimParam("lookat_2_y", "LookAt out Y", "double", 0.059, 0, 1)
 
     # =====================================================
     # OPERATORS
@@ -608,18 +611,22 @@ class Component(component.Main):
         self.connect_eyelookat_axis(self.follow_lookat_threshold_y_attr, "translateY", 0.0, 1.0, attrsY)
 
     def connect_eyelookat_axis(self, threshold_attr, attr, clamp_neg, clamp_pos, attrs):
+
         eye_comp = self.rig.findComponent("eye_{}0_root".format(self.side))
         aim = eye_comp.aimTrigger_ref
         radius = abs(eye_comp.arrow_npo.attr("translateZ").get())
 
         # base = radius * math.sin(0.5 * math.pi * 0.4)  # in degree 36 
-        sin = pm.createNode("sin")  # this node is in degree... not radian
-        threshold_attr.connect(sin.input)
+        # sin = pm.createNode("sin")  # this node is in degree... not radian
+        deg2rad_mul = pm.createNode("multiplyDivide")
+        deg2rad_mul.operation.set(1)  # multiply
+        deg2rad_mul.input2X.set(math.pi / 180.0)
+        threshold_attr.connect(deg2rad_mul.input1X)
 
         mult = pm.createNode("multiplyDivide")
         mult.operation.set(1)  # multiply
         mult.input1X.set(radius)
-        sin.output.connect(mult.input2X)
+        deg2rad_mul.outputX.connect(mult.input2X)
 
         # smoothstep 3x^2 - 2x^3
         div = pm.createNode("multiplyDivide")
