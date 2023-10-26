@@ -159,7 +159,7 @@ def createCurveFromOrderedEdges(edgeLoop,
     return crv
 
 
-def createCuveFromEdges(edgeList,
+def createCurveFromEdges(edgeList,
                         name,
                         parent=None,
                         degree=3,
@@ -179,12 +179,14 @@ def createCuveFromEdges(edgeList,
         dagNode: The newly created curve.
 
     """
-    if sortingAxis == "x":
+    if "x" in sortingAxis:
         axis = 0
-    elif sortingAxis == "y":
+    elif "y" in sortingAxis:
         axis = 1
     else:
         axis = 2
+
+    reverse = "-" in sortingAxis
 
     vList = pm.polyListComponentConversion(edgeList, fe=True, tv=True)
 
@@ -199,7 +201,13 @@ def createCuveFromEdges(edgeList,
             # we use index [0] to order in X axis
             xOrder.append(v.getPosition(space='world')[axis])
             xReOrder.append(v.getPosition(space='world')[axis])
-    for x in sorted(xReOrder):
+
+    if reverse:
+        xReOrder = sorted(xReOrder, reverse=True)
+    else:
+        xReOrder = sorted(xReOrder)
+
+    for x in xReOrder:
         i = xOrder.index(x)
         centersOrdered.append(centers[i])
 
@@ -230,7 +238,7 @@ def createCurveFromCurve(srcCrv, name, nbPoints, parent=None, m=datatypes.Matrix
     paramStart = sc.findParamFromLength(0.0)
     paramEnd = sc.findParamFromLength(length)
     paramLength = paramEnd - paramStart
-    increment = paramLength / (nbPoints - 1)
+    increment = paramLength / nbPoints
 
     p = paramStart
     # if curve is close, we need to find start param to be offseted to find nearest point to 0
@@ -818,3 +826,86 @@ def as_mfnmesh(name):
     # type: (Text) -> om2.MFnMesh
     dagpath = as_dagpath(name)
     return om2.MFnMesh(dagpath)
+
+
+def applyPathCnsLocal(target, curve, u, maintainOffset=True):
+    # type: (dt.Transform, dt.Transform, float, bool) -> None
+    import ymt_shifter_utility
+
+    prev_matrix = target.getMatrix(objectSpace=True)
+
+    cns = applyop.pathCns(target, curve, cnsType=False, u=u, tangent=False)
+    pm.connectAttr(curve.attr("local"), cns.attr("geometryPath"), f=True)  # tobe local space
+
+    comp_node = pm.createNode("composeMatrix")
+    cns.attr("allCoordinates") >> comp_node.attr("inputTranslate")
+    cns.attr("rotate") >> comp_node.attr("inputRotate")
+    cns.attr("rotateOrder") >> comp_node.attr("inputRotateOrder")
+    # curve.attr("matrix") >> mul_node.attr("matrixIn[1]")
+
+    if maintainOffset:
+        h = 1
+    else:
+        h = 0
+
+    mul_node = pm.createNode("multMatrix")
+    comp_node.attr("outputMatrix") >> mul_node.attr("matrixIn[{}]".format(h))
+
+    down, _, up = ymt_shifter_utility.findPathAtoB(curve, target)
+    for i, d in enumerate(down):
+        d.attr("matrix") >> mul_node.attr("matrixIn[{}]".format(h + i + 1))
+
+    for j, u in enumerate(up[:-1]):
+        u.attr("inverseMatrix") >> mul_node.attr("matrixIn[{}]".format(h + i + j + 2))
+
+    if maintainOffset:
+        tmp_output = mul_node.attr("matrixSum").get()
+        offset_matrix = datatypes.Matrix(tmp_output).inverse() * prev_matrix.inverse()
+        offset_node = pm.createNode("fourByFourMatrix")
+        offset_node.attr("in00").set(offset_matrix[0][0])
+        offset_node.attr("in01").set(offset_matrix[0][1])
+        offset_node.attr("in02").set(offset_matrix[0][2])
+        offset_node.attr("in03").set(offset_matrix[0][3])
+        offset_node.attr("in10").set(offset_matrix[1][0])
+        offset_node.attr("in11").set(offset_matrix[1][1])
+        offset_node.attr("in12").set(offset_matrix[1][2])
+        offset_node.attr("in13").set(offset_matrix[1][3])
+        offset_node.attr("in20").set(offset_matrix[2][0])
+        offset_node.attr("in21").set(offset_matrix[2][1])
+        offset_node.attr("in22").set(offset_matrix[2][2])
+        offset_node.attr("in23").set(offset_matrix[2][3])
+        offset_node.attr("in30").set(offset_matrix[3][0])
+        offset_node.attr("in31").set(offset_matrix[3][1])
+        offset_node.attr("in32").set(offset_matrix[3][2])
+        offset_node.attr("in33").set(offset_matrix[3][3])
+        offset_node.attr("output") >> mul_node.attr("matrixIn[0]")
+
+    decomp_node = pm.createNode("decomposeMatrix")
+    mul_node.attr("matrixSum") >> decomp_node.attr("inputMatrix")
+    decomp_node.attr("outputTranslate") >> target.attr("translate")
+    decomp_node.attr("outputRotate") >> target.attr("rotate")
+
+    return cns
+    
+
+def applyPathConstrainLocal(target, src_curve):
+    # type: (str, str) -> None
+
+    if isinstance(target, six.string_types) or isinstance(target, six.text_type):
+        target = pm.PyNode(target)
+    if isinstance(src_curve, six.string_types) or isinstance(src_curve, six.text_type):
+        src_curve = pm.PyNode(src_curve)
+
+    try:
+        ma = target.getMatrix(worldSpace=True)
+        mb = src_curve.getMatrix(worldSpace=True)
+        m = ma * mb.inverse()
+        pos = datatypes.Vector(m[3][0], m[3][1], m[3][2])
+        param, length = getCurveParamAtPosition(src_curve, pos)
+        u_length = findLenghtFromParam(src_curve, param)
+        u_param = u_length / length
+
+        applyPathCnsLocal(target, src_curve, u_param)
+    except:
+        import traceback as tb
+        tb.print_exc()

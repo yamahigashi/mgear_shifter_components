@@ -2,6 +2,7 @@
 # pylint: disable=import-error,W0201,C0111,C0112
 import re
 import sys
+import math
 
 import maya.cmds as cmds
 import maya.api.OpenMaya as om
@@ -13,6 +14,7 @@ from mgear.shifter import component
 from mgear.rigbits.facial_rigger import helpers
 from mgear.rigbits.facial_rigger import constraints
 from mgear.rigbits import ghost
+from mgear.rigbits import addNPO
 
 from mgear.core import (
     transform,
@@ -303,7 +305,7 @@ class Component(component.Main):
         npoBuffer = addTransform(npo, self.getName("%s_bufferNpo" % oName, oSide), t)
 
         # Create casual control
-        if o_icon is not "npo":
+        if o_icon != "npo":
             if o_icon == "sphere":
                 rot_offset = None
             else:
@@ -533,10 +535,20 @@ class Component(component.Main):
     def addAttributes(self):
         """Create the anim and setupr rig attributes for the component"""
 
-        # if not self.settings["ui_host"]:
-        #     self.uihost = self.over_ctl
+        if not self.settings["ui_host"]:
+            self.uihost = self.mainControl
 
-        return
+        self.follow_lookat_threshold_x_attr = self.addAnimParam(
+                "lookat_threshold_x", "LookAt threshold X", "double", 90.0, 0.0001, 179.9999)
+        self.follow_lookat_threshold_y_attr = self.addAnimParam(
+                "lookat_threshold_y", "LookAt threshold Y", "double", 36.0, 0.0001, 179.9999)
+
+        self.follow_lookat_0_x_attr = self.addAnimParam("lookat_0_x", "LookAt inner X", "double", 0.010, 0, 1)
+        self.follow_lookat_1_x_attr = self.addAnimParam("lookat_1_x", "LookAt mid X", "double", 0.020, 0, 1)
+        self.follow_lookat_2_x_attr = self.addAnimParam("lookat_2_x", "LookAt out X", "double", 0.013, 0, 1)
+        self.follow_lookat_0_y_attr = self.addAnimParam("lookat_0_y", "LookAt inner Y", "double", 0.066, 0, 1)
+        self.follow_lookat_1_y_attr = self.addAnimParam("lookat_1_y", "LookAt mid Y", "double", 0.133, 0, 1)
+        self.follow_lookat_2_y_attr = self.addAnimParam("lookat_2_y", "LookAt out Y", "double", 0.059, 0, 1)
 
     # =====================================================
     # OPERATORS
@@ -575,6 +587,109 @@ class Component(component.Main):
         if self.settings["addJoints"]:
             for i, ctl in enumerate(self.secondaryControls):
                 self.jnt_pos.append([ctl, str(i).zfill(2)])
+
+        if True:
+            try:
+                self.connect_eyelookat()
+            except Exception as _:
+                import traceback
+                traceback.print_exc()
+                raise
+
+    def connect_eyelookat(self):
+        attrsX = [
+            self.follow_lookat_0_x_attr,
+            self.follow_lookat_1_x_attr,
+            self.follow_lookat_2_x_attr,
+        ]
+        attrsY = [
+            self.follow_lookat_0_y_attr,
+            self.follow_lookat_1_y_attr,
+            self.follow_lookat_2_y_attr,
+        ]
+        self.connect_eyelookat_axis(self.follow_lookat_threshold_x_attr, "translateX", -1.0,1.0, attrsX)
+        self.connect_eyelookat_axis(self.follow_lookat_threshold_y_attr, "translateY", 0.0, 1.0, attrsY)
+
+    def connect_eyelookat_axis(self, threshold_attr, attr, clamp_neg, clamp_pos, attrs):
+
+        eye_comp = self.rig.findComponent("eye_{}0_root".format(self.side))
+        aim = eye_comp.aimTrigger_ref
+        radius = abs(eye_comp.arrow_npo.attr("translateZ").get())
+
+        # base = radius * math.sin(0.5 * math.pi * 0.4)  # in degree 36 
+        # sin = pm.createNode("sin")  # this node is in degree... not radian
+        deg2rad_mul = pm.createNode("multiplyDivide")
+        deg2rad_mul.operation.set(1)  # multiply
+        deg2rad_mul.input2X.set(math.pi / 180.0)
+        threshold_attr.connect(deg2rad_mul.input1X)
+
+        mult = pm.createNode("multiplyDivide")
+        mult.operation.set(1)  # multiply
+        mult.input1X.set(radius)
+        deg2rad_mul.outputX.connect(mult.input2X)
+
+        # smoothstep 3x^2 - 2x^3
+        div = pm.createNode("multiplyDivide")
+        div.operation.set(2)  # divide
+        aim.attr(attr).connect(div.input1X)
+        mult.outputX.connect(div.input2X)
+
+        clamp = pm.createNode("clamp")
+        clamp.minR.set(clamp_neg)
+        clamp.maxR.set(clamp_pos)
+        div.outputX.connect(clamp.inputR)
+
+        # 3x^2 = A
+        pow2 = pm.createNode("multiplyDivide")
+        pow2.operation.set(3)  # power
+        clamp.outputR.connect(pow2.input1X)
+        pow2.input2X.set(2)
+        mult3 = pm.createNode("multiplyDivide")
+        mult3.operation.set(1)  # multiply
+        pow2.outputX.connect(mult3.input1X)
+        mult3.input2X.set(3)
+
+        # 2x^3 = B
+        pow3 = pm.createNode("multiplyDivide")
+        pow3.operation.set(3)  # pow
+        clamp.outputR.connect(pow3.input1X)
+        pow3.input2X.set(3)
+        mult2 = pm.createNode("multiplyDivide")
+        mult2.operation.set(1)  # multiply
+        pow3.outputX.connect(mult2.input1X)
+        clamp.outputR.connect(mult2.input2X)
+
+        # A - B
+        sub = pm.createNode("plusMinusAverage")
+        sub.operation.set(2)  # subtract
+        mult3.outputX.connect(sub.input1D[0])
+        mult2.outputX.connect(sub.input1D[1])
+
+        mult_res = pm.createNode("multiplyDivide")
+        mult_res.operation.set(1)  # multiply
+        aim.attr(attr).connect(mult_res.input1X)
+        sub.output1D.connect(mult_res.input2X)
+
+        res0 = pm.createNode("multiplyDivide")
+        res1 = pm.createNode("multiplyDivide")
+        res2 = pm.createNode("multiplyDivide")
+        res0.operation.set(1)  # multiply
+        res1.operation.set(1)  # multiply
+        res2.operation.set(1)  # multiply
+        mult_res.outputX.connect(res0.input1X)
+        mult_res.outputX.connect(res1.input1X)
+        mult_res.outputX.connect(res2.input1X)
+        attrs[0].connect(res0.input2X)
+        attrs[1].connect(res1.input2X)
+        attrs[2].connect(res2.input2X)
+
+        # insert npo
+        npo0 = addNPO(self.mainControls[0])[0]
+        npo1 = addNPO(self.mainControls[2])[0]
+        npo2 = addNPO(self.mainControls[4])[0]
+        res0.outputX.connect(npo0.attr(attr))
+        res1.outputX.connect(npo1.attr(attr))
+        res2.outputX.connect(npo2.attr(attr))
 
     def connect_slide_ghost(self):
 

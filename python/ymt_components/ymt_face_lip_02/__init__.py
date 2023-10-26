@@ -3,16 +3,14 @@
 import re
 import six
 import sys
+import math
 import traceback
 
 import maya.cmds as cmds
-import maya.OpenMaya as om1
 import maya.api.OpenMaya as om
 
 import pymel.core as pm
 from pymel.core import datatypes
-
-import exprespy.cmd
 
 from mgear import rigbits
 from mgear.rigbits import ghost
@@ -20,25 +18,17 @@ from mgear.shifter import component
 
 from mgear.core import (
     transform,
-    # curve,
     applyop,
-    # attribute,
-    # icon,
-    # fcurve,
-    vector,
-    # meshNavigation,
+    # vector,
     node,
     primitive,
-    # utils,
 )
 
 from mgear.core.transform import (
     getTransform,
-    # resetTransform,
-    # getTransformLookingAt,
-    # getChainTransform2,
     setMatrixPosition,
     setMatrixRotation,
+    setMatrixScale,
 )
 
 from mgear.core.primitive import (
@@ -47,28 +37,27 @@ from mgear.core.primitive import (
 import ymt_shifter_utility as ymt_util
 import ymt_shifter_utility.curve as curve
 
-if sys.version_info >= (3, 0):  # pylint: disable=using-constant-test  # pylint: disable=using-constant-test, wrong-import-order
-    # For type annotation
-    from typing import (  # NOQA: F401 pylint: disable=unused-import
-        Optional,
-        Dict,
-        List,
-        Tuple,
-        Pattern,
-        Callable,
-        Any,
-        Text,
-        Generator,
-        Union
-    )
-    from pathlib import Path  # NOQA: F401, F811 pylint: disable=unused-import,reimported
-    from types import ModuleType  # NOQA: F401 pylint: disable=unused-import
-    from six.moves import reload_module as reload  # NOQA: F401 pylint: disable=unused-import
+
+if sys.version_info > (3, 0):
+    from typing import TYPE_CHECKING
+    if TYPE_CHECKING:
+        from typing import (
+            Optional,  # noqa: F401
+            Dict,  # noqa: F401
+            List,  # noqa: F401
+            Tuple,  # noqa: F401
+            Pattern,  # noqa: F401
+            Callable,  # noqa: F401
+            Any,  # noqa: F401
+            Text,  # noqa: F401
+            Generator,  # noqa: F401
+            Union  # noqa: F401
+        )
 
 from logging import (  # noqa:F401 pylint: disable=unused-import, wrong-import-order
     StreamHandler,
     getLogger,
-    WARN,
+    WARN,  # noqa: F401
     DEBUG,
     INFO
 )
@@ -112,22 +101,20 @@ class Component(component.Main):
                                 0, 0, 0,
                                 0, 0, 0]
 
-        # -------------------------------------------------------
-        self.surfRef = self.settings["surfaceReference"]
         self.connect_surface_slider = self.settings["isSlidingSurface"]
+        self.surfRef = self.settings["surfaceReference"]
+        self.cheekLeftRef = self.settings["cheekLeftReference"]
+        self.cheekRightRef = self.settings["cheekRightReference"]
+        # -------------------------------------------------------
 
-        self.num_uplocs = self.getNumberOfLocators("_uploc")
-        self.num_lowlocs = self.getNumberOfLocators("_lowloc")
+        self.num_locs = self.getNumberOfLocators("_loc")
 
-        self.inPos = self.guide.apos[-5]
-        self.outPos = self.guide.apos[-4]
         self.upPos = self.guide.apos[-3]
         self.lowPos = self.guide.apos[-2]
         self.frontPos = self.guide.apos[-1]
         self.rootPos = self.guide.apos[0]
 
-        self.uplocsPos = self.guide.apos[2:self.num_uplocs + 2]
-        self.lowlocsPos = self.guide.apos[2 + self.num_uplocs:-5]
+        self.locsPos = self.guide.apos[2:self.num_locs + 2]
 
         self.offset = (self.frontPos - self.rootPos) * 0.3
         if self.negate:
@@ -138,26 +125,36 @@ class Component(component.Main):
         self.ctlName = "ctl"
         self.detailControllersGroupName = "controllers_detail"  # TODO: extract to settings
         self.primaryControllersGroupName = "controllers_primary"  # TODO: extract to settings
-        self.blinkH = 0.2
-        self.upperVTrack = 0.04
-        self.upperHTrack = 0.01
-        self.lowerVTrack = 0.02
-        self.lowerHTrack = 0.01
 
-        self.thickness = 0.003
-        self.FRONT_OFFSET = .0002
-
-        if self.num_uplocs % 2 == 0:
+        self.thickness = 0.07
+        self.FRONT_OFFSET = 0.2
+        self.NB_CVS = self.num_locs
+        if self.num_locs % 2 == 0:
             # even
-            self.num_rope_up = self.num_uplocs * 20 + 1
+            self.NB_ROPE = self.num_locs * 20 + 1
         else:
-            self.num_rope_up = self.num_uplocs * 20
+            self.NB_ROPE = self.num_locs * 20
 
-        if self.num_lowlocs % 2 == 0:
-            # even
-            self.num_rope_low = self.num_lowlocs * 20 + 1
+        # odd / event
+        if self.num_locs % 2 == 0:
+            self.bottom_index = int(self.num_locs / 2)
         else:
-            self.num_rope_low = self.num_lowlocs * 20
+            self.bottom_index = int((self.num_locs -1) / 2)
+
+        # treat most left side as corner index
+        peek_x = 0.0
+        self.left_index = 0
+        for i in range(0, self.bottom_index):
+            if self.locsPos[i][0] > peek_x:
+                peek_x = self.locsPos[i][0]
+                self.left_index = i
+
+        peek_x = 0.0
+        self.right_index = 0
+        for i in range(self.bottom_index, self.num_locs):
+            if self.locsPos[i][0] < peek_x:
+                peek_x = self.locsPos[i][0]
+                self.right_index = i
 
         # --------------------------------------------------------
         self.ik_ctl = []
@@ -176,9 +173,9 @@ class Component(component.Main):
         self.lowControls = []
         self.trackLvl = []
 
-        self.upCrv = None
-        self.lowCrv = None
-        self.upCrv_ctl = None
+        self.crv = None
+        # self.lowCrv = None
+        self.crv_ctl = None
         self.lowCrv_ctl = None
         self.upBlink = None
         self.lowBlink = None
@@ -201,7 +198,8 @@ class Component(component.Main):
         t = getTransform(self.root)
 
         self.crv_root = addTransform(self.root, self.getName("crvs"), t)
-        self.lipsRope_root = addTransform(self.root, self.getName("rope"), t)
+        self.ctl_root = addTransform(self.root, self.getName("ctls"), t)
+        self.rope_root = addTransform(self.root, self.getName("rope"), t)
 
     def getNumberOfLocators(self, query):
         # type: (Text) -> int
@@ -217,21 +215,15 @@ class Component(component.Main):
     def addDummyPlane(self):
         # type: () -> om.MFnMesh
 
-        positions = [self.inPos]
-        positions.extend(self.uplocsPos)
-        positions.append(self.outPos)
-        positions.extend(reversed(self.lowlocsPos))
+        positions = []
+        positions.extend(self.locsPos)
 
         return draw_eye_guide_mesh_plane(positions, self.root)
-        # return mgear_util.draw_eye_guide_mesh_plane(joint_points)
 
     def addCurve(self):
 
-        plane = self.addDummyPlane()
-
-        self.addCurves(self.crv_root, plane)
-        self.addCurveBaseControllers(self.crv_root, plane)
-        cmds.delete(cmds.listRelatives(plane.fullPathName(), parent=True))
+        self.addCurves(self.crv_root)
+        self.addCurveBaseControllers(self.crv_root)
 
         if not self.surfRef:
             self.sliding_surface = pm.duplicate(self.guide.getObjects(self.guide.root)["sliding_surface"])[0]
@@ -239,103 +231,87 @@ class Component(component.Main):
             self.sliding_surface.visibility.set(False)
             pm.makeIdentity(self.sliding_surface, apply=True, t=1,  r=1, s=1, n=0, pn=1)
 
-    def addCurves(self, crv_root, plane):
+    def getCurveCVs(self, crv, space="world"):
+        # type: (...) -> List[om.MPoint]
+
+        cvs = crv.getCVs(space=space)
+        degree = cmds.getAttr("{}.degree".format(crv))
+
+        # TODO: extract to settings later
+        # if self.settings["close"]:
+        cvs = cvs[:len(cvs) - degree]  # closed curve goes not get cvs properly
+
+        return cvs
+
+    def addCurves(self, crv_root):
 
         t = getTransform(self.root)
         gen = curve.createCurveFromOrderedEdges
+        plane = self.addDummyPlane()
         planeNode = pm.PyNode(plane.fullPathName())
 
         # -------------------------------------------------------------------
-        def _inner(edges, name):
-            crv = gen(edges, planeNode.verts[1], self.getName("{}Crv".format(name)), parent=crv_root, m=t)
-            ctl = gen(edges, planeNode.verts[1], self.getName("{}Ctl_crv".format(name)), parent=crv_root, m=t)
+        def _inner(edges):
+            crv = gen(edges, planeNode.verts[1], self.getName("crv"), parent=crv_root, m=t, close=True)
+            ctl = gen(edges, planeNode.verts[1], self.getName("ctl_crv"), parent=crv_root, m=t, close=True)
             crv.attr("visibility").set(False)
             ctl.attr("visibility").set(False)
 
-            cvs = crv.getCVs(space="world")
+            cvs = self.getCurveCVs(crv)
+            center_pos = sum(cvs) / len(cvs)  # type: ignore
             for i, cv in enumerate(cvs):
-
-                if i == 0:
-                    # we know the curv starts from right to left
-                    offset = [cv[0] - self.thickness, cv[1], cv[2] - self.thickness]
-
-                elif i == len(cvs) - 1:
-                    offset = [cv[0] + self.thickness, cv[1], cv[2] - self.thickness]
-
-                else:
-                    offset = [cv[0], cv[1] + self.thickness, cv[2]]
-
-                crv.setCV(i, offset, space='world')
+                offset = (cv - center_pos).normal() * self.thickness
+                new_pos = [cv[0] + offset[0], cv[1] + offset[1], cv[2] + offset[2]]
+                crv.setCV(i, new_pos, space="world")
 
             return crv, ctl
 
         # -------------------------------------------------------------------
         edgeList = ["{}.e[{}]".format(plane.fullPathName(), 0)]
-        for i in range(1, self.num_uplocs + 1):
+        for i in range(1, self.num_locs + 1):
             edgeList.append("{}.e[{}]".format(plane.fullPathName(), i * 2 + 1))
         edgeList = [pm.PyNode(x) for x in edgeList]
-        self.upCrv, self.upCrv_ctl = _inner(edgeList, "upper")
+        self.crv, self.crv_ctl = _inner(edgeList)
+        cmds.delete(cmds.listRelatives(plane.fullPathName(), parent=True))
 
-        # -------------------------------------------------------------------
-        edgeList = []
-        for i in reversed(range(self.num_uplocs + 1, self.num_uplocs + self.num_lowlocs + 2)):
-            edgeList.append("{}.e[{}]".format(plane.fullPathName(), i * 2 + 1))
-        edgeList = [pm.PyNode(x) for x in edgeList]
-        self.lowCrv, self.lowCrv_ctl = _inner(edgeList, "lower")
+    def addCurveBaseControllers(self, crv_root):
 
-    def addCurveBaseControllers(self, crv_root, plane):
-
-        def gen2(crv, name, nbPoints, tobe_offset):
+        def curveFromCurve(crv, name, nbPoints, tobe_offset):
             t = getTransform(self.root)
 
-            new_crv = curve.createCurveFromCurve(crv, self.getName(name), nbPoints=nbPoints, parent=crv_root, m=t)
+            new_crv = curve.createCurveFromCurve(crv, self.getName(name), nbPoints=nbPoints, parent=crv_root, m=t, close=True)
             new_crv.attr("visibility").set(False)
 
             # double translation denial
-            cvs = new_crv.getCVs(space="world")
+            cvs = self.getCurveCVs(new_crv)
+
             for i, cv in enumerate(cvs):
                 x, y, z = transform.getTranslation(new_crv)
                 offset = [cv[0] - x, cv[1] - y, cv[2] - z]
-                new_crv.setCV(i, offset, space='world')
+                new_crv.setCV(i, offset, space="world")
 
             if not tobe_offset:
                 return new_crv
 
-            cvs = new_crv.getCVs(space="world")
+            cvs = self.getCurveCVs(new_crv)
             for i, cv in enumerate(cvs):
-
-                # we populate the closest vertext list here to skipt the first
-                # and latest point
                 offset = [cv[0], cv[1], cv[2] + self.FRONT_OFFSET]
-
-                new_crv.setCV(i, offset, space='world')
+                new_crv.setCV(i, offset, space="world")
 
             return new_crv
 
         # -------------------------------------------------------------------
-        self.upCrv_ctl   = gen2(self.upCrv,  "upCtl_crv",   7, False)
-        self.lowCrv_ctl  = gen2(self.lowCrv, "lowCtl_crv",  7, False)
-
-        self.upRope      = gen2(self.upCrv,  "upRope_crv",  self.num_rope_up, False)
-        self.lowRope     = gen2(self.lowCrv, "lowRope_crv", self.num_rope_low, False)
-
-        self.upCrv_upv   = gen2(self.upCrv,  "upCtl_upv",   7, True)
-        self.lowCrv_upv  = gen2(self.lowCrv, "lowCtl_upv",  7, True)
-
-        self.upRope_upv  = gen2(self.upCrv,  "upRope_upv",  self.num_rope_up, True)
-        self.lowRope_upv = gen2(self.lowCrv, "lowRope_upv", self.num_rope_low, True)
+        self.crv_ctl  = curveFromCurve(self.crv, "ctl_crv",  12,  False)
+        self.rope     = curveFromCurve(self.crv, "rope_crv", self.NB_ROPE, False)
+        self.crv_upv  = curveFromCurve(self.crv, "ctl_upv",  12,  True)
+        self.rope_upv = curveFromCurve(self.crv, "rope_upv", self.NB_ROPE, True)
 
     def addControlJoints(self):
-        skip = not self.settings.get("isSplitCorners", False)
+        self.joints = self._addControlJoints(self.crv, self.rope_root, self.rope, self.rope_upv)
 
-        self.upJoints = self._addControlJoints(self.upCrv, "up", self.lipsRope_root, self.upRope, self.upRope_upv)
-        self.lowJoints = self._addControlJoints(self.lowCrv, "low", self.lipsRope_root, self.lowRope, self.lowRope_upv, skipHeadAndTail=skip)
+    def _addControlJoints(self, crv, rope_root, rope, rope_upv):
 
-    def _addControlJoints(self, crv, name, rope_root, rope, rope_upv, skipHeadAndTail=False):
-
-        lvlType = "transform"
-        cvs = crv.getCVs(space="world")
-        local_cvs = crv.getCVs(space="object")
+        local_cvs = self.getCurveCVs(crv, "object")
         controls = []
         t = getTransform(self.root)
 
@@ -344,64 +320,86 @@ class Component(component.Main):
         wd = .3
         po = self.offset * 0.3
 
-        pm.progressWindow(title='Creating Upper Joints', progress=0, max=len(cvs))
+        cvsObject = self.getCurveCVs(crv, "object")
+        cvsWorld = self.getCurveCVs(crv, "world")
 
-        for i, cv in enumerate(cvs):
-            if skipHeadAndTail and i == 0:
-                continue
+        for i, _ in enumerate(cvsObject):
 
-            if skipHeadAndTail and (i == len(cvs) - 1):
-                continue
+            mirror = i > self.num_locs / 2
+            lower = i > self.left_index and i < self.right_index
 
-            pm.progressWindow(e=True, step=1, status='\nCreating Joint for  %s' % cv)
+            # sub component name
+            if i == 0: 
+                sub_comp = "C0"
 
-            upv = addTransform(rope_root, self.getName("{}LipRope_upv{}".format(name, str(i).zfill(3))))
-            npo = addTransform(rope_root, self.getName("{}LipRope_npo{}".format(name, str(i).zfill(3))))
+            elif i == self.bottom_index: 
+                sub_comp = "C1"
 
-            oParam, oLength = curve.getCurveParamAtPosition(rope, local_cvs[i])
-            uLength = curve.findLenghtFromParam(rope, oParam)
-            u = uLength / oLength
-
-            if (i + 1) / float(len(cvs)) < 0.5:
-                negate = True
-            else:
-                negate = False
-
-            cns = applyPathCnsLocal(upv, rope_upv, u, negate=negate)
-            cns = applyPathCnsLocal(npo, rope, u, negate=negate)
-
-            pm.connectAttr(upv.attr("worldMatrix[0]"), cns.attr("worldUpMatrix"))
-
-            ctl_name = self.getName("%s_crvdetail%s_%s" % (name, i, self.ctlName))
-
-            self.thickness = 0.0
-            if i == 0:
-                # we know the curv starts from right to left
-                offset = [cv[0] + self.thickness, cv[1], cv[2] + self.thickness]
-
-            elif i == len(cvs) - 1:
-                offset = [cv[0] - self.thickness, cv[1], cv[2] + self.thickness]
+            elif not mirror:
+                if i <= self.left_index:
+                    sub_comp = "L" + str(i - 1)
+                else:
+                    sub_comp = "L" + str(self.bottom_index - i + self.left_index - 1)
 
             else:
-                offset = [cv[0], cv[1] - self.thickness, cv[2]]
+                tmp = self.num_locs - self.right_index
+                if i < self.right_index:
+                    sub_comp = "R" + str(i - self.bottom_index + tmp - 1)
+                else:
+                    sub_comp = "R" + str(tmp - i + self.right_index - 1)
 
-            # offset = [cv[0], cv[1], cv[2] - self.FRONT_OFFSET]
-            m = getTransform(npo)
+            cvOS = cvsObject[i]
+            # cvOSoffset = [cvOS[0], cvOS[1], cvOS[2] + self.FRONT_OFFSET]
+
+            # upv = addTransform(rope_root, self.getName("rope_{}_upv".format(sub_comp)))
+            cns = addTransform(rope_root, self.getName("rope_{}_cns".format(sub_comp)))
+            # applyPathCnsLocal(upv, self.crv_upv, rope_upv, cvOSoffset)
+            applyPathCnsLocal(cns, self.crv_ctl, rope, cvOS)
+
+            cv = cvsWorld[i]
+            m = getTransform(cns)
             x = datatypes.Vector(m[0][0], m[0][1], m[0][2])
             y = datatypes.Vector(m[1][0], m[1][1], m[1][2])
             z = datatypes.Vector(m[2][0], m[2][1], m[2][2])
             rot = [x, y, z]
-            xform = setMatrixPosition(t, offset)
+            xform = setMatrixPosition(t, cv)
             xform = setMatrixRotation(xform, rot)
-            # xform = setMatrixPosition(t, cv)
+            offset = datatypes.EulerRotation((90.0, 0, 0), unit="degrees")
+            xform = offset.asMatrix() * xform
 
-            npo_name = self.getName("{}LipRope_jnt{}_npo".format(name, str(i)))
-            npo = addTransform(npo, npo_name, xform)
+            if mirror:
+                if lower:
+                    xform = setMatrixScale(xform, scl=[1, -1, -1])
+                else:
+                    xform = setMatrixScale(xform, scl=[-1, 1, 1])
 
+                # aimVec = (0, 0, -1)
+            else:
+                if lower:
+                    xform = setMatrixScale(xform, scl=[-1, -1, -1])
+                else:
+                    xform = setMatrixScale(xform, scl=[1, 1, 1])
+                # aimVec = (0, 0, 1)
+
+            if i == self.left_index:
+                prev = getTransform(controls[i-1]).rotate
+                # xform = setMatrixRotation(xform, prev)
+            if i == self.right_index + 1:
+                rightCtl = controls[self.right_index]
+                rightNpo = rightCtl.getParent()
+                pos = cmds.xform(rightNpo.fullPath(), q=True, ws=True, translation=True)
+                pm.xform(rightNpo, ws=True, matrix=xform)
+                pm.xform(rightNpo, ws=True, translation=pos)
+
+            npo_name = self.getName("rope_{}_jnt_npo".format(sub_comp))
+            npo = addTransform(cns, npo_name, xform)
+
+            t = getTransform(npo)
+            ctl_name = self.getName("%s_crvdetail_%s" % (sub_comp, self.ctlName))
             ctl = self.addCtl(
                 npo,
                 ctl_name,
-                xform,
+                t,
                 color,
                 icon_shape,
                 w=wd,
@@ -414,10 +412,9 @@ class Component(component.Main):
 
             # getting joint parent
             # jnt = rigbits.addJnt(npo, noReplace=True, parent=self.j_parent)
-            self.jnt_pos.append([ctl, "{}{}".format(name, i)])
+            self.jnt_pos.append([ctl, "{}".format(i)])
             self.addToSubGroup(ctl, self.detailControllersGroupName)
 
-        pm.progressWindow(e=True, endProgress=True)
         return controls
 
     def addToSubGroup(self, obj, group_name):
@@ -431,146 +428,108 @@ class Component(component.Main):
 
     def addControllers(self):
         axis_list = ["sx", "sy", "sz", "ro"]
-        upCtlOptions = [["corner", "R", "square", 4, .05, axis_list],
-                        ["upOuter", "R", "circle", 14, .03, []],
-                        ["upInner", "R", "circle", 14, .03, []],
-                        ["upper", "C", "square", 4, .05, axis_list],
-                        ["upInner", "L", "circle", 14, .03, []],
-                        ["upOuter", "L", "circle", 14, .03, []],
-                        ["corner", "L", "square", 4, .05, axis_list]]
 
-        lowCtlOptions = [["lowOuter", "R", "circle", 14, .03, []],
-                         ["lowInner", "R", "circle", 14, .03, []],
-                         ["lower", "C", "square", 4, .05, axis_list],
-                         ["lowInner", "L", "circle", 14, .03, []],
-                         ["lowOuter", "L", "circle", 14, .03, []]]
+        ctlOptions = [
+            # name,      side, icon,   color, width, keyable
+            ["upper",    "C", "square", 4,  .05, axis_list],  # 0
+            ["upInner",  "L", "circle", 14, .03, []],         # 1
+            ["upOuter",  "L", "circle", 14, .03, []],         # 2
+            ["corner",   "L", "square", 4,  .05, axis_list],  # 3
+            ["lowOuter", "L", "circle", 14, .03, []],         # 4
+            ["lowInner", "L", "circle", 14, .03, []],         # 5
+            ["lower",    "C", "square", 4,  .05, axis_list],  # 6
+            ["lowInner", "R", "circle", 14, .03, []],         # 7
+            ["lowOuter", "R", "circle", 14, .03, []],         # 8
+            ["corner",   "R", "square", 4,  .05, axis_list],  # 9
+            ["upOuter",  "R", "circle", 14, .03, []],         # 10
+            ["upInner",  "R", "circle", 14, .03, []],         # 11
+        ]
 
-        self.upNpos, self.upCtls, self.upUpvs = self._addControls(self.upCrv_ctl, upCtlOptions, False)
-        self.lowNpos, self.lowCtls, self.lowUpvs = self._addControls(self.lowCrv_ctl, lowCtlOptions, True)
+        self.upNpos, self.upCtls, self.upUpvs = self._addControls(self.crv_ctl, ctlOptions)
 
-        self.lips_R_Corner_ctl   = self.upCtls[0]
-        self.lips_R_upOuter_ctl  = self.upCtls[1]
-        self.lips_R_upInner_ctl  = self.upCtls[2]
-        self.lips_C_upper_ctl    = self.upCtls[3]
-        self.lips_L_upInner_ctl  = self.upCtls[4]
-        self.lips_L_upOuter_ctl  = self.upCtls[5]
-        self.lips_L_Corner_ctl   = self.upCtls[6]
+        self.lips_C_upper_ctl  = self.upCtls[0]
+        self.lips_C_lower_ctl  = self.upCtls[6]
 
-        self.lips_R_lowOuter_ctl = self.lowCtls[0]
-        self.lips_R_lowInner_ctl = self.lowCtls[1]
-        self.lips_C_lower_ctl    = self.lowCtls[2]
-        self.lips_L_lowInner_ctl = self.lowCtls[3]
-        self.lips_L_lowOuter_ctl = self.lowCtls[4]
+        self.lips_L_Corner_npo = self.upNpos[3]
+        self.lips_R_Corner_npo = self.upNpos[9]
 
-        self.lips_R_Corner_npo   = self.upNpos[0]
-        self.lips_R_upOuter_npo  = self.upNpos[1]
-        self.lips_R_upInner_npo  = self.upNpos[2]
-        self.lips_C_upper_npo    = self.upNpos[3]
-        self.lips_L_upInner_npo  = self.upNpos[4]
-        self.lips_L_upOuter_npo  = self.upNpos[5]
-        self.lips_L_Corner_npo   = self.upNpos[6]
-
-        self.lips_R_lowOuter_npo = self.lowNpos[0]
-        self.lips_R_lowInner_npo = self.lowNpos[1]
-        self.lips_C_lower_npo    = self.lowNpos[2]
-        self.lips_L_lowInner_npo = self.lowNpos[3]
-        self.lips_L_lowOuter_npo = self.lowNpos[4]
-
-        upvec = self.upUpvs + self.lowUpvs
-
-        pm.parent(self.lips_R_upOuter_npo,  self.lips_R_lowOuter_npo,  self.lips_R_Corner_ctl)
-        pm.parent(self.lips_R_upInner_npo,  self.lips_L_upInner_npo,   self.lips_C_upper_ctl)
-        pm.parent(self.lips_L_upOuter_npo,  self.lips_L_lowOuter_npo,  self.lips_L_Corner_ctl)
-        pm.parent(self.lips_R_lowInner_npo, self.lips_L_lowInner_npo,  self.lips_C_lower_ctl)
+        upvec = self.upUpvs
 
         # Connecting control crvs with controls
-        applyop.gear_curvecns_op(self.upCrv_ctl, self.upCtls)
-        applyop.gear_curvecns_op(self.lowCrv_ctl,
-                                 [self.upCtls[0]] + self.lowCtls + [self.upCtls[-1]])
-
-        applyop.gear_curvecns_op(self.upCrv_upv, upvec)
-        applyop.gear_curvecns_op(self.lowCrv_upv, [upvec[0]] + self.lowUpvs + [upvec[-1]])
+        applyop.gear_curvecns_op(self.crv_ctl, self.upCtls)
+        applyop.gear_curvecns_op(self.crv_upv, upvec)
 
         # adding wires
-        pm.wire(self.upCrv, w=self.upCrv_ctl, dropoffDistance=[0, 1000])
-        pm.wire(self.lowCrv, w=self.lowCrv_ctl, dropoffDistance=[0, 1000])
-        pm.wire(self.upRope, w=self.upCrv_ctl, dropoffDistance=[0, 1000])
-        pm.wire(self.lowRope, w=self.lowCrv_ctl, dropoffDistance=[0, 1000])
-
-        pm.wire(self.upRope_upv, w=self.upCrv_upv, dropoffDistance=[0, 1000])
-        pm.wire(self.lowRope_upv, w=self.lowCrv_upv, dropoffDistance=[0, 1000])
-
-        return
+        pm.wire(self.crv, w=self.crv_ctl, dropoffDistance=[0, self.size * 10])
+        pm.wire(self.rope, w=self.crv_ctl, dropoffDistance=[0, self.size * 10])
+        pm.wire(self.rope_upv, w=self.crv_upv, dropoffDistance=[0, self.size * 10])
 
     def addConstraints(self):
 
-        def __upper(ctls, s1, s2, d, p1, p2):
-            s1o = ctls[s1]
-            s2o = ctls[s2]
-            do = ctls[d].getParent()
+        def applyMultiCns(ctls, src1Index, src2Index, dstIndex, p1, p2):
 
-            cns_node = pm.parentConstraint(s1o, s2o, do, mo=True, skipRotate=["x", "y", "z"])
-            cns_node.attr(ctls[s1].name() + "W0").set(p1)
-            cns_node.attr(ctls[s2].name() + "W1").set(p2)
+            src1 = ctls[src1Index]
+            src2 = ctls[src2Index]
+            dst = ctls[dstIndex]
 
-        def __lower(s1, s2, d, p1, p2):
-            cns_node = pm.parentConstraint(s1, s2, d.getParent(), mo=True, skipRotate=["x", "y", "z"])
-            cns_node.attr(s1.name() + "W0").set(p1)
-            cns_node.attr(s2.name() + "W1").set(p2)
+            src1Path = src1.fullPath()
+            src2Path = src2.fullPath()
+            dstPath = ctls[dstIndex].getParent().fullPath()
 
-        __upper(self.upCtls, 0, 3, 1, 0.33, 0.67)
-        __upper(self.upCtls, 0, 3, 2, 0.25, 0.75)
-        __upper(self.upCtls, 3, 6, 4, 0.75, 0.25)
-        __upper(self.upCtls, 3, 6, 5, 0.67, 0.33)
+            r2, r1 = calcDistRatio(src1, src2, dst)
 
-        __lower(self.lips_R_Corner_ctl, self.lips_C_lower_ctl, self.lips_R_lowOuter_ctl, 0.33, 0.67)
-        __lower(self.lips_R_Corner_ctl, self.lips_C_lower_ctl, self.lips_R_lowInner_ctl, 0.25, 0.75)
-        __lower(self.lips_L_Corner_ctl, self.lips_C_lower_ctl, self.lips_L_lowInner_ctl, 0.25, 0.75)
-        __lower(self.lips_L_Corner_ctl, self.lips_C_lower_ctl, self.lips_L_lowOuter_ctl, 0.33, 0.67)
+            cns_node = cmds.parentConstraint(src1Path, src2Path, dstPath, mo=True, skipRotate=("x", "y", "z"))[0]  # type: str
+            attr1 = cns_node + "." + src1.name().split("|")[-1] + "W0"
+            attr2 = cns_node + "." + src2.name().split("|")[-1] + "W1"
 
-    def _addControls(self, crv_ctl, option, sidecut):
+            cmds.setAttr(attr1, (r1 * 0.4) + (p1 * 0.6))
+            cmds.setAttr(attr2, (r2 * 0.4) + (p2 * 0.6))
 
-        cvs = crv_ctl.getCVs(space="world")
+        def calcDistRatio(a, b, c):
+            pa = a.getTranslation(space="world")
+            pb = b.getTranslation(space="world")
+            pc = c.getTranslation(space="world")
 
-        pm.progressWindow(title='controls', progress=0, max=len(cvs))
+            d1 = abs((pa- pc).length())
+            d2 = abs((pb- pc).length())
 
-        v0 = transform.getTransformFromPos(cvs[0])
-        v1 = transform.getTransformFromPos(cvs[-1])
-        distSize = vector.getDistance(v0, v1) * 3
+            r1 = d1 / (d1 + d2)
+            r2 = 1.0 - abs(r1)
+
+            return r1, r2
+
+        # if 8 locs, : up is 0, left is 2, bottom is 4, right is 6
+        applyMultiCns(self.upCtls, 0, 3, 1,  0.70, 0.10)
+        applyMultiCns(self.upCtls, 0, 3, 2,  0.70, 0.15)
+
+        applyMultiCns(self.upCtls, 3, 6, 4,  0.20, 0.80)
+        applyMultiCns(self.upCtls, 3, 6, 5,  0.20, 0.80)
+
+        applyMultiCns(self.upCtls, 6, 9, 7,  0.80, 0.20)
+        applyMultiCns(self.upCtls, 6, 9, 8,  0.80, 0.20)
+
+        applyMultiCns(self.upCtls, 9, 0, 10, 0.10, 0.70)
+        applyMultiCns(self.upCtls, 9, 0, 11, 0.15, 0.70)
+
+    def _addControls(self, crv_ctl, option):
+
+        cvs = self.getCurveCVs(crv_ctl)
+
+        center_pos = sum(cvs) / len(cvs)  # type: ignore
+        total_dist = sum([(x - center_pos).length() for x in cvs])
+        average_dist = total_dist / len(cvs)
+
+        distSize = average_dist * 5.0
 
         npos = []
         ctls = []
         upvs = []
         params = ["tx", "ty", "tz", "rx", "ry", "rz"]
-        joints = self.upJoints + self.lowJoints
 
-        iterator = enumerate(cvs)
-        if sidecut:
-            iterator = enumerate(cvs[1:-1])
+        for i, cv in enumerate(cvs):
 
-        for i, cv in iterator:
-
-            pm.progressWindow(e=True, step=1, status='\nCreating control for%s' % cv)
-
-            t = transform.getTransformFromPos(cv)
-
-            # Get nearest joint for orientation of controls
-            nearest_joint = None
-            nearest_distance = None
-
-            for joint in joints:
-                distance = vector.getDistance(transform.getTranslation(joint), cv)
-                if nearest_distance is None or distance < nearest_distance:
-                    nearest_distance = distance
-                    nearest_joint = joint
-
-            if nearest_joint:
-
-                t = transform.setMatrixPosition(transform.getTransform(nearest_joint), cv)
-                temp = addTransform(self.root, self.getName("temp"), t)
-                # temp.rx.set(0)
-                t = transform.getTransform(temp)
-                pm.delete(temp)
+            mirror = i > (len(cvs) / 2)
+            lower = i > 3 and i < 9
 
             oName  = option[i][0]
             oSide  = option[i][1]
@@ -579,25 +538,29 @@ class Component(component.Main):
             wd     = option[i][4]
             oPar   = option[i][5]
 
-            if oSide == "R":
-                scl = [1, 1, -1]
-            else:
-                scl = [1, 1, 1]
+            scl = [1, 1, 1]
+            if mirror:
+                scl[0] = -1
+            if lower:
+                scl[1] = -1
+
+            t = transform.getTransformFromPos(cv)
             t = transform.setMatrixScale(t, scl)
 
-            npo = addTransform(self.root, self.getName("%s_npo" % oName, oSide), t)
+            npo = addTransform(self.ctl_root, self.getName("%s_npo" % oName, oSide), t)
             npos.append(npo)
 
-            ctl = self.addCtl(npo,
-                              self.getName("{}_{}".format(oName, self.ctlName), oSide),
-                              t,
-                              color,
-                              o_icon,
-                              w=wd * distSize,
-                              d=wd * distSize,
-                              ro=datatypes.Vector(1.57079633, 0, 0),
-                              po=datatypes.Vector(0, 0, .07 * distSize),
-                              )
+            ctl = self.addCtl(
+                npo,
+                self.getName("{}_{}".format(oName, self.ctlName), oSide),
+                t,
+                color,
+                o_icon,
+                w=wd * distSize,
+                d=wd * distSize,
+                ro=datatypes.Vector(1.57079633, 0, 0),
+                po=datatypes.Vector(0, 0, .07 * distSize),
+            )
 
             ctls.append(ctl)
 
@@ -608,8 +571,6 @@ class Component(component.Main):
             upvs.append(upv)
             self.addToSubGroup(ctl, self.primaryControllersGroupName)
 
-        pm.progressWindow(e=True, endProgress=True)
-
         return npos, ctls, upvs
 
     # =====================================================
@@ -618,10 +579,9 @@ class Component(component.Main):
     def addAttributes(self):
         """Create the anim and setupr rig attributes for the component"""
 
+        pass
         # if not self.settings["ui_host"]:
         #     self.uihost = self.over_ctl
-
-        return
 
     # =====================================================
     # OPERATORS
@@ -641,24 +601,24 @@ class Component(component.Main):
     # =====================================================
     def addConnection(self):
         self.connections["mouth_01"] = self.connect_mouth
-        self.connections["mouth_02"] = self.connect_mouth
+        self.connections["lip_01"] = self.connect_mouth
+        self.connections["standard"] = self.connect_mouth
 
     def connect_mouth(self):
 
         if self.parent is None:
             return
 
-        self.parent.addChild(self.root)
         if self.surfRef:
             ref = self.rig.findComponent(self.surfRef)
             self.sliding_surface = ref.sliding_surface
 
+        self.parent.addChild(self.root)
+
         try:
             self.connect_ghosts()
-
-        except Exception as e:
+        except:
             traceback.print_exc()
-
             raise
 
     def connect_standard(self):
@@ -727,10 +687,9 @@ class Component(component.Main):
 
     def _createGhostCtl(self, ghost_ctl, parent):
 
-        ctl = ghost.createGhostCtl(ghost_ctl, parent)
+        ctl = ghost.createGhostCtl(ghost_ctl, parent=parent, connect=True)
+        # rigbits.connectLocalTransform([ctl, ghost_ctl])
         ctl.attr("isCtl") // ghost_ctl.attr("isCtl")
-        # logger.error("ctl is %s, ghost_ctl: %s, parent: %s", ctl.name(), ghost_ctl.name(), parent.name())
-
         ctl.attr("isCtl").set(True)
         ghost_ctl.attr("isCtl").set(False)
 
@@ -762,21 +721,18 @@ class Component(component.Main):
 
         if self.settings["ctlGrp"]:
             ctlGrp = self.settings["ctlGrp"]
-            # self.addToGroup(ctl, ctlGrp, "controllers")
 
         else:
             ctlGrp = "controllers"
-            # self.addToGroup(ctl, ctlGrp)
 
         if ctlGrp not in self.groups.keys():
             return
 
         for grp_name, grp in self.groups.items():
-            try:
+            try:  # noqa: FURB107
                 grp.remove(obj)
-            except (ValueError) as e:
+            except ValueError:
                 pass
-                # logger.error(e)
 
     def connect_slide_ghost(self, intTra, slide_c_ref, corner_l_ref, corner_r_ref):
 
@@ -822,9 +778,22 @@ class Component(component.Main):
         self.addToSubGroup(self.lips_C_lower_ctl, self.primaryControllersGroupName)
 
         # add slider offset
-        npos = rigbits.addNPO([self.lips_C_upper_ctl, self.lips_C_lower_ctl])
-        for c in npos:
-            rigbits.connectLocalTransform([self.mouthSlide_ctl, c])
+        s = self.mouthSlide_ctl.name()
+        up_npo = rigbits.addNPO(self.lips_C_upper_ctl)[0].name()
+        low_npo = rigbits.addNPO(self.lips_C_lower_ctl)[0].name()
+
+        pm.connectAttr(s + ".translate", up_npo + ".translate", force=True)
+        pm.connectAttr(s + ".scale", up_npo + ".scale", force=True)
+        pm.connectAttr(s + ".rotate", up_npo + ".rotate", force=True)
+
+        r = pm.createNode("multiplyDivide")
+        pm.setAttr(r + ".input2Y", -1)
+        pm.connectAttr(s + ".translateY", r + ".input1Y", force=True)
+        pm.connectAttr(r + ".outputY",    low_npo + ".translateY", force=True)
+        pm.connectAttr(s + ".translateX", low_npo + ".translateX", force=True)
+        pm.connectAttr(s + ".translateZ", low_npo + ".translateZ", force=True)
+        pm.connectAttr(s + ".scale", low_npo + ".scale", force=True)
+        pm.connectAttr(s + ".rotate", low_npo + ".rotate", force=True)
 
         return
 
@@ -975,8 +944,8 @@ def ghostSliderForMouth(ghostControls, intTra, surface, sliderParent):
 
         pm.parent(ctlGhost.getParent(), slider)
         ymt_util.setKeyableAttributesDontLockVisibility(slider, [])
-        for shape in ctlGhost.getShapes():
-            pm.delete(shape)
+        # for shape in ctlGhost.getShapes():
+        #     pm.delete(shape)
 
     for slider in sliders[1:]:
         _visi_off_lock(slider)
@@ -1042,35 +1011,76 @@ def createGhostWithParentConstraint(ctl, parent=None, connect=True):
     return newCtl, ctl
 
 
-def applyPathCnsLocal(target, curve, u, negate=False):
-    cns = applyop.pathCns(target, curve, cnsType=False, u=u, tangent=False)
-    pm.connectAttr(curve.attr("local"), cns.attr("geometryPath"), f=True)  # tobe local space
+def applyPathCnsLocal(target, ctl_curve, rope, cv):
 
-    comp_node = pm.createNode("composeMatrix")
-    cns.attr("allCoordinates") >> comp_node.attr("inputTranslate")
-    cns.attr("rotate") >> comp_node.attr("inputRotate")
-    cns.attr("rotateOrder") >> comp_node.attr("inputRotateOrder")
+    def _searchNearestEditPoint(curve, cv):
 
-    mul_node = pm.createNode("multMatrix")
-    comp_node2 = pm.createNode("composeMatrix")
+        candidate = math.inf
+        index = 0
+        numberOfSpans = cmds.getAttr(curve + ".spans")
 
-    if negate:
-        pm.setAttr(comp_node2.attr("inputScaleX"), -1.0)
+        for i in range(numberOfSpans):
+            point = cmds.getAttr(curve + ".editPoints["+str(i)+"]")[0]
+            dist = math.sqrt((point[0] - cv[0])**2 + (point[1] - cv[1])**2 + (point[2] - cv[2])**2)
+            if dist < candidate:
+                candidate = dist
+                index = i
 
-    pm.setAttr(comp_node2.attr("inputRotateX"), 90.0)
-    pm.setAttr(comp_node2.attr("inputRotateZ"), 90.0)
+        return index
 
-    comp_node2.attr("outputMatrix") >> mul_node.attr("matrixIn[0]")
-    comp_node.attr("outputMatrix") >> mul_node.attr("matrixIn[1]")
-    curve.attr("matrix") >> mul_node.attr("matrixIn[2]")
+    nearestIndex = _searchNearestEditPoint(rope, cv)
 
-    decomp_node = pm.createNode("decomposeMatrix")
-    mul_node.attr("matrixSum") >> decomp_node.attr("inputMatrix")
-    decomp_node.attr("outputTranslate") >> target.attr("translate")
-    decomp_node.attr("outputRotate") >> target.attr("rotate")
-    decomp_node.attr("outputScale") >> target.attr("scale")
+    nearestPointOnCurve = cmds.createNode("nearestPointOnCurve")
+    cmds.connectAttr(rope+ ".editPoints["+str(nearestIndex)+"]", nearestPointOnCurve + ".inPosition")
+    cmds.connectAttr(rope + ".local", nearestPointOnCurve + ".inputCurve")
 
-    return cns
+    motionPath = cmds.createNode("motionPath")
+    cmds.connectAttr(nearestPointOnCurve + ".parameter", motionPath + ".uValue")
+    cmds.connectAttr(rope + ".local", motionPath + ".geometryPath")
+
+    cmds.setAttr(motionPath + ".fractionMode", 0)
+    cmds.setAttr(motionPath + ".frontAxis", 0)
+
+    comp_node = cmds.createNode("composeMatrix")
+    cmds.connectAttr(motionPath + ".rotate", comp_node + ".inputRotate")
+    cmds.connectAttr(motionPath + ".rotateOrder", comp_node + ".inputRotateOrder")
+    cmds.connectAttr(nearestPointOnCurve + ".position", comp_node + ".inputTranslate")
+
+    cmds.connectAttr(nearestPointOnCurve + ".position", target.fullPath() + ".translate")
+    cmds.connectAttr(motionPath + ".rotate", target.fullPath() + ".rotate")
+
+    # cns = applyop.pathCns(target, curve, cnsType=False, u=u, tangent=False)
+    # pm.connectAttr(curve.attr("local"), cns.attr("geometryPath"), f=True)  # tobe local space
+    # 
+    # comp_node = pm.createNode("composeMatrix")
+    # cns.attr("allCoordinates") >> comp_node.attr("inputTranslate")
+    # cns.attr("rotate") >> comp_node.attr("inputRotate")
+    # cns.attr("rotateOrder") >> comp_node.attr("inputRotateOrder")
+    # pm.setAttr(cns.attr("worldUpVectorX"), 0.0)
+    # pm.setAttr(cns.attr("worldUpVectorY"), 0.0)
+    # pm.setAttr(cns.attr("worldUpVectorZ"), 1.0)
+    # 
+    # mul_node = pm.createNode("multMatrix")
+    # comp_node2 = pm.createNode("composeMatrix")
+    # 
+    # pos = target.getTranslation(space="world")
+    # if pos.x < -0.001:
+    #     pm.setAttr(comp_node2.attr("inputScaleX"), -1.0)
+    # 
+    # pm.setAttr(comp_node2.attr("inputRotateX"), 90.0)
+    # pm.setAttr(comp_node2.attr("inputRotateZ"), 90.0)
+    # 
+    # comp_node2.attr("outputMatrix") >> mul_node.attr("matrixIn[0]")
+    # comp_node.attr("outputMatrix") >> mul_node.attr("matrixIn[1]")
+    # curve.attr("matrix") >> mul_node.attr("matrixIn[2]")
+    # 
+    # decomp_node = pm.createNode("decomposeMatrix")
+    # mul_node.attr("matrixSum") >> decomp_node.attr("inputMatrix")
+    # decomp_node.attr("outputTranslate") >> target.attr("translate")
+    # decomp_node.attr("outputRotate") >> target.attr("rotate")
+    # decomp_node.attr("outputScale") >> target.attr("scale")
+
+    # return cns
 
 
 def _visi_off_lock(node):
