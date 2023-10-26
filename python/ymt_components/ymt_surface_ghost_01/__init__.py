@@ -118,18 +118,27 @@ class Component(component.Main):
 
         # --------------------------------------------------------
         self.previusTag = self.parentCtlTag
-        t = getTransform(self.root)
-        if self.negate:
-            scl = [-1, 1, 1]
-            t = transform.setMatrixScale(t, scl)
+        if self.settings["neutralpose"]:
+            t = transform.getTransformFromPos(self.guide.pos["root"])
+            if self.negate:
+                scl = [-1, 1, 1]
+                t = transform.setMatrixScale(t, scl)
+
+        else:
+            t = self.guide.tra["root"]
+            t = transform.setMatrixScale(t)
 
         self.npo = addTransform(self.root, self.getName("npo"), t)
         self.surfaceCtl = self.addCtl(
-                self.npo,
-                "surface_ctl",
-                t,
-                self.color_ik,
-                "square")
+            self.npo,
+            "surface_ctl",
+            t,
+            self.color_ik,
+            "square",
+            ro=datatypes.Vector([1.5708, 0, 0]),
+        )
+        if self.settings["addJoints"]:
+            self.jnt_pos = [[self.surfaceCtl , "0"]]
 
         self.surfRef = self.settings["surfaceReference"]
         if not self.surfRef:
@@ -304,7 +313,8 @@ class Component(component.Main):
                             worldUpVector=[0, 1, 0],
                             worldUpObject=self.root)
         pm.parent(self.ghostCtl.getParent(), slider)
-        self.jnt_pos.append([self.ghostCtl, "0"])
+        if self.settings["addJoints"]:
+            self.jnt_pos = [[self.ghostCtl, "0"]]
 
         if self.surfaceKeyable:
             self.ghostCtl.attr("isCtl").set(True)

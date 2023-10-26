@@ -3,7 +3,10 @@ import re
 import math
 import sys
 
-from pymel.core import datatypes
+from pymel.core import (
+    datatypes,
+    nodetypes,
+)
 from pymel import versions
 import pymel.core as pm
 
@@ -319,14 +322,11 @@ def addJointCtl(self,
     if "degree" not in kwargs.keys():
         kwargs["degree"] = 1
 
-    # print name
-    # fullName = self.getName(name)
-
     # remove the _ctl hardcoded in component name
     if name.endswith("_ctl"):
         name = name[:-4]
-    # in some situation the name will be only ctl and should be removed
-    # for example control_01
+
+    # in some situation the name will be only ctl and should be removed( for example control_01)
     if name.endswith("ctl"):
         name = name[:-3]
 
@@ -970,3 +970,243 @@ def deserialize_nurbs_surface(surface_name, serialized_data):
         cmds.setAttr("{0}.{1}".format(new_surface, cv), posX, posY, posZ, type="double3")
 
     return new_surface
+
+
+def apply_rivet_constrain(mesh_name, position, name=None):
+    # type: (Text, Tuple[Text, Text, Text], Optional[Text]) -> Text
+    """Apply uvPin constrain to given world position"""
+
+    pin = cmds.createNode("uvPin")
+    orig, deformed = get_original_and_deformed_mesh(mesh_name)
+    obj_type = cmds.objectType(mesh_name)
+    if obj_type == "transform":
+        mesh_name = cmds.listRelatives(mesh_name, shapes=True)[0]
+
+    if orig and deformed:
+        obj_type = cmds.objectType(mesh_name)
+
+        if obj_type == "mesh":
+            orig_attr = "{}.outMesh".format(orig)
+            deform_attr = "{}.worldMesh".format(deformed)
+
+        elif obj_type == "nurbsSurface":
+            orig_attr = "{}.local".format(orig)
+            deform_attr = "{}.local".format(deformed)
+            # deform_attr = "{}.local".format(deformed)
+
+        else:
+            raise TypeError("mesh_name({}) must be a mesh or nurbsSurface but got {}".format(mesh_name, obj_type))
+
+        # cmds.connectAttr("{}.outMesh".format(orig), "{}.originalGeometry".format(pin))
+        # cmds.connectAttr("{}.worldMesh".format(deformed), "{}.deformedGeometry".format(pin))
+        cmds.connectAttr(orig_attr, "{}.originalGeometry".format(pin))
+        cmds.connectAttr(deform_attr, "{}.deformedGeometry".format(pin))
+
+    # UV
+    uv = get_uv_at_position(mesh_name, position)
+    cmds.setAttr("{}.coordinate[0].coordinateU".format(pin), uv[0])
+    cmds.setAttr("{}.coordinate[0].coordinateV".format(pin), uv[1])
+
+    # output
+    output = cmds.createNode("transform")
+    try:
+        cmds.connectAttr("{}.outputMatrix[0]".format(pin), "{}.offsetParentMatrix".format(output))
+    except RuntimeError:
+        cmds.connectAttr("{}.outputMatrix[0]".format(pin), "{}.matrix".format(output))
+
+    return output
+
+
+def get_original_and_deformed_mesh(mesh_name):
+    # type: (Text) -> Tuple[Text, Text]
+
+    try:
+        shapes = cmds.listRelatives(mesh_name, shapes=True) or []
+    except TypeError:
+        print(mesh_name)
+        print(type(mesh_name))
+        raise
+    if len(shapes) < 1:
+        raise Exception("shape not found for mesh: {}".format(mesh_name))
+
+    orig = None
+    deform = None
+
+    orig = cmds.deformableShape(shapes[0], originalGeometry=True)[0]
+
+    # FIXME: idn how to get the derformed shape
+    for shape in shapes:
+        if shape != orig:
+            deform = shape
+            break
+
+    if cmds.objectType(shapes[0]) == "nurbsSurface":
+        if not orig:
+            # create new orig
+            orig = cmds.deformableShape(shapes[0], createOriginalGeometry=True)[0]
+
+    return orig.split(".")[0], deform
+
+
+def get_uv_at_position(mesh_name, position):
+    # type: (Text, Tuple[Text, Text, Text]) -> Tuple[Text, Text]
+    """Get uv at given world position"""
+
+    obj_type = cmds.objectType(mesh_name)
+    if obj_type == "transform":
+        try:
+            shape = cmds.listRelatives(mesh_name, shapes=True)[0]
+        except IndexError:
+            raise TypeError("mesh_name must be a mesh or nurbsSurface but got {0}".format(obj_type))
+
+        obj_type = cmds.objectType(shape)
+
+    if obj_type == "mesh":
+        uv = get_uv_at_mesh_position(mesh_name, position)
+
+    elif obj_type == "nurbsSurface":
+        uv = get_uv_at_nurbs_surface_position(mesh_name, position)
+
+    else:
+        raise TypeError("mesh_name must be a mesh or nurbsSurface but got {0}".format(obj_type))
+
+    return uv
+
+
+def get_uv_at_mesh_position(mesh_name, position):
+    # type: (Text, Tuple[Text, Text, Text]) -> Tuple[Text, Text]
+    """Get uv at given world position"""
+
+    sel = om.MSelectionList()
+    sel.add(mesh_name)
+    mesh_dag = sel.getDagPath(0)
+    mfn_mesh = om.MFnMesh(mesh_dag)
+    point = om.MPoint(position)
+    uv = mfn_mesh.getUVAtPoint(point, space=om.MSpace.kWorld)
+
+    return uv
+
+
+def get_uv_at_nurbs_surface_position(surface_name, position):
+    # type: (Text, Tuple[Text, Text, Text]) -> Tuple[Text, Text]
+    """Get uv at given world position"""
+
+    sel = om.MSelectionList()
+    sel.add(surface_name)
+    surface_dag = sel.getDagPath(0)
+    mfn_surface = om.MFnNurbsSurface(surface_dag)
+
+    point = om.MPoint(position)
+    closest_point, u, v = mfn_surface.closestPoint(point, space=om.MSpace.kWorld)
+
+    return u, v
+
+
+def apply_rivet_constrain_on_vertex(mesh, vertex_id):
+    # type: (Text, int) -> Text
+    """Apply uvPin constrain to given world position"""
+
+    sel = om.MSelectionList()
+    sel.add(mesh)
+    mesh_dag = sel.getDagPath(0)
+    mfn_mesh = om.MFnMesh(mesh_dag)
+    position = mfn_mesh.getPoint(vertex_id)
+
+    return apply_rivet_constrain(mesh, position)
+
+
+def apply_rivet_constrain_to_selected(mesh, targets):
+    # type: (Text, List[Text]|Text) -> List[Text]
+    """Apply uvPin constrain to given objects"""
+
+    if not isinstance(targets, list):
+        targets = [targets]
+
+    if isinstance(mesh, nodetypes.Transform):
+        mesh = mesh.name()
+
+    pins = []
+    for target in targets:
+        print("target({}) type is {}".format(target, type(target)))
+        if isinstance(target, nodetypes.Transform):
+            target = target.name()
+            print("target({}) type is {}".format(target, type(target)))
+
+        if not cmds.objExists(target):
+            raise Exception("target({}) {} not found".format(type(target), target))
+
+        pin = apply_rivet_constrain(mesh, cmds.xform(target, q=True, ws=True, t=True))
+        pin = cmds.rename(pin, target + "_rivet")
+        pins.append(pin)
+
+    return pins
+
+
+def create_dummy_edges_from_positions(positions):
+    # type: (List[Tuple[float, float, float]]) -> Tuple[List[Text], om.MFnMesh]
+    plane = draw_plane_from_positions(positions)  # type: ignore
+
+    edge_list = ["{}.e[{}]".format(plane.fullPathName(), 0)]
+    for i in range(1, len(positions) + 1):
+        edge_list.append("{}.e[{}]".format(plane.fullPathName(), i * 2 + 1))
+    # edge_list = [pm.PyNode(x) for x in edge_list]
+
+    return edge_list, plane
+
+
+def create_dummy_edges_from_objects(objects):
+    # type: (List[Text]) -> Tuple[List[Text], om.MFnMesh]
+    positions = [cmds.xform(x, q=True, ws=True, t=True) for x in objects]
+    return create_dummy_edges_from_positions(positions)
+
+
+def draw_plane_from_positions(positions):
+    # type: (List[Tuple[float, float, float]]) -> om.MFnMesh
+
+    mean_x = sum(p[0] for p in positions) / len(positions)
+    mean_y = sum(p[1] for p in positions) / len(positions)
+    mean_z = sum(p[2] for p in positions) / len(positions)
+    mean = (mean_x, mean_y, mean_z)
+
+    # Simple unitCube coordinates
+    vertices = [om.MPoint(mean), ]
+    polygonCounts = []
+    polygonConnects = []
+
+    for i, p in enumerate(positions):
+        vertices.append(om.MPoint(p))    # 0
+
+        if 1 < i:
+            polygonCounts.append(3)
+            polygonConnects.append(i)
+            polygonConnects.append(i - 1)
+            polygonConnects.append(0)
+
+        if len(positions) == (i + 1):
+            polygonCounts.append(3)
+            polygonConnects.append(i + 1)
+            polygonConnects.append(i)
+            polygonConnects.append(0)
+
+            polygonCounts.append(3)
+            polygonConnects.append(1)
+            polygonConnects.append(i + 1)
+            polygonConnects.append(0)
+
+    mesh = om.MFnMesh()
+    _mesh_obj = mesh.create(vertices, polygonCounts, polygonConnects)
+    return mesh
+
+
+def get_centroid_from_objects(objects):
+    # type: (List[Text]) -> Tuple[float, float, float]
+    positions = [cmds.xform(x, q=True, ws=True, t=True) for x in objects]
+    return get_centroid_from_positions(positions)
+
+
+def get_centroid_from_positions(positions):
+    # type: (List[Tuple[float, float, float]]) -> Tuple[float, float, float]
+    mean_x = sum(p[0] for p in positions) / len(positions)
+    mean_y = sum(p[1] for p in positions) / len(positions)
+    mean_z = sum(p[2] for p in positions) / len(positions)
+    return mean_x, mean_y, mean_z

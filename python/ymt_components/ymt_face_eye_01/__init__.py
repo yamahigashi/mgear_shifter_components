@@ -28,6 +28,8 @@ from mgear.core import (
     utils,
 )
 
+from mgear.rigbits import ghost
+
 from mgear.core.transform import (
     getTransform,
     resetTransform,
@@ -174,6 +176,20 @@ class Component(component.Main):
         self.addCurve()
         self.addControllers()
 
+        # self.connect_surface_slider = self.settings["isSlidingSurface"]
+        self.connect_surface_slider = True
+        if self.connect_surface_slider:
+            bt = transform.getTransform(self.root)
+            self.slider_root = addTransform(self.root, self.getName("sliders"), bt)
+            ymt_util.setKeyableAttributesDontLockVisibility(self.slider_root, [])
+
+        self.surfRef = self.settings["surfaceReference"]
+        if not self.surfRef:
+            self.sliding_surface = pm.duplicate(self.guide.getObjects(self.guide.root)["sliding_surface"])[0]
+            pm.parent(self.sliding_surface.name(), self.root)
+            self.sliding_surface.visibility.set(False)
+            pm.makeIdentity(self.sliding_surface, apply=True, t=1,  r=1, s=1, n=0, pn=1)
+
     def getNumberOfLocators(self, query):
         # type: (Text) -> int
         """ _uplocs."""
@@ -243,8 +259,8 @@ class Component(component.Main):
 
         self.upTarget = gen2(self.upCrv, self.getName("upblink_target"), nbPoints=30, parent=crv_root)
         self.lowTarget = gen2(self.lowCrv, self.getName("lowBlink_target"), nbPoints=30, parent=crv_root)
-        self.midTarget = gen2(self.lowCrv, self.getName("midBlink_target"), nbPoints=30, parent=crv_root)
-        self.midTargetLower = gen2(self.lowCrv, self.getName("midBlinkLower_target"), nbPoints=30, parent=crv_root)
+        # self.midTarget = gen2(self.lowCrv, self.getName("midBlink_target"), nbPoints=30, parent=crv_root)
+        # self.midTargetLower = gen2(self.lowCrv, self.getName("midBlinkLower_target"), nbPoints=30, parent=crv_root)
 
         rigCrvs = [self.upCrv,
                    self.lowCrv,
@@ -254,8 +270,9 @@ class Component(component.Main):
                    self.lowBlink,
                    self.upTarget,
                    self.lowTarget,
-                   self.midTarget,
-                   self.midTargetLower]
+                   # self.midTarget,
+                   # self.midTargetLower
+        ]
 
         for crv in rigCrvs:
             crv.attr("visibility").set(False)
@@ -384,7 +401,7 @@ class Component(component.Main):
         # For some unknown reason the right side gets scewed rotation values
         resetTransform(aimTrigger_lvl)
         # aimTrigger_lvl.attr("tz").set(1.0)
-        self.aimTrigger_ref = addTransform(aimTrigger_lvl, self.getName("self.aimTrigger_ref"), t)
+        self.aimTrigger_ref = addTransform(aimTrigger_lvl, self.getName("aimTrigger_ref"), t)
 
         # For some unknown reason the right side gets scewed rotation values
         resetTransform(self.aimTrigger_ref)
@@ -449,8 +466,13 @@ class Component(component.Main):
         skip = not self.settings.get("isSplitCorners", False)
 
         # upper eyelid controls
-        self.upDetailControllers = self._addCurveDetailControllers(t, self.upCrv, "upEyelid")
-        self.lowDetailControllers = self._addCurveDetailControllers(t, self.lowCrv, "lowEyelid", skipHeadAndTail=skip)
+        ctls, npos =  self._addCurveDetailControllers(t, self.upCrv, "upEyelid")
+        self.upDetailControllers = ctls
+        self.upDetailNpos = npos
+
+        ctls, npos = self._addCurveDetailControllers(t, self.lowCrv, "lowEyelid", skipHeadAndTail=skip)
+        self.lowDetailControllers = ctls
+        self.lowDetailNpos = npos
 
     def _addCurveControllers(self, t, crv, ctlNames, inCtl=None, outCtl=None):
 
@@ -530,6 +552,7 @@ class Component(component.Main):
     def _addCurveDetailControllers(self, t, crv, name, skipHeadAndTail=False):
 
         controls = []
+        npos = []
 
         cvs = crv.getCVs(space="world")
         crv_info = node.createCurveInfoNode(crv)
@@ -585,11 +608,12 @@ class Component(component.Main):
 
             self.addToSubGroup(ctl, self.detailControllersGroupName)
             controls.append(ctl)
+            npos.append(npo)
 
             jnt_name = "{}{}".format(name, i)
             self.jnt_pos.append([ctl, jnt_name])
 
-        return controls
+        return controls, npos
 
     def addWires(self):
         # adding wires
@@ -600,30 +624,22 @@ class Component(component.Main):
         self.w4 = pm.wire(self.lowTarget, w=self.lowCrv_ctl)[0]
 
         # adding blendshapes
-        self.bs_upBlink  = pm.blendShape(self.upTarget,  self.midTarget,      self.upBlink,        n=self.getName("blendShapeUpBlink"))
-        self.bs_lowBlink = pm.blendShape(self.lowTarget, self.midTargetLower, self.lowBlink,       n=self.getName("blendShapeLowBlink"))
-        self.bs_mid      = pm.blendShape(self.lowTarget, self.upTarget,       self.midTarget,      n=self.getName("blendShapeMidBlink"))
-        self.bs_midLower = pm.blendShape(self.lowTarget, self.upTarget,       self.midTargetLower, n=self.getName("blendShapeMidLowerBlink"))
+        self.bs_upBlink  = pm.blendShape(self.upTarget, self.lowTarget, self.upBlink, n=self.getName("blendShapeUpBlink"))
+        self.bs_lowBlink = pm.blendShape(self.lowTarget, self.upTarget, self.lowBlink, n=self.getName("blendShapeLowBlink"))
 
         # setting blendshape reverse connections
         rev_node = pm.createNode("reverse")
-        pm.connectAttr(self.bs_upBlink[0].attr(self.midTarget.name()), rev_node + ".inputX")
+        pm.connectAttr(self.bs_upBlink[0].attr(self.lowTarget.name()), rev_node + ".inputX")
         pm.connectAttr(rev_node + ".outputX", self.bs_upBlink[0].attr(self.upTarget.name()))
 
         rev_node = pm.createNode("reverse")
         rev_nodeLower = pm.createNode("reverse")
-        pm.connectAttr(self.bs_lowBlink[0].attr(self.midTargetLower.name()), rev_node + ".inputX")
+        pm.connectAttr(self.bs_lowBlink[0].attr(self.upTarget.name()), rev_node + ".inputX")
         pm.connectAttr(rev_node + ".outputX", self.bs_lowBlink[0].attr(self.lowTarget.name()))
 
         rev_node = pm.createNode("reverse")
-        pm.connectAttr(self.bs_mid[0].attr(self.upTarget.name()), rev_node + ".inputX")
-        pm.connectAttr(self.bs_midLower[0].attr(self.upTarget.name()), rev_nodeLower + ".inputX")
-        pm.connectAttr(rev_node + ".outputX", self.bs_mid[0].attr(self.lowTarget.name()))
-        pm.connectAttr(rev_nodeLower + ".outputX", self.bs_midLower[0].attr(self.lowTarget.name()))
-
-        # setting default values
-        self.bs_mid[0].attr(self.upTarget.name()).set(self.blinkH)
-        self.bs_midLower[0].attr(self.upTarget.name()).set(self.blinkH)
+        pm.connectAttr(self.bs_lowBlink[0].attr(self.upTarget.name()), rev_node + ".inputX")
+        pm.connectAttr(self.bs_upBlink[0].attr(self.lowTarget.name()), rev_nodeLower + ".inputX")
 
     # =====================================================
     # ATTRIBUTES
@@ -655,9 +671,10 @@ class Component(component.Main):
         self.blinkMult_att = self.addAnimParam("blinkMult", "Blink Multiplyer", "float", 1, minValue=1, maxValue=2)
         self.blinkUpper_att = addAttrNonAnim(self.blink_upper_ctl, "upperBlink", "float", value=0, minValue=-1.0, maxValue=1.0)
         self.blinkLower_att = addAttrNonAnim(self.blink_upper_ctl, "lowerBlink", "float", value=0, minValue=-1.0, maxValue=1.0)
-        self.midBlinkH_att = addAttrNonAnim(self.blink_upper_ctl, "blinkHeight", "float", value=self.blinkH)
+        # self.midBlinkH_att = addAttrNonAnim(self.blink_upper_ctl, "blinkHeight", "float", value=self.blinkH)
 
         height = (self.upPos - self.lowPos).length()
+        invHeight = 1.0 / height
 
         # Add blink + upper and blink + lower so animator can use both.
         # But also clamp them so using both doesn't exceed 1.0
@@ -671,89 +688,65 @@ class Component(component.Main):
         self.blinkLower_att.connect(blinkAdd.input2D[1].input2Dy)
 
         # calculate mid blink height: (height + low - hi) / (height * 2.0)
-        midBlinkAdd1 = pm.createNode("plusMinusAverage")
-        midBlinkAdd1.operation.set(1)  # add
-        midBlinkAdd1.input1D[0].set(height)
-        self.blink_lower_ctl.attr("translateY").connect(midBlinkAdd1.input1D[1])
+        upHeightRatio = pm.createNode("multiplyDivide")
+        upHeightRatio.operation.set(1)  # mult
+        upHeightRatio.input1X.set(invHeight)
+        self.blink_upper_ctl.attr("translateY").connect(upHeightRatio.input2X)
 
-        midBlinkAdd2 = pm.createNode("plusMinusAverage")
-        midBlinkAdd1.output1D.connect(midBlinkAdd2.input1D[0])
-        midBlinkAdd2.operation.set(2)  # sub
-        self.blink_upper_ctl.attr("translateY").connect(midBlinkAdd2.input1D[1])
+        loHeightRatio = pm.createNode("multiplyDivide")
+        loHeightRatio.operation.set(1)  # mult
+        loHeightRatio.input1X.set(invHeight)
+        self.blink_lower_ctl.attr("translateY").connect(loHeightRatio.input2X)
 
-        div = pm.createNode("multiplyDivide")
-        div.operation.set(2)  # div
-        midBlinkAdd2.output1D.connect(div.input1X)
-        div.input2X.set(height * 2.0)
-        div.outputX.connect(self.midBlinkH_att)
-
-        # connect blink upper
-        sub = pm.createNode("plusMinusAverage")
-        sub.operation.set(2)  # sub
-        sub.input1D[0].set(1.0)
-        self.midBlinkH_att.connect(sub.input1D[1])
-        mult = pm.createNode("multiplyDivide")
-        mult.operation.set(1)  # mult
-        mult.input1Y.set(height)
-        pm.connectAttr(sub.output1D, mult.input2Y)
-        cond = pm.createNode("condition")
-        pm.connectAttr(mult.outputY, cond + ".firstTerm")
-        pm.setAttr(cond + ".secondTerm", 0.0)
-        pm.setAttr(cond + ".operation", 4)  # less than
-        pm.setAttr(cond + ".colorIfTrueR", 0.0001)
-        pm.connectAttr(mult.outputY, cond + ".colorIfFalseR")
-
-        div = pm.createNode("multiplyDivide")
-        div.operation.set(2)  # div
-        cond.outColorR.connect(div.input2Y)
-
-        cond = pm.createNode("condition")
-        pm.setAttr(cond + ".secondTerm", 0.0)
-        pm.setAttr(cond + ".operation", 4)  # less than
-        pm.setAttr(cond + ".colorIfTrueR", 0.0001)
-        self.blink_upper_ctl.attr("translateY").connect(cond.firstTerm)
-        pm.connectAttr(self.blink_upper_ctl.attr("translateY"), cond + ".colorIfFalseR")
-        cond.outColorR.connect(div.input1Y)
-        pm.connectAttr(div.outputY, self.blinkUpper_att)
-
-        # connect blink lower
-        mult = pm.createNode("multiplyDivide")
-        mult.input1Y.set(height)
-        mult.operation.set(1)  # mult
-        self.midBlinkH_att.connect(mult.input2Y)
-
-        cond = pm.createNode("condition")
-        pm.connectAttr(mult.outputY, cond + ".firstTerm")
-        pm.setAttr(cond + ".secondTerm", 0.0)
-        pm.setAttr(cond + ".operation", 4)  # less than
-        pm.setAttr(cond + ".colorIfTrueR", 0.0001)
-        pm.connectAttr(mult.outputY, cond + ".colorIfFalseR")
-
-        div = pm.createNode("multiplyDivide")
-        div.operation.set(2)  # div
-        cond.outColorR.connect(div.input2Y)
-        cond = pm.createNode("condition")
-        pm.setAttr(cond + ".secondTerm", 0.0)
-        pm.setAttr(cond + ".operation", 4)  # less than
-        pm.setAttr(cond + ".colorIfTrueR", 0.0001)
-        self.blink_lower_ctl.attr("translateY").connect(cond.firstTerm)
-        pm.connectAttr(self.blink_lower_ctl.attr("translateY"), cond + ".colorIfFalseR")
-        cond.outColorR.connect(div.input1Y)
-        pm.connectAttr(div.outputY, self.blinkLower_att)
-
-        addOutput = blinkAdd.output2D
-        addOutput.output2Dx.connect(blinkClamp.inputR)
-        addOutput.output2Dy.connect(blinkClamp.inputG)
-
-        # Drive the clamped blinks through blinkMult, then to the blendshapes
-        mult_node = node.createMulNode(blinkClamp.outputR, self.blinkMult_att)
-        mult_nodeLower = node.createMulNode(blinkClamp.outputG, self.blinkMult_att)
-        pm.connectAttr(mult_node + ".outputX", self.bs_upBlink[0].attr(self.midTarget.name()))
-        pm.connectAttr(mult_nodeLower + ".outputX", self.bs_lowBlink[0].attr(self.midTargetLower.name()))
-        pm.connectAttr(self.midBlinkH_att, self.bs_mid[0].attr(self.upTarget.name()))
-        pm.connectAttr(self.midBlinkH_att, self.bs_midLower[0].attr(self.upTarget.name()))
+        pm.connectAttr(upHeightRatio + ".outputX", self.bs_upBlink[0].attr(self.lowTarget.name()))
+        pm.connectAttr(loHeightRatio + ".outputX", self.bs_lowBlink[0].attr(self.upTarget.name()))
 
     def addEyeTrackingAttributes(self):
+
+        height = (self.upPos - self.lowPos).length()
+
+        def add(name, blinkCrv, upDefault, lowDefault, hDefault):
+            cap = name.capitalize()
+            vTrackingUp_att = self.addAnimParam("vTracking{}Up".format(cap), "Lookat Tracking Vertical {} Upper".format(cap), "float", upDefault, minValue=0, maxValue=1)
+            vTrackingLow_att = self.addAnimParam("vTracking{}Low".format(cap), "Lookat Tracking Vertical {} Lower".format(cap), "float", lowDefault, minValue=0, maxValue=1)
+            hTracking_att = self.addAnimParam("hTracking{}".format(cap), "Lookat Tracking Horizontal {}".format(cap), "float", hDefault, minValue=0, maxValue=1)
+
+            # get num edit points
+            numPoints = pm.getAttr(blinkCrv + ".controlPoints", size=True)
+            crvShape = blinkCrv.getShape()
+            add1 = pm.createNode("addDoubleLinear")
+            add2 = pm.createNode("addDoubleLinear")
+            add3 = pm.createNode("addDoubleLinear")
+            pm.connectAttr("{}.editPoints[{}].yValueEp".format(crvShape, int(numPoints / 2)), add1 + ".input1")
+            pm.connectAttr("{}.translateY".format(blinkCrv), add1 + ".input2")
+
+            pm.connectAttr(add1 + ".output", add2 + ".input1")
+            # pm.connectAttr("pupil_L0_proj_cns_slideDriven.translateY", add2 + ".input2")
+
+            pm.connectAttr(add2 + ".output", add3 + ".input1")
+            pm.setAttr(add3 + ".input2", pm.getAttr(add1 + ".output"))
+
+            cond = pm.createNode("condition")
+            pm.connectAttr(add3 + ".output", cond + ".firstTerm")
+            pm.setAttr(cond + ".secondTerm", 0)
+            pm.setAttr(cond + ".operation", 2)  # greater than
+
+            mult_node = pm.createNode("multiplyDivide")
+            pm.setAttr(mult_node + ".input2X", height * 0.3)
+            pm.connectAttr(vTrackingUp_att, mult_node + ".input1X")
+            pm.connectAttr(mult_node + ".outputX", cond + ".colorIfTrueR")
+
+            mult_node = pm.createNode("multiplyDivide")
+            pm.setAttr(mult_node + ".input2X", height * 0.3)
+            pm.connectAttr(vTrackingLow_att, mult_node + ".input1X")
+            pm.connectAttr(mult_node + ".outputX", cond + ".colorIfFalseR")
+
+            # mult_node = node.createMulNode(cond + ".outColorR", self.aimTrigger_ref.attr("ty"))
+            pm.connectAttr(mult_node + ".outputX", self.trackLvl[0].attr("ty"))
+            pm.connectAttr(mult_node + ".outputX", self.trackLvl[0].attr("tx"))
+
+        # add("up", self.upBlink, self.upperVTrackUp, self.upperVTrackLow, self.upperHTrack)
+        # return
 
         # Adding channels for eye tracking
         # self.blink_att = self.addAnimParam("blink" + self.side, "Blink", "float", 0, minValue=0, maxValue=1)
@@ -908,10 +901,22 @@ class Component(component.Main):
                         pm.connectAttr(node_name + ".outColorR", attr)
 
     def connect_standard(self):
+
         self.parent.addChild(self.root)
+        if self.surfRef:
+            ref = self.rig.findComponent(self.surfRef)
+            self.sliding_surface = ref.sliding_surface
+
+        if self.connect_surface_slider:
+            try:
+                self.connect_slide_ghost()
+
+            except Exception as _:
+                import traceback
+                traceback.print_exc()
 
     def connect_pupil(self):
-        self.parent.addChild(self.root)
+        self.connect_standard()
 
         lookat = self.rig.findRelative("pupil_{}0_lookat".format(self.side))
         if not lookat:
@@ -919,6 +924,22 @@ class Component(component.Main):
             raise Exception("pupil_{}0_lookat not found".format(self.side))
 
         _cns_node = pm.aimConstraint(lookat, self.arrow_npo, maintainOffset=True)
+
+    def connect_slide_ghost(self):
+
+        # slide system
+        self.ghostSliderForEyeBrow(
+            self.upDetailNpos,
+            self.sliding_surface,
+            self.sliding_surface.getParent())
+
+        # self.setRelation()  # MUST re-setRelation, swapped ghost and real controls
+
+    def _visi_off_lock(self, node):
+        """Short cuts."""
+        node.visibility.set(False)
+        ymt_util.setKeyableAttributesDontLockVisibility(node, [])
+        cmds.setAttr("{}.visibility".format(node.name()), l=False)
 
     # =====================================================
     # CONNECTOR
@@ -943,6 +964,75 @@ class Component(component.Main):
 
         self.relatives["inloc"] = self.upDetailControllers[0]
         self.relatives["outloc"] = self.upDetailControllers[-1]
+
+    def ghostSliderForEyeBrow(self, ghostControls, surface, sliderParent):
+        """Modify the ghost control behaviour to slide on top of a surface
+
+        Args:
+            ghostControls (dagNode): The ghost control
+            surface (Surface): The NURBS surface
+            sliderParent (dagNode): The parent for the slider.
+        """
+
+        if not isinstance(ghostControls, list):
+            ghostControls = [ghostControls]
+
+        surfaceShape = surface.getShape()
+        sliders = []
+
+        for i, ctlGhost in enumerate(ghostControls):
+            # ctl = pm.listConnections(ctlGhost, t="transform")[-1]
+            t = ctlGhost.getMatrix(worldSpace=True)
+            scl = [1, 1, 1]
+            if self.negate:
+                scl = [-1, 1, 1]
+            # t = transform.setMatrixScale(t, scl)
+
+            gDriver = primitive.addTransform(ctlGhost.getParent(), "{}_slideDriver".format(ctlGhost.name()), t)
+
+            oParent = ctlGhost.getParent()
+            npoName = "_".join(ctlGhost.name().split("_")[:-1]) + "_ghost_npo"
+            npo = pm.PyNode(pm.createNode("transform", n=npoName, p=oParent, ss=True))
+
+            npo.setTransformation(ctlGhost.getMatrix())
+            ymt_util.setKeyableAttributesDontLockVisibility(npo, [])
+            pm.parent(ctlGhost, npo)
+
+            slider = primitive.addTransform(sliderParent, ctlGhost.name() + "_slideDriven", t)
+            sliders.append(slider)
+
+            down, _, up = ymt_util.findPathAtoB(ctlGhost, sliderParent)
+            mul_node = pm.createNode("multMatrix")
+            j = k = 0
+            for j, d in enumerate(down):
+                d.attr("matrix") >> mul_node.attr("matrixIn[{}]".format(j))
+            # mid.attr("matrix") >> mul_node.attr("matrixIn[{}]".format(j + 1))
+            for k, u in enumerate(up):
+                u.attr("inverseMatrix") >> mul_node.attr("matrixIn[{}]".format(k + j + 1))
+
+            dm_node = node.createDecomposeMatrixNode(mul_node.attr("matrixSum"))
+
+            cps_node = pm.createNode("closestPointOnSurface")
+            dm_node.attr("outputTranslate") >> cps_node.attr("inPosition")
+            surfaceShape.attr("local") >> cps_node.attr("inputSurface")
+            cps_node.attr("position") >> slider.attr("translate")
+
+            if self.negate:
+                aim = [0, 0, -1]
+            else:
+                aim = [0, 0, 1]
+            pm.normalConstraint(surfaceShape,
+                                slider,
+                                aimVector=aim,
+                                upVector=[0, 1, 0],
+                                worldUpType="objectrotation",
+                                worldUpVector=[0, 1, 0],
+                                worldUpObject=gDriver)
+
+            pm.parentConstraint(ctlGhost, slider)
+            # pm.parent(ctlGhost.getParent(), slider)
+            # pm.parent(gDriver.getParent(), self.mainControl)
+
 
 
 def draw_eye_guide_mesh_plane(points, t):
