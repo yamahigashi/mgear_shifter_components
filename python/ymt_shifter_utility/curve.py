@@ -238,7 +238,11 @@ def createCurveFromCurve(srcCrv, name, nbPoints, parent=None, m=datatypes.Matrix
     paramStart = sc.findParamFromLength(0.0)
     paramEnd = sc.findParamFromLength(length)
     paramLength = paramEnd - paramStart
-    increment = paramLength / nbPoints
+
+    if not close:
+        increment = paramLength / (nbPoints - 1)
+    else:
+        increment = paramLength / nbPoints
 
     p = paramStart
     # if curve is close, we need to find start param to be offseted to find nearest point to 0
@@ -909,3 +913,78 @@ def applyPathConstrainLocal(target, src_curve):
     except:
         import traceback as tb
         tb.print_exc()
+
+
+def curvecns_op(crv, inputs=[]):
+
+    for i, item in enumerate(inputs):
+        node = pm.createNode("decomposeMatrix")
+        pm.connectAttr(item + ".worldMatrix[0]", node + ".inputMatrix")
+        pm.connectAttr(node + ".outputTranslate",
+                       crv + ".controlPoints[%s]" % i)
+
+    return node
+
+
+def gear_curvecns_op(crv, inputs=[]):
+    """
+    create mGear curvecns node.
+
+    Arguments:
+        crv (nurbsCurve): Nurbs curve.
+        inputs (List of dagNodes): Input object to drive the curve. Should be
+            same number as crv points.
+            Also the order should be the same as the points
+
+    Returns:
+        pyNode: The curvecns node.
+    """
+    pm.select(crv)
+    node = pm.deformer(type="mgear_curveCns")[0]
+
+    for i, item in enumerate(inputs):
+        pm.connectAttr(item + ".worldMatrix", node + ".inputs[%s]" % i)
+
+    return node
+
+
+def gear_curvecns_op_local(crv, inputs=[]):
+    """
+    create mGear curvecns node.
+
+    Arguments:
+        crv (nurbsCurve): Nurbs curve.
+        inputs (List of dagNodes): Input object to drive the curve. Should be
+            same number as crv points.
+            Also the order should be the same as the points
+
+    Returns:
+        pyNode: The curvecns node.
+    """
+    import ymt_shifter_utility
+
+    pm.select(crv)
+    node = pm.deformer(type="mgear_curveCns")[0]
+
+    con = pm.listConnections(node + ".input", plugs=True, connections=True, source=True, destination=False)[0]
+    pm.disconnectAttr(con[1], con[0])
+    pm.connectAttr(
+        con[1].name().replace(".worldSpace[0]", ".local"),
+        node + ".input[0].inputGeometry"
+    )
+
+    for i, item in enumerate(inputs):
+        mul = pm.createNode("multMatrix")
+        comp = pm.createNode("composeMatrix")
+        decomp = ymt_shifter_utility.getDecomposeMatrixOfAtoB(item.getParent(), crv)
+        pm.connectAttr(decomp + ".outputTranslate", comp + ".inputTranslate")
+        pm.connectAttr(decomp + ".outputRotate", comp + ".inputRotate")
+        pm.connectAttr(decomp + ".outputScale", comp + ".inputScale")
+        comp2 = pm.createNode("composeMatrix")
+        pm.connectAttr(item + ".translate", comp2 + ".inputTranslate")
+
+        pm.connectAttr(comp + ".outputMatrix", mul + ".matrixIn[1]")
+        pm.connectAttr(comp2 + ".outputMatrix", mul + ".matrixIn[0]")
+        pm.connectAttr(mul + ".matrixSum", node + ".inputs[%s]" % i)
+
+    return node

@@ -118,6 +118,9 @@ def setKeyableAttributesDontLockVisibility(nodes, params=None):
 
 def getFullPath(start, routes=None):
     # type: (pm.nt.transform, List[pm.nt.transform]|None) -> List[pm.nt.transform]
+    if isinstance(start, unicode):
+        start = pm.PyNode(start)
+
     if not routes:
         routes = []
 
@@ -1009,11 +1012,10 @@ def apply_rivet_constrain(mesh_name, position, name=None):
 
     # output
     output = cmds.createNode("transform")
-    try:
-        cmds.connectAttr("{}.outputMatrix[0]".format(pin), "{}.offsetParentMatrix".format(output))
-    except RuntimeError:
-        cmds.connectAttr("{}.outputMatrix[0]".format(pin), "{}.matrix".format(output))
-
+    cmds.connectAttr("{}.outputMatrix[0]".format(pin), "{}.offsetParentMatrix".format(output))
+    for attr in ["t", "r", "s"]:
+        for axis in ("x", "y", "z"):
+            cmds.setAttr("{}.{}{}".format(output, attr, axis), 0.0)
     return output
 
 
@@ -1127,15 +1129,16 @@ def apply_rivet_constrain_to_selected(mesh, targets):
 
     pins = []
     for target in targets:
-        print("target({}) type is {}".format(target, type(target)))
+        # print("target({}) type is {}".format(target, type(target)))
         if isinstance(target, nodetypes.Transform):
             target = target.name()
-            print("target({}) type is {}".format(target, type(target)))
+            # print("target({}) type is {}".format(target, type(target)))
 
         if not cmds.objExists(target):
             raise Exception("target({}) {} not found".format(type(target), target))
 
-        pin = apply_rivet_constrain(mesh, cmds.xform(target, q=True, ws=True, t=True))
+        pos = cmds.xform(target, q=True, ws=True, t=True)
+        pin = apply_rivet_constrain(mesh, pos)
         pin = cmds.rename(pin, target + "_rivet")
         pins.append(pin)
 
@@ -1210,3 +1213,28 @@ def get_centroid_from_positions(positions):
     mean_y = sum(p[1] for p in positions) / len(positions)
     mean_z = sum(p[2] for p in positions) / len(positions)
     return mean_x, mean_y, mean_z
+
+
+def get_normalized_vector_node_from_attribute_path(attr_path):
+    # type: (Text) -> Text
+    """Get normalized vector node from given attribute path"""
+    vecProd = cmds.createNode("vectorProduct")
+    cmds.setAttr(vecProd + ".operation", 1)  # dot product
+    cmds.connectAttr(attr_path, vecProd + ".input1")
+    cmds.connectAttr(attr_path, vecProd + ".input2")
+
+    power = cmds.createNode("multiplyDivide")
+    cmds.setAttr(power + ".operation", 3)  # power
+    cmds.setAttr(power + ".input2X", 0.5)
+    cmds.setAttr(power + ".input2Y", 0.5)
+    cmds.setAttr(power + ".input2Z", 0.5)
+    cmds.connectAttr(vecProd + ".output", power + ".input1")
+
+    div = cmds.createNode("multiplyDivide")
+    cmds.setAttr(div + ".operation", 2)  # divide
+    cmds.connectAttr(attr_path, div + ".input1")
+    cmds.connectAttr(power + ".outputX", div + ".input2.input2X")
+    cmds.connectAttr(power + ".outputX", div + ".input2.input2Y")
+    cmds.connectAttr(power + ".outputX", div + ".input2.input2Z")
+
+    return div + ".output"
