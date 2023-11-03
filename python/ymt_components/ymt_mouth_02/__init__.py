@@ -162,17 +162,17 @@ class Component(component.Main):
         """Create the anim and setupr rig attributes for the component"""
 
         self.sideRotation_att = self.addAnimParam(
-            "siderot", "Sides Rotation", "double", 20, 0, 100)
+            "siderot", "Sides Rotation", "double", 2.5, 0, 100)
         self.vertRotation_att = self.addAnimParam(
-            "vertrot", "Vertical Rotation", "double", 40, 0, 100)
+            "vertrot", "Vertical Rotation", "double", 5, 0, 100)
         self.frontalTranslation_att = self.addAnimParam(
-            "fronttrans", "Frontal Translation", "double", 1, 0, 1)
+            "fronttrans", "Frontal Translation", "double", 0.3, 0, 1)
         self.verticalTranslation_att = self.addAnimParam(
             "verttrans", "Vertical Translation", "double", 0.2, 0, 1)
         self.followLips_att = self.addAnimParam(
             "floowlips", "FollowLips", "double", 0.05, 0, 1)
         self.lipsAlignSpeed_att = self.addAnimParam(
-            "lipsAlignSpeed", "Lips Align Speed", "double", 0.05, 0, 10)
+            "lipsAlignSpeed", "Lips Align Speed", "double", 0.03, 0, 10)
 
     # =====================================================
     # OPERATORS
