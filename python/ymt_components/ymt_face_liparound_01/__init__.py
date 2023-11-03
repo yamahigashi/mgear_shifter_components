@@ -128,7 +128,9 @@ class Component(component.Main):
 
         self.thickness = 0.07
         self.FRONT_OFFSET = 0.2
-        self.NB_CVS = self.num_locs
+
+        self.numInterControls = 1  # TODO: extract to settings
+        self.NB_CVS = self.numInterControls * 4 + 4  # means 4 spans with 2 controllers each + 4 controllers for the corners
         if self.num_locs % 2 == 0:
             # even
             self.NB_ROPE = self.num_locs * 20 + 1
@@ -320,7 +322,6 @@ class Component(component.Main):
         po = self.offset * 0.3
 
         cvsObject = self.getCurveCVs(crv, "object")
-        cvsWorld = self.getCurveCVs(crv, "world")
 
         for i, _ in enumerate(cvsObject):
 
@@ -355,13 +356,12 @@ class Component(component.Main):
             # applyPathCnsLocal(upv, self.crv_upv, rope_upv, cvOSoffset)
             applyPathCnsLocal(cns, self.crv_ctl, rope, cvOS)
 
-            cv = cvsWorld[i]
             m = getTransform(cns)
             x = datatypes.Vector(m[0][0], m[0][1], m[0][2])
             y = datatypes.Vector(m[1][0], m[1][1], m[1][2])
             z = datatypes.Vector(m[2][0], m[2][1], m[2][2])
             rot = [x, y, z]
-            xform = setMatrixPosition(t, cv)
+            xform = setMatrixPosition(t, self.locsPos[i])
             xform = setMatrixRotation(xform, rot)
             offset = datatypes.EulerRotation((90.0, 0, 0), unit="degrees")
             xform = offset.asMatrix() * xform
@@ -454,7 +454,7 @@ class Component(component.Main):
 
     def addControllers(self):
         axis_list = ["sx", "sy", "sz", "ro"]
-        upCtlOptions = [
+        ctlOptions = [
             # for referenece
             # name,      side, icon,   color, width, keyable
             # ["upcenter", "C", "square", 4,  .05, axis_list],
@@ -470,35 +470,51 @@ class Component(component.Main):
             # ["upcorner", "R", "circle", 14, .03, []],
             # ["upinner",  "R", "circle", 14, .03, []]
         ]
-        # if 8 locs, : up is 0, left is 2, bottom is 4, right is 6
-        upCtlOptions.append(["upcenter", "C", "square", 4, .05, axis_list])
-        for i in range(1, self.left_index):
-            upCtlOptions.append(["up{}".format(i - 1), "L", "circle", 14, .03, []])
+        # # if 8 locs, : up is 0, left is 2, bottom is 4, right is 6
+        # ctlOptions.append(["upcenter", "C", "square", 4, .05, axis_list])
+        # for i in range(1, self.left_index):
+        #     ctlOptions.append(["up{}".format(i - 1), "L", "circle", 14, .03, []])
+        # 
+        # ctlOptions.append(["outer", "L", "square", 4, .05, axis_list])
+        # for i in range(self.left_index, self.bottom_index - 1):
+        #     ctlOptions.append(["low{}".format(i - self.left_index), "L", "circle", 14, .03, []])
+        # 
+        # ctlOptions.append(["lowcenter", "C", "square", 4, .05, axis_list])
+        # for i in range(self.bottom_index, self.right_index - 1):
+        #     reverse_i = self.right_index - i - 2
+        #     ctlOptions.append(["low{}".format(reverse_i), "R", "circle", 14, .03, []])
+        # 
+        # ctlOptions.append(["outer", "R", "square", 4, .05, axis_list])
+        # for i in range(self.right_index, self.num_locs - 1):
+        #     reverse_i = self.num_locs - i - 2
+        #     ctlOptions.append(["up{}".format(reverse_i), "R", "circle", 14, .03, []])
 
-        upCtlOptions.append(["outer", "L", "square", 4, .05, axis_list])
-        for i in range(self.left_index, self.bottom_index - 1):
-            upCtlOptions.append(["low{}".format(i - self.left_index), "L", "circle", 14, .03, []])
+        ctlOptions.append(["upcenter", "C", "square", 4, .05, axis_list])
+        for i in range(self.numInterControls):
+            ctlOptions.append(["up{}".format(i), "L", "circle", 14, .03, []])
 
-        upCtlOptions.append(["lowcenter", "C", "square", 4, .05, axis_list])
-        for i in range(self.bottom_index, self.right_index - 1):
-            reverse_i = self.right_index - i - 2
-            upCtlOptions.append(["low{}".format(reverse_i), "R", "circle", 14, .03, []])
+        ctlOptions.append(["outer", "L", "square", 4, .05, axis_list])
+        for i in range(self.numInterControls):
+            ctlOptions.append(["low{}".format(i), "L", "circle", 14, .03, []])
 
-        upCtlOptions.append(["outer", "R", "square", 4, .05, axis_list])
-        for i in range(self.right_index, self.num_locs - 1):
-            reverse_i = self.num_locs - i - 2
-            upCtlOptions.append(["up{}".format(reverse_i), "R", "circle", 14, .03, []])
+        ctlOptions.append(["lowcenter", "C", "square", 4, .05, axis_list])
+        for i in reversed(range(self.numInterControls)):
+            ctlOptions.append(["low{}".format(i), "R", "circle", 14, .03, []])
 
-        self.upNpos, self.upCtls, self.upUpvs = self._addControls(self.crv, upCtlOptions)
+        ctlOptions.append(["outer", "R", "square", 4, .05, axis_list])
+        for i in reversed(range(self.numInterControls)):
+            ctlOptions.append(["up{}".format(i), "R", "circle", 14, .03, []])
+
+        self.upNpos, self.upCtls, self.upUpvs = self._addControls(self.crv_ctl, ctlOptions)
 
         assert self.left_index > 0, "left_index is 0, could not find left most index, meaning x is not negative"
         assert self.right_index > 0, "right_index is 0, could not find right most index, meaning x is not positive"
 
         self.lips_C_upper_ctl  = self.upCtls[0]
-        self.lips_C_lower_ctl  = self.upCtls[self.bottom_index]
+        self.lips_C_lower_ctl  = self.upCtls[self.numInterControls * 2 + 2]
 
-        self.lips_L_Corner_npo = self.upNpos[self.left_index]
-        self.lips_R_Corner_npo = self.upNpos[self.right_index]
+        self.lips_L_Corner_npo = self.upNpos[self.numInterControls + 1]
+        self.lips_R_Corner_npo = self.upNpos[self.numInterControls * 3 + 3]
 
         upvec = self.upUpvs
 
@@ -545,17 +561,16 @@ class Component(component.Main):
             return r1, r2
 
         # if 8 locs, : up is 0, left is 2, bottom is 4, right is 6
-        for i in range(1, self.left_index):
-            applyMultiCns(self.upCtls, 0, self.left_index, i,  0.50, 0.25)
-
-        for i in range(self.left_index + 1, self.bottom_index):
-            applyMultiCns(self.upCtls, self.left_index, self.bottom_index, i,  0.20, 0.80)
-
-        for i in range(self.bottom_index + 1, self.right_index):
-            applyMultiCns(self.upCtls, self.bottom_index, self.right_index, i,  0.80, 0.20)
-
-        for i in range(self.right_index + 1, len(self.upCtls)):
-            applyMultiCns(self.upCtls, self.right_index, 0, i,  0.25, 0.50)
+        nic = self.numInterControls  # shortcuts
+        t = 0
+        l = nic * 1 + 1  # noqa: E741
+        b = nic * 2 + 2
+        r = nic * 3 + 3
+        for i in range(self.numInterControls):
+            applyMultiCns(self.upCtls, t, l, nic * 0 + i + 1,  0.50, 0.25)
+            applyMultiCns(self.upCtls, l, b, nic * 1 + i + 2,  0.20, 0.80)
+            applyMultiCns(self.upCtls, b, r, nic * 2 + i + 3,  0.80, 0.20)
+            applyMultiCns(self.upCtls, r, t, nic * 3 + i + 4,  0.25, 0.50)
 
     def _addControls(self, crv_ctl, option):
 
@@ -586,9 +601,10 @@ class Component(component.Main):
 
             scl = [1, 1, 1]
             if mirror:
-                scl[0] = -1
-            if lower:
                 scl[1] = -1
+                scl[2] = -1
+            if lower:
+                scl[0] = -1
 
             t = transform.getTransformFromPos(cv)
             t = transform.setMatrixScale(t, scl)

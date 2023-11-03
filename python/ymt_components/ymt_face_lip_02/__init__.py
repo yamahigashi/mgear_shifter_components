@@ -128,12 +128,12 @@ class Component(component.Main):
 
         self.thickness = 0.07
         self.FRONT_OFFSET = 0.2
-        self.NB_CVS = self.num_locs
+        self.NB_CVS = 2 * 4 + 4  # means 4 spans with 2 controllers each + 4 controllers for the corners
         if self.num_locs % 2 == 0:
             # even
-            self.NB_ROPE = self.num_locs * 20 + 1
+            self.NB_ROPE = self.num_locs * 2 + 1
         else:
-            self.NB_ROPE = self.num_locs * 20
+            self.NB_ROPE = self.num_locs * 2
 
         # odd / event
         if self.num_locs % 2 == 0:
@@ -322,8 +322,10 @@ class Component(component.Main):
 
         cvsObject = self.getCurveCVs(crv, "object")
         cvsWorld = self.getCurveCVs(crv, "world")
+        cvPairs = list(zip(cvsObject, cvsWorld))
+        cvs = cvPairs[0:-1]
 
-        for i, _ in enumerate(cvsObject):
+        for i, (cvo, cvw) in enumerate(cvs):
 
             mirror = i > self.num_locs / 2
             lower = i > self.left_index and i < self.right_index
@@ -343,26 +345,23 @@ class Component(component.Main):
 
             else:
                 tmp = self.num_locs - self.right_index
-                if i < self.right_index:
-                    sub_comp = "R" + str(i - self.bottom_index + tmp - 1)
+                if i <= self.right_index:
+                    sub_comp = "R" + str(i - self.bottom_index + tmp - 2)
                 else:
-                    sub_comp = "R" + str(tmp - i + self.right_index - 1)
+                    sub_comp = "R" + str(tmp - i + self.right_index - 2)
 
-            cvOS = cvsObject[i]
-            # cvOSoffset = [cvOS[0], cvOS[1], cvOS[2] + self.FRONT_OFFSET]
-
+            # cvOSoffset = [cvo[0], cvo[1], cvo[2] + self.FRONT_OFFSET]
             # upv = addTransform(rope_root, self.getName("rope_{}_upv".format(sub_comp)))
             cns = addTransform(rope_root, self.getName("rope_{}_cns".format(sub_comp)))
             # applyPathCnsLocal(upv, self.crv_upv, rope_upv, cvOSoffset)
-            applyPathCnsLocal(cns, self.crv_ctl, rope, cvOS)
+            applyPathCnsLocal(cns, self.crv_ctl, rope, cvo)
 
-            cv = cvsWorld[i]
             m = getTransform(cns)
             x = datatypes.Vector(m[0][0], m[0][1], m[0][2])
             y = datatypes.Vector(m[1][0], m[1][1], m[1][2])
             z = datatypes.Vector(m[2][0], m[2][1], m[2][2])
             rot = [x, y, z]
-            xform = setMatrixPosition(t, cv)
+            xform = setMatrixPosition(t, self.locsPos[i])
             xform = setMatrixRotation(xform, rot)
             offset = datatypes.EulerRotation((90.0, 0, 0), unit="degrees")
             xform = offset.asMatrix() * xform
@@ -373,17 +372,15 @@ class Component(component.Main):
                 else:
                     xform = setMatrixScale(xform, scl=[-1, 1, 1])
 
-                # aimVec = (0, 0, -1)
             else:
                 if lower:
                     xform = setMatrixScale(xform, scl=[-1, -1, -1])
                 else:
                     xform = setMatrixScale(xform, scl=[1, 1, 1])
-                # aimVec = (0, 0, 1)
 
-            if i == self.left_index:
-                prev = getTransform(controls[i-1]).rotate
-                # xform = setMatrixRotation(xform, prev)
+            # if i == self.left_index:
+            #     prev = getTransform(controls[i-1]).rotate
+            #     xform = setMatrixRotation(xform, prev)
             if i == self.right_index + 1:
                 rightCtl = controls[self.right_index]
                 rightNpo = rightCtl.getParent()
@@ -427,22 +424,24 @@ class Component(component.Main):
         self.addToGroup(obj, group_name, parentGrp=ctlGrp)
 
     def addControllers(self):
-        axis_list = ["sx", "sy", "sz", "ro"]
+
+        paramsMain = ["tx", "ty", "tz", "rx", "ry", "rz", "sx", "sy", "sz", "ro"]
+        paramsSub = ["tx", "ty", "tz", "rx"]
 
         ctlOptions = [
             # name,      side, icon,   color, width, keyable
-            ["upper",    "C", "square", 4,  .05, axis_list],  # 0
-            ["upInner",  "L", "circle", 14, .03, []],         # 1
-            ["upOuter",  "L", "circle", 14, .03, []],         # 2
-            ["corner",   "L", "square", 4,  .05, axis_list],  # 3
-            ["lowOuter", "L", "circle", 14, .03, []],         # 4
-            ["lowInner", "L", "circle", 14, .03, []],         # 5
-            ["lower",    "C", "square", 4,  .05, axis_list],  # 6
-            ["lowInner", "R", "circle", 14, .03, []],         # 7
-            ["lowOuter", "R", "circle", 14, .03, []],         # 8
-            ["corner",   "R", "square", 4,  .05, axis_list],  # 9
-            ["upOuter",  "R", "circle", 14, .03, []],         # 10
-            ["upInner",  "R", "circle", 14, .03, []],         # 11
+            ["upper",    "C", "square", 4,  .05, paramsMain],  # 0
+            ["upInner",  "L", "circle", 14, .03, paramsSub],         # 1
+            ["upOuter",  "L", "circle", 14, .03, paramsSub],         # 2
+            ["corner",   "L", "square", 4,  .05, paramsMain],  # 3
+            ["lowOuter", "L", "circle", 14, .03, paramsSub],         # 4
+            ["lowInner", "L", "circle", 14, .03, paramsSub],         # 5
+            ["lower",    "C", "square", 4,  .05, paramsMain],  # 6
+            ["lowInner", "R", "circle", 14, .03, paramsSub],         # 7
+            ["lowOuter", "R", "circle", 14, .03, paramsSub],         # 8
+            ["corner",   "R", "square", 4,  .05, paramsMain],  # 9
+            ["upOuter",  "R", "circle", 14, .03, paramsSub],         # 10
+            ["upInner",  "R", "circle", 14, .03, paramsSub],         # 11
         ]
 
         self.upNpos, self.upCtls, self.upUpvs = self._addControls(self.crv_ctl, ctlOptions)
@@ -456,8 +455,8 @@ class Component(component.Main):
         upvec = self.upUpvs
 
         # Connecting control crvs with controls
-        applyop.gear_curvecns_op(self.crv_ctl, self.upCtls)
-        applyop.gear_curvecns_op(self.crv_upv, upvec)
+        curve.gear_curvecns_op_local(self.crv_ctl, self.upCtls)
+        curve.gear_curvecns_op_local(self.crv_upv, upvec)
 
         # adding wires
         pm.wire(self.crv, w=self.crv_ctl, dropoffDistance=[0, self.size * 10])
@@ -511,6 +510,8 @@ class Component(component.Main):
         applyMultiCns(self.upCtls, 9, 0, 10, 0.10, 0.70)
         applyMultiCns(self.upCtls, 9, 0, 11, 0.15, 0.70)
 
+        self._constrainCtlRotToCurve(self.upCtls, self.crv)
+
     def _addControls(self, crv_ctl, option):
 
         cvs = self.getCurveCVs(crv_ctl)
@@ -524,7 +525,6 @@ class Component(component.Main):
         npos = []
         ctls = []
         upvs = []
-        params = ["tx", "ty", "tz", "rx", "ry", "rz"]
 
         for i, cv in enumerate(cvs):
 
@@ -564,7 +564,7 @@ class Component(component.Main):
 
             ctls.append(ctl)
 
-            ymt_util.setKeyableAttributesDontLockVisibility(ctl, params + oPar)
+            ymt_util.setKeyableAttributesDontLockVisibility(ctl, oPar)
 
             upv = addTransform(ctl, self.getName("%s_upv" % oName, oSide), t)
             upv.attr("tz").set(self.FRONT_OFFSET)
@@ -572,6 +572,56 @@ class Component(component.Main):
             self.addToSubGroup(ctl, self.primaryControllersGroupName)
 
         return npos, ctls, upvs
+
+    def _constrainCtlRotToCurve(self, ctls, crv): 
+
+        # for i, cv in enumerate(cvs):
+        for i in (1, 2, 4, 5, 7, 8, 10, 11):
+            crvShape = crv.getShape().fullPath()
+
+            ctl = ctls[i]
+            dm_node = ymt_util.getDecomposeMatrixOfAtoB(ctl, crv)
+
+            npo = rigbits.addNPO(ctl)[0].name()
+            point = cmds.createNode("nearestPointOnCurve")
+            cmds.connectAttr(dm_node + ".outputTranslate", point + ".inPosition")
+            cmds.connectAttr(crvShape + ".local", point + ".inputCurve")
+
+            uvalue = cmds.getAttr(point + ".parameter")
+            cmds.delete(point)
+            # cmds.delete(dm_node.fullPath())
+
+            motPath = cmds.createNode("motionPath")
+            cmds.setAttr(motPath + ".uValue", uvalue)
+            cmds.setAttr(motPath + ".frontAxis", 0)
+            cmds.setAttr(motPath + ".upAxis", 1)
+            cmds.setAttr(motPath + ".worldUpType", 3)  # vector
+            cmds.setAttr(motPath + ".worldUpVector", 0, 1, 0)
+            cmds.connectAttr(crvShape + ".local", motPath + ".geometryPath")
+
+            mirror = i > 6
+            lower = 3 < i and i < 9
+            outpath = motPath + ".rotateZ"
+
+            if lower:
+                cmds.setAttr(motPath + ".inverseFront", 1)
+
+                if not mirror:
+                    mul = cmds.createNode("multDoubleLinear")
+                    cmds.connectAttr(motPath + ".rotateZ", mul + ".input1")
+                    cmds.setAttr(mul + ".input2", -1)
+                    outpath = mul + ".output"
+
+            else:
+                cmds.setAttr(motPath + ".inverseFront", 0)
+
+                if mirror:
+                    mul = cmds.createNode("multDoubleLinear")
+                    cmds.connectAttr(motPath + ".rotateZ", mul + ".input1")
+                    cmds.setAttr(mul + ".input2", -1)
+                    outpath = mul + ".output"
+
+            cmds.connectAttr(outpath, npo + ".rotateZ")
 
     # =====================================================
     # ATTRIBUTES
@@ -640,11 +690,6 @@ class Component(component.Main):
         corner_l_comp = self.rig.findComponent("mouthCorner_L0_root")
         corner_r_comp = self.rig.findComponent("mouthCorner_R0_root")
 
-        # temporally
-        original_parent_c = slide_c_comp.root
-        original_parent_l = corner_l_comp.root
-        original_parent_r = corner_r_comp.root
-
         if slide_c_comp.root.parent(0) != self.parent:
             self.parent.addChild(slide_c_comp.root)
 
@@ -655,7 +700,7 @@ class Component(component.Main):
             self.parent.addChild(corner_r_comp.root)
 
         # create interpose lvl for the ctl
-        intTra = rigbits.createInterpolateTransform([lipup_ref, liplow_ref])
+        intTra = rigbits.createInterpolateTransform([lipup_ref, liplow_ref], blend=0.38)
         pm.rename(intTra, intTra.name() + "_int")
 
         drivers = self.connect_slide_ghost(
@@ -680,10 +725,6 @@ class Component(component.Main):
                     continue
 
                 comp.groups[k] = []
-
-        original_parent_c.addChild(slide_c_comp.root)
-        original_parent_l.addChild(corner_l_comp.root)
-        original_parent_r.addChild(corner_r_comp.root)
 
     def _createGhostCtl(self, ghost_ctl, parent):
 
@@ -740,6 +781,9 @@ class Component(component.Main):
         self.mouthSlide_ctl = self._createGhostCtl(slide_c_ref, intTra)
         self.cornerL_ctl = self._createGhostCtl(corner_l_ref, slide_c_ref)
         self.cornerR_ctl = self._createGhostCtl(corner_r_ref, slide_c_ref)
+        self.jnt_pos.insert(0, [self.mouthSlide_ctl, "slide_c"])
+        self.jnt_pos.insert(1, [self.cornerL_ctl, "corner_l"])
+        self.jnt_pos.insert(2, [self.cornerR_ctl, "corner_r"])
 
         # slide system
         drivers = ghostSliderForMouth(

@@ -326,11 +326,25 @@ class Component(component.Main):
         else:
             self.removeFromControllerGroup(self.surfaceCtl)
 
+        # add to group
+        if self.settings["ctlGrp"]:
+            ctlGrp = self.settings["ctlGrp"]
+            self.addToGroup(self.ghostCtl, ctlGrp, "controllers")
+            self.addToGroup(self.surfaceCtl, ctlGrp, "controllers")
+
+        else:
+            ctlGrp = "controllers"
+            self.addToGroup(self.ghostCtl, ctlGrp)
+            self.addToGroup(self.surfaceCtl, ctlGrp)
+
+        if ctlGrp not in self.groups.keys():
+            self.groups[ctlGrp] = []
+
         self.setRelation()  # MUST re-setRelation, swapped ghost and real controls
 
     def connect_rivet(self):
         rivets = ymt_util.apply_rivet_constrain_to_selected(self.sliding_surface, self.npo)
-        cmds.parent(rivets[0], self.sliding_surface.getParent().fullPath())
+        cmds.parent(rivets[0], self.sliding_surface.getParent().fullPath(), relative=True)
         cmds.parentConstraint(rivets[0], self.npo.fullPath(), mo=True)
 
     # =====================================================
