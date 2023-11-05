@@ -582,7 +582,6 @@ class Component(component.Main):
             ctl = ctls[i]
             dm_node = ymt_util.getDecomposeMatrixOfAtoB(ctl, crv)
 
-            npo = rigbits.addNPO(ctl)[0].name()
             point = cmds.createNode("nearestPointOnCurve")
             cmds.connectAttr(dm_node + ".outputTranslate", point + ".inPosition")
             cmds.connectAttr(crvShape + ".local", point + ".inputCurve")
@@ -621,7 +620,14 @@ class Component(component.Main):
                     cmds.setAttr(mul + ".input2", -1)
                     outpath = mul + ".output"
 
-            cmds.connectAttr(outpath, npo + ".rotateZ")
+            # Inserting an orient constraint node in between because
+            # dagPose command cannot be applied when connected dilectly to the output
+            cmds.setAttr("{}.rotateZ".format(ctl), lock=False)
+            oriCns = cmds.createNode("orientConstraint")
+            cmds.parent(oriCns, ctl.fullPath(), relative=True)
+            cmds.connectAttr(outpath, oriCns + ".target[0].targetRotateZ")
+            cmds.connectAttr(oriCns + ".constraintRotateZ", ctl + ".rotateZ")
+            cmds.setAttr("{}.rotateZ".format(ctl), lock=True)
 
     # =====================================================
     # ATTRIBUTES
@@ -782,8 +788,6 @@ class Component(component.Main):
         self.cornerL_ctl = self._createGhostCtl(corner_l_ref, slide_c_ref)
         self.cornerR_ctl = self._createGhostCtl(corner_r_ref, slide_c_ref)
         self.jnt_pos.insert(0, [self.mouthSlide_ctl, "slide_c"])
-        self.jnt_pos.insert(1, [self.cornerL_ctl, "corner_l"])
-        self.jnt_pos.insert(2, [self.cornerR_ctl, "corner_r"])
 
         # slide system
         drivers = ghostSliderForMouth(
