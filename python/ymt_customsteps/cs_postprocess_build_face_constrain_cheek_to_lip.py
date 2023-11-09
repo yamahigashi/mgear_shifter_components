@@ -124,6 +124,7 @@ class CustomShifterStep(cstp.customShifterMainStep):
                 ],
                 "dst": "aroundlip_C0_aroundlip_L0_outer_ctl",
                 "rates": [0.25, 0.25, 1.0],
+                "mode": "addNpo",
             },
             {
                 "src": [
@@ -133,6 +134,7 @@ class CustomShifterStep(cstp.customShifterMainStep):
                 ],
                 "dst": "aroundlip_C0_aroundlip_R0_outer_ctl",
                 "rates": [0.25, 0.25, 1.0],
+                "mode": "addNpo",
             },
             {
                 "src": [
@@ -141,6 +143,16 @@ class CustomShifterStep(cstp.customShifterMainStep):
                 ],
                 "dst": "aroundlip_C0_aroundlip_C0_upcenter_ctl",
                 "rates": [0.15, 0.85],
+                "mode": "addNpo",
+            },
+            {
+                "src": [
+                    "mouth_C0_jawLow_rot",
+                    "lip_C0_lip_C0_lower_ctl",
+                ],
+                "dst": "aroundlip_C0_aroundlip_C0_lowcenter_ctl",
+                "rates": [0.70, 0.30],
+                "mode": "addNpo",
             },
             {
                 "src": [
@@ -148,7 +160,7 @@ class CustomShifterStep(cstp.customShifterMainStep):
                 ],
                 "dst": "cheek_L3_surface_ctl",
                 "rates": [0.62],
-                "addNpo": False
+                "mode": "parent",
             },
             {
                 "src": [
@@ -156,7 +168,7 @@ class CustomShifterStep(cstp.customShifterMainStep):
                 ],
                 "dst": "cheek_R3_surface_ctl",
                 "rates": [0.62],
-                "addNpo": False
+                "mode": "parent",
             },
             {
                 "src": [
@@ -164,7 +176,7 @@ class CustomShifterStep(cstp.customShifterMainStep):
                 ],
                 "dst": "cheek_L2_surface_ctl",
                 "rates": [0.33],
-                "addNpo": False
+                "mode": "parent",
             },
             {
                 "src": [
@@ -172,7 +184,7 @@ class CustomShifterStep(cstp.customShifterMainStep):
                 ],
                 "dst": "cheek_R2_surface_ctl",
                 "rates": [0.33],
-                "addNpo": False
+                "mode": "parent",
             },
             {
                 "src": [
@@ -182,7 +194,7 @@ class CustomShifterStep(cstp.customShifterMainStep):
                 ],
                 "dst": "cheek_L0_surface_ctl",
                 "rates": [0.07, 0.1, 0.05],
-                "addNpo": False
+                "mode": "parent",
             },
             {
                 "src": [
@@ -192,7 +204,7 @@ class CustomShifterStep(cstp.customShifterMainStep):
                 ],
                 "dst": "cheek_R0_surface_ctl",
                 "rates": [0.07, 0.1, 0.05],
-                "addNpo": False
+                "mode": "parent",
             },
             {
                 "src": [
@@ -202,7 +214,7 @@ class CustomShifterStep(cstp.customShifterMainStep):
                 ],
                 "dst": "cheek_L1_surface_ctl",
                 "rates": [0.05, 0.1, 0.07],
-                "addNpo": False
+                "mode": "parent",
             },
             {
                 "src": [
@@ -212,7 +224,25 @@ class CustomShifterStep(cstp.customShifterMainStep):
                 ],
                 "dst": "cheek_R1_surface_ctl",
                 "rates": [0.05, 0.1, 0.07],
-                "addNpo": False
+                "mode": "parent",
+            },
+            {
+                "src": [
+                    "eye_L0_lowEyelid_crvdetail3_ctl",
+                    "surfaceWire_L0_ctls",
+                ],
+                "dst": "surfaceWire_L0_source_0_ctl",
+                "rates": [0.5, 0.5],
+                "mode": "self",
+            },
+            {
+                "src": [
+                    "lip_C0_lip_C0_L2_crvdetail_ctl",
+                    "aroundlip_C0_aroundlip_C0_L1_crvdetail_ctl",
+                ],
+                "dst": "surfaceWire_L0_source_2_ctl",
+                "rates": [0.5, 0.2],
+                "mode": "self",
             },
         ]
 
@@ -226,20 +256,43 @@ class CustomShifterStep(cstp.customShifterMainStep):
             src = entry["src"]
             dst = entry["dst"]
             rates = entry["rates"]
-            addNpo = entry.get("addNpo", True)
+            mode = entry.get("mode", "addNpo")
 
-            self.connect(src, dst, rates, addNpo=addNpo)
+            self.connect(src, dst, rates, mode=mode)
 
-    def connect(self, src, dst, rates, addNpo=True):
+    def connect(self, src, dst, rates, mode="addNpo"):
 
         dst_node = pm.PyNode(dst)
-        parent = dst_node.getParent()
 
-        if addNpo:
-            parent = rigbits.addNPO(dst_node)[0]  # type: pm.PyNode
+        if mode == "self":
+            target = dst_node
+        elif mode == "parent":
+            target = dst_node.getParent()
+        elif mode == "addNpo":
+            target = rigbits.addNPO(dst_node)[0]  # type: pm.PyNode
+        else:
+            raise ValueError("Invalid mode: {}".format(mode))
 
-        cns = cmds.parentConstraint(src, parent.fullPath(), mo=True)[0]  # type: str
+        lockedTx = cmds.getAttr(target.fullPath() + ".tx", lock=True)
+        lockedTy = cmds.getAttr(target.fullPath() + ".ty", lock=True)
+        lockedTz = cmds.getAttr(target.fullPath() + ".tz", lock=True)
+        lockedRx = cmds.getAttr(target.fullPath() + ".rx", lock=True)
+        lockedRy = cmds.getAttr(target.fullPath() + ".ry", lock=True)
+        lockedRz = cmds.getAttr(target.fullPath() + ".rz", lock=True)
+        cmds.setAttr(target.fullPath() + ".tx", lock=False)
+        cmds.setAttr(target.fullPath() + ".ty", lock=False)
+        cmds.setAttr(target.fullPath() + ".tz", lock=False)
+        cmds.setAttr(target.fullPath() + ".rx", lock=False)
+        cmds.setAttr(target.fullPath() + ".ry", lock=False)
+        cmds.setAttr(target.fullPath() + ".rz", lock=False)
+        cns = cmds.parentConstraint(src, target.fullPath(), mo=True)[0]  # type: str
         cmds.setAttr("{}.interpType".format(cns), 2)  # shortest
+        cmds.setAttr(target.fullPath() + ".tx", lock=lockedTx)
+        cmds.setAttr(target.fullPath() + ".ty", lock=lockedTy)
+        cmds.setAttr(target.fullPath() + ".tz", lock=lockedTz)
+        cmds.setAttr(target.fullPath() + ".rx", lock=lockedRx)
+        cmds.setAttr(target.fullPath() + ".ry", lock=lockedRy)
+        cmds.setAttr(target.fullPath() + ".rz", lock=lockedRz)
 
         # if already has been constrained, adding to the existing constraint
         counts = len(cmds.parentConstraint(cns, q=True, weightAliasList=True))
