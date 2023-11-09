@@ -253,9 +253,7 @@ class Component(component.Main):
         # -------------------------------------------------------------------
         def _inner(edges):
             crv = gen(edges, planeNode.verts[1], self.getName("crv"), parent=crv_root, m=t, close=True)
-            ctl = gen(edges, planeNode.verts[1], self.getName("ctl_crv"), parent=crv_root, m=t, close=True)
             crv.attr("visibility").set(False)
-            ctl.attr("visibility").set(False)
 
             cvs = self.getCurveCVs(crv)
             center_pos = sum(cvs) / len(cvs)  # type: ignore
@@ -264,14 +262,14 @@ class Component(component.Main):
                 new_pos = [cv[0] + offset[0], cv[1] + offset[1], cv[2] + offset[2]]
                 crv.setCV(i, new_pos, space="world")
 
-            return crv, ctl
+            return crv
 
         # -------------------------------------------------------------------
         edgeList = ["{}.e[{}]".format(plane.fullPathName(), 0)]
         for i in range(1, self.num_locs + 1):
             edgeList.append("{}.e[{}]".format(plane.fullPathName(), i * 2 + 1))
         edgeList = [pm.PyNode(x) for x in edgeList]
-        self.crv, self.crv_ctl = _inner(edgeList)
+        self.crv = _inner(edgeList)
         cmds.delete(cmds.listRelatives(plane.fullPathName(), parent=True))
 
     def addCurveBaseControllers(self, crv_root):
@@ -427,6 +425,7 @@ class Component(component.Main):
 
         paramsMain = ["tx", "ty", "tz", "rx", "ry", "rz", "sx", "sy", "sz", "ro"]
         paramsSub = ["tx", "ty", "tz", "rx"]
+        paramsSub = ["tx", "ty", "tz", "rx", "ry", "rz", "sx", "sy", "sz", "ro"]
 
         ctlOptions = [
             # name,      side, icon,   color, width, keyable
@@ -627,7 +626,7 @@ class Component(component.Main):
             cmds.parent(oriCns, ctl.fullPath(), relative=True)
             cmds.connectAttr(outpath, oriCns + ".target[0].targetRotateZ")
             cmds.connectAttr(oriCns + ".constraintRotateZ", ctl + ".rotateZ")
-            cmds.setAttr("{}.rotateZ".format(ctl), lock=True)
+            # cmds.setAttr("{}.rotateZ".format(ctl), lock=True)
 
     # =====================================================
     # ATTRIBUTES
