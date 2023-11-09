@@ -133,6 +133,14 @@ def getFullPath(start, routes=None):
 def getDecomposeMatrixOfAtoB(a, b):
     # type: (pm.PyNode, pm.PyNode) -> pm.nt.DecomposeMatrix
     """Returns matrix of A to B"""
+    mul_node = getMultMatrixOfAtoB(a, b)
+    dm_node = node.createDecomposeMatrixNode(mul_node.attr("matrixSum"))
+    return dm_node
+
+
+def getMultMatrixOfAtoB(a, b):
+    # type: (pm.PyNode, pm.PyNode) -> pm.nt.DecomposeMatrix
+    """Returns matrix of A to B"""
     down, _, up = findPathAtoB(a, b)
     mul_node = pm.createNode("multMatrix")
 
@@ -142,8 +150,7 @@ def getDecomposeMatrixOfAtoB(a, b):
     for j, u in enumerate(up[:-1]):
         u.attr("inverseMatrix") >> mul_node.attr("matrixIn[{}]".format(i + j + 1))
 
-    dm_node = node.createDecomposeMatrixNode(mul_node.attr("matrixSum"))
-    return dm_node
+    return mul_node
 
 
 def findPathAtoB(a, b):
