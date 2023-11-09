@@ -16,6 +16,9 @@ import maya.OpenMaya as om
 import maya.api.OpenMaya as om2
 
 from mgear.core import applyop
+from mgear.core.transform import (
+    getTransform,
+)
 
 if sys.version_info > (3, 0):
     from typing import TYPE_CHECKING
@@ -58,11 +61,11 @@ def addCnsCurve(parent, name, centers, degree=1, m=datatypes.Matrix(), close=Fal
             centers.insert(0, centers[0])
             centers.append(centers[-1])
         elif len(centers) == 3:
-            centers.append(centers[-1])
+            centers.insert(1, centers[1])
 
     points = [datatypes.Vector() for center in centers]
 
-    node = addCurve(parent, name, points, False, degree, m=m, close=close)
+    node = addCurve(parent, name, points, degree=degree, m=m, close=close)
 
     applyop.gear_curvecns_op(node, centers)
 
@@ -215,7 +218,7 @@ def createCurveFromEdges(edgeList,
     return crv
 
 
-def createCurveFromCurve(srcCrv, name, nbPoints, parent=None, m=datatypes.Matrix(), close=False):
+def createCurveFromCurve(srcCrv, name, nbPoints, parent=None, m=datatypes.Matrix(), close=False, space=om2.MSpace.kWorld):
     # type: (Union[str, pm.PyNode], str, int, Union[str, pm.PyNode, None], datatypes.Matrix, bool) -> pm.PyNode
     """Create a curve from a curve
 
@@ -245,7 +248,7 @@ def createCurveFromCurve(srcCrv, name, nbPoints, parent=None, m=datatypes.Matrix
         increment = paramLength / nbPoints
 
     p = paramStart
-    # if curve is close, we need to find start param to be offseted to find nearest point to 0
+    # if curve is close, we need to find start param to be offset to find nearest point to 0
     if close:
         retry = 0
         tolerance = 0.0001
@@ -258,17 +261,21 @@ def createCurveFromCurve(srcCrv, name, nbPoints, parent=None, m=datatypes.Matrix
             retry += 1
             tolerance += length / 10000.0
 
-    positions = []
-    for x in range(nbPoints):
-        # we need to check that the positions value never exceed the paramEnd
-        if p > paramEnd:
-            p -= paramLength
+    if close:
+        p = p
+    else:
+        p = paramStart
 
-        point = sc.getPointAtParam(p, space=om2.MSpace.kWorld)
+    positions = []
+
+    for x in range(nbPoints):
+        point = sc.getPointAtParam(p, space=space)
         pos = (point[0], point[1], point[2])
         positions.append(pos)
 
         p += increment
+        if p > paramEnd:
+            p -= paramLength
 
     crv = addCurve(parent, name, positions, close=close, degree=3, m=m)
     return crv
@@ -306,6 +313,41 @@ def getCurveParamAtPosition(crv, position):
     param = paramUtill.getDouble(paramPtr)
 
     return param, length
+
+
+def getCurveParamByRatio(crv, ratio):
+    """Get curve parameter from a ratio
+
+    Arguments:
+        crv (curve): The  source curve to get the parameter.
+        ratio (float): Ratio on the curve
+
+    Returns:
+        list: paramenter and curve length
+    """
+
+    sc = getMFnNurbsCurve(crv.name())
+    length = sc.length()
+    paramStart = sc.findParamFromLength(0.0)
+    paramEnd = sc.findParamFromLength(length)
+    param = (paramEnd - paramStart) * ratio + paramStart
+
+    return param, length
+
+
+def getPositionByRatio(crv, ratio):
+    """Get position on curve from a ratio
+
+    Arguments:
+        crv (curve): The  source curve to get the parameter.
+        ratio (float): Ratio on the curve
+
+    Returns:
+        float: position
+    """
+    param, length = getCurveParamByRatio(crv, ratio)
+    point = crv.getShape().getPointAtParam(param, space='world')
+    return point
 
 
 def findLenghtFromParam(crv, param, close=False):
@@ -864,7 +906,8 @@ def applyPathCnsLocal(target, curve, u, maintainOffset=True):
 
     if maintainOffset:
         tmp_output = mul_node.attr("matrixSum").get()
-        offset_matrix = datatypes.Matrix(tmp_output).inverse() * prev_matrix.inverse()
+        # offset_matrix = datatypes.Matrix(tmp_output).inverse() * prev_matrix.inverse()
+        offset_matrix = prev_matrix * datatypes.Matrix(tmp_output).inverse()
         offset_node = pm.createNode("fourByFourMatrix")
         offset_node.attr("in00").set(offset_matrix[0][0])
         offset_node.attr("in01").set(offset_matrix[0][1])
@@ -909,10 +952,13 @@ def applyPathConstrainLocal(target, src_curve):
         u_length = findLenghtFromParam(src_curve, param)
         u_param = u_length / length
 
-        applyPathCnsLocal(target, src_curve, u_param)
+        cns = applyPathCnsLocal(target, src_curve, u_param)
     except:
         import traceback as tb
         tb.print_exc()
+        raise
+
+    return cns
 
 
 def curvecns_op(crv, inputs=[]):
@@ -988,3 +1034,89 @@ def gear_curvecns_op_local(crv, inputs=[]):
         pm.connectAttr(mul + ".matrixSum", node + ".inputs[%s]" % i)
 
     return node
+
+
+def createCurveOnSurfaceFromCurve(crv, surface, name):
+    import ymt_shifter_utility
+    nbPoints = crv.numEPs()
+    close = crv.form() == 3
+
+    t = getTransform(crv)
+    targetCrv = createCurveFromCurve(
+        crv.fullPath(),
+        name,
+        nbPoints=nbPoints,
+        close=close,
+        parent=crv.getParent(),
+        m=t
+    )
+
+    localMat = ymt_shifter_utility.getMultMatrixOfAtoB(crv, surface)
+    invLocal = pm.createNode("inverseMatrix")
+    pm.connectAttr(localMat + ".matrixSum", invLocal + ".inputMatrix")
+
+    for pointNumber in range(nbPoints):
+        compMat = pm.createNode("composeMatrix")
+        pm.connectAttr(
+            crv + ".editPoints[%s]" % pointNumber,
+            compMat + ".inputTranslate"
+        )
+
+        # Mult matrix, change curve point position to surface local space
+        multMat = pm.createNode("multMatrix")
+        pm.connectAttr(
+            compMat + ".outputMatrix",
+            multMat + ".matrixIn[1]"
+        )
+        pm.connectAttr(
+            localMat + ".matrixSum",
+            multMat + ".matrixIn[0]"
+        )
+
+        decomposeMat = pm.createNode("decomposeMatrix")
+        pm.connectAttr(
+            multMat + ".matrixSum",
+            decomposeMat + ".inputMatrix"
+        )
+
+        # Closest point on surface in local space
+        closestPoint = pm.createNode("closestPointOnSurface")
+        pm.connectAttr(
+            decomposeMat + ".outputTranslate",
+            closestPoint + ".inPosition"
+        )
+
+        pm.connectAttr(
+            surface + ".local",
+            closestPoint + ".inputSurface"
+        )
+
+        # apply inverse matrix to get the position in curve local space
+        multMat2 = pm.createNode("multMatrix")
+        compMat2 = pm.createNode("composeMatrix")
+        decomposeMat2 = pm.createNode("decomposeMatrix")
+
+        pm.connectAttr(
+            closestPoint + ".position",
+            compMat2 + ".inputTranslate"
+        )
+        pm.connectAttr(
+            invLocal + ".outputMatrix",
+            multMat2 + ".matrixIn[0]"
+        )
+        pm.connectAttr(
+            compMat2 + ".outputMatrix",
+            multMat2 + ".matrixIn[1]"
+        )
+        pm.connectAttr(
+            multMat2 + ".matrixSum",
+            decomposeMat2 + ".inputMatrix"
+        )
+
+        # Apply to curve
+        pm.connectAttr(
+            decomposeMat2 + ".outputTranslate",
+            targetCrv + ".controlPoints[%s]" % pointNumber
+        )
+
+    return targetCrv

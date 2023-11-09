@@ -43,14 +43,15 @@ class CustomShifterStep(cstp.customShifterMainStep):
         # type: () -> None
 
         cmds.select(self.deformers)
-        self.skin = cmds.skinCluster(
+        skin = self.skin = cmds.skinCluster(
             self.deformers,
             self.surfaces,
             toSelectedBones=True,
             # skinMethod=1,
             bindMethod=1,
             smoothWeights=0.5,
-        )
+        )[0]
 
+        cmds.setAttr("{}.relativeSpaceMode".format(skin), 1)  # local skinning
 
         # cmds.deformer(type="deltaMush")
