@@ -42,7 +42,7 @@ if sys.version_info > (3, 0):
 #############################################
 
 
-def addCnsCurve(parent, name, centers, degree=1, m=datatypes.Matrix(), close=False):
+def addCnsCurve(parent, name, centers, degree=1, m=datatypes.Matrix(), close=False, local=False):
     """Create a curve attached to given centers. One point per center
 
     Arguments:
@@ -63,11 +63,18 @@ def addCnsCurve(parent, name, centers, degree=1, m=datatypes.Matrix(), close=Fal
         elif len(centers) == 3:
             centers.insert(1, centers[1])
 
+    for c in centers:
+        if isinstance(c, str):
+            c = pm.PyNode(c)
+
     points = [datatypes.Vector() for center in centers]
 
     node = addCurve(parent, name, points, degree=degree, m=m, close=close)
 
-    applyop.gear_curvecns_op(node, centers)
+    if local:
+        gear_curvecns_op_local(node, centers)
+    else:
+        applyop.gear_curvecns_op(node, centers)
 
     return node
 
@@ -1020,18 +1027,32 @@ def gear_curvecns_op_local(crv, inputs=[]):
     )
 
     for i, item in enumerate(inputs):
-        mul = pm.createNode("multMatrix")
-        comp = pm.createNode("composeMatrix")
-        decomp = ymt_shifter_utility.getDecomposeMatrixOfAtoB(item.getParent(), crv)
-        pm.connectAttr(decomp + ".outputTranslate", comp + ".inputTranslate")
-        pm.connectAttr(decomp + ".outputRotate", comp + ".inputRotate")
-        pm.connectAttr(decomp + ".outputScale", comp + ".inputScale")
-        comp2 = pm.createNode("composeMatrix")
-        pm.connectAttr(item + ".translate", comp2 + ".inputTranslate")
+        localMat = ymt_shifter_utility.getMultMatrixOfAtoB(item, crv, skip_last=False)
+        pm.connectAttr(localMat + ".matrixSum", node + ".inputs[%s]" % i)
 
-        pm.connectAttr(comp + ".outputMatrix", mul + ".matrixIn[1]")
-        pm.connectAttr(comp2 + ".outputMatrix", mul + ".matrixIn[0]")
-        pm.connectAttr(mul + ".matrixSum", node + ".inputs[%s]" % i)
+    return node
+
+
+def gear_curvecns_op_local_skip_rotate(crv, inputs=[]):
+    """."""
+
+    node = gear_curvecns_op_local(crv, inputs)
+    for mult in node.attr("inputs").inputs():
+        ctl = mult.attr("matrixIn").inputs()[0]
+        pm.disconnectAttr(
+            ctl + ".matrix",
+            mult + ".matrixIn[0]"
+        )
+
+        compMat = pm.createNode("composeMatrix")
+        pm.connectAttr(
+            ctl + ".translate",
+            compMat + ".inputTranslate"
+        )
+        pm.connectAttr(
+            compMat + ".outputMatrix",
+            mult + ".matrixIn[0]"
+        )
 
     return node
 
@@ -1051,7 +1072,7 @@ def createCurveOnSurfaceFromCurve(crv, surface, name):
         m=t
     )
 
-    localMat = ymt_shifter_utility.getMultMatrixOfAtoB(crv, surface)
+    localMat = ymt_shifter_utility.getMultMatrixOfAtoB(crv, surface, skip_last=True)
     invLocal = pm.createNode("inverseMatrix")
     pm.connectAttr(localMat + ".matrixSum", invLocal + ".inputMatrix")
 
@@ -1101,11 +1122,11 @@ def createCurveOnSurfaceFromCurve(crv, surface, name):
             compMat2 + ".inputTranslate"
         )
         pm.connectAttr(
-            invLocal + ".outputMatrix",
+            compMat2 + ".outputMatrix",
             multMat2 + ".matrixIn[0]"
         )
         pm.connectAttr(
-            compMat2 + ".outputMatrix",
+            invLocal + ".outputMatrix",
             multMat2 + ".matrixIn[1]"
         )
         pm.connectAttr(
@@ -1120,3 +1141,25 @@ def createCurveOnSurfaceFromCurve(crv, surface, name):
         )
 
     return targetCrv
+
+
+def gear_curvecns_op(crv, inputs=[]):
+    """
+    create mGear curvecns node.
+
+    Arguments:
+        crv (nurbsCurve): Nurbs curve.
+        inputs (List of dagNodes): Input object to drive the curve. Should be
+            same number as crv points.
+            Also the order should be the same as the points
+
+    Returns:
+        pyNode: The curvecns node.
+    """
+    pm.select(crv)
+    node = pm.deformer(type="mgear_curveCns")[0]
+
+    for i, item in enumerate(inputs):
+        pm.connectAttr(item + ".worldMatrix", node + ".inputs[%s]" % i)
+
+    return node

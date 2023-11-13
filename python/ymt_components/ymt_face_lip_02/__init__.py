@@ -454,8 +454,8 @@ class Component(component.Main):
         upvec = self.upUpvs
 
         # Connecting control crvs with controls
-        curve.gear_curvecns_op_local(self.crv_ctl, self.upCtls)
-        curve.gear_curvecns_op_local(self.crv_upv, upvec)
+        curve.gear_curvecns_op_local_skip_rotate(self.crv_ctl, self.upCtls)
+        curve.gear_curvecns_op_local_skip_rotate(self.crv_upv, upvec)
 
         # adding wires
         pm.wire(self.crv, w=self.crv_ctl, dropoffDistance=[0, self.size * 10])
@@ -579,7 +579,7 @@ class Component(component.Main):
             crvShape = crv.getShape().fullPath()
 
             ctl = ctls[i]
-            dm_node = ymt_util.getDecomposeMatrixOfAtoB(ctl, crv)
+            dm_node = ymt_util.getDecomposeMatrixOfAtoB(ctl, crv, skip_last=True)
 
             point = cmds.createNode("nearestPointOnCurve")
             cmds.connectAttr(dm_node + ".outputTranslate", point + ".inPosition")
@@ -937,9 +937,9 @@ def ghostSliderForMouth(ghostControls, intTra, surface, sliderParent):
                 pass
 
     def connCenter(ctl, driver, ghost):
-        dm_node = ymt_util.getDecomposeMatrixOfAtoB(ctl, driver)
+        dm_node = ymt_util.getDecomposeMatrixOfAtoB(ctl, driver, skip_last=True)
 
-        for attr in ["translate", "scale", "rotate"]:
+        for attr in ["translate", "scale"]:
             pm.connectAttr("{}.output{}".format(dm_node, attr.capitalize()), "{}.{}".format(driver, attr))
             pm.disconnectAttr("{}.{}".format(ctl, attr), "{}.{}".format(ghost, attr))
 
@@ -974,7 +974,7 @@ def ghostSliderForMouth(ghostControls, intTra, surface, sliderParent):
             dm_node = node.createDecomposeMatrixNode(gDriver.attr("matrix"))
 
         else:
-            dm_node = ymt_util.getDecomposeMatrixOfAtoB(ctl, slider)
+            dm_node = ymt_util.getDecomposeMatrixOfAtoB(ctl, slider, skip_last=True)
 
         cps_node = pm.createNode("closestPointOnSurface")
         dm_node.attr("outputTranslate") >> cps_node.attr("inPosition")

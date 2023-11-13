@@ -2,6 +2,7 @@
 import re
 import math
 import sys
+import contextlib
 
 from pymel.core import (
     datatypes,
@@ -103,10 +104,10 @@ def hide():
 
 def setKeyableAttributesDontLockVisibility(nodes, params=None):
 
-    if not params:
-        params = ["tx", "ty", "tz",
-                  "ro", "rx", "ry", "rz",
-                  "sx", "sy", "sz"]
+    # if not params:
+    #     params = ["tx", "ty", "tz",
+    #               "ro", "rx", "ry", "rz",
+    #               "sx", "sy", "sz"]
 
     attribute.setKeyableAttributes(nodes, params)
 
@@ -130,16 +131,16 @@ def getFullPath(start, routes=None):
     return getFullPath(start.getParent(), routes + [start, ])
 
 
-def getDecomposeMatrixOfAtoB(a, b):
-    # type: (pm.PyNode, pm.PyNode) -> pm.nt.DecomposeMatrix
+def getDecomposeMatrixOfAtoB(a, b, skip_last=False):
+    # type: (pm.PyNode, pm.PyNode, bool) -> pm.nt.DecomposeMatrix
     """Returns matrix of A to B"""
-    mul_node = getMultMatrixOfAtoB(a, b)
+    mul_node = getMultMatrixOfAtoB(a, b, skip_last=skip_last)
     dm_node = node.createDecomposeMatrixNode(mul_node.attr("matrixSum"))
     return dm_node
 
 
-def getMultMatrixOfAtoB(a, b):
-    # type: (pm.PyNode, pm.PyNode) -> pm.nt.DecomposeMatrix
+def getMultMatrixOfAtoB(a, b, skip_last=False):
+    # type: (pm.PyNode, pm.PyNode, bool) -> pm.nt.DecomposeMatrix
     """Returns matrix of A to B"""
     down, _, up = findPathAtoB(a, b)
     mul_node = pm.createNode("multMatrix")
@@ -147,7 +148,9 @@ def getMultMatrixOfAtoB(a, b):
     for i, d in enumerate(down):
         d.attr("matrix") >> mul_node.attr("matrixIn[{}]".format(i))
 
-    for j, u in enumerate(up[:-1]):
+    if skip_last:
+        up = up[:-1]
+    for j, u in enumerate(up):
         u.attr("inverseMatrix") >> mul_node.attr("matrixIn[{}]".format(i + j + 1))
 
     return mul_node
@@ -1245,3 +1248,24 @@ def get_normalized_vector_node_from_attribute_path(attr_path):
     cmds.connectAttr(power + ".outputX", div + ".input2.input2Z")
 
     return div + ".output"
+
+
+@contextlib.contextmanager
+def unlockAttribute(node, attrs=None):
+    # type: (Text, List[Text]|None) -> Generator[None, None, None]
+    """Temporarily unlock given attributes of given node.
+
+    store original lock state and restore it after function call"""
+
+    current_lock_state = {}
+    if attrs is None:
+        attrs = cmds.listAttr(node, locked=True)
+
+    for attr in attrs:
+        current_lock_state[attr] = cmds.getAttr(node + "." + attr, lock=True)
+        cmds.setAttr(node + "." + attr, lock=False)
+
+    yield
+
+    for attr, lock_state in current_lock_state.items():
+        cmds.setAttr(node + "." + attr, lock=lock_state)

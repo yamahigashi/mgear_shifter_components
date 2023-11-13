@@ -921,7 +921,7 @@ def ghostSliderForMouth(ghostControls, intTra, surface, sliderParent):
                 pass
 
     def connCenter(ctl, driver, ghost):
-        dm_node = ymt_util.getDecomposeMatrixOfAtoB(ctl, driver)
+        dm_node = ymt_util.getDecomposeMatrixOfAtoB(ctl, driver, skip_last=True)
 
         for attr in ["translate", "scale", "rotate"]:
             pm.connectAttr("{}.output{}".format(dm_node, attr.capitalize()), "{}.{}".format(driver, attr))
@@ -958,7 +958,7 @@ def ghostSliderForMouth(ghostControls, intTra, surface, sliderParent):
             dm_node = node.createDecomposeMatrixNode(gDriver.attr("matrix"))
 
         else:
-            dm_node = ymt_util.getDecomposeMatrixOfAtoB(ctl, slider)
+            dm_node = ymt_util.getDecomposeMatrixOfAtoB(ctl, slider, skip_last=True)
 
         cps_node = pm.createNode("closestPointOnSurface")
         dm_node.attr("outputTranslate") >> cps_node.attr("inPosition")
