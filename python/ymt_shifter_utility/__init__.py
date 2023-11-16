@@ -108,6 +108,8 @@ def setKeyableAttributesDontLockVisibility(nodes, params=None):
     #     params = ["tx", "ty", "tz",
     #               "ro", "rx", "ry", "rz",
     #               "sx", "sy", "sz"]
+    if not params:
+        params = []
 
     attribute.setKeyableAttributes(nodes, params)
 
@@ -1259,7 +1261,7 @@ def unlockAttribute(node, attrs=None):
 
     current_lock_state = {}
     if attrs is None:
-        attrs = cmds.listAttr(node, locked=True)
+        attrs = cmds.listAttr(node, locked=True) or []
 
     for attr in attrs:
         current_lock_state[attr] = cmds.getAttr(node + "." + attr, lock=True)

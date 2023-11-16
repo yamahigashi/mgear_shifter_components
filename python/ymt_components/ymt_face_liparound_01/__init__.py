@@ -330,116 +330,120 @@ class Component(component.Main):
 
             # sub component name
             if i == 0: 
-                sub_comp = "C0"
+                oSide = "C"
+                _index = 0
 
             elif i == self.bottom_index: 
-                sub_comp = "C1"
+                oSide = "C"
+                _index = 1
 
             elif not mirror:
+                oSide = "L"
                 if i <= self.left_index:
-                    sub_comp = "L" + str(i - 1)
+                    _index = i - 1
                 else:
-                    sub_comp = "L" + str(self.bottom_index - i + self.left_index - 1)
+                    _index = (self.bottom_index - i + self.left_index - 1)
 
             else:
                 tmp = self.num_locs - self.right_index
+                oSide = "R"
                 if i < self.right_index:
-                    sub_comp = "R" + str(i - self.bottom_index + tmp - 1)
+                    _index = (i - self.bottom_index + tmp - 1)
                 else:
-                    sub_comp = "R" + str(tmp - i + self.right_index - 1)
+                    _index = (tmp - i + self.right_index - 1)
 
-            cvOS = cvsObject[i]
-            # cvOSoffset = [cvOS[0], cvOS[1], cvOS[2] + self.FRONT_OFFSET]
+            with ymt_util.overrideNamingAttributeTemporary(self, side=oSide):
+                cvOS = cvsObject[i]
+                # cvOSoffset = [cvOS[0], cvOS[1], cvOS[2] + self.FRONT_OFFSET]
 
-            # upv = addTransform(rope_root, self.getName("rope_{}_upv".format(sub_comp)))
-            cns = addTransform(rope_root, self.getName("rope_{}_cns".format(sub_comp)))
-            # applyPathCnsLocal(upv, self.crv_upv, rope_upv, cvOSoffset)
-            applyPathCnsLocal(cns, self.crv_ctl, rope, cvOS)
+                # upv = addTransform(rope_root, self.getName("rope_{}_upv".format(sub_comp)))
+                cns = addTransform(rope_root, self.getName("rope_{}_cns".format(_index)))
+                # applyPathCnsLocal(upv, self.crv_upv, rope_upv, cvOSoffset)
+                applyPathCnsLocal(cns, self.crv_ctl, rope, cvOS)
 
-            m = getTransform(cns)
-            x = datatypes.Vector(m[0][0], m[0][1], m[0][2])
-            y = datatypes.Vector(m[1][0], m[1][1], m[1][2])
-            z = datatypes.Vector(m[2][0], m[2][1], m[2][2])
-            rot = [x, y, z]
-            xform = setMatrixPosition(t, self.locsPos[i])
-            xform = setMatrixRotation(xform, rot)
-            offset = datatypes.EulerRotation((90.0, 0, 0), unit="degrees")
-            xform = offset.asMatrix() * xform
+                m = getTransform(cns)
+                x = datatypes.Vector(m[0][0], m[0][1], m[0][2])
+                y = datatypes.Vector(m[1][0], m[1][1], m[1][2])
+                z = datatypes.Vector(m[2][0], m[2][1], m[2][2])
+                rot = [x, y, z]
+                xform = setMatrixPosition(t, self.locsPos[i])
+                xform = setMatrixRotation(xform, rot)
+                offset = datatypes.EulerRotation((90.0, 0, 0), unit="degrees")
+                xform = offset.asMatrix() * xform
 
-            if mirror:
-                if lower:
-                    xform = setMatrixScale(xform, scl=[1, -1, -1])
+                if mirror:
+                    if lower:
+                        xform = setMatrixScale(xform, scl=[1, -1, -1])
+                    else:
+                        xform = setMatrixScale(xform, scl=[-1, 1, 1])
+
+                    # aimVec = (0, 0, -1)
                 else:
-                    xform = setMatrixScale(xform, scl=[-1, 1, 1])
+                    if lower:
+                        xform = setMatrixScale(xform, scl=[-1, -1, -1])
+                    else:
+                        xform = setMatrixScale(xform, scl=[1, 1, 1])
+                    # aimVec = (0, 0, 1)
 
-                # aimVec = (0, 0, -1)
-            else:
-                if lower:
-                    xform = setMatrixScale(xform, scl=[-1, -1, -1])
-                else:
-                    xform = setMatrixScale(xform, scl=[1, 1, 1])
-                # aimVec = (0, 0, 1)
+                if i == self.left_index:
+                    prev = getTransform(controls[i-1]).rotate
+                    # xform = setMatrixRotation(xform, prev)
+                if i == self.right_index + 1:
+                    rightCtl = controls[self.right_index]
+                    rightNpo = rightCtl.getParent()
+                    pos = cmds.xform(rightNpo.fullPath(), q=True, ws=True, translation=True)
+                    pm.xform(rightNpo, ws=True, matrix=xform)
+                    pm.xform(rightNpo, ws=True, translation=pos)
 
-            if i == self.left_index:
-                prev = getTransform(controls[i-1]).rotate
-                # xform = setMatrixRotation(xform, prev)
-            if i == self.right_index + 1:
-                rightCtl = controls[self.right_index]
-                rightNpo = rightCtl.getParent()
-                pos = cmds.xform(rightNpo.fullPath(), q=True, ws=True, translation=True)
-                pm.xform(rightNpo, ws=True, matrix=xform)
-                pm.xform(rightNpo, ws=True, translation=pos)
+                npo_name = self.getName("rope_{}_jnt_npo".format(_index))
+                npo = addTransform(cns, npo_name, xform)
+                # aim = addTransform(upv, self.getName("rope_{}_jnt_aim".format(sub_comp)), xform)
+                # cmds.setAttr("{}.translateX".format(aim), cmds.getAttr("{}.translateX".format(npo)))
+                # cmds.setAttr("{}.translateY".format(aim), cmds.getAttr("{}.translateY".format(npo)))
+                # cmds.setAttr("{}.translateZ".format(aim), cmds.getAttr("{}.translateZ".format(npo)))
 
-            npo_name = self.getName("rope_{}_jnt_npo".format(sub_comp))
-            npo = addTransform(cns, npo_name, xform)
-            # aim = addTransform(upv, self.getName("rope_{}_jnt_aim".format(sub_comp)), xform)
-            # cmds.setAttr("{}.translateX".format(aim), cmds.getAttr("{}.translateX".format(npo)))
-            # cmds.setAttr("{}.translateY".format(aim), cmds.getAttr("{}.translateY".format(npo)))
-            # cmds.setAttr("{}.translateZ".format(aim), cmds.getAttr("{}.translateZ".format(npo)))
+                # aimCns = cmds.aimConstraint(
+                #     aim.name(),
+                #     npo.name(),
+                #     aimVector=aimVec,
+                #     # upVector=(0, 1, 0),
+                #     worldUpType="None",
+                #     # worldUpObject=self.root.name()
+                # )
+                # cmds.delete(aimCns)
+                # 
+                # if lower:
+                #     npo.rotateBy((0, 0, 180))
+                # 
+                # aimCns = pm.aimConstraint(
+                #     aim,
+                #     npo,
+                #     aimVector=(0, 0, 1),
+                #     upVector=(0, 1, 0),
+                #     worldUpType="None",
+                #     # worldUpObject=self.root,
+                #     maintainOffset=True
+                # )
+     
+                t = getTransform(npo)
+                ctl = self.addCtl(
+                    npo,
+                    "%s_crvdetail" % _index,
+                    t,
+                    color,
+                    icon_shape,
+                    w=wd,
+                    d=wd,
+                    ro=datatypes.Vector(1.57079633, 0, 0),
+                    po=po
+                )
 
-            # aimCns = cmds.aimConstraint(
-            #     aim.name(),
-            #     npo.name(),
-            #     aimVector=aimVec,
-            #     # upVector=(0, 1, 0),
-            #     worldUpType="None",
-            #     # worldUpObject=self.root.name()
-            # )
-            # cmds.delete(aimCns)
-            # 
-            # if lower:
-            #     npo.rotateBy((0, 0, 180))
-            # 
-            # aimCns = pm.aimConstraint(
-            #     aim,
-            #     npo,
-            #     aimVector=(0, 0, 1),
-            #     upVector=(0, 1, 0),
-            #     worldUpType="None",
-            #     # worldUpObject=self.root,
-            #     maintainOffset=True
-            # )
+                controls.append(ctl)
 
-            t = getTransform(npo)
-            ctl_name = self.getName("%s_crvdetail_%s" % (sub_comp, self.ctlName))
-            ctl = self.addCtl(
-                npo,
-                ctl_name,
-                t,
-                color,
-                icon_shape,
-                w=wd,
-                d=wd,
-                ro=datatypes.Vector(1.57079633, 0, 0),
-                po=po
-            )
-
-            controls.append(ctl)
-
-            # getting joint parent
-            # jnt = rigbits.addJnt(npo, noReplace=True, parent=self.j_parent)
-            self.jnt_pos.append([ctl, "{}".format(i)])
-            self.addToSubGroup(ctl, self.detailControllersGroupName)
+                # getting joint parent
+                # jnt = rigbits.addJnt(npo, noReplace=True, parent=self.j_parent)
+                self.jnt_pos.append([ctl, "{}".format(i)])
+                self.addToSubGroup(ctl, self.detailControllersGroupName)
 
         return controls
 
@@ -589,8 +593,8 @@ class Component(component.Main):
 
         for i, cv in enumerate(cvs):
 
-            mirror = i > self.num_locs / 2
-            lower = i > self.left_index and i < self.right_index
+            mirror = i > (len(cvs) / 2)
+            lower = i > 2 and i < 6
 
             oName  = option[i][0]
             oSide  = option[i][1]
@@ -601,34 +605,37 @@ class Component(component.Main):
 
             scl = [1, 1, 1]
             if mirror:
-                scl[1] = -1
-                scl[2] = -1
-            if lower:
                 scl[0] = -1
+            if lower:
+                scl[1] = -1
 
             t = transform.getTransformFromPos(cv)
             t = transform.setMatrixScale(t, scl)
 
-            npo = addTransform(self.ctl_root, self.getName("%s_npo" % oName, oSide), t)
-            npos.append(npo)
+            with ymt_util.overrideNamingAttributeTemporary(self, side=oSide):
+                name = self.getName(oName + "_npo")
+                npo = addTransform(self.ctl_root, name, t)
+                npos.append(npo)
 
-            ctl = self.addCtl(
-                npo,
-                self.getName("{}_{}".format(oName, self.ctlName), oSide),
-                t,
-                color,
-                o_icon,
-                w=wd * distSize,
-                d=wd * distSize,
-                ro=datatypes.Vector(1.57079633, 0, 0),
-                po=datatypes.Vector(0, 0, .07 * distSize),
-            )
+                name = self.getName(oName, side=oSide, ext=self.ctlName)
+                ctl = self.addCtl(
+                    npo,
+                    oName,
+                    t,
+                    color,
+                    o_icon,
+                    w=wd * distSize,
+                    d=wd * distSize,
+                    ro=datatypes.Vector(1.57079633, 0, 0),
+                    po=datatypes.Vector(0, 0, .07 * distSize),
+                )
 
             ctls.append(ctl)
 
             ymt_util.setKeyableAttributesDontLockVisibility(ctl, params + oPar)
 
-            upv = addTransform(ctl, self.getName("%s_upv" % oName, oSide), t)
+            name = self.getName(oName, side=oSide, ext="upv")
+            upv = addTransform(ctl, name, t)
             upv.attr("tz").set(self.FRONT_OFFSET)
             upvs.append(upv)
             self.addToSubGroup(ctl, self.primaryControllersGroupName)
@@ -697,26 +704,24 @@ class Component(component.Main):
         if self.cheekLeftRef:
             query = self.cheekLeftRef.replace("_root", "_ctl")
             outer_l_ref = self.rig.findRelative(query)
-            print(f"query: {query}, outer_l_ref: {outer_l_ref}")
 
             if not outer_l_ref:
                 query = self.cheekLeftRef
                 outer_l_ref = outer_l_ref.replace(query)
 
         else:
-            outer_l_ref = self.rig.findRelative("mouthOuter_L0_root")
+            outer_l_ref = self.root
 
         if self.cheekRightRef:
             query = self.cheekRightRef.replace("_root", "_ctl")
             outer_r_ref = self.rig.findRelative(query)
-            print(f"query: {query}, outer_r_ref: {outer_r_ref}")
 
             if not outer_r_ref:
                 query = self.cheekRightRef
                 outer_r_ref = outer_r_ref.replace(query)
 
         else:
-            outer_r_ref = self.rig.findRelative("mouthOuter_R0_root")
+            outer_r_ref = self.root
 
         jaw_ctl_ref = self.rig.findRelative("mouth_C0_jaw")
 
@@ -731,8 +736,8 @@ class Component(component.Main):
         liplow_ref = self.parent_comp.liplow_ctl
 
         int_c = rigbits.createInterpolateTransform([jaw_ctl_ref, liplow_ref])
-        int_l = rigbits.createInterpolateTransform([outer_l_ref, corner_l_ref])
-        int_r = rigbits.createInterpolateTransform([outer_r_ref, corner_r_ref])
+        int_l = rigbits.createInterpolateTransform([outer_l_ref, corner_l_ref], blend=0.8)
+        int_r = rigbits.createInterpolateTransform([outer_r_ref, corner_r_ref], blend=0.8)
         pm.rename(int_c, int_c.name() + "_int")
         pm.rename(int_l, int_l.name() + "_int")
         pm.rename(int_r, int_r.name() + "_int")
