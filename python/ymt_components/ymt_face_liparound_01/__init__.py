@@ -695,12 +695,26 @@ class Component(component.Main):
         corner_r_ref = self.rig.findRelative("mouthCorner_R0_root")
 
         if self.cheekLeftRef:
-            outer_l_ref = self.rig.findRelative(self.cheekLeftRef)
+            query = self.cheekLeftRef.replace("_root", "_ctl")
+            outer_l_ref = self.rig.findRelative(query)
+            print(f"query: {query}, outer_l_ref: {outer_l_ref}")
+
+            if not outer_l_ref:
+                query = self.cheekLeftRef
+                outer_l_ref = outer_l_ref.replace(query)
+
         else:
             outer_l_ref = self.rig.findRelative("mouthOuter_L0_root")
 
         if self.cheekRightRef:
-            outer_r_ref = self.rig.findRelative(self.cheekRightRef)
+            query = self.cheekRightRef.replace("_root", "_ctl")
+            outer_r_ref = self.rig.findRelative(query)
+            print(f"query: {query}, outer_r_ref: {outer_r_ref}")
+
+            if not outer_r_ref:
+                query = self.cheekRightRef
+                outer_r_ref = outer_r_ref.replace(query)
+
         else:
             outer_r_ref = self.rig.findRelative("mouthOuter_R0_root")
 
@@ -709,10 +723,8 @@ class Component(component.Main):
         slide_c_comp = self.rig.findComponent("mouthSlide_C0_root")
         corner_l_comp = self.rig.findComponent("mouthCorner_L0_root")
         corner_r_comp = self.rig.findComponent("mouthCorner_R0_root")
-        outer_l_comp = self.rig.findComponent(outer_l_ref.split("|")[-1])
-        outer_r_comp = self.rig.findComponent(outer_r_ref.split("|")[-1])
 
-        if outer_l_comp is None or outer_r_comp is None:
+        if outer_l_ref is None or outer_r_ref is None:
             logger.error("No outer mouth component found: mouthOuter_L0_root or mouthOuter_R0_root")
             raise Exception("No outer mouth component found: mouthOuter_L0_root or mouthOuter_R0_root")
             
@@ -1049,7 +1061,8 @@ def createGhostWithParentConstraint(ctl, parent=None, connect=True):
                        worldSpace=True)
         pm.parent(newCtl, oTra)
     if connect:
-        pm.parentConstraint(newCtl, ctl, mo=True)
+        with ymt_util.unlockAttribute(ctl.fullPathName()):
+            pm.parentConstraint(newCtl, ctl, mo=True)
         # rigbits.connectLocalTransform([newCtl, ctl])
         rigbits.connectUserDefinedChannels(newCtl, ctl)
     for grp in grps:
@@ -1061,8 +1074,6 @@ def createGhostWithParentConstraint(ctl, parent=None, connect=True):
         pm.delete(shape)
 
     return newCtl, ctl
-
-
 
 
 def applyPathCnsLocal(target, ctl_curve, rope, cv):

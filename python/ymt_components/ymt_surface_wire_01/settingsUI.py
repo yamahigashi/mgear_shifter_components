@@ -153,7 +153,7 @@ class Ui_Form(object):
     def retranslateUi(self, Form):
         Form.setWindowTitle(QCoreApplication.translate("Form", u"Form", None))
         self.groupBox_3.setTitle(QCoreApplication.translate("Form", u"Surface", None))
-        self.isSlidingSurface.setText(QCoreApplication.translate("Form", u"Sliding on Surface", None))
+        self.isSlidingSurface.setText(QCoreApplication.translate("Form", u"Riveting(off) or Sliding(on) on Surface", None))
         self.ikRefArray_groupBox.setTitle("")
         self.surfaceReferenceAdd_pushButton.setText(QCoreApplication.translate("Form", u"<<", None))
         self.surfaceReferenceRemove_pushButton.setText(QCoreApplication.translate("Form", u">>", None))

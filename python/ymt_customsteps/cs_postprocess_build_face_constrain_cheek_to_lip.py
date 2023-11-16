@@ -118,26 +118,6 @@ class CustomShifterStep(cstp.customShifterMainStep):
         self.defaultConfig = [
             {
                 "src": [
-                    "cheek_L2_surface_ctl",
-                    "cheek_L3_surface_ctl",
-                    "lip_C0_lip_L0_corner_ctl",
-                ],
-                "dst": "aroundlip_C0_aroundlip_L0_outer_ctl",
-                "rates": [0.25, 0.25, 1.0],
-                "mode": "addNpo",
-            },
-            {
-                "src": [
-                    "cheek_R2_surface_ctl",
-                    "cheek_R3_surface_ctl",
-                    "lip_C0_lip_R0_corner_ctl",
-                ],
-                "dst": "aroundlip_C0_aroundlip_R0_outer_ctl",
-                "rates": [0.25, 0.25, 1.0],
-                "mode": "addNpo",
-            },
-            {
-                "src": [
                     "nose_C0_ctl",
                     "lip_C0_lip_C0_upper_ctl",
                 ],
@@ -153,38 +133,6 @@ class CustomShifterStep(cstp.customShifterMainStep):
                 "dst": "aroundlip_C0_aroundlip_C0_lowcenter_ctl",
                 "rates": [0.70, 0.30],
                 "mode": "addNpo",
-            },
-            {
-                "src": [
-                    "mouthCorner_L0_ctl_ghost",
-                ],
-                "dst": "cheek_L3_surface_ctl",
-                "rates": [0.62],
-                "mode": "parent",
-            },
-            {
-                "src": [
-                    "mouthCorner_R0_ctl_ghost",
-                ],
-                "dst": "cheek_R3_surface_ctl",
-                "rates": [0.62],
-                "mode": "parent",
-            },
-            {
-                "src": [
-                    "mouthCorner_L0_ctl_ghost",
-                ],
-                "dst": "cheek_L2_surface_ctl",
-                "rates": [0.33],
-                "mode": "parent",
-            },
-            {
-                "src": [
-                    "mouthCorner_R0_ctl_ghost",
-                ],
-                "dst": "cheek_R2_surface_ctl",
-                "rates": [0.33],
-                "mode": "parent",
             },
             {
                 "src": [
@@ -231,7 +179,7 @@ class CustomShifterStep(cstp.customShifterMainStep):
                     "eye_L0_lowEyelid_crvdetail3_ctl",
                     "surfaceWire_L0_ctls",
                 ],
-                "dst": "surfaceWire_L0_source_0_ctl",
+                "dst": "surfaceWire_L0_0_ctl",
                 "rates": [0.5, 0.5],
                 "mode": "self",
             },
@@ -240,7 +188,25 @@ class CustomShifterStep(cstp.customShifterMainStep):
                     "lip_C0_lip_C0_L2_crvdetail_ctl",
                     "aroundlip_C0_aroundlip_C0_L1_crvdetail_ctl",
                 ],
-                "dst": "surfaceWire_L0_source_2_ctl",
+                "dst": "surfaceWire_L0_2_ctl",
+                "rates": [0.5, 0.2],
+                "mode": "self",
+            },
+            {
+                "src": [
+                    "eye_R0_lowEyelid_crvdetail3_ctl",
+                    "surfaceWire_R0_ctls",
+                ],
+                "dst": "surfaceWire_R0_0_ctl",
+                "rates": [0.5, 0.5],
+                "mode": "self",
+            },
+            {
+                "src": [
+                    "lip_C0_lip_C0_R2_crvdetail_ctl",
+                    "aroundlip_C0_aroundlip_C0_R1_crvdetail_ctl",
+                ],
+                "dst": "surfaceWire_R0_2_ctl",
                 "rates": [0.5, 0.2],
                 "mode": "self",
             },
