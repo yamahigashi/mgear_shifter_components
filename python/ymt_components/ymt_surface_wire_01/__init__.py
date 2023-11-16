@@ -179,6 +179,9 @@ class Component(component.Main):
             ro=datatypes.Vector([1.5708, 0, 0]),
             po=datatypes.Vector([0, 0, self.size * 0.33]),
             tp=self.previusTag,
+            d=self.size * 0.1,
+            h=self.size * 0.1,
+            w=self.size * 0.1,
             mirrorConf=self.mirror_conf
         )
 
@@ -247,6 +250,9 @@ class Component(component.Main):
                 ro=datatypes.Vector([1.5708, 0, 0]),
                 po=datatypes.Vector([0, 0, self.size * 0.075]),
                 tp=self.previusTag,
+                d=self.size * 0.1,
+                h=self.size * 0.1,
+                w=self.size * 0.1,
                 mirrorConf=self.mirror_conf
             )
 
@@ -379,19 +385,13 @@ class Component(component.Main):
 
         if self.sourceKeyable:
             surfaceCtl.attr("isCtl").set(True)
+            try:
+                self.groups[self.detailControllersGroupName].remove(surfaceCtl)
+            except:
+                pass
+            self.addToGroup(surfaceCtl, self.primaryControllersGroupName, "controllers")
         else:
             self.removeFromControllerGroup(surfaceCtl)
-
-        # add to group
-        if self.settings["ctlGrp"]:
-            ctlGrp = self.settings["ctlGrp"]
-        else:
-            ctlGrp = "controllers"
-
-        self.addToGroup(surfaceCtl, self.primaryControllersGroupName, "controllers")
-
-        if ctlGrp not in self.groups.keys():
-            self.groups[ctlGrp] = []
 
         self.setRelation()  # MUST re-setRelation, swapped ghost and real controls
         self.ghost_npos.append(npo)

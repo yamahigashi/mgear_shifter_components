@@ -1,40 +1,27 @@
 """mGear shifter components"""
 # pylint: disable=import-error,W0201,C0111,C0112
-import re
-import math
-import functools
-
+import sys
 import maya.cmds as cmds
-import maya.OpenMaya as om1
-import maya.api.OpenMaya as om
 
 import pymel.core as pm
 from pymel.core import datatypes
 
-import exprespy.cmd
 from mgear.shifter import component
 
 from mgear.core import (
     transform,
     # curve,
-    applyop,
-    attribute,
-    icon,
-    fcurve,
-    vector,
-    meshNavigation,
     node,
     primitive,
-    utils,
 )
 from mgear.rigbits import ghost
 
 from mgear.core.transform import (
     getTransform,
-    resetTransform,
+    # resetTransform,
     # getTransformLookingAt,
     # getChainTransform2,
-    setMatrixPosition,
+    # setMatrixPosition,
 )
 
 from mgear.core.primitive import (
@@ -42,30 +29,26 @@ from mgear.core.primitive import (
 )
 
 import ymt_shifter_utility as ymt_util
-import ymt_shifter_utility.curve as curve
 
-if False:  # pylint: disable=using-constant-test, wrong-import-order
-    # For type annotation
-    from typing import (  # NOQA: F401 pylint: disable=unused-import
-        Optional,
-        Dict,
-        List,
-        Tuple,
-        Pattern,
-        Callable,
-        Any,
-        Text,
-        Generator,
-        Union
-    )
-    from pathlib import Path  # NOQA: F401, F811 pylint: disable=unused-import,reimported
-    from types import ModuleType  # NOQA: F401 pylint: disable=unused-import
-    from six.moves import reload_module as reload  # NOQA: F401 pylint: disable=unused-import
-
+if sys.version_info > (3, 0):
+    from typing import TYPE_CHECKING
+    if TYPE_CHECKING:
+        from typing import (
+            Optional,  # noqa: F401
+            Dict,  # noqa: F401
+            List,  # noqa: F401
+            Tuple,  # noqa: F401
+            Pattern,  # noqa: F401
+            Callable,  # noqa: F401
+            Any,  # noqa: F401
+            Text,  # noqa: F401
+            Generator,  # noqa: F401
+            Union  # noqa: F401
+        )
 from logging import (  # noqa:F401 pylint: disable=unused-import, wrong-import-order
     StreamHandler,
     getLogger,
-    WARN,
+    # WARN,
     DEBUG,
     INFO
 )
@@ -112,6 +95,9 @@ class Component(component.Main):
         self.connect_surface_slider = self.settings["isSlidingSurface"]
         self.surfaceKeyable = self.settings["surfaceKeyable"]
         self.sourceKeyable = self.settings["sourceKeyable"]
+        self.icon = "circle"
+        self.icon = "square"
+        self.icon = "sphere"  # TODO: extract to settings
         # --------------------------------------------------------
         self.ik_ctl = []
         self.ik_npo = []
@@ -134,8 +120,11 @@ class Component(component.Main):
             "surface_ctl",
             t,
             self.color_ik,
-            "square",
+            self.icon,
             ro=datatypes.Vector([1.5708, 0, 0]),
+            w=self.size,
+            h=self.size,
+            d=self.size,
         )
         if self.settings["addJoints"]:
             self.jnt_pos = [[self.surfaceCtl , "0"]]
@@ -252,7 +241,7 @@ class Component(component.Main):
 
         # create ghost controls
         self.ghostCtl = ghost.createGhostCtl(self.surfaceCtl, self.slider_root)
-        self.ghostCtl.rename(self.getName("surface_ctl"))
+        # self.ghostCtl.rename(self.getName("surface_ctl"))
 
         if self.settings.get("visHost", False):
             self._visi_off_lock(self.surfaceCtl)
@@ -276,9 +265,10 @@ class Component(component.Main):
         npoName = "_".join(self.ghostCtl.name().split("_")[:-1]) + "_npo"
         npo = pm.PyNode(pm.createNode("transform", n=npoName, p=oParent, ss=True))
         npo.setTransformation(self.ghostCtl.getMatrix())
-        ymt_util.setKeyableAttributesDontLockVisibility(npo, [])
-
-        pm.parent(self.ghostCtl, npo)
+        if self.negate:
+            npo.attr("sz").set(-1)
+        pm.parent(self.ghostCtl, npo, absolute=True)
+        self.ghostCtl.attr("sz").set(1)
 
         slider = primitive.addTransform(
                 self.sliding_surface.getParent(),
@@ -312,7 +302,7 @@ class Component(component.Main):
                             worldUpType="objectrotation",
                             worldUpVector=[0, 1, 0],
                             worldUpObject=self.root)
-        pm.parent(self.ghostCtl.getParent(), slider)
+        pm.parent(self.ghostCtl.getParent(), slider, absolute=True)
         if self.settings["addJoints"]:
             self.jnt_pos = [[self.ghostCtl, "0"]]
 
@@ -340,6 +330,7 @@ class Component(component.Main):
         if ctlGrp not in self.groups.keys():
             self.groups[ctlGrp] = []
 
+        ymt_util.setKeyableAttributesDontLockVisibility(npo, [])
         self.setRelation()  # MUST re-setRelation, swapped ghost and real controls
 
     def connect_rivet(self):
@@ -385,7 +376,7 @@ class Component(component.Main):
         obj.attr("isCtl").set(False)
         pm.deleteAttr(obj.attr("isCtl"))
         ymt_util.setKeyableAttributesDontLockVisibility(obj, [])
-        pm.delete(obj.getShape())
+        pm.delete(pm.listRelatives(obj, shapes=True))
 
 
 if __name__ == "__main__":
