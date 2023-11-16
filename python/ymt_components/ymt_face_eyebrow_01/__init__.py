@@ -687,9 +687,9 @@ class Component(component.Main):
         attrs[2].connect(res2.input2X)
 
         # insert npo
-        npo0 = addNPO(self.mainControls[0])[0]
-        npo1 = addNPO(self.mainControls[2])[0]
-        npo2 = addNPO(self.mainControls[4])[0]
+        npo0 = ymt_util.addNPOPreservingMatrixConnections(self.mainControls[0])[0]
+        npo1 = ymt_util.addNPOPreservingMatrixConnections(self.mainControls[2])[0]
+        npo2 = ymt_util.addNPOPreservingMatrixConnections(self.mainControls[4])[0]
         res0.outputX.connect(npo0.attr(attr))
         res1.outputX.connect(npo1.attr(attr))
         res2.outputX.connect(npo2.attr(attr))
@@ -785,8 +785,7 @@ class Component(component.Main):
             npo = pm.PyNode(pm.createNode("transform", n=npoName, p=oParent, ss=True))
 
             npo.setTransformation(ctlGhost.getMatrix())
-            ymt_util.setKeyableAttributesDontLockVisibility(npo, [])
-            pm.parent(ctlGhost, npo)
+            pm.parent(ctlGhost, npo, absolute=True)
 
             slider = primitive.addTransform(sliderParent, ctl.name() + "_slideDriven", t)
             sliders.append(slider)
@@ -818,9 +817,9 @@ class Component(component.Main):
                                 worldUpType="objectrotation",
                                 worldUpVector=[0, 1, 0],
                                 worldUpObject=gDriver)
-            pm.parent(ctlGhost.getParent(), slider)
-
-            pm.parent(gDriver.getParent(), self.mainControl)
+            pm.parent(ctlGhost.getParent(), slider, absolute=True)
+            pm.parent(gDriver.getParent(), self.mainControl, absolute=True)
+            ymt_util.setKeyableAttributesDontLockVisibility(npo, [])
 
 
 def draw_eye_guide_mesh_plane(points, t):

@@ -1269,3 +1269,103 @@ def unlockAttribute(node, attrs=None):
 
     for attr, lock_state in current_lock_state.items():
         cmds.setAttr(node + "." + attr, lock=lock_state)
+
+
+@contextlib.contextmanager
+def overrideNamingAttributeTemporary(comp, name=None, side=None, index=None):
+    currentName = comp.name
+    currentIndex = comp.index
+    currentSide = comp.side
+
+    if name is not None:
+        comp.name = name
+
+    if side is not None:
+        comp.side = side
+
+    if index is not None:
+        comp.index = index
+
+    yield
+
+    comp.name = currentName
+    comp.index = currentIndex
+    comp.side = currentSide
+
+
+def addNPOPreservingMatrixConnections(ctl):
+    # type: (dt.Transform) -> dt.Transform
+
+    from mgear.rigbits import addNPO
+    newNPO = addNPO(ctl)
+
+    matrix_connections = cmds.listConnections(
+        ctl.fullPathName() + ".matrix",
+        s=False,
+        d=True,
+        plugs=True,
+        connections=True
+    ) or []
+
+    if matrix_connections:
+        multMatrix = cmds.createNode("multMatrix")
+        cmds.connectAttr(
+            ctl.fullPathName() + ".matrix",
+            multMatrix + ".matrixIn[0]"
+        )
+        cmds.connectAttr(
+            newNPO[0].fullPathName() + ".matrix",
+            multMatrix + ".matrixIn[1]"
+        )
+
+        for src, dst in zip(matrix_connections[::2], matrix_connections[1::2]):
+            cmds.connectAttr(multMatrix + ".matrixSum", dst, force=True)
+
+    pos_connections = cmds.listConnections(
+        ctl.fullPathName() + ".t",
+        s=False,
+        d=True,
+        plugs=True,
+        connections=True
+    ) or []
+
+    rot_connections = cmds.listConnections(
+        ctl.fullPathName() + ".r",
+        s=False,
+        d=True,
+        plugs=True,
+        connections=True
+    ) or []
+
+    scl_connections = cmds.listConnections(
+        ctl.fullPathName() + ".s",
+        s=False,
+        d=True,
+        plugs=True,
+        connections=True
+    ) or []
+
+    if pos_connections or rot_connections or scl_connections:
+        multMatrix = cmds.createNode("multMatrix")
+        cmds.connectAttr(
+            ctl.fullPathName() + ".matrix",
+            multMatrix + ".matrixIn[0]"
+        )
+        cmds.connectAttr(
+            newNPO[0].fullPathName() + ".matrix",
+            multMatrix + ".matrixIn[1]"
+        )
+
+        decompMatrix = cmds.createNode("decomposeMatrix")
+        cmds.connectAttr(multMatrix + ".matrixSum", decompMatrix + ".inputMatrix")
+
+        for src, dst in zip(pos_connections[::2], pos_connections[1::2]):
+            cmds.connectAttr(decompMatrix + ".outputTranslate", dst, force=True)
+
+        for src, dst in zip(rot_connections[::2], rot_connections[1::2]):
+            cmds.connectAttr(decompMatrix + ".outputRotate", dst, force=True)
+
+        for src, dst in zip(scl_connections[::2], scl_connections[1::2]):
+            cmds.connectAttr(decompMatrix + ".outputScale", dst, force=True)
+
+    return newNPO
