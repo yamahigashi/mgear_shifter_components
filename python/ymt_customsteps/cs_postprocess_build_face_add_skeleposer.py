@@ -11,6 +11,7 @@ except ImportError:
         "skeleposerEditor not found. Please install it from "
         "https://github.com/azagoruyko/skeleposer"
     )
+import ymt_shifter_utility as ymt_utility
 
 
 class CustomShifterStep(cstp.customShifterMainStep):
@@ -35,7 +36,7 @@ class CustomShifterStep(cstp.customShifterMainStep):
 
         for ctrl in self.get_controllers():
             try:
-                npo = rigbits.addNPO(pm.PyNode(ctrl))[0]  # type: pm.PyNode
+                npo = ymt_util.addNPOPreservingMatrixConnections(pm.PyNode(ctrl))[0]  # type: pm.PyNode
             except RuntimeError:
                 print("addNPO failed for {}".format(ctrl))
                 continue
