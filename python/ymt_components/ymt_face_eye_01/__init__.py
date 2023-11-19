@@ -374,7 +374,7 @@ class Component(component.Main):
             ro = datatypes.Vector(math.pi, 0, 0)
             po = datatypes.Vector(0, 0, radius * -1.0) + self.offset * 0.3
 
-        self.arrow_npo = addTransform(self.root, self.getName("aim_npo"), t_look)
+        self.arrow_npo = addTransform(self.over_ctl, self.getName("aim_npo"), t_look)
         self.arrow_ctl = self.addCtl(
             self.arrow_npo,
             "aim_%s" % self.ctlName,
@@ -935,12 +935,6 @@ class Component(component.Main):
 
         # self.setRelation()  # MUST re-setRelation, swapped ghost and real controls
 
-    def _visi_off_lock(self, node):
-        """Short cuts."""
-        node.visibility.set(False)
-        ymt_util.setKeyableAttributesDontLockVisibility(node, [])
-        cmds.setAttr("{}.visibility".format(node.name()), l=False)
-
     # =====================================================
     # CONNECTOR
     # =====================================================
@@ -950,7 +944,7 @@ class Component(component.Main):
 
     def setRelation(self):
         """Set the relation beetween object from guide to rig"""
-        self.relatives["root"] = self.root
+        self.relatives["root"] = self.over_ctl
 
         for i, ctl in enumerate(self.upDetailControllers):
 

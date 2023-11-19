@@ -19,7 +19,7 @@
      <property name="title">
       <string>Surface</string>
      </property>
-     <layout class="QGridLayout" name="gridLayout_4" rowstretch="0,0,0,0">
+     <layout class="QGridLayout" name="gridLayout_4" rowstretch="0,0">
       <property name="sizeConstraint">
        <enum>QLayout::SetDefaultConstraint</enum>
       </property>
@@ -183,24 +183,218 @@ li.checked::marker { content: &quot;\2612&quot;; }
      <property name="title">
       <string>GroupBox</string>
      </property>
-     <layout class="QHBoxLayout" name="horizontalLayout_2" stretch="0">
+     <layout class="QVBoxLayout" name="verticalLayout_3">
       <item>
-       <layout class="QVBoxLayout" name="verticalLayout_3">
+       <widget class="QCheckBox" name="sourceKeyable_checkBox">
+        <property name="text">
+         <string notr="true">Source control keyable</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QCheckBox" name="overrideNegate_checkBox">
+        <property name="text">
+         <string notr="true">Surface control keyable</string>
+        </property>
+        <property name="checked">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QCheckBox" name="addJoints_checkBox">
+        <property name="text">
+         <string notr="true">Add Joints</string>
+        </property>
+        <property name="checked">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QCheckBox" name="surfaceKeyable_checkBox">
+        <property name="text">
+         <string notr="true">Override Negate Axis Direction For &quot;R&quot; Side</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QGroupBox" name="groupBox_2">
+     <property name="title">
+      <string/>
+     </property>
+     <layout class="QVBoxLayout" name="verticalLayout_2">
+      <item>
+       <layout class="QHBoxLayout" name="horizontalLayout">
         <item>
-         <widget class="QCheckBox" name="overrideNegate_checkBox">
+         <widget class="QLabel" name="ctlNum_label">
           <property name="text">
-           <string notr="true">Override Negate Axis Direction For &quot;R&quot; Side</string>
+           <string>Num Ctl</string>
           </property>
          </widget>
         </item>
         <item>
-         <widget class="QCheckBox" name="addJoints_checkBox">
+         <widget class="QDoubleSpinBox" name="ctlNum_doubleSpinBox">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+          <property name="wrapping">
+           <bool>false</bool>
+          </property>
+          <property name="alignment">
+           <set>Qt::AlignCenter</set>
+          </property>
+          <property name="buttonSymbols">
+           <enum>QAbstractSpinBox::PlusMinus</enum>
+          </property>
+          <property name="decimals">
+           <number>0</number>
+          </property>
+          <property name="minimum">
+           <double>2.000000000000000</double>
+          </property>
+          <property name="maximum">
+           <double>10.000000000000000</double>
+          </property>
+          <property name="value">
+           <double>2.000000000000000</double>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="horizontalLayout_4">
+        <item>
+         <widget class="QLabel" name="ctlSize_label">
           <property name="text">
-           <string notr="true">Add Joints</string>
+           <string>Ctl Size</string>
           </property>
-          <property name="checked">
-           <bool>true</bool>
+         </widget>
+        </item>
+        <item>
+         <widget class="QDoubleSpinBox" name="ctlSize_doubleSpinBox">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
           </property>
+          <property name="wrapping">
+           <bool>false</bool>
+          </property>
+          <property name="alignment">
+           <set>Qt::AlignCenter</set>
+          </property>
+          <property name="buttonSymbols">
+           <enum>QAbstractSpinBox::PlusMinus</enum>
+          </property>
+          <property name="minimum">
+           <double>0.010000000000000</double>
+          </property>
+          <property name="maximum">
+           <double>20000.000000000000000</double>
+          </property>
+          <property name="value">
+           <double>1.000000000000000</double>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="horizontalLayout_3">
+        <item>
+         <widget class="QLabel" name="controlShape_label">
+          <property name="text">
+           <string notr="true">Control Shape</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QComboBox" name="controlShape_comboBox">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+          <item>
+           <property name="text">
+            <string>Arrow</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>Circle</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>Compas</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>Cross</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>Crossarrow</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>Cube</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>Cubewithpeak</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>Cylinder</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>Diamond</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>Flower</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>Null</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>Pyramid</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>Sphere</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>Square</string>
+           </property>
+          </item>
          </widget>
         </item>
        </layout>

@@ -1,6 +1,7 @@
 """mGear shifter components"""
 # pylint: disable=import-error,W0201,C0111,C0112
 import sys
+import math
 import maya.cmds as cmds
 # import maya.OpenMaya as om1
 import maya.api.OpenMaya as om
@@ -103,13 +104,15 @@ class Component(component.Main):
         self.ctlName = "ctl"
         self.detailControllersGroupName = "controllers_detail"  # TODO: extract to settings
         self.primaryControllersGroupName = "controllers_primary"  # TODO: extract to settings
-        self.connect_surface_slider = self.settings["isSlidingSurface"]
+        self.isSlide = self.settings["isSlidingSurface"]
         self.surfaceKeyable = self.settings["surfaceKeyable"]
         self.sourceKeyable = self.settings["sourceKeyable"]
+        self.surfRef = self.settings["surfaceReference"]
+        if not self.surfRef:
+            raise Exception("No surface reference specified")
+        self.numLocs = len(self.guide.atra) - 2
+        self.ctlSize = (self.size / self.numLocs) * self.settings["ctlSize"] * 0.5
         # --------------------------------------------------------
-        self.num_ctrls = len(self.guide.atra) - 2
-        self.ik_ctl = []
-        self.ik_npo = []
 
         self.float_ctls = []
         self.float_npos = []
@@ -119,23 +122,23 @@ class Component(component.Main):
         # --------------------------------------------------------
         self.previusTag = self.parentCtlTag
 
+        if self.settings["addJoints"]:
+            self.jnt_pos = []
+
+        # --------------------------------------------------------
+        self.addContainers()
+        self.addControllers()
+
+    def addContainers(self):
         t = getTransform(self.root)
         self.slider_root = addTransform(self.root, self.getName("sliders"), t)
         self.ctl_root = addTransform(self.root, self.getName("ctls"), t)
         self.crv_root = addTransform(self.root, self.getName("crv_root"), t)
 
-        self.addControllers()
-        # self.addWire()
-
-        self.surfRef = self.settings["surfaceReference"]
-        if not self.surfRef:
-            self.sliding_surface = pm.duplicate(self.guide.getObjects(self.guide.root)["sliding_surface"])[0]
-            pm.parent(self.sliding_surface.name(), self.root)
-            self.sliding_surface.visibility.set(False)
-            pm.makeIdentity(self.sliding_surface, apply=True, t=1,  r=1, s=1, n=0, pn=1)  # type: ignore
-
-        if self.connect_surface_slider:
-            ymt_util.setKeyableAttributesDontLockVisibility(self.slider_root, [])
+        self.crv_root.visibility.set(False)
+        ymt_util.setKeyableAttributesDontLockVisibility(self.crv_root, [])
+        ymt_util.setKeyableAttributesDontLockVisibility(self.slider_root, [])
+        ymt_util.setKeyableAttributesDontLockVisibility(self.ctl_root, [])
 
     def addControllers(self):
 
@@ -149,17 +152,23 @@ class Component(component.Main):
 
         count = self.settings["numberOfControllers"]
         for index in range(count):
-            if index == 0:
+            if count == self.numLocs:
+                position = self.guide.apos[index + 1]
+
+            elif index == 0:
                 ratio = 0
+                position = self.guide.apos[1]
+
             else:
                 ratio = float(index) / (count - 1)
-            position = curve.getPositionByRatio(self.dummyCurve, ratio)
+                position = curve.getPositionByRatio(self.dummyCurve, ratio)
+
             t = transform.setMatrixPosition(self.guide.atra[0], position)
             npo, ctl = self.addController(index, t)
             self.float_npos.append(npo)
             self.float_ctls.append(ctl)
 
-        cmds.delete(self.dummyCurve.fullPathName())
+        # cmds.delete(self.dummyCurve.fullPathName())
 
     def addController(self, index, t):
 
@@ -171,18 +180,18 @@ class Component(component.Main):
         npo = addTransform(self.ctl_root, self.getName("{}_npo".format(index)), t)
         ctl = self.addCtl(
             npo,
-            "surface_{}_ctl".format(index),
+            "{}_ctl".format(index),
             t,
             self.color_ik,
-            "square",
-            ro=datatypes.Vector([1.5708, 0, 0]),
-            po=datatypes.Vector([0, 0, self.size * 0.1]),
+            self.settings["icon"],
+            ro=datatypes.Vector([0.0, math.pi / 2.0, 0.0]),
+            po=datatypes.Vector([0.0, 0.0, self.size * 0.33]),
             tp=self.previusTag,
+            d=self.ctlSize,
+            h=self.ctlSize,
+            w=self.ctlSize,
             mirrorConf=self.mirror_conf
         )
-
-        if self.settings["addJoints"]:
-            self.jnt_pos = []
 
         return npo, ctl
 
@@ -197,12 +206,13 @@ class Component(component.Main):
             degree=3,
             close=False,
             m=t,
+            local=True
         )
         cmds.dgeval(self.curve.name() + ".v", self.curve.name() + ".v")
         self.target = curve.createCurveFromCurve(
             self.curve.fullPathName(),
             self.getName("curve_target"),
-            nbPoints=30,
+            nbPoints=8,
             parent=self.crv_root,
             close=False,
             space=om.MSpace.kObject,
@@ -215,23 +225,10 @@ class Component(component.Main):
             self.sliding_surface,
             self.getName("curve_on_surface")
         )
-
-        posLocal = []
-        for tra in self.guide.atra[1:-1]:
-            mat = t.inverse() * tra
-            posLocal.append((mat[3][0], mat[3][1], mat[3][2]))
-        self.rope = curve.addCurve(
-            self.crv_root,
-            self.getName("rope"),
-            posLocal,
-            m=t,
-            close=False,
-            degree=3,
-        )
-        pa = self.rope.getPointAtParam(0, space=om.MSpace.kWorld)
-        pb = self.surfaceCurve.getPointAtParam(0, space=om.MSpace.kWorld)
-        dist = (pa - pb).length() * 2.0 + self.size * 3.0
-        self.wire3 = pm.wire(self.rope, w=self.surfaceCurve, dropoffDistance=(0, dist))[0]
+        ymt_util.setKeyableAttributesDontLockVisibility(self.curve, [])
+        ymt_util.setKeyableAttributesDontLockVisibility(self.target, [])
+        ymt_util.setKeyableAttributesDontLockVisibility(self.surfaceCurve, [])
+        # ymt_util.setKeyableAttributesDontLockVisibility(self.wire, [])
 
         for i, (pos, tra) in enumerate(
                 zip(self.guide.apos[1:-1],
@@ -240,7 +237,7 @@ class Component(component.Main):
         ):
 
             adj = addTransform(self.ctl_root, self.getName("detail{}_adj".format(str(i))), tra)
-            cns = curve.applyPathConstrainLocal(adj, self.rope)
+            cns = curve.applyPathConstrainLocal(adj, self.surfaceCurve)
             cmds.setAttr(cns + ".worldUpType", 2)  # object rotation up
             cmds.setAttr(cns + ".worldUpVectorX", 0)
             cmds.setAttr(cns + ".worldUpVectorY", 0)
@@ -261,21 +258,18 @@ class Component(component.Main):
                 ro=datatypes.Vector([1.5708, 0, 0]),
                 po=datatypes.Vector([0, 0, self.size * 0.075]),
                 tp=self.previusTag,
+                d=self.ctlSize,
+                h=self.ctlSize,
+                w=self.ctlSize,
                 mirrorConf=self.mirror_conf
             )
+            if not self.surfaceKeyable:
+                self.removeFromControllerGroup(ctl)
+
             if self.settings["addJoints"]:
                 self.jnt_pos.append([ctl , str(i)])
-            if self.settings["ctlGrp"]:
-                ctlGrp = self.settings["ctlGrp"]
-                self.addToGroup(ctl, ctlGrp, "controllers")
 
-            else:
-                ctlGrp = "controllers"
-                self.addToGroup(ctl, ctlGrp)
-
-            if ctlGrp not in self.groups.keys():
-                self.groups[ctlGrp] = []
-
+            self.addToGroup(ctl, self.detailControllersGroupName, "controllers")
 
     # =====================================================
     # ATTRIBUTES
@@ -283,9 +277,8 @@ class Component(component.Main):
     def addAttributes(self):
         """Create the anim and setupr rig attributes for the component"""
 
-        pass
-        # if not self.settings["ui_host"]:
-        #     self.uihost = self.surfaceCtl
+        if not self.settings["ui_host"]:
+            self.uihost = self.float_ctls[0]
 
     # =====================================================
     # OPERATORS
@@ -300,65 +293,13 @@ class Component(component.Main):
         """
         pass
 
-    def connectRef(self, refArray, cns_obj, upVAttr=None, init_refNames=False):
-        """Connect the cns_obj to a multiple object using parentConstraint.
-
-        Args:
-            refArray (list of dagNode): List of driver objects
-            cns_obj (dagNode): The driven object.
-            upVAttr (bool): Set if the ref Array is for IK or Up vector
-        """
-        if refArray:
-            if upVAttr and not init_refNames:
-                # we only can perform name validation if the init_refnames are
-                # provided in a separated list. This check ensures backwards
-                # copatibility
-                ref_names = refArray.split(",")
-            else:
-                ref_names = self.get_valid_ref_list(refArray.split(","))
-
-            if not ref_names:
-                # return if the not ref_names list
-                return
-            elif len(ref_names) == 1:
-                ref = self.rig.findRelative(ref_names[0])
-                pm.parent(cns_obj, ref)
-            else:
-                ref = []
-                for ref_name in ref_names:
-                    ref.append(self.rig.findRelative(ref_name))
-
-                ref.append(cns_obj)
-                cns_node = pm.parentConstraint(*ref, maintainOffset=True)
-                cns_attr = pm.parentConstraint(
-                    cns_node, query=True, weightAliasList=True)
-                # check if the ref Array is for IK or Up vector
-                try:
-                    if upVAttr:
-                        oAttr = self.upvref_att
-                    else:
-                        oAttr = self.ikref_att
-
-                except AttributeError:
-                    oAttr = None
-
-                if oAttr:
-                    for i, attr in enumerate(cns_attr):
-                        node_name = pm.createNode("condition")
-                        pm.connectAttr(oAttr, node_name + ".firstTerm")
-                        pm.setAttr(node_name + ".secondTerm", i)
-                        pm.setAttr(node_name + ".operation", 0)
-                        pm.setAttr(node_name + ".colorIfTrueR", 1)
-                        pm.setAttr(node_name + ".colorIfFalseR", 0)
-                        pm.connectAttr(node_name + ".outColorR", attr)
-
     def connect_standard(self):
         self.parent.addChild(self.root)
         if self.surfRef:
             ref = self.rig.findComponent(self.surfRef)
             self.sliding_surface = ref.sliding_surface
 
-        if self.connect_surface_slider:
+        if self.isSlide:
             try:
                 self.connect_slide_ghosts()
                 self.addWire(self.ghost_ctls)
@@ -369,7 +310,8 @@ class Component(component.Main):
 
         else:
             try:
-                self.connect_rivet()
+                self.connect_rivets()
+                self.addWire(self.float_ctls)
 
             except Exception as _:
                 import traceback
@@ -380,11 +322,13 @@ class Component(component.Main):
         for i, (_, ctl) in enumerate(zip(self.float_npos, self.float_ctls)):
             self.connect_slide_ghost(ctl, i)
 
+        pm.delete(self.slider_root)
+
     def connect_slide_ghost(self, surfaceCtl, index):
 
         # create ghost controls
         ghostCtl = ghost.createGhostCtl(surfaceCtl, self.slider_root)
-        ghostCtl.rename(self.getName("surface_{}_ctl".format(index)))
+        ghostCtl.rename(self.getName("{}_ghost".format(index)))
 
         if self.settings.get("visHost", False):
             self._visi_off_lock(surfaceCtl)
@@ -398,8 +342,10 @@ class Component(component.Main):
         ghostCtl.attr("translate") // surfaceCtl.attr("translate")
         ghostCtl.attr("rotate") // surfaceCtl.attr("rotate")
         ghostCtl.attr("scale") // surfaceCtl.attr("scale")
+        ymt_util.setKeyableAttributesDontLockVisibility(npo, [])
+        ymt_util.setKeyableAttributesDontLockVisibility(ghostCtl, [])
 
-        surfaceCtl.rename(self.getName("source_{}_ctl".format(index)))
+        surfaceCtl.rename(self.getName("{}_ctl".format(index)))
 
         ctl = pm.listConnections(ghostCtl, t="transform")[-1]
         t = ctl.getMatrix(worldSpace=True)
@@ -449,31 +395,27 @@ class Component(component.Main):
 
         if self.sourceKeyable:
             surfaceCtl.attr("isCtl").set(True)
+            try:
+                self.groups[self.detailControllersGroupName].remove(surfaceCtl)
+            except:
+                pass
+            self.addToGroup(surfaceCtl, self.primaryControllersGroupName, "controllers")
         else:
             self.removeFromControllerGroup(surfaceCtl)
-
-        # add to group
-        if self.settings["ctlGrp"]:
-            ctlGrp = self.settings["ctlGrp"]
-            self.addToGroup(ghostCtl, ctlGrp, "controllers")
-            self.addToGroup(surfaceCtl, ctlGrp, "controllers")
-
-        else:
-            ctlGrp = "controllers"
-            self.addToGroup(ghostCtl, ctlGrp)
-            self.addToGroup(surfaceCtl, ctlGrp)
-
-        if ctlGrp not in self.groups.keys():
-            self.groups[ctlGrp] = []
 
         self.setRelation()  # MUST re-setRelation, swapped ghost and real controls
         self.ghost_npos.append(npo)
         self.ghost_ctls.append(ghostCtl)
 
-    def connect_rivet(self):
-        rivets = ymt_util.apply_rivet_constrain_to_selected(self.sliding_surface, self.npo)
+    def connect_rivets(self):
+        for i, (npo, ctl) in enumerate(zip(self.float_npos, self.float_ctls)):
+            self.connect_rivet(npo, i)
+
+    def connect_rivet(self, npo, index):
+        rivets = ymt_util.apply_rivet_constrain_to_selected(self.sliding_surface, npo)
         cmds.parent(rivets[0], self.sliding_surface.getParent().fullPath(), relative=True)
-        cmds.parentConstraint(rivets[0], self.npo.fullPath(), mo=True)
+        cmds.parentConstraint(rivets[0], npo.fullPath(), mo=True)
+        ymt_util.setKeyableAttributesDontLockVisibility(pm.PyNode(rivets[0]), [])
 
     # =====================================================
     # CONNECTOR
@@ -513,7 +455,7 @@ class Component(component.Main):
         obj.attr("isCtl").set(False)
         pm.deleteAttr(obj.attr("isCtl"))
         ymt_util.setKeyableAttributesDontLockVisibility(obj, [])
-        pm.delete(obj.getShape())
+        pm.delete(pm.listRelatives(obj, shapes=True))
 
 
 if __name__ == "__main__":

@@ -2,6 +2,7 @@
 import re
 import math
 import sys
+import contextlib
 
 from pymel.core import (
     datatypes,
@@ -103,10 +104,12 @@ def hide():
 
 def setKeyableAttributesDontLockVisibility(nodes, params=None):
 
+    # if not params:
+    #     params = ["tx", "ty", "tz",
+    #               "ro", "rx", "ry", "rz",
+    #               "sx", "sy", "sz"]
     if not params:
-        params = ["tx", "ty", "tz",
-                  "ro", "rx", "ry", "rz",
-                  "sx", "sy", "sz"]
+        params = []
 
     attribute.setKeyableAttributes(nodes, params)
 
@@ -130,16 +133,16 @@ def getFullPath(start, routes=None):
     return getFullPath(start.getParent(), routes + [start, ])
 
 
-def getDecomposeMatrixOfAtoB(a, b):
-    # type: (pm.PyNode, pm.PyNode) -> pm.nt.DecomposeMatrix
+def getDecomposeMatrixOfAtoB(a, b, skip_last=False):
+    # type: (pm.PyNode, pm.PyNode, bool) -> pm.nt.DecomposeMatrix
     """Returns matrix of A to B"""
-    mul_node = getMultMatrixOfAtoB(a, b)
+    mul_node = getMultMatrixOfAtoB(a, b, skip_last=skip_last)
     dm_node = node.createDecomposeMatrixNode(mul_node.attr("matrixSum"))
     return dm_node
 
 
-def getMultMatrixOfAtoB(a, b):
-    # type: (pm.PyNode, pm.PyNode) -> pm.nt.DecomposeMatrix
+def getMultMatrixOfAtoB(a, b, skip_last=False):
+    # type: (pm.PyNode, pm.PyNode, bool) -> pm.nt.DecomposeMatrix
     """Returns matrix of A to B"""
     down, _, up = findPathAtoB(a, b)
     mul_node = pm.createNode("multMatrix")
@@ -147,7 +150,9 @@ def getMultMatrixOfAtoB(a, b):
     for i, d in enumerate(down):
         d.attr("matrix") >> mul_node.attr("matrixIn[{}]".format(i))
 
-    for j, u in enumerate(up[:-1]):
+    if skip_last:
+        up = up[:-1]
+    for j, u in enumerate(up):
         u.attr("inverseMatrix") >> mul_node.attr("matrixIn[{}]".format(i + j + 1))
 
     return mul_node
@@ -1245,3 +1250,124 @@ def get_normalized_vector_node_from_attribute_path(attr_path):
     cmds.connectAttr(power + ".outputX", div + ".input2.input2Z")
 
     return div + ".output"
+
+
+@contextlib.contextmanager
+def unlockAttribute(node, attrs=None):
+    # type: (Text, List[Text]|None) -> Generator[None, None, None]
+    """Temporarily unlock given attributes of given node.
+
+    store original lock state and restore it after function call"""
+
+    current_lock_state = {}
+    if attrs is None:
+        attrs = cmds.listAttr(node, locked=True) or []
+
+    for attr in attrs:
+        current_lock_state[attr] = cmds.getAttr(node + "." + attr, lock=True)
+        cmds.setAttr(node + "." + attr, lock=False)
+
+    yield
+
+    for attr, lock_state in current_lock_state.items():
+        cmds.setAttr(node + "." + attr, lock=lock_state)
+
+
+@contextlib.contextmanager
+def overrideNamingAttributeTemporary(comp, name=None, side=None, index=None):
+    currentName = comp.name
+    currentIndex = comp.index
+    currentSide = comp.side
+
+    if name is not None:
+        comp.name = name
+
+    if side is not None:
+        comp.side = side
+
+    if index is not None:
+        comp.index = index
+
+    yield
+
+    comp.name = currentName
+    comp.index = currentIndex
+    comp.side = currentSide
+
+
+def addNPOPreservingMatrixConnections(ctl):
+    # type: (dt.Transform) -> dt.Transform
+
+    from mgear.rigbits import addNPO
+    newNPO = addNPO(ctl)
+
+    matrix_connections = cmds.listConnections(
+        ctl.fullPathName() + ".matrix",
+        s=False,
+        d=True,
+        plugs=True,
+        connections=True
+    ) or []
+
+    if matrix_connections:
+        multMatrix = cmds.createNode("multMatrix")
+        cmds.connectAttr(
+            ctl.fullPathName() + ".matrix",
+            multMatrix + ".matrixIn[0]"
+        )
+        cmds.connectAttr(
+            newNPO[0].fullPathName() + ".matrix",
+            multMatrix + ".matrixIn[1]"
+        )
+
+        for src, dst in zip(matrix_connections[::2], matrix_connections[1::2]):
+            cmds.connectAttr(multMatrix + ".matrixSum", dst, force=True)
+
+    pos_connections = cmds.listConnections(
+        ctl.fullPathName() + ".t",
+        s=False,
+        d=True,
+        plugs=True,
+        connections=True
+    ) or []
+
+    rot_connections = cmds.listConnections(
+        ctl.fullPathName() + ".r",
+        s=False,
+        d=True,
+        plugs=True,
+        connections=True
+    ) or []
+
+    scl_connections = cmds.listConnections(
+        ctl.fullPathName() + ".s",
+        s=False,
+        d=True,
+        plugs=True,
+        connections=True
+    ) or []
+
+    if pos_connections or rot_connections or scl_connections:
+        multMatrix = cmds.createNode("multMatrix")
+        cmds.connectAttr(
+            ctl.fullPathName() + ".matrix",
+            multMatrix + ".matrixIn[0]"
+        )
+        cmds.connectAttr(
+            newNPO[0].fullPathName() + ".matrix",
+            multMatrix + ".matrixIn[1]"
+        )
+
+        decompMatrix = cmds.createNode("decomposeMatrix")
+        cmds.connectAttr(multMatrix + ".matrixSum", decompMatrix + ".inputMatrix")
+
+        for src, dst in zip(pos_connections[::2], pos_connections[1::2]):
+            cmds.connectAttr(decompMatrix + ".outputTranslate", dst, force=True)
+
+        for src, dst in zip(rot_connections[::2], rot_connections[1::2]):
+            cmds.connectAttr(decompMatrix + ".outputRotate", dst, force=True)
+
+        for src, dst in zip(scl_connections[::2], scl_connections[1::2]):
+            cmds.connectAttr(decompMatrix + ".outputScale", dst, force=True)
+
+    return newNPO

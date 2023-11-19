@@ -103,8 +103,9 @@ class Component(component.Main):
 
         self.connect_surface_slider = self.settings["isSlidingSurface"]
         self.surfRef = self.settings["surfaceReference"]
-        self.cheekLeftRef = self.settings["cheekLeftReference"]
-        self.cheekRightRef = self.settings["cheekRightReference"]
+        self.mouthCenterRef = self.settings["mouthCenterReference"]
+        self.mouthLeftRef = self.settings["mouthLeftReference"]
+        self.mouthRightRef = self.settings["mouthRightReference"]
         # -------------------------------------------------------
 
         self.num_locs = self.getNumberOfLocators("_loc")
@@ -328,87 +329,90 @@ class Component(component.Main):
             mirror = i > self.num_locs / 2
             lower = i > self.left_index and i < self.right_index
 
-            # sub component name
             if i == 0: 
-                sub_comp = "C0"
+                oSide = "C"
+                _index = 0
 
             elif i == self.bottom_index: 
-                sub_comp = "C1"
+                oSide = "C"
+                _index = 1
 
             elif not mirror:
+                oSide = "L"
                 if i <= self.left_index:
-                    sub_comp = "L" + str(i - 1)
+                    _index = i - 1
                 else:
-                    sub_comp = "L" + str(self.bottom_index - i + self.left_index - 1)
+                    _index = (self.bottom_index - i + self.left_index - 1)
 
             else:
                 tmp = self.num_locs - self.right_index
-                if i <= self.right_index:
-                    sub_comp = "R" + str(i - self.bottom_index + tmp - 2)
+                oSide = "R"
+                if i < self.right_index:
+                    _index = (i - self.bottom_index + tmp - 2)
                 else:
-                    sub_comp = "R" + str(tmp - i + self.right_index - 2)
+                    _index = (tmp - i + self.right_index - 2)
 
-            # cvOSoffset = [cvo[0], cvo[1], cvo[2] + self.FRONT_OFFSET]
-            # upv = addTransform(rope_root, self.getName("rope_{}_upv".format(sub_comp)))
-            cns = addTransform(rope_root, self.getName("rope_{}_cns".format(sub_comp)))
-            # applyPathCnsLocal(upv, self.crv_upv, rope_upv, cvOSoffset)
-            applyPathCnsLocal(cns, self.crv_ctl, rope, cvo)
+            with ymt_util.overrideNamingAttributeTemporary(self, side=oSide):
+                # cvOSoffset = [cvo[0], cvo[1], cvo[2] + self.FRONT_OFFSET]
+                # upv = addTransform(rope_root, self.getName("rope_{}_upv".format(sub_comp)))
+                cns = addTransform(rope_root, self.getName("rope_{}_cns".format(_index)))
+                # applyPathCnsLocal(upv, self.crv_upv, rope_upv, cvOSoffset)
+                applyPathCnsLocal(cns, self.crv_ctl, rope, cvo)
 
-            m = getTransform(cns)
-            x = datatypes.Vector(m[0][0], m[0][1], m[0][2])
-            y = datatypes.Vector(m[1][0], m[1][1], m[1][2])
-            z = datatypes.Vector(m[2][0], m[2][1], m[2][2])
-            rot = [x, y, z]
-            xform = setMatrixPosition(t, self.locsPos[i])
-            xform = setMatrixRotation(xform, rot)
-            offset = datatypes.EulerRotation((90.0, 0, 0), unit="degrees")
-            xform = offset.asMatrix() * xform
-
-            if mirror:
-                if lower:
-                    xform = setMatrixScale(xform, scl=[1, -1, -1])
+                m = getTransform(cns)
+                x = datatypes.Vector(m[0][0], m[0][1], m[0][2])
+                y = datatypes.Vector(m[1][0], m[1][1], m[1][2])
+                z = datatypes.Vector(m[2][0], m[2][1], m[2][2])
+                rot = [x, y, z]
+                xform = setMatrixPosition(t, self.locsPos[i])
+                xform = setMatrixRotation(xform, rot)
+                offset = datatypes.EulerRotation((90.0, 0, 0), unit="degrees")
+                xform = offset.asMatrix() * xform
+     
+                if mirror:
+                    if lower:
+                        xform = setMatrixScale(xform, scl=[1, -1, -1])
+                    else:
+                        xform = setMatrixScale(xform, scl=[-1, 1, 1])
+     
                 else:
-                    xform = setMatrixScale(xform, scl=[-1, 1, 1])
-
-            else:
-                if lower:
-                    xform = setMatrixScale(xform, scl=[-1, -1, -1])
-                else:
-                    xform = setMatrixScale(xform, scl=[1, 1, 1])
-
-            # if i == self.left_index:
-            #     prev = getTransform(controls[i-1]).rotate
-            #     xform = setMatrixRotation(xform, prev)
-            if i == self.right_index + 1:
-                rightCtl = controls[self.right_index]
-                rightNpo = rightCtl.getParent()
-                pos = cmds.xform(rightNpo.fullPath(), q=True, ws=True, translation=True)
-                pm.xform(rightNpo, ws=True, matrix=xform)
-                pm.xform(rightNpo, ws=True, translation=pos)
-
-            npo_name = self.getName("rope_{}_jnt_npo".format(sub_comp))
-            npo = addTransform(cns, npo_name, xform)
-
-            t = getTransform(npo)
-            ctl_name = self.getName("%s_crvdetail_%s" % (sub_comp, self.ctlName))
-            ctl = self.addCtl(
-                npo,
-                ctl_name,
-                t,
-                color,
-                icon_shape,
-                w=wd,
-                d=wd,
-                ro=datatypes.Vector(1.57079633, 0, 0),
-                po=po
-            )
-
-            controls.append(ctl)
-
-            # getting joint parent
-            # jnt = rigbits.addJnt(npo, noReplace=True, parent=self.j_parent)
-            self.jnt_pos.append([ctl, "{}".format(i)])
-            self.addToSubGroup(ctl, self.detailControllersGroupName)
+                    if lower:
+                        xform = setMatrixScale(xform, scl=[-1, -1, -1])
+                    else:
+                        xform = setMatrixScale(xform, scl=[1, 1, 1])
+     
+                # if i == self.left_index:
+                #     prev = getTransform(controls[i-1]).rotate
+                #     xform = setMatrixRotation(xform, prev)
+                if i == self.right_index + 1:
+                    rightCtl = controls[self.right_index]
+                    rightNpo = rightCtl.getParent()
+                    pos = cmds.xform(rightNpo.fullPath(), q=True, ws=True, translation=True)
+                    pm.xform(rightNpo, ws=True, matrix=xform)
+                    pm.xform(rightNpo, ws=True, translation=pos)
+     
+                npo_name = self.getName("rope_{}_jnt_npo".format(_index))
+                npo = addTransform(cns, npo_name, xform)
+     
+                t = getTransform(npo)
+                ctl = self.addCtl(
+                    npo,
+                    "%s_crvdetail" % _index,
+                    t,
+                    color,
+                    icon_shape,
+                    w=wd,
+                    d=wd,
+                    ro=datatypes.Vector(1.57079633, 0, 0),
+                    po=po
+                )
+     
+                controls.append(ctl)
+     
+                # getting joint parent
+                # jnt = rigbits.addJnt(npo, noReplace=True, parent=self.j_parent)
+                self.jnt_pos.append([ctl, "{}".format(i)])
+                self.addToSubGroup(ctl, self.detailControllersGroupName)
 
         return controls
 
@@ -454,8 +458,8 @@ class Component(component.Main):
         upvec = self.upUpvs
 
         # Connecting control crvs with controls
-        curve.gear_curvecns_op_local(self.crv_ctl, self.upCtls)
-        curve.gear_curvecns_op_local(self.crv_upv, upvec)
+        curve.gear_curvecns_op_local_skip_rotate(self.crv_ctl, self.upCtls)
+        curve.gear_curvecns_op_local_skip_rotate(self.crv_upv, upvec)
 
         # adding wires
         pm.wire(self.crv, w=self.crv_ctl, dropoffDistance=[0, self.size * 10])
@@ -546,29 +550,30 @@ class Component(component.Main):
             t = transform.getTransformFromPos(cv)
             t = transform.setMatrixScale(t, scl)
 
-            npo = addTransform(self.ctl_root, self.getName("%s_npo" % oName, oSide), t)
-            npos.append(npo)
+            with ymt_util.overrideNamingAttributeTemporary(self, side=oSide):
+                npo = addTransform(self.ctl_root, self.getName("%s_npo" % oName), t)
+                npos.append(npo)
 
-            ctl = self.addCtl(
-                npo,
-                self.getName("{}_{}".format(oName, self.ctlName), oSide),
-                t,
-                color,
-                o_icon,
-                w=wd * distSize,
-                d=wd * distSize,
-                ro=datatypes.Vector(1.57079633, 0, 0),
-                po=datatypes.Vector(0, 0, .07 * distSize),
-            )
+                ctl = self.addCtl(
+                    npo,
+                    oName,
+                    t,
+                    color,
+                    o_icon,
+                    w=wd * distSize,
+                    d=wd * distSize,
+                    ro=datatypes.Vector(1.57079633, 0, 0),
+                    po=datatypes.Vector(0, 0, .07 * distSize),
+                )
 
-            ctls.append(ctl)
+                ctls.append(ctl)
 
-            ymt_util.setKeyableAttributesDontLockVisibility(ctl, oPar)
+                ymt_util.setKeyableAttributesDontLockVisibility(ctl, oPar)
 
-            upv = addTransform(ctl, self.getName("%s_upv" % oName, oSide), t)
-            upv.attr("tz").set(self.FRONT_OFFSET)
-            upvs.append(upv)
-            self.addToSubGroup(ctl, self.primaryControllersGroupName)
+                upv = addTransform(ctl, self.getName("%s_upv" % oName), t)
+                upv.attr("tz").set(self.FRONT_OFFSET)
+                upvs.append(upv)
+                self.addToSubGroup(ctl, self.primaryControllersGroupName)
 
         return npos, ctls, upvs
 
@@ -579,7 +584,7 @@ class Component(component.Main):
             crvShape = crv.getShape().fullPath()
 
             ctl = ctls[i]
-            dm_node = ymt_util.getDecomposeMatrixOfAtoB(ctl, crv)
+            dm_node = ymt_util.getDecomposeMatrixOfAtoB(ctl, crv, skip_last=True)
 
             point = cmds.createNode("nearestPointOnCurve")
             cmds.connectAttr(dm_node + ".outputTranslate", point + ".inPosition")
@@ -687,13 +692,13 @@ class Component(component.Main):
         lipup_ref = self.parent_comp.lipup_ctl
         liplow_ref = self.parent_comp.liplow_ctl
 
-        slide_c_ref = self.rig.findRelative("mouthSlide_C0_root")
-        corner_l_ref = self.rig.findRelative("mouthCorner_L0_root")
-        corner_r_ref = self.rig.findRelative("mouthCorner_R0_root")
+        slide_c_ref = self.rig.findRelative(self.mouthCenterRef)
+        corner_l_ref = self.rig.findRelative(self.mouthLeftRef)
+        corner_r_ref = self.rig.findRelative(self.mouthRightRef)
 
-        slide_c_comp = self.rig.findComponent("mouthSlide_C0_root")
-        corner_l_comp = self.rig.findComponent("mouthCorner_L0_root")
-        corner_r_comp = self.rig.findComponent("mouthCorner_R0_root")
+        slide_c_comp = self.rig.findComponent(self.mouthCenterRef)
+        corner_l_comp = self.rig.findComponent(self.mouthLeftRef)
+        corner_r_comp = self.rig.findComponent(self.mouthRightRef)
 
         if slide_c_comp.root.parent(0) != self.parent:
             self.parent.addChild(slide_c_comp.root)
@@ -819,6 +824,7 @@ class Component(component.Main):
         # center main controls
         self.lips_C_upper_ctl, up_ghost_ctl = createGhostWithParentConstraint(self.lips_C_upper_ctl, lipup_ref)
         self.lips_C_lower_ctl, lo_ghost_ctl = createGhostWithParentConstraint(self.lips_C_lower_ctl, liplow_ref)
+
         self._removeFromCtrlGroup(up_ghost_ctl)
         self._removeFromCtrlGroup(lo_ghost_ctl)
         self.addToSubGroup(self.lips_C_upper_ctl, self.primaryControllersGroupName)
@@ -840,7 +846,17 @@ class Component(component.Main):
         pm.connectAttr(s + ".translateX", low_npo + ".translateX", force=True)
         pm.connectAttr(s + ".translateZ", low_npo + ".translateZ", force=True)
         pm.connectAttr(s + ".scale", low_npo + ".scale", force=True)
-        pm.connectAttr(s + ".rotate", low_npo + ".rotate", force=True)
+        for axis in ("X", "Y", "Z"):
+            inv = cmds.createNode("multiplyDivide")
+            cmds.setAttr(inv + ".input2" + axis, -1)
+            cmds.connectAttr(
+                s + ".rotate" + axis,
+                inv + ".input1" + axis
+            )
+            cmds.connectAttr(
+                inv + ".output" + axis,
+                low_npo + ".rotate" + axis
+            )
 
         return
 
@@ -929,17 +945,15 @@ def ghostSliderForMouth(ghostControls, intTra, surface, sliderParent):
 
 
     def conn(ctl, driver, ghost):
+
         for attr in ["translate", "scale", "rotate"]:
-            try:
-                pm.connectAttr("{}.{}".format(ctl, attr), "{}.{}".format(driver, attr))
-                pm.disconnectAttr("{}.{}".format(ctl, attr), "{}.{}".format(ghost, attr))
-            except RuntimeError:
-                pass
+            pm.connectAttr("{}.{}".format(ctl, attr), "{}.{}".format(driver, attr))
+            pm.disconnectAttr("{}.{}".format(ctl, attr), "{}.{}".format(ghost, attr))
 
     def connCenter(ctl, driver, ghost):
-        dm_node = ymt_util.getDecomposeMatrixOfAtoB(ctl, driver)
+        dm_node = ymt_util.getDecomposeMatrixOfAtoB(ctl, driver, skip_last=True)
 
-        for attr in ["translate", "scale", "rotate"]:
+        for attr in ["translate", "scale"]:
             pm.connectAttr("{}.output{}".format(dm_node, attr.capitalize()), "{}.{}".format(driver, attr))
             pm.disconnectAttr("{}.{}".format(ctl, attr), "{}.{}".format(ghost, attr))
 
@@ -974,7 +988,7 @@ def ghostSliderForMouth(ghostControls, intTra, surface, sliderParent):
             dm_node = node.createDecomposeMatrixNode(gDriver.attr("matrix"))
 
         else:
-            dm_node = ymt_util.getDecomposeMatrixOfAtoB(ctl, slider)
+            dm_node = ymt_util.getDecomposeMatrixOfAtoB(ctl, slider, skip_last=True)
 
         cps_node = pm.createNode("closestPointOnSurface")
         dm_node.attr("outputTranslate") >> cps_node.attr("inPosition")

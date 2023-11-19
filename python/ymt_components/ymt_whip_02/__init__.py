@@ -43,29 +43,28 @@ import ymt_shifter_utility as ymt_util
 from ymt_shifter_utility import twistSplineBuilder as tsBuilder
 
 from logging import (  # noqa:F401 pylint: disable=unused-import, wrong-import-order
-    StreamHandler,
+    # StreamHandler,
     getLogger,
-    WARN,
-    DEBUG,
+    # WARN,
+    # DEBUG,
     INFO
 )
 
-if sys.version_info >= (3, 0):
-    # For type annotation
-    from typing import (  # NOQA: F401 pylint: disable=unused-import
-        Optional,
-        Dict,
-        List,
-        Tuple,
-        Pattern,
-        Callable,
-        Any,
-        Text,
-        Generator,
-        Union
-    )
-    import pathlib
-
+if sys.version_info > (3, 0):
+    from typing import TYPE_CHECKING
+    if TYPE_CHECKING:
+        from typing import (
+            Optional,  # noqa: F401
+            Dict,  # noqa: F401
+            List,  # noqa: F401
+            Tuple,  # noqa: F401
+            Pattern,  # noqa: F401
+            Callable,  # noqa: F401
+            Any,  # noqa: F401
+            Text,  # noqa: F401
+            Generator,  # noqa: F401
+            Union  # noqa: F401
+        )
 logger = getLogger(__name__)
 logger.setLevel(INFO)
 # logger.setLevel(WARN)
@@ -277,20 +276,20 @@ class Component(component.Main):
         roll = theta + math.pi
 
         tm = datatypes.TransformationMatrix(t)
-        tm.addRotation([0., roll, 0], 'XYZ', om.MSpace.kObject)
+        tm.addRotation([0., roll, 0], "XYZ", om.MSpace.kObject)
 
         return datatypes.Matrix(tm)
 
     def _addObjectsFkControl(self, i, parentdiv, parentctl, t, pt, parent_twistRef):
         # References
         tm = datatypes.TransformationMatrix(t)
-        tm.addRotation([0., 0., math.pi / -2.], 'XYZ', om.MSpace.kObject)  # TODO: align with convention
-        tm.addRotation([0., math.pi / -2., 0], 'XYZ', om.MSpace.kObject)
+        tm.addRotation([0., 0., math.pi / -2.], "XYZ", om.MSpace.kObject)  # TODO: align with convention
+        tm.addRotation([0., math.pi / -2., 0], "XYZ", om.MSpace.kObject)
         global_t  = datatypes.Matrix(tm)
 
         tm = datatypes.TransformationMatrix(pt)
-        tm.addRotation([0., 0., math.pi / -2.], 'XYZ', om.MSpace.kObject)  # TODO: align with convention
-        tm.addRotation([0., math.pi / -2., 0], 'XYZ', om.MSpace.kObject)
+        tm.addRotation([0., 0., math.pi / -2.], "XYZ", om.MSpace.kObject)  # TODO: align with convention
+        tm.addRotation([0., math.pi / -2., 0], "XYZ", om.MSpace.kObject)
         local_t  = datatypes.Matrix(tm)
 
         # global input
@@ -670,7 +669,7 @@ class Component(component.Main):
             cmds.setAttr("{0}.tx".format(bfr), cur[0] + offset[0])
             cmds.setAttr("{0}.ty".format(bfr), cur[1] + offset[1])
             cmds.setAttr("{0}.tz".format(bfr), cur[2] + offset[2])
-            for att in [x+y for x in 'trs' for y in 'xyz']:
+            for att in [x+y for x in "trs" for y in "xyz"]:
                 cmds.setAttr("{0}.{1}".format(bfr, att), lock=True)
 
         scl = self.length * (1. / self.division) * 1.3
@@ -927,70 +926,70 @@ class Component(component.Main):
             cns_obj (dagNode): The driven object.
             upVAttr (bool): Set if the ref Array is for IK or Up vector
         """
-        if refArray:
-            if upVAttr and not init_refNames:
-                # we only can perform name validation if the init_refnames are
-                # provided in a separated list. This check ensures backwards
-                # copatibility
-                ref_names = refArray.split(",")
+        if not refArray:
+            return
+
+        if upVAttr and not init_refNames:
+            # we only can perform name validation if the init_refnames are
+            # provided in a separated list. This check ensures backwards
+            # copatibility
+            ref_names = refArray.split(",")
+        else:
+            ref_names = self.get_valid_ref_list(refArray.split(","))
+
+        if not ref_names:
+            # return if the not ref_names list
+            return
+
+        elif len(ref_names) == 1:
+            ref = self.rig.findRelative(ref_names[0])
+            pm.parent(cns_obj, ref)
+            return
+
+        ref = []
+        for ref_name in ref_names:
+            ref.append(self.rig.findRelative(ref_name))
+
+        ref.append(cns_obj)
+
+        cns_node = pm.parentConstraint(*ref, maintainOffset=True)
+        cns_attr = pm.parentConstraint(
+            cns_node, query=True, weightAliasList=True)
+
+        # check if the ref Array is for IK or Up vector
+        try:
+            if upVAttr:
+                oAttr = self.upvref_att
             else:
-                ref_names = self.get_valid_ref_list(refArray.split(","))
+                oAttr = self.ikref_att
 
-            if not ref_names:
-                # return if the not ref_names list
-                return
-            elif len(ref_names) == 1:
-                ref = self.rig.findRelative(ref_names[0])
-                pm.parent(cns_obj, ref)
-            else:
-                ref = []
-                for ref_name in ref_names:
-                    ref.append(self.rig.findRelative(ref_name))
+        except AttributeError:
+            oAttr = None
 
-                ref.append(cns_obj)
-                cns_node = pm.parentConstraint(*ref, maintainOffset=True)
-                cns_attr = pm.parentConstraint(
-                    cns_node, query=True, weightAliasList=True)
-                # check if the ref Array is for IK or Up vector
-                try:
-                    if upVAttr:
-                        oAttr = self.upvref_att
-                    else:
-                        oAttr = self.ikref_att
+        if not oAttr:
+            return
 
-                except AttributeError:
-                    oAttr = None
-
-                if oAttr:
-                    for i, attr in enumerate(cns_attr):
-                        node_name = pm.createNode("condition")
-                        pm.connectAttr(oAttr, node_name + ".firstTerm")
-                        pm.setAttr(node_name + ".secondTerm", i)
-                        pm.setAttr(node_name + ".operation", 0)
-                        pm.setAttr(node_name + ".colorIfTrueR", 1)
-                        pm.setAttr(node_name + ".colorIfFalseR", 0)
-                        pm.connectAttr(node_name + ".outColorR", attr)
+        for i, attr in enumerate(cns_attr):
+            node_name = pm.createNode("condition")
+            pm.connectAttr(oAttr, node_name + ".firstTerm")
+            pm.setAttr(node_name + ".secondTerm", i)
+            pm.setAttr(node_name + ".operation", 0)
+            pm.setAttr(node_name + ".colorIfTrueR", 1)
+            pm.setAttr(node_name + ".colorIfFalseR", 0)
+            pm.connectAttr(node_name + ".outColorR", attr)
 
     def connect_standard(self):
         self.parent.addChild(self.root)
 
         if self.settings["ik0refarray"]:
-
-            for attr in ymt_util.iter_tr_xyz(self.ik_npo[0].getName()):
-                cmds.setAttr(attr, lock=False)
-            self.connectRef(self.settings["ik0refarray"], self.ik_npo[0])
-            for attr in ymt_util.iter_tr_xyz(self.ik_npo[0].getName()):
-                cmds.setAttr(attr, lock=True)
+            npo = self.ik_npo[0]
+            with ymt_util.unlockAttribute(npo.fullPathName()):
+                self.connectRef(self.settings["ik0refarray"], npo)
 
         if self.settings["ik1refarray"]:
             for npo in self.ik_npo[1:]:
-                for attr in ymt_util.iter_tr_xyz(npo.getName()):
-                    cmds.setAttr(attr, lock=False)
-
-                self.connectRef(self.settings["ik1refarray"], npo)
-
-                for attr in ymt_util.iter_tr_xyz(npo.getName()):
-                    cmds.setAttr(attr, lock=True)
+                with ymt_util.unlockAttribute(npo.fullPathName()):
+                    self.connectRef(self.settings["ik1refarray"], npo)
 
     # =====================================================
     # CONNECTOR

@@ -97,6 +97,8 @@ class Component(component.Main):
         self.addToSubGroup(self.ctl, self.primaryControllersGroupName)
 
         self.aim_cns = primitive.addTransform(self.root, self.getName("aim_cns"), t)
+        if self.settings["joint"]:
+            self.jnt_pos.append([self.aim_cns, "aim"])
 
         diff = self.guide.apos[2] - self.guide.apos[0]
         offset = diff.normal() * self.initialDist + t.translate
@@ -204,14 +206,6 @@ class Component(component.Main):
     def connect_orientation(self):
         """Orient connection definition for the component"""
         self.connect_orientCns()
-
-    def _visi_off_lock(self, node):
-        """Short cuts."""
-
-        return
-        node.visibility.set(False)
-        ymt_util.setKeyableAttributesDontLockVisibility(node, [])
-        cmds.setAttr("{}.visibility".format(node.name()), l=False)
 
     def connect_slide_ghost(self):
 

@@ -147,7 +147,6 @@ class Component(component.Main):
         self.addContainers()
         self.addCurve()
         self.addRope()
-        self.reparentControls()
         self.attachSecondaryControlsToMainCurve()
         self.connectWires()
 
@@ -276,6 +275,7 @@ class Component(component.Main):
             ctl, upv = self._foreachControlOption(self.mainControl, ctlOptions)
             self.mainControls.append(ctl)
             self.mainUpvs.append(upv)
+        self.reparentControls()
         self.addMainCnsCurve(self.mainControls)
 
         self.secondaryControls = []
@@ -339,11 +339,20 @@ class Component(component.Main):
     def addMainCnsCurve(self, ctls):
         crv_degree = 2
 
-        crv = helpers.addCnsCurve(self.crv_root, self.getName("mainCtl_crv"), ctls, crv_degree)
-        ymt_util.setKeyableAttributesDontLockVisibility(crv[0], [])
+        t = getTransform(self.root)
+        crv = curve.addCnsCurve(
+                self.crv_root,
+                self.getName("mainCtl_crv"),
+                ctls,
+                degree=crv_degree,
+                m=t,
+                local=True)
+        deformer = crv.getShape().attr("create").inputs()[0]
+
+        ymt_util.setKeyableAttributesDontLockVisibility(crv, [])
         v = self.root.getTranslation(space="world")
-        crv[0].setTranslation(v, om.MSpace.kWorld)
-        self.mainCtlCurves.append(crv[0])
+        crv.setTranslation(v, om.MSpace.kWorld)
+        self.mainCtlCurves.append(crv)
 
         # create upvector curve to drive secondary control
         if self.secondary_ctl_check:
@@ -352,7 +361,7 @@ class Component(component.Main):
             v = self.root.getTranslation(space="world")
             mainCtlUpv.setTranslation(v, om.MSpace.kWorld)
             # connect upv curve to mainCrv_ctl driver node.
-            pm.connectAttr(crv[1].attr("outputGeometry[0]"), mainCtlUpv.getShape().attr("create"))
+            pm.connectAttr(deformer.attr("outputGeometry[0]"), mainCtlUpv.getShape().attr("create"))
 
             # offset upv curve
             cvs = mainCtlUpv.getCVs(space="world")
@@ -391,13 +400,20 @@ class Component(component.Main):
     def addSecondaryCnsCurve(self, ctls):
         crv_degree = 2
 
-        crv = helpers.addCnsCurve(self.crv_root, self.getName("secCtl_crv"), ctls, crv_degree)
-        ymt_util.setKeyableAttributesDontLockVisibility(crv[0], [])
+        t = getTransform(self.root)
+        crv = curve.addCnsCurve(
+                self.crv_root,
+                self.getName("secCtl_crv"),
+                ctls,
+                crv_degree,
+                m=t,
+                local=True)
+        ymt_util.setKeyableAttributesDontLockVisibility(crv, [])
         v = self.root.getTranslation(space="world")
-        crv[0].setTranslation(v, om.MSpace.kWorld)
+        crv.setTranslation(v, om.MSpace.kWorld)
 
-        self.secondaryCurves.append(crv[0])
-        self.rigCurves.append(crv[0])
+        self.secondaryCurves.append(crv)
+        self.rigCurves.append(crv)
 
     def _foreachSecCtrlPos(self, i, ctlPos, sec_number_index):
 
@@ -448,16 +464,6 @@ class Component(component.Main):
         pm.parent(self.mainControls[1].getParent(2), self.mainControls[0])
         pm.parent(self.mainControls[-2].getParent(2), self.mainControls[-1])
 
-        return
-
-        # TODO: fix later
-        for ctl in self.mainControls:
-            if "_tangent" not in ctl.name():
-                pm.parent(ctl.getParent(2), self.root)
-
-        # controls tags
-        # node.add_controller_tag(ctl, tagParent=tag_parent)
-
     def attachSecondaryControlsToMainCurve(self):
 
         secControlsMerged = []
@@ -467,9 +473,6 @@ class Component(component.Main):
 
         for secCtl in self.secondaryControls:
             constraints.matrixConstraint(self.root, secCtl.getParent(2), 'rs', True)
-
-            # controls tags
-            # node.add_controller_tag(secCtl, tagParent=parent_tag_L)
 
         # create hooks on the main ctl curve
         for j, crv in enumerate(self.secondaryCurves):
@@ -684,9 +687,9 @@ class Component(component.Main):
         attrs[2].connect(res2.input2X)
 
         # insert npo
-        npo0 = addNPO(self.mainControls[0])[0]
-        npo1 = addNPO(self.mainControls[2])[0]
-        npo2 = addNPO(self.mainControls[4])[0]
+        npo0 = ymt_util.addNPOPreservingMatrixConnections(self.mainControls[0])[0]
+        npo1 = ymt_util.addNPOPreservingMatrixConnections(self.mainControls[2])[0]
+        npo2 = ymt_util.addNPOPreservingMatrixConnections(self.mainControls[4])[0]
         res0.outputX.connect(npo0.attr(attr))
         res1.outputX.connect(npo1.attr(attr))
         res2.outputX.connect(npo2.attr(attr))
@@ -782,8 +785,7 @@ class Component(component.Main):
             npo = pm.PyNode(pm.createNode("transform", n=npoName, p=oParent, ss=True))
 
             npo.setTransformation(ctlGhost.getMatrix())
-            ymt_util.setKeyableAttributesDontLockVisibility(npo, [])
-            pm.parent(ctlGhost, npo)
+            pm.parent(ctlGhost, npo, absolute=True)
 
             slider = primitive.addTransform(sliderParent, ctl.name() + "_slideDriven", t)
             sliders.append(slider)
@@ -815,9 +817,9 @@ class Component(component.Main):
                                 worldUpType="objectrotation",
                                 worldUpVector=[0, 1, 0],
                                 worldUpObject=gDriver)
-            pm.parent(ctlGhost.getParent(), slider)
-
-            pm.parent(gDriver.getParent(), self.mainControl)
+            pm.parent(ctlGhost.getParent(), slider, absolute=True)
+            pm.parent(gDriver.getParent(), self.mainControl, absolute=True)
+            ymt_util.setKeyableAttributesDontLockVisibility(npo, [])
 
 
 def draw_eye_guide_mesh_plane(points, t):

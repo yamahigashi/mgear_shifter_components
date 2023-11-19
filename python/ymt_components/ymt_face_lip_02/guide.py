@@ -156,8 +156,9 @@ class Guide(guide.ComponentGuide):
         self.pParentJointIndex = self.addParam("parentJointIndex", "long", -1, None, None)
         self.pSlidingSurface   = self.addParam("isSlidingSurface", "bool", True)
         self.pSurfaceReference = self.addParam("surfaceReference", "string", "")
-        self.pCheekLeftReference = self.addParam("cheekLeftReference", "string", "")
-        self.pCheekRightReference = self.addParam("cheekRightReference", "string", "")
+        self.pMouthCenterReference = self.addParam("mouthCenterReference", "string", "mouthSlide_C0_root")
+        self.pMouthLeftReference = self.addParam("mouthLeftReference", "string", "mouthCorner_L0_root")
+        self.pMouthRightReference = self.addParam("mouthRightReference", "string", "mouthCorner_R0_root")
 
     def modalPositions(self):
         """Launch a modal dialog to set position of the guide."""
@@ -267,13 +268,16 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
         self.populateCheck(self.settingsTab.isSlidingSurface,"isSlidingSurface")
 
         surfaceReference = self.root.attr("surfaceReference").get()
-        self.settingsTab.surfaceReference_listWidget.addItem(surfaceReference)
+        self.settingsTab.surfaceReference_lineEdit.setText(surfaceReference)
 
-        cheekLeftReference = self.root.attr("cheekLeftReference").get()
-        self.settingsTab.cheekLeftReference_listWidget.addItem(cheekLeftReference)
+        mouthCenterReference = self.root.attr("mouthCenterReference").get()
+        self.settingsTab.mouthCenter_lineEdit.setText(mouthCenterReference)
 
-        cheekRightReference = self.root.attr("cheekRightReference").get()
-        self.settingsTab.cheekRightReference_listWidget.addItem(cheekRightReference)
+        mouthLeftReference = self.root.attr("mouthLeftReference").get()
+        self.settingsTab.mouthLeft_lineEdit.setText(mouthLeftReference)
+
+        mouthRightReference = self.root.attr("mouthRightReference").get()
+        self.settingsTab.mouthRight_lineEdit.setText(mouthRightReference)
 
     def create_componentLayout(self):
 
@@ -302,51 +306,103 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
 
         self.settingsTab.surfaceReferenceAdd_pushButton.clicked.connect(
             partial(
-                self.addItem2listWidget,
-                self.settingsTab.surfaceReference_listWidget,
+                self.addReference,
+                self.settingsTab.surfaceReference_lineEdit,
                 "surfaceReference"
             )
         )
 
         self.settingsTab.surfaceReferenceRemove_pushButton.clicked.connect(
             partial(
-                self.removeSelectedFromListWidget,
-                self.settingsTab.surfaceReference_listWidget,
+                self.removeReference,
+                self.settingsTab.surfaceReference_lineEdit,
                 "surfaceReference"
             )
         )
 
-        self.settingsTab.cheekLeftReferenceAdd_pushButton.clicked.connect(
+        self.settingsTab.mouthCenterAdd_pushButton.clicked.connect(
             partial(
-                self.addItem2listWidget,
-                self.settingsTab.cheekLeftReference_listWidget,
-                "cheekLeftReference"
+                self.addReference,
+                self.settingsTab.mouthCenter_lineEdit,
+                "mouthCenterReference"
             )
         )
 
-        self.settingsTab.cheekLeftReferenceRemove_pushButton.clicked.connect(
+        self.settingsTab.mouthCenterRemove_pushButton.clicked.connect(
             partial(
-                self.removeSelectedFromListWidget,
-                self.settingsTab.cheekLeftReference_listWidget,
-                "cheekLeftReference"
+                self.removeReference,
+                self.settingsTab.mouthCenter_lineEdit,
+                "mouthCenterReference"
             )
         )
 
-        self.settingsTab.cheekRightReferenceAdd_pushButton.clicked.connect(
+        self.settingsTab.mouthLeftAdd_pushButton.clicked.connect(
             partial(
-                self.addItem2listWidget,
-                self.settingsTab.cheekRightReference_listWidget,
-                "cheekRightReference"
+                self.addReference,
+                self.settingsTab.mouthLeft_lineEdit,
+                "mouthLeftReference"
             )
         )
 
-        self.settingsTab.cheekRightReferenceRemove_pushButton.clicked.connect(
+        self.settingsTab.mouthLeftRemove_pushButton.clicked.connect(
             partial(
-                self.removeSelectedFromListWidget,
-                self.settingsTab.cheekRightReference_listWidget,
-                "cheekRightReference"
+                self.removeReference,
+                self.settingsTab.mouthLeft_lineEdit,
+                "mouthLeftReference"
             )
         )
+
+        self.settingsTab.mouthRightAdd_pushButton.clicked.connect(
+            partial(
+                self.addReference,
+                self.settingsTab.mouthRight_lineEdit.setText,
+                "mouthRightReference"
+            )
+        )
+
+        self.settingsTab.mouthRightRemove_pushButton.clicked.connect(
+            partial(
+                self.removeReference,
+                self.settingsTab.mouthRight_lineEdit,
+                "mouthRightReference"
+            )
+        )
+
+    def addReference(self, lineEdit, targetAttr):
+        oSel = pm.selected()
+        compatible = ["nurbsSurface"]
+
+        def __findRoot(oNode):
+            if oNode.hasAttr("isGearGuide"):
+                return oNode
+
+            if oNode.getParent():
+                return __findRoot(oNode.getParent())
+            else:
+                raise Exception("Root not found")
+
+        if oSel:
+            if (isinstance(oSel[0], pm.nodetypes.Transform)
+                    and oSel[0].getShape()
+                    and oSel[0].getShape().nodeType() in compatible):
+
+                root = __findRoot(oSel[0])
+                lineEdit.setText(root.name())
+                self.root.attr(targetAttr).set(root.name())
+
+            elif (isinstance(oSel[0], pm.nodetypes.Transform)
+                  and oSel[0].hasAttr("isGearGuide")
+            ):
+                root = oSel[0]
+                lineEdit.setText(root.name())
+                self.root.attr(targetAttr).set(root.name())
+
+            else:
+                pm.displayWarning("Select a nurbsSurface")
+
+    def removeReference(self, lineEdit, targetAttr):
+        lineEdit.clear()
+        self.root.attr(targetAttr).set("")
 
     def updateMasterChain(self, lEdit, targetAttr):
         oType = pm.nodetypes.Transform
