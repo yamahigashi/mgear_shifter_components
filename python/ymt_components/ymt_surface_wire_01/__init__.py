@@ -1,6 +1,7 @@
 """mGear shifter components"""
 # pylint: disable=import-error,W0201,C0111,C0112
 import sys
+import math
 import maya.cmds as cmds
 # import maya.OpenMaya as om1
 import maya.api.OpenMaya as om
@@ -109,8 +110,9 @@ class Component(component.Main):
         self.surfRef = self.settings["surfaceReference"]
         if not self.surfRef:
             raise Exception("No surface reference specified")
+        self.numLocs = len(self.guide.atra) - 2
+        self.ctlSize = (self.size / self.numLocs) * self.settings["ctlSize"] * 0.5
         # --------------------------------------------------------
-        self.num_ctrls = len(self.guide.atra) - 2
 
         self.float_ctls = []
         self.float_npos = []
@@ -150,17 +152,23 @@ class Component(component.Main):
 
         count = self.settings["numberOfControllers"]
         for index in range(count):
-            if index == 0:
+            if count == self.numLocs:
+                position = self.guide.apos[index + 1]
+
+            elif index == 0:
                 ratio = 0
+                position = self.guide.apos[1]
+
             else:
                 ratio = float(index) / (count - 1)
-            position = curve.getPositionByRatio(self.dummyCurve, ratio)
+                position = curve.getPositionByRatio(self.dummyCurve, ratio)
+
             t = transform.setMatrixPosition(self.guide.atra[0], position)
             npo, ctl = self.addController(index, t)
             self.float_npos.append(npo)
             self.float_ctls.append(ctl)
 
-        cmds.delete(self.dummyCurve.fullPathName())
+        # cmds.delete(self.dummyCurve.fullPathName())
 
     def addController(self, index, t):
 
@@ -175,13 +183,13 @@ class Component(component.Main):
             "{}_ctl".format(index),
             t,
             self.color_ik,
-            "square",
-            ro=datatypes.Vector([1.5708, 0, 0]),
-            po=datatypes.Vector([0, 0, self.size * 0.33]),
+            self.settings["icon"],
+            ro=datatypes.Vector([0.0, math.pi / 2.0, 0.0]),
+            po=datatypes.Vector([0.0, 0.0, self.size * 0.33]),
             tp=self.previusTag,
-            d=self.size * 0.1,
-            h=self.size * 0.1,
-            w=self.size * 0.1,
+            d=self.ctlSize,
+            h=self.ctlSize,
+            w=self.ctlSize,
             mirrorConf=self.mirror_conf
         )
 
@@ -250,11 +258,13 @@ class Component(component.Main):
                 ro=datatypes.Vector([1.5708, 0, 0]),
                 po=datatypes.Vector([0, 0, self.size * 0.075]),
                 tp=self.previusTag,
-                d=self.size * 0.1,
-                h=self.size * 0.1,
-                w=self.size * 0.1,
+                d=self.ctlSize,
+                h=self.ctlSize,
+                w=self.ctlSize,
                 mirrorConf=self.mirror_conf
             )
+            if not self.surfaceKeyable:
+                self.removeFromControllerGroup(ctl)
 
             if self.settings["addJoints"]:
                 self.jnt_pos.append([ctl , str(i)])
@@ -445,7 +455,7 @@ class Component(component.Main):
         obj.attr("isCtl").set(False)
         pm.deleteAttr(obj.attr("isCtl"))
         ymt_util.setKeyableAttributesDontLockVisibility(obj, [])
-        pm.delete(obj.getShape())
+        pm.delete(pm.listRelatives(obj, shapes=True))
 
 
 if __name__ == "__main__":

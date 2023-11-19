@@ -87,6 +87,8 @@ class Guide(guide.ComponentGuide):
         self.pSourceKeyable = self.addParam("sourceKeyable", "bool", True)
         self.pSurfaceKeyable = self.addParam("surfaceKeyable", "bool", True)
         self.pNumberOfControllers = self.addParam("numberOfControllers", "long", 3, 2, None)
+        self.pCtlSize = self.addParam("ctlSize", "double", 1, None, None)
+        self.pIcon = self.addParam("icon", "string", "cube")
 
     def modalPositions(self):
         """Launch a modal dialog to set position of the guide."""
@@ -152,6 +154,22 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
 
         super(self.__class__, self).__init__(parent=parent)
         self.settingsTab = settingsTab()
+        self.iconsList = [
+            "arrow",
+            "circle",
+            "compas",
+            "cross",
+            "crossarrow",
+            "cube",
+            "cubewithpeak",
+            "cylinder",
+            "diamond",
+            "flower",
+            "null",
+            "pyramid",
+            "sphere",
+            "square"
+        ]
 
         self.setup_componentSettingWindow()
         self.create_componentControls()
@@ -198,6 +216,11 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
             surfaceReference = ""
             self.root.pSurfaceReference = self.root.addParam("surfaceReference", "string", "")
         self.settingsTab.surfaceReference_listWidget.addItem(surfaceReference)
+
+        self.settingsTab.ctlNum_doubleSpinBox.setValue(self.root.attr("numberOfControllers").get())
+        self.settingsTab.ctlSize_doubleSpinBox.setValue(self.root.attr("ctlSize").get())
+        sideIndex = self.iconsList.index(self.root.attr("icon").get())
+        self.settingsTab.controlShape_comboBox.setCurrentIndex(sideIndex)
 
         # populate connections in main settings
         self.c_box = self.mainSettingsTab.connector_comboBox
@@ -272,6 +295,20 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
                 "surfaceReference"
             )
         )
+
+        self.settingsTab.ctlNum_doubleSpinBox.valueChanged.connect(
+            partial(self.updateSpinBox,
+                    self.settingsTab.ctlNum_doubleSpinBox,
+                    "numberOfControllers"))
+
+        self.settingsTab.ctlSize_doubleSpinBox.valueChanged.connect(
+            partial(self.updateSpinBox,
+                    self.settingsTab.ctlSize_doubleSpinBox,
+                    "ctlSize"))
+        self.settingsTab.controlShape_comboBox.currentIndexChanged.connect(
+            partial(self.updateControlShape,
+                    self.settingsTab.controlShape_comboBox,
+                    self.iconsList, "icon"))
 
     def updateMasterChain(self, lEdit, targetAttr):
         oType = pm.nodetypes.Transform

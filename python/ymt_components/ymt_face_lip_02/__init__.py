@@ -103,8 +103,9 @@ class Component(component.Main):
 
         self.connect_surface_slider = self.settings["isSlidingSurface"]
         self.surfRef = self.settings["surfaceReference"]
-        self.cheekLeftRef = self.settings["cheekLeftReference"]
-        self.cheekRightRef = self.settings["cheekRightReference"]
+        self.mouthCenterRef = self.settings["mouthCenterReference"]
+        self.mouthLeftRef = self.settings["mouthLeftReference"]
+        self.mouthRightRef = self.settings["mouthRightReference"]
         # -------------------------------------------------------
 
         self.num_locs = self.getNumberOfLocators("_loc")
@@ -691,13 +692,13 @@ class Component(component.Main):
         lipup_ref = self.parent_comp.lipup_ctl
         liplow_ref = self.parent_comp.liplow_ctl
 
-        slide_c_ref = self.rig.findRelative("mouthSlide_C0_root")
-        corner_l_ref = self.rig.findRelative("mouthCorner_L0_root")
-        corner_r_ref = self.rig.findRelative("mouthCorner_R0_root")
+        slide_c_ref = self.rig.findRelative(self.mouthCenterRef)
+        corner_l_ref = self.rig.findRelative(self.mouthLeftRef)
+        corner_r_ref = self.rig.findRelative(self.mouthRightRef)
 
-        slide_c_comp = self.rig.findComponent("mouthSlide_C0_root")
-        corner_l_comp = self.rig.findComponent("mouthCorner_L0_root")
-        corner_r_comp = self.rig.findComponent("mouthCorner_R0_root")
+        slide_c_comp = self.rig.findComponent(self.mouthCenterRef)
+        corner_l_comp = self.rig.findComponent(self.mouthLeftRef)
+        corner_r_comp = self.rig.findComponent(self.mouthRightRef)
 
         if slide_c_comp.root.parent(0) != self.parent:
             self.parent.addChild(slide_c_comp.root)

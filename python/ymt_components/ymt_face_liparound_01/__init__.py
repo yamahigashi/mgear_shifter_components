@@ -216,10 +216,8 @@ class Component(component.Main):
     def addDummyPlane(self):
         # type: () -> om.MFnMesh
 
-        positions = []
-        positions.extend(self.locsPos)
-
-        return draw_eye_guide_mesh_plane(positions, self.root)
+        t = getTransform(self.root)
+        return ymt_util.draw_plane_from_positions(self.locsPos, t)
 
     def addCurve(self):
 
@@ -913,13 +911,6 @@ def draw_eye_guide_mesh_plane(points, t):
             polygonConnects.append(0)
 
     mesh_obj = mesh.create(vertices, polygonCounts, polygonConnects)
-    return mesh
-
-    mesh_trans = om.MFnTransform(mesh_obj)
-    n = pm.PyNode(mesh_trans.name())
-    v = t.getTranslation(space="world")
-    n.setTranslation(v, om.MSpace.kWorld)
-
     return mesh
 
 
