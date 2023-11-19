@@ -10,10 +10,6 @@ from mgear.vendor.Qt import QtWidgets, QtCore
 from mgear import shifter
 from mgear.core import transform
 
-# from mgear.core.transform import getTransform
-# from mgear.core.transform import getTransformLookingAt
-# from mgear.core.transform import getChainTransform2
-# from mgear.core.transform import setMatrixPosition
 from mgear.core.primitive import addTransform
 
 
