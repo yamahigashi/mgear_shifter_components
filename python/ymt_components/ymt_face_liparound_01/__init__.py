@@ -395,33 +395,6 @@ class Component(component.Main):
 
                 npo_name = self.getName("rope_{}_jnt_npo".format(_index))
                 npo = addTransform(cns, npo_name, xform)
-                # aim = addTransform(upv, self.getName("rope_{}_jnt_aim".format(sub_comp)), xform)
-                # cmds.setAttr("{}.translateX".format(aim), cmds.getAttr("{}.translateX".format(npo)))
-                # cmds.setAttr("{}.translateY".format(aim), cmds.getAttr("{}.translateY".format(npo)))
-                # cmds.setAttr("{}.translateZ".format(aim), cmds.getAttr("{}.translateZ".format(npo)))
-
-                # aimCns = cmds.aimConstraint(
-                #     aim.name(),
-                #     npo.name(),
-                #     aimVector=aimVec,
-                #     # upVector=(0, 1, 0),
-                #     worldUpType="None",
-                #     # worldUpObject=self.root.name()
-                # )
-                # cmds.delete(aimCns)
-                # 
-                # if lower:
-                #     npo.rotateBy((0, 0, 180))
-                # 
-                # aimCns = pm.aimConstraint(
-                #     aim,
-                #     npo,
-                #     aimVector=(0, 0, 1),
-                #     upVector=(0, 1, 0),
-                #     worldUpType="None",
-                #     # worldUpObject=self.root,
-                #     maintainOffset=True
-                # )
      
                 t = getTransform(npo)
                 ctl = self.addCtl(
@@ -472,24 +445,6 @@ class Component(component.Main):
             # ["upcorner", "R", "circle", 14, .03, []],
             # ["upinner",  "R", "circle", 14, .03, []]
         ]
-        # # if 8 locs, : up is 0, left is 2, bottom is 4, right is 6
-        # ctlOptions.append(["upcenter", "C", "square", 4, .05, axis_list])
-        # for i in range(1, self.left_index):
-        #     ctlOptions.append(["up{}".format(i - 1), "L", "circle", 14, .03, []])
-        # 
-        # ctlOptions.append(["outer", "L", "square", 4, .05, axis_list])
-        # for i in range(self.left_index, self.bottom_index - 1):
-        #     ctlOptions.append(["low{}".format(i - self.left_index), "L", "circle", 14, .03, []])
-        # 
-        # ctlOptions.append(["lowcenter", "C", "square", 4, .05, axis_list])
-        # for i in range(self.bottom_index, self.right_index - 1):
-        #     reverse_i = self.right_index - i - 2
-        #     ctlOptions.append(["low{}".format(reverse_i), "R", "circle", 14, .03, []])
-        # 
-        # ctlOptions.append(["outer", "R", "square", 4, .05, axis_list])
-        # for i in range(self.right_index, self.num_locs - 1):
-        #     reverse_i = self.num_locs - i - 2
-        #     ctlOptions.append(["up{}".format(reverse_i), "R", "circle", 14, .03, []])
 
         ctlOptions.append(["upcenter", "C", "square", 4, .05, axis_list])
         for i in range(self.numInterControls):
@@ -870,48 +825,6 @@ class Component(component.Main):
         """Set the relation beetween object from guide to rig"""
 
         self.relatives["root"] = self.root
-
-
-def draw_eye_guide_mesh_plane(points, t):
-    # type: (Tuple[float, float, float], datatypes.MMatrix) -> om.MFnMesh
-
-    mesh = om.MFnMesh()
-
-    points = [x - t.getTranslation(space="world") for x in points]
-    # points = [x - t.getTranslation(space="world") for x in points]
-
-    mean_x = sum(p[0] for p in points) / len(points)
-    mean_y = sum(p[1] for p in points) / len(points)
-    mean_z = sum(p[2] for p in points) / len(points)
-    mean = (mean_x, mean_y, mean_z)
-
-    # Simple unitCube coordinates
-    vertices = [om.MPoint(mean), ]
-    polygonCounts = []
-    polygonConnects = []
-
-    for i, p in enumerate(points):
-        vertices.append(om.MPoint(p))    # 0
-
-        if 1 < i:
-            polygonCounts.append(3)
-            polygonConnects.append(i)
-            polygonConnects.append(i - 1)
-            polygonConnects.append(0)
-
-        if len(points) == (i + 1):
-            polygonCounts.append(3)
-            polygonConnects.append(i + 1)
-            polygonConnects.append(i)
-            polygonConnects.append(0)
-
-            polygonCounts.append(3)
-            polygonConnects.append(1)
-            polygonConnects.append(i + 1)
-            polygonConnects.append(0)
-
-    mesh_obj = mesh.create(vertices, polygonCounts, polygonConnects)
-    return mesh
 
 
 def ghostSliderForMouth(ctlGhost, surface, sliderParent):
