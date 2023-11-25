@@ -255,14 +255,15 @@ class Component(component.Main):
             self.jnt_pos = [[self.ghostCtl, "0"]]
 
         if self.surfaceKeyable:
-            self.surfaceCtl.attr("isCtl").set(True)
-        else:
-            self.removeFromControllerGroup(self.surfaceCtl)
-
-        if self.sourceKeyable:
             self.ghostCtl.attr("isCtl").set(True)
         else:
             self.removeFromControllerGroup(self.ghostCtl)
+
+        if self.sourceKeyable:
+            # this is intended, the naming is confusing but the source is the real control
+            self.surfaceCtl.attr("isCtl").set(True)
+        else:
+            self.removeFromControllerGroup(self.surfaceCtl)
 
         # add to group
         if self.settings["ctlGrp"]:
