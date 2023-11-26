@@ -1,17 +1,16 @@
 """mGear shifter components"""
-# pylint: disable=import-error,W0201,C0111,C0112
+import sys
 import re
 import math
 import functools
 
 import maya.cmds as cmds
-import maya.OpenMaya as om1
-import maya.api.OpenMaya as om
+# import maya.OpenMaya as om1
+# import maya.api.OpenMaya as om
 
 import pymel.core as pm
 from pymel.core import datatypes
 
-import exprespy.cmd
 from mgear.shifter import component
 
 from mgear.core import (
@@ -19,16 +18,14 @@ from mgear.core import (
     # curve,
     applyop,
     attribute,
-    icon,
-    fcurve,
-    vector,
+    # icon,
+    # fcurve,
+    # vector,
     meshNavigation,
     node,
     primitive,
     utils,
 )
-
-from mgear.rigbits import ghost
 
 from mgear.core.transform import (
     getTransform,
@@ -41,32 +38,31 @@ from mgear.core.transform import (
 from mgear.core.primitive import (
     addTransform,
 )
+from mgear.rigbits import ghost
 
 import ymt_shifter_utility as ymt_util
 import ymt_shifter_utility.curve as curve
 
-if False:  # pylint: disable=using-constant-test, wrong-import-order
-    # For type annotation
-    from typing import (  # NOQA: F401 pylint: disable=unused-import
-        Optional,
-        Dict,
-        List,
-        Tuple,
-        Pattern,
-        Callable,
-        Any,
-        Text,
-        Generator,
-        Union
-    )
-    from pathlib import Path  # NOQA: F401, F811 pylint: disable=unused-import,reimported
-    from types import ModuleType  # NOQA: F401 pylint: disable=unused-import
-    from six.moves import reload_module as reload  # NOQA: F401 pylint: disable=unused-import
+if sys.version_info > (3, 0):
+    from typing import TYPE_CHECKING
+    if TYPE_CHECKING:
+        from typing import (
+            Optional,  # noqa: F401
+            Dict,  # noqa: F401
+            List,  # noqa: F401
+            Tuple,  # noqa: F401
+            Pattern,  # noqa: F401
+            Callable,  # noqa: F401
+            Any,  # noqa: F401
+            Text,  # noqa: F401
+            Generator,  # noqa: F401
+            Union  # noqa: F401
+        )
 
 from logging import (  # noqa:F401 pylint: disable=unused-import, wrong-import-order
     StreamHandler,
     getLogger,
-    WARN,
+    # WARN,
     DEBUG,
     INFO
 )
@@ -77,6 +73,9 @@ logger = getLogger(__name__)
 logger.setLevel(INFO)
 logger.addHandler(handler)
 logger.propagate = False
+
+
+EPSILON = 1e-4
 
 
 ##########################################################
@@ -131,9 +130,10 @@ class Component(component.Main):
             # self.offset[2] = self.offset[2] * -1.0
 
         # -------------------------------------------------------
+        # TODO: extract to settings
         self.ctlName = "ctl"
-        self.detailControllersGroupName = "controllers_detail"  # TODO: extract to settings
-        self.primaryControllersGroupName = "controllers_primary"  # TODO: extract to settings
+        self.detailControllersGroupName = "controllers_detail"
+        self.primaryControllersGroupName = "controllers_primary"
         self.blinkH = 0.2
         self.upperVTrackUp = 0.33
         self.upperVTrackLow = 0.10
@@ -143,52 +143,63 @@ class Component(component.Main):
         self.lowerHTrack = 0.10
 
         # --------------------------------------------------------
-        self.ik_ctl = []
-        self.ik_npo = []
-        self.ik_roll_npo = []
-        self.ik_global_in = []
-        self.ik_local_in = []
-        self.ik_global_out = []
-        self.ik_global_ref = []
-        self.ik_uv_param = []
-        self.ik_decompose_rot = []
-
-        self.arrow_ctl = None
-        self.arrow_npo = None
         self.upControls = []
         self.lowControls = []
         self.trackLvl = []
 
-        self.upCrv = None
-        self.lowCrv = None
-        self.upCrv_ctl = None
-        self.lowCrv_ctl = None
-        self.upBlink = None
-        self.lowBlink = None
-        self.upTarget = None
-        self.lowTarget = None
-        self.midTarget = None
-        self.midTargetLower = None
+        # self.arrow_ctl = None
+        # self.arrow_npo = None
+        # self.upCrv = None
+        # self.lowCrv = None
+        # self.upCrv_ctl = None
+        # self.lowCrv_ctl = None
+        # self.upBlink = None
+        # self.lowBlink = None
+        # self.upTarget = None
+        # self.lowTarget = None
+        # self.midTarget = None
+        # self.midTargetLower = None
 
         self.previusTag = self.parentCtlTag
-        self.guide.eyeMesh = self.guide.getObjects(self.guide.root)["eyeMesh"]
+        self.guide.eyeMesh = self.guide.getObjects(self.guide.root)["pivotAndSizeRef"]
+        # --------------------------------------------------------
 
-        self.addCurve()
+        positions = [self.inPos]
+        positions.extend(self.uplocsPos)
+        positions.append(self.outPos)
+        relativeUpPositions = [x - self.rootPos for x in positions]
+
+        positions = [self.inPos]
+        positions.extend(self.lowlocsPos)
+        positions.append(self.outPos)
+        relativeLowPositions = [x - self.rootPos for x in positions]
+
+        self.crvroot, crvs = self.addCurves(relativeUpPositions, relativeLowPositions)
+        self.upCrv = crvs[0]
+        self.lowCrv = crvs[1]
+        self.upCrv_ctl = crvs[2]
+        self.lowCrv_ctl = crvs[3]
+        self.upBlink = crvs[4]
+        self.lowBlink = crvs[5]
+        self.upTarget = crvs[6]
+        self.lowTarget = crvs[7]
+
         self.addControllers()
 
-        # self.connect_surface_slider = self.settings["isSlidingSurface"]
-        self.connect_surface_slider = True
-        if self.connect_surface_slider:
-            bt = transform.getTransform(self.root)
-            self.slider_root = addTransform(self.root, self.getName("sliders"), bt)
-            ymt_util.setKeyableAttributesDontLockVisibility(self.slider_root, [])
+        self.connect_surface_slider = self.settings["isSlidingSurface"]
+        if not self.connect_surface_slider:
+            return
+
+        bt = transform.getTransform(self.root)
+        self.slider_root = addTransform(self.root, self.getName("sliders"), bt)
+        ymt_util.setKeyableAttributesDontLockVisibility(self.slider_root, [])
 
         self.surfRef = self.settings["surfaceReference"]
         if not self.surfRef:
             self.sliding_surface = pm.duplicate(self.guide.getObjects(self.guide.root)["sliding_surface"])[0]
             pm.parent(self.sliding_surface.name(), self.root)
             self.sliding_surface.visibility.set(False)
-            pm.makeIdentity(self.sliding_surface, apply=True, t=1,  r=1, s=1, n=0, pn=1)
+            pm.makeIdentity(self.sliding_surface, apply=True, t=1,  r=1, s=1, n=0, pn=1)  # type: ignore
 
     def getNumberOfLocators(self, query):
         # type: (Text) -> int
@@ -196,23 +207,18 @@ class Component(component.Main):
         num = 0
         for k, v in self.guide.tra.items():
             if query in k:
-                index = int(re.search(r"^(\d+)", k).group(1))
+                m = re.search(r"^(\d+)", k)
+                if not m:
+                    continue
+                index = int(m.group(1))
                 num = max(num, index + 1)
 
         return num
 
-    def addDummyPlane(self):
-        # type: () -> om.MFnMesh
+    def addCurves(self, upPositions, lowPositions):
 
-        positions = [self.inPos]
-        positions.extend(self.uplocsPos)
-        positions.append(self.outPos)
-        positions.extend(reversed(self.lowlocsPos))
-
-        return draw_eye_guide_mesh_plane(positions, self.root)
-        # return mgear_util.draw_eye_guide_mesh_plane(joint_points)
-
-    def addCurve(self):
+        gen2 = curve.createCurveFromCurve
+        gen3 = curve.addCurve
 
         t = getTransform(self.root)
         scl = [1, 1, 1]
@@ -221,61 +227,45 @@ class Component(component.Main):
         t = transform.setMatrixScale(t, scl)
         crv_root = addTransform(self.root, self.getName("crvs"), t)
 
-        plane = self.addDummyPlane()
-        self.addCurves(crv_root, plane)
-        cmds.delete(cmds.listRelatives(plane.fullPathName(), parent=True))
-
-    def addCurves(self, crv_root, plane):
-
         t = getTransform(self.root)
-        gen = curve.createCurveFromOrderedEdges
-        gen2 = curve.createCurveFromCurve
-        planeNode = pm.PyNode(plane.fullPathName())
 
         # -------------------------------------------------------------------
-        edgeList = ["{}.e[{}]".format(plane.fullPathName(), 0)]
-        for i in range(1, self.num_uplocs + 1):
-            edgeList.append("{}.e[{}]".format(plane.fullPathName(), i * 2 + 1))
-        edgeList = [pm.PyNode(x) for x in edgeList]
-
-        # upEyelid = meshNavigation.edgeRangeInLoopFromMid(edgeList, upPos, inPos, outPos)
-        self.upCrv = gen(edgeList, planeNode.verts[1], self.getName("upperEyelid"), parent=crv_root, m=t)
-        self.upCrv_ctl = gen(edgeList, planeNode.verts[1], self.getName("upCtl_crv"), parent=crv_root, m=t)
-        pm.rebuildCurve(self.upCrv_ctl, s=2, rt=0, rpo=True, ch=False)
+        upCrv = gen3(crv_root, self.getName("upperEyelid"), upPositions, m=t)
+        upCrv_ctl = gen3(crv_root, self.getName("upCtl_crv"), upPositions, m=t)
+        pm.rebuildCurve(upCrv_ctl, s=2, rt=0, rpo=True, ch=False)
 
         # -------------------------------------------------------------------
-        edgeList = []
-        for i in reversed(range(self.num_uplocs + 1, self.num_uplocs + self.num_lowlocs + 2)):
-            edgeList.append("{}.e[{}]".format(plane.fullPathName(), i * 2 + 1))
-        edgeList = [pm.PyNode(x) for x in edgeList]
 
-        self.lowCrv = gen(edgeList, planeNode.verts[1], self.getName("lowerEyelid"), parent=crv_root, m=t)
-        self.lowCrv_ctl = gen(edgeList, planeNode.verts[1], self.getName("lowCtl_crv"), parent=crv_root, m=t)
-        pm.rebuildCurve(self.lowCrv_ctl, s=2, rt=0, rpo=True, ch=False)
+        lowCrv = gen3(crv_root, self.getName("lowerEyelid"), lowPositions, m=t)
+        lowCrv_ctl = gen3(crv_root, self.getName("lowCtl_crv"), lowPositions, m=t)
+        pm.rebuildCurve(lowCrv_ctl, s=2, rt=0, rpo=True, ch=False)
 
         # -------------------------------------------------------------------
-        self.upBlink = gen2(self.upCrv, self.getName("upblink_crv"), nbPoints=30, parent=crv_root)
-        self.lowBlink = gen2(self.lowCrv, self.getName("lowBlink_crv"), nbPoints=30, parent=crv_root)
+        _ = gen2(upCrv, self.getName("upblink_crv"), nbPoints=30, parent=crv_root)
+        pm.delete(_)
+        upBlink = gen2(upCrv, self.getName("upblink_crv"), nbPoints=30, parent=crv_root)
+        _ = gen2(lowCrv, self.getName("lowBlink_crv"), nbPoints=30, parent=crv_root)
+        pm.delete(_)
+        lowBlink = gen2(lowCrv, self.getName("lowBlink_crv"), nbPoints=30, parent=crv_root)
 
-        self.upTarget = gen2(self.upCrv, self.getName("upblink_target"), nbPoints=30, parent=crv_root)
-        self.lowTarget = gen2(self.lowCrv, self.getName("lowBlink_target"), nbPoints=30, parent=crv_root)
-        # self.midTarget = gen2(self.lowCrv, self.getName("midBlink_target"), nbPoints=30, parent=crv_root)
-        # self.midTargetLower = gen2(self.lowCrv, self.getName("midBlinkLower_target"), nbPoints=30, parent=crv_root)
+        upTarget = gen2(upCrv, self.getName("upblink_target"), nbPoints=30, parent=crv_root)
+        lowTarget = gen2(lowCrv, self.getName("lowBlink_target"), nbPoints=30, parent=crv_root)
 
-        rigCrvs = [self.upCrv,
-                   self.lowCrv,
-                   self.upCrv_ctl,
-                   self.lowCrv_ctl,
-                   self.upBlink,
-                   self.lowBlink,
-                   self.upTarget,
-                   self.lowTarget,
-                   # self.midTarget,
-                   # self.midTargetLower
+        # -------------------------------------------------------------------
+        rigCrvs = [upCrv,
+                   lowCrv,
+                   upCrv_ctl,
+                   lowCrv_ctl,
+                   upBlink,
+                   lowBlink,
+                   upTarget,
+                   lowTarget,
         ]
 
         for crv in rigCrvs:
             crv.attr("visibility").set(False)
+
+        return crv_root, rigCrvs
 
     def getBboxRadius(self):
         # localBBOX
@@ -297,11 +287,9 @@ class Component(component.Main):
 
         t = transform.getTransformLookingAt(
             self.root.getTranslation(space="world"),
-            # self.bboxCenter,
             self.frontPos,
             self.normalVec,
             axis=axis,
-            # negate=self.negate
         ) 
 
         # averagePosition,
@@ -312,13 +300,6 @@ class Component(component.Main):
 
         self.eyeTargets_root = addTransform(self.root, self.getName("targets"), t)
         self.jnt_root = addTransform(self.root, self.getName("joints"), bt)
-        # self.jnt_root = primitive.addTransformFromPos(self.root, self.getName("joints"), pos=self.bboxCenter)
-        # TODO: implement later
-        # if deformers_group:
-        #     deformers_group = pm.PyNode(deformers_group)
-        #     pm.parentConstraint(self.root, jnt_root, mo=True)
-        #     pm.scaleConstraint(self.root, jnt_root, mo=True)
-        #     deformers_group.addChild(jnt_root)
         if self.negate:
             scl = [-1, 1, 1]
         t = transform.setMatrixScale(t, scl)
@@ -388,26 +369,22 @@ class Component(component.Main):
         self.addToSubGroup(self.over_ctl, self.primaryControllersGroupName)
 
         ymt_util.setKeyableAttributesDontLockVisibility(self.arrow_ctl, params=["rx", "ry", "rz"])
-        # self.addAnimParam(self.arrow_ctl, "isCtl", "bool", keyable=False)
 
     def addAimControllers(self, t):
 
         # tracking custom trigger
         aimTrigger_root = addTransform(self.center_lookat, self.getName("aimTrigger_root"), t)
-        # For some unknown reason the right side gets scewed rotation values
         resetTransform(aimTrigger_root)
         aimTrigger_lvl = addTransform(aimTrigger_root, self.getName("aimTrigger_lvl"), t)
 
-        # For some unknown reason the right side gets scewed rotation values
         resetTransform(aimTrigger_lvl)
-        # aimTrigger_lvl.attr("tz").set(1.0)
         self.aimTrigger_ref = addTransform(aimTrigger_lvl, self.getName("aimTrigger_ref"), t)
-
-        # For some unknown reason the right side gets scewed rotation values
         resetTransform(self.aimTrigger_ref)
-        self.aimTrigger_ref.attr("tz").set(0.0)
+        self.aimTrigger_ref.attr("tx").set(EPSILON)
+        self.aimTrigger_ref.attr("ty").set(EPSILON)
+        self.aimTrigger_ref.attr("tz").set(EPSILON)
 
-        # connect  trigger with arrow_ctl
+        # connect trigger with arrow_ctl
         pm.parentConstraint(self.arrow_ctl, self.aimTrigger_ref, mo=True)
 
     def addBlinkControllers(self, t):
@@ -458,21 +435,24 @@ class Component(component.Main):
             self.lowControls = self._addCurveControllers(t, self.lowCrv_ctl, lowerCtlNames)
         else:
             self.lowControls = self._addCurveControllers(t, self.lowCrv_ctl, lowerCtlNames, inCtl=self.upControls[0], outCtl=self.upControls[-1])
-        self.lowControls.insert(0, self.upControls[0])
-        self.lowControls.append(self.upControls[-1])
+
+        # self.lowControls.insert(0, self.upControls[0])
+        # self.lowControls.append(self.upControls[-1])
 
     def addCurveJoints(self, t):
 
         skip = not self.settings.get("isSplitCorners", False)
 
         # upper eyelid controls
-        ctls, npos =  self._addCurveDetailControllers(t, self.upCrv, "upEyelid")
+        ctls, npos, aim_npos =  self._addCurveDetailControllers(t, self.upCrv, "upEyelid")
         self.upDetailControllers = ctls
         self.upDetailNpos = npos
+        self.upDetailAimNpos = aim_npos
 
-        ctls, npos = self._addCurveDetailControllers(t, self.lowCrv, "lowEyelid", skipHeadAndTail=skip)
+        ctls, npos, aim_npos = self._addCurveDetailControllers(t, self.lowCrv, "lowEyelid", skipHeadAndTail=skip)
         self.lowDetailControllers = ctls
         self.lowDetailNpos = npos
+        self.lowDetailAimNpos = aim_npos
 
     def _addCurveControllers(self, t, crv, ctlNames, inCtl=None, outCtl=None):
 
@@ -507,8 +487,6 @@ class Component(component.Main):
 
             t = setMatrixPosition(t, cvs[i])
             npo = addTransform(self.center_lookat, self.getName("%s_npo" % ctlNames[i]), t)
-            self.ik_npo.append(npo)
-            npoBase = npo
 
             if i == 2:
                 # we add an extra level to input the tracking ofset values
@@ -537,7 +515,8 @@ class Component(component.Main):
                 d = ctls[i + 1]
                 pm.parentConstraint(s, d, ctl.getParent(), mo=True)
 
-        applyop.gear_curvecns_op(crv, ctls)
+        curve.gear_curvecns_op_local(crv, ctls)
+
         return ctls
 
     def addToSubGroup(self, obj, group_name):
@@ -553,6 +532,7 @@ class Component(component.Main):
 
         controls = []
         npos = []
+        aim_npos = []
 
         cvs = crv.getCVs(space="world")
         crv_info = node.createCurveInfoNode(crv)
@@ -584,14 +564,15 @@ class Component(component.Main):
 
             # joints
             xform = setMatrixPosition(t, self.bboxCenter)
-            npo_name = self.getName("{}_jnt_base{}".format(name, str(i)))
-            npo = addTransform(self.jnt_root, npo_name, xform)
-            applyop.aimCns(npo, trn, axis="zy", wupObject=self.jnt_root)
+            npo_name = self.getName("{}{}_jnt_base".format(name, str(i)))
+            aim_npo = addTransform(self.jnt_root, npo_name, xform)
+            applyop.aimCns(aim_npo, trn, axis="zy", wupObject=self.jnt_root)
+            aim_npos.append(aim_npo)
 
             xform = setMatrixPosition(t, cv)
 
-            npo_name = self.getName("{}_jnt{}_npo".format(name, str(i)))
-            npo = addTransform(npo, npo_name, xform)
+            npo_name = self.getName("{}{}_jnt_npo".format(name, str(i)))
+            npo = addTransform(aim_npo, npo_name, xform)
 
             ctl_name = "%s_crvdetail%s_%s" % (name, i, self.ctlName)
             ctl = self.addCtl(
@@ -613,7 +594,7 @@ class Component(component.Main):
             jnt_name = "{}{}".format(name, i)
             self.jnt_pos.append([ctl, jnt_name])
 
-        return controls, npos
+        return controls, npos, aim_npos
 
     def addWires(self):
         # adding wires
@@ -629,17 +610,17 @@ class Component(component.Main):
 
         # setting blendshape reverse connections
         rev_node = pm.createNode("reverse")
-        pm.connectAttr(self.bs_upBlink[0].attr(self.lowTarget.name()), rev_node + ".inputX")
-        pm.connectAttr(rev_node + ".outputX", self.bs_upBlink[0].attr(self.upTarget.name()))
+        pm.connectAttr(self.bs_upBlink[0].attr(self.lowTarget.name().split("|")[-1]), rev_node + ".inputX")
+        pm.connectAttr(rev_node + ".outputX", self.bs_upBlink[0].attr(self.upTarget.name().split("|")[-1]))
 
         rev_node = pm.createNode("reverse")
         rev_nodeLower = pm.createNode("reverse")
-        pm.connectAttr(self.bs_lowBlink[0].attr(self.upTarget.name()), rev_node + ".inputX")
-        pm.connectAttr(rev_node + ".outputX", self.bs_lowBlink[0].attr(self.lowTarget.name()))
+        pm.connectAttr(self.bs_lowBlink[0].attr(self.upTarget.name().split("|")[-1]), rev_node + ".inputX")
+        pm.connectAttr(rev_node + ".outputX", self.bs_lowBlink[0].attr(self.lowTarget.name().split("|")[-1]))
 
         rev_node = pm.createNode("reverse")
-        pm.connectAttr(self.bs_lowBlink[0].attr(self.upTarget.name()), rev_node + ".inputX")
-        pm.connectAttr(self.bs_upBlink[0].attr(self.lowTarget.name()), rev_nodeLower + ".inputX")
+        pm.connectAttr(self.bs_lowBlink[0].attr(self.upTarget.name().split("|")[-1]), rev_node + ".inputX")
+        pm.connectAttr(self.bs_upBlink[0].attr(self.lowTarget.name().split("|")[-1]), rev_nodeLower + ".inputX")
 
     # =====================================================
     # ATTRIBUTES
@@ -688,18 +669,18 @@ class Component(component.Main):
         self.blinkLower_att.connect(blinkAdd.input2D[1].input2Dy)
 
         # calculate mid blink height: (height + low - hi) / (height * 2.0)
-        upHeightRatio = pm.createNode("multiplyDivide")
-        upHeightRatio.operation.set(1)  # mult
-        upHeightRatio.input1X.set(invHeight)
-        self.blink_upper_ctl.attr("translateY").connect(upHeightRatio.input2X)
+        self.upHeightRatio = pm.createNode("multiplyDivide")
+        self.upHeightRatio.operation.set(1)  # mult
+        self.upHeightRatio.input1X.set(invHeight)
+        self.blink_upper_ctl.attr("translateY").connect(self.upHeightRatio.input2X)
 
-        loHeightRatio = pm.createNode("multiplyDivide")
-        loHeightRatio.operation.set(1)  # mult
-        loHeightRatio.input1X.set(invHeight)
-        self.blink_lower_ctl.attr("translateY").connect(loHeightRatio.input2X)
+        self.loHeightRatio = pm.createNode("multiplyDivide")
+        self.loHeightRatio.operation.set(1)  # mult
+        self.loHeightRatio.input1X.set(invHeight)
+        self.blink_lower_ctl.attr("translateY").connect(self.loHeightRatio.input2X)
 
-        pm.connectAttr(upHeightRatio + ".outputX", self.bs_upBlink[0].attr(self.lowTarget.name()))
-        pm.connectAttr(loHeightRatio + ".outputX", self.bs_lowBlink[0].attr(self.upTarget.name()))
+        pm.connectAttr(self.upHeightRatio + ".outputX", self.bs_upBlink[0].attr(self.lowTarget.name()))
+        pm.connectAttr(self.loHeightRatio + ".outputX", self.bs_lowBlink[0].attr(self.upTarget.name()))
 
     def addEyeTrackingAttributes(self):
 
@@ -817,8 +798,8 @@ class Component(component.Main):
         # Drive the clamped blinks through to the blink tension wire deformers
         # Add blink + upper and blink + lower so animator can use both.
         # But also clamp them so using both doesn't exceed 1.0
-        blinkAdd = pm.createNode('plusMinusAverage')
-        blinkClamp = pm.createNode('clamp')
+        blinkAdd = pm.createNode("plusMinusAverage")
+        blinkClamp = pm.createNode("clamp")
         blinkClamp.maxR.set(1.0)
         blinkClamp.maxG.set(1.0)
         self.blink_att.connect(blinkAdd.input2D[0].input2Dx)
@@ -848,58 +829,6 @@ class Component(component.Main):
         """
         pass
 
-    def connectRef(self, refArray, cns_obj, upVAttr=None, init_refNames=False):
-        """Connect the cns_obj to a multiple object using parentConstraint.
-
-        Args:
-            refArray (list of dagNode): List of driver objects
-            cns_obj (dagNode): The driven object.
-            upVAttr (bool): Set if the ref Array is for IK or Up vector
-        """
-        if refArray:
-            if upVAttr and not init_refNames:
-                # we only can perform name validation if the init_refnames are
-                # provided in a separated list. This check ensures backwards
-                # copatibility
-                ref_names = refArray.split(",")
-            else:
-                ref_names = self.get_valid_ref_list(refArray.split(","))
-
-            if not ref_names:
-                # return if the not ref_names list
-                return
-            elif len(ref_names) == 1:
-                ref = self.rig.findRelative(ref_names[0])
-                pm.parent(cns_obj, ref)
-            else:
-                ref = []
-                for ref_name in ref_names:
-                    ref.append(self.rig.findRelative(ref_name))
-
-                ref.append(cns_obj)
-                cns_node = pm.parentConstraint(*ref, maintainOffset=True)
-                cns_attr = pm.parentConstraint(
-                    cns_node, query=True, weightAliasList=True)
-                # check if the ref Array is for IK or Up vector
-                try:
-                    if upVAttr:
-                        oAttr = self.upvref_att
-                    else:
-                        oAttr = self.ikref_att
-
-                except AttributeError:
-                    oAttr = None
-
-                if oAttr:
-                    for i, attr in enumerate(cns_attr):
-                        node_name = pm.createNode("condition")
-                        pm.connectAttr(oAttr, node_name + ".firstTerm")
-                        pm.setAttr(node_name + ".secondTerm", i)
-                        pm.setAttr(node_name + ".operation", 0)
-                        pm.setAttr(node_name + ".colorIfTrueR", 1)
-                        pm.setAttr(node_name + ".colorIfFalseR", 0)
-                        pm.connectAttr(node_name + ".outColorR", attr)
-
     def connect_standard(self):
 
         self.parent.addChild(self.root)
@@ -927,13 +856,143 @@ class Component(component.Main):
 
     def connect_slide_ghost(self):
 
-        # slide system
-        self.ghostSliderForEyeBrow(
-            self.upDetailNpos,
-            self.sliding_surface,
-            self.sliding_surface.getParent())
+        upGhostControls = []
+        lowGhostControls = []
+        upPositions = []
+        lowPositions = []
+
+        for i, ctl in enumerate(self.upControls):
+            ghost = self._connect_slide_ghost(ctl, i)
+            upGhostControls.append(ghost)
+            upPositions.append(getTransform(ghost))
+
+        relativeUpPositions = [x.translate - self.rootPos for x in upPositions]
+
+        for i, ctl in enumerate(self.lowControls):
+            ghost = self._connect_slide_ghost(ctl, i)
+            lowGhostControls.append(ghost)
+            lowPositions.append(getTransform(ghost))
+        relativeLowPositions = [x.translate - self.rootPos for x in lowPositions]
+
+        root, crvs = self.addCurves(relativeUpPositions, relativeLowPositions)
+        self.upCrv = crvs[0]
+        self.lowCrv = crvs[1]
+        self.upCrv_ctl = crvs[2]
+        self.lowCrv_ctl = crvs[3]
+        self.upBlink = crvs[4]
+        self.lowBlink = crvs[5]
+        self.upTarget = crvs[6]
+        self.lowTarget = crvs[7]
+
+        curve.gear_curvecns_op_local(self.upCrv_ctl, upGhostControls)
+        curve.gear_curvecns_op_local(self.lowCrv_ctl, lowGhostControls)
+
+        self.addWires()
+        pm.connectAttr(self.upHeightRatio + ".outputX", self.bs_upBlink[0].attr(self.lowTarget.name().split("|")[-1]))
+        pm.connectAttr(self.loHeightRatio + ".outputX", self.bs_lowBlink[0].attr(self.upTarget.name().split("|")[-1]))
+
+        # rebind DetailControls
+        bt = transform.getTransform(self.root)
+        self.detail_root = addTransform(self.root, self.getName("detail_ctls"), bt)
+
+        for i, npo in enumerate(self.upDetailNpos):
+            tra = transform.getTransform(npo)
+            adj = addTransform(self.detail_root, self.getName("detail{}_adj".format(str(i))), tra)
+            cns = curve.applyPathConstrainLocal(adj, self.upCrv)
+
+            ymt_util.setKeyableAttributesDontLockVisibility(npo, ["tx", "ty", "tz", "rx", "ry", "rz", "sx", "sy", "sz", "ro"])
+            npo.setParent(adj, absolute=True)
+            aim = self.upDetailAimNpos[i]
+            pm.aimConstraint(aim, npo, maintainOffset=True)
+
+            ymt_util.setKeyableAttributesDontLockVisibility(npo, [])
+
+        for i, npo in enumerate(self.lowDetailNpos):
+            tra = transform.getTransform(npo)
+            adj = addTransform(self.detail_root, self.getName("detail{}_adj".format(str(i))), tra)
+            cns = curve.applyPathConstrainLocal(adj, self.lowCrv)
+
+            ymt_util.setKeyableAttributesDontLockVisibility(npo, ["tx", "ty", "tz", "rx", "ry", "rz", "sx", "sy", "sz", "ro"])
+            npo.setParent(adj, absolute=True)
+            aim = self.lowDetailAimNpos[i]
+            pm.aimConstraint(aim, npo, maintainOffset=True)
+
+            ymt_util.setKeyableAttributesDontLockVisibility(npo, [])
+
+        pm.delete(self.crvroot)
+
+    def _connect_slide_ghost(self, surfaceCtl, index):
+
+        # create ghost controls
+        ghostCtl = ghost.createGhostCtl(surfaceCtl, self.slider_root)
+        ghostCtl.rename(self.getName("{}_ghost".format(index)))
+        shapes = cmds.listRelatives(ghostCtl.fullPathName(), shapes=True)
+        cmds.delete(shapes)
+
+        oParent = ghostCtl.getParent()
+        npoName = "_".join(ghostCtl.name().split("_")[:-1]) + "{}_npo".format(index)
+        npo = pm.PyNode(pm.createNode("transform", n=npoName, p=oParent, ss=True))
+        npo.addChild(ghostCtl)
+
+        ghostCtl.attr("isCtl") // surfaceCtl.attr("isCtl")  # pyright: ignore [reportUnusedExpression]        ghostCtl.attr("translate") // surfaceCtl.attr("translate")
+        ghostCtl.attr("rotate") // surfaceCtl.attr("rotate")  # pyright: ignore [reportUnusedExpression]
+        ghostCtl.attr("scale") // surfaceCtl.attr("scale")  # pyright: ignore [reportUnusedExpression]
+        ymt_util.setKeyableAttributesDontLockVisibility(npo, [])
+        ymt_util.setKeyableAttributesDontLockVisibility(ghostCtl, [])
+        cmds.deleteAttr(ghostCtl.fullPathName(), attribute="isCtl")
+
+        surfaceCtl.rename(self.getName("{}_ctl".format(index)))
+
+        ctl = pm.listConnections(ghostCtl, t="transform")[-1]
+        ghostCtl.attr("translate") // surfaceCtl.attr("translate")  # pyright: ignore [reportUnusedExpression]        ghostCtl.attr("translate") // surfaceCtl.attr("translate")
+
+        t = ctl.getMatrix(worldSpace=True)
+
+        oParent = ghostCtl.getParent()
+        npoName = "_".join(ghostCtl.name().split("_")[:-1]) + "_npo"
+        npo = pm.PyNode(pm.createNode("transform", n=npoName, p=oParent, ss=True))
+        npo.setTransformation(ghostCtl.getMatrix())
+        ymt_util.setKeyableAttributesDontLockVisibility(npo, [])
+
+        pm.parent(ghostCtl, npo)
+
+        slider = primitive.addTransform(
+                self.sliding_surface.getParent(),
+                ctl.name() + "_slideDriven",
+                t)
+
+        down, _, up = ymt_util.findPathAtoB(ctl, self.sliding_surface.getParent())
+        mul_node = pm.createNode("multMatrix")
+        j = k = 0
+        for j, d in enumerate(down):
+            d.attr("matrix") >> mul_node.attr("matrixIn[{}]".format(j))  # pyright: ignore [reportUnusedExpression]
+        for k, u in enumerate(up):
+            u.attr("inverseMatrix") >> mul_node.attr("matrixIn[{}]".format(k + j + 1))  # pyright: ignore [reportUnusedExpression]
+
+        dm_node = node.createDecomposeMatrixNode(mul_node.attr("matrixSum"))
+
+        cps_node = pm.createNode("closestPointOnSurface")
+        dm_node.attr("outputTranslate") >> cps_node.attr("inPosition")  # pyright: ignore [reportUnusedExpression]
+        surfaceShape = self.sliding_surface.getShape()
+        surfaceShape.attr("local") >> cps_node.attr("inputSurface")  # pyright: ignore [reportUnusedExpression]
+        cps_node.attr("position") >> slider.attr("translate")  # pyright: ignore [reportUnusedExpression]
+
+        if self.negate:
+            aim = [0, 0, -1]
+        else:
+            aim = [0, 0, 1]
+        pm.normalConstraint(surfaceShape,
+                            slider,
+                            aimVector=aim,
+                            upVector=[0, 1, 0],
+                            worldUpType="objectrotation",
+                            worldUpVector=[0, 1, 0],
+                            worldUpObject=self.root)
+        pm.parent(ghostCtl.getParent(), slider)
+        # self.removeFromControllerGroup(ghostCtl)
 
         # self.setRelation()  # MUST re-setRelation, swapped ghost and real controls
+        return ghostCtl
 
     # =====================================================
     # CONNECTOR
@@ -958,123 +1017,6 @@ class Component(component.Main):
 
         self.relatives["inloc"] = self.upDetailControllers[0]
         self.relatives["outloc"] = self.upDetailControllers[-1]
-
-    def ghostSliderForEyeBrow(self, ghostControls, surface, sliderParent):
-        """Modify the ghost control behaviour to slide on top of a surface
-
-        Args:
-            ghostControls (dagNode): The ghost control
-            surface (Surface): The NURBS surface
-            sliderParent (dagNode): The parent for the slider.
-        """
-
-        if not isinstance(ghostControls, list):
-            ghostControls = [ghostControls]
-
-        surfaceShape = surface.getShape()
-        sliders = []
-
-        for i, ctlGhost in enumerate(ghostControls):
-            # ctl = pm.listConnections(ctlGhost, t="transform")[-1]
-            t = ctlGhost.getMatrix(worldSpace=True)
-            scl = [1, 1, 1]
-            if self.negate:
-                scl = [-1, 1, 1]
-            # t = transform.setMatrixScale(t, scl)
-
-            gDriver = primitive.addTransform(ctlGhost.getParent(), "{}_slideDriver".format(ctlGhost.name()), t)
-
-            oParent = ctlGhost.getParent()
-            npoName = "_".join(ctlGhost.name().split("_")[:-1]) + "_ghost_npo"
-            npo = pm.PyNode(pm.createNode("transform", n=npoName, p=oParent, ss=True))
-
-            npo.setTransformation(ctlGhost.getMatrix())
-            ymt_util.setKeyableAttributesDontLockVisibility(npo, [])
-            pm.parent(ctlGhost, npo)
-
-            slider = primitive.addTransform(sliderParent, ctlGhost.name() + "_slideDriven", t)
-            sliders.append(slider)
-
-            down, _, up = ymt_util.findPathAtoB(ctlGhost, sliderParent)
-            mul_node = pm.createNode("multMatrix")
-            j = k = 0
-            for j, d in enumerate(down):
-                d.attr("matrix") >> mul_node.attr("matrixIn[{}]".format(j))
-            # mid.attr("matrix") >> mul_node.attr("matrixIn[{}]".format(j + 1))
-            for k, u in enumerate(up):
-                u.attr("inverseMatrix") >> mul_node.attr("matrixIn[{}]".format(k + j + 1))
-
-            dm_node = node.createDecomposeMatrixNode(mul_node.attr("matrixSum"))
-
-            cps_node = pm.createNode("closestPointOnSurface")
-            dm_node.attr("outputTranslate") >> cps_node.attr("inPosition")
-            surfaceShape.attr("local") >> cps_node.attr("inputSurface")
-            cps_node.attr("position") >> slider.attr("translate")
-
-            if self.negate:
-                aim = [0, 0, -1]
-            else:
-                aim = [0, 0, 1]
-            pm.normalConstraint(surfaceShape,
-                                slider,
-                                aimVector=aim,
-                                upVector=[0, 1, 0],
-                                worldUpType="objectrotation",
-                                worldUpVector=[0, 1, 0],
-                                worldUpObject=gDriver)
-
-            pm.parentConstraint(ctlGhost, slider)
-            # pm.parent(ctlGhost.getParent(), slider)
-            # pm.parent(gDriver.getParent(), self.mainControl)
-
-
-
-def draw_eye_guide_mesh_plane(points, t):
-    # type: (Tuple[float, float, float], datatypes.MMatrix) -> om.MFnMesh
-
-    mesh = om.MFnMesh()
-
-    points = [x - t.getTranslation(space="world") for x in points]
-    # points = [x - t.getTranslation(space="world") for x in points]
-
-    mean_x = sum(p[0] for p in points) / len(points)
-    mean_y = sum(p[1] for p in points) / len(points)
-    mean_z = sum(p[2] for p in points) / len(points)
-    mean = (mean_x, mean_y, mean_z)
-
-    # Simple unitCube coordinates
-    vertices = [om.MPoint(mean), ]
-    polygonCounts = []
-    polygonConnects = []
-
-    for i, p in enumerate(points):
-        vertices.append(om.MPoint(p))    # 0
-
-        if 1 < i:
-            polygonCounts.append(3)
-            polygonConnects.append(i)
-            polygonConnects.append(i - 1)
-            polygonConnects.append(0)
-
-        if len(points) == (i + 1):
-            polygonCounts.append(3)
-            polygonConnects.append(i + 1)
-            polygonConnects.append(i)
-            polygonConnects.append(0)
-
-            polygonCounts.append(3)
-            polygonConnects.append(1)
-            polygonConnects.append(i + 1)
-            polygonConnects.append(0)
-
-    mesh_obj = mesh.create(vertices, polygonCounts, polygonConnects)
-    return mesh
-    mesh_trans = om.MFnTransform(mesh_obj)
-    n = pm.PyNode(mesh_trans.name())
-    v = t.getTranslation(space="world")
-    n.setTranslation(v, om.MSpace.kWorld)
-
-    return mesh
 
 
 if __name__ == "__main__":
