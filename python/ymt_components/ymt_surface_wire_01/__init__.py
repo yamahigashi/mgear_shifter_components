@@ -242,7 +242,7 @@ class Component(component.Main):
             cmds.setAttr(cns + ".worldUpVectorX", 0)
             cmds.setAttr(cns + ".worldUpVectorY", 0)
             cmds.setAttr(cns + ".worldUpVectorZ", 1)
-            cmds.connectAttr(self.root.fullPathName() + ".worldMatrix", cns + ".worldUpMatrix")  # object rotation up
+            # cmds.connectAttr(self.root.fullPathName() + ".worldMatrix", cns + ".worldUpMatrix")  # object rotation up
             cmds.setAttr(cns + ".frontAxis", 0)  # front axis y
             cmds.setAttr(cns + ".upAxis", 2)  # up axis x
             cmds.setAttr(cns + ".inverseFront", True)

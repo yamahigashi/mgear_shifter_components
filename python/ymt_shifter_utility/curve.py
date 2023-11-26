@@ -8,7 +8,7 @@
 import six
 import sys
 import pymel.core as pm
-from pymel.core import datatypes
+from pymel.core import datatypes as dt
 import json
 
 import maya.cmds as cmds
@@ -42,7 +42,7 @@ if sys.version_info > (3, 0):
 #############################################
 
 
-def addCnsCurve(parent, name, centers, degree=1, m=datatypes.Matrix(), close=False, local=False):
+def addCnsCurve(parent, name, centers, degree=1, m=dt.Matrix(), close=False, local=False):
     """Create a curve attached to given centers. One point per center
 
     Arguments:
@@ -67,7 +67,7 @@ def addCnsCurve(parent, name, centers, degree=1, m=datatypes.Matrix(), close=Fal
         if isinstance(c, str):
             c = pm.PyNode(c)
 
-    points = [datatypes.Vector() for center in centers]
+    points = [dt.Vector() for center in centers]
 
     node = addCurve(parent, name, points, degree=degree, m=m, close=close)
 
@@ -84,7 +84,7 @@ def addCurve(parent,
              points,
              close=False,
              degree=3,
-             m=datatypes.Matrix()):
+             m=dt.Matrix()):
     """Create a NurbsCurve with a single subcurve.
 
     Arguments:
@@ -122,7 +122,7 @@ def createCurveFromOrderedEdges(edgeLoop,
                                 name,
                                 parent=None,
                                 degree=3,
-                                m=datatypes.Matrix(),
+                                m=dt.Matrix(),
                                 close=False):
     """Create a curve for a edgeloop ordering the list from starting vertex
 
@@ -175,7 +175,7 @@ def createCurveFromEdges(edgeList,
                         degree=3,
                         sortingAxis="x",
                         close=False,
-                        m=datatypes.Matrix()):
+                        m=dt.Matrix()):
     """Create curve from a edge list.
 
     Arguments:
@@ -225,8 +225,8 @@ def createCurveFromEdges(edgeList,
     return crv
 
 
-def createCurveFromCurve(srcCrv, name, nbPoints, parent=None, m=datatypes.Matrix(), close=False, space=om2.MSpace.kWorld):
-    # type: (Union[str, pm.PyNode], str, int, Union[str, pm.PyNode, None], datatypes.Matrix, bool) -> pm.PyNode
+def createCurveFromCurve(srcCrv, name, nbPoints, parent=None, m=dt.Matrix(), close=False, space=om2.MSpace.kWorld):
+    # type: (Union[str, pm.PyNode], str, int, Union[str, pm.PyNode, None], dt.Matrix, bool) -> pm.PyNode
     """Create a curve from a curve
 
     Arguments:
@@ -335,6 +335,8 @@ def getCurveParamByRatio(crv, ratio):
 
     sc = getMFnNurbsCurve(crv.name())
     length = sc.length()
+    print(length)
+    print(crv.name())
     paramStart = sc.findParamFromLength(0.0)
     paramEnd = sc.findParamFromLength(length)
     param = (paramEnd - paramStart) * ratio + paramStart
@@ -885,16 +887,30 @@ def applyPathCnsLocal(target, curve, u, maintainOffset=True):
     # type: (dt.Transform, dt.Transform, float, bool) -> None
     import ymt_shifter_utility
 
-    prev_matrix = target.getMatrix(objectSpace=True)
+    # prev_matrix = target.getMatrix(objectSpace=True)
+    ma = target.getMatrix(worldSpace=True)
+    mb = curve.getMatrix(worldSpace=True)
 
     cns = applyop.pathCns(target, curve, cnsType=False, u=u, tangent=False)
-    pm.connectAttr(curve.attr("local"), cns.attr("geometryPath"), f=True)  # tobe local space
+
+    # TODO: extract axis into arguments
+    cmds.setAttr(cns + ".worldUpType", 2)  # object rotation up
+    cmds.setAttr(cns + ".worldUpVectorX", 0)
+    cmds.setAttr(cns + ".worldUpVectorY", 1)
+    cmds.setAttr(cns + ".worldUpVectorZ", 0)
+    cmds.connectAttr(curve.fullPathName() + ".worldMatrix", cns + ".worldUpMatrix")  # object rotation up
+    cmds.setAttr(cns + ".frontAxis", 2)  # front axis x
+    cmds.setAttr(cns + ".upAxis", 1)  # up axis y
+    pm.connectAttr(curve.attr("local"), cns.attr("geometryPath"), f=True)
 
     comp_node = pm.createNode("composeMatrix")
-    cns.attr("allCoordinates") >> comp_node.attr("inputTranslate")
-    cns.attr("rotate") >> comp_node.attr("inputRotate")
-    cns.attr("rotateOrder") >> comp_node.attr("inputRotateOrder")
-    # curve.attr("matrix") >> mul_node.attr("matrixIn[1]")
+    cns.attr("allCoordinates") >> comp_node.attr("inputTranslate")  # pyright: ignore [reportUnusedExpression]
+    cns.attr("rotate") >> comp_node.attr("inputRotate")  # pyright: ignore [reportUnusedExpression]
+    cns.attr("rotateOrder") >> comp_node.attr("inputRotateOrder")  # pyright: ignore [reportUnusedExpression]
+
+    tmp_output = dt.Matrix(comp_node.attr("outputMatrix").get())
+    tmp_global = tmp_output * mb
+    offset_matrix = ma * tmp_global.inverse()
 
     if maintainOffset:
         h = 1
@@ -902,19 +918,20 @@ def applyPathCnsLocal(target, curve, u, maintainOffset=True):
         h = 0
 
     mul_node = pm.createNode("multMatrix")
-    comp_node.attr("outputMatrix") >> mul_node.attr("matrixIn[{}]".format(h))
+    comp_node.attr("outputMatrix") >> mul_node.attr("matrixIn[{}]".format(h))  # pyright: ignore [reportUnusedExpression]
 
     down, _, up = ymt_shifter_utility.findPathAtoB(curve, target)
-    for i, d in enumerate(down):
-        d.attr("matrix") >> mul_node.attr("matrixIn[{}]".format(h + i + 1))
+    i = 0
+    j = 0
+    for _i, _d in enumerate(down):
+        i = _i
+        _d.attr("matrix") >> mul_node.attr("matrixIn[{}]".format(h + i + 1))  # pyright: ignore [reportUnusedExpression]
 
-    for j, u in enumerate(up[:-1]):
-        u.attr("inverseMatrix") >> mul_node.attr("matrixIn[{}]".format(h + i + j + 2))
+    for j, _u in enumerate(up[:-1]):
+        _u.attr("inverseMatrix") >> mul_node.attr("matrixIn[{}]".format(h + i + j + 2))  # pyright: ignore [reportUnusedExpression]
 
     if maintainOffset:
         tmp_output = mul_node.attr("matrixSum").get()
-        # offset_matrix = datatypes.Matrix(tmp_output).inverse() * prev_matrix.inverse()
-        offset_matrix = prev_matrix * datatypes.Matrix(tmp_output).inverse()
         offset_node = pm.createNode("fourByFourMatrix")
         offset_node.attr("in00").set(offset_matrix[0][0])
         offset_node.attr("in01").set(offset_matrix[0][1])
@@ -932,12 +949,12 @@ def applyPathCnsLocal(target, curve, u, maintainOffset=True):
         offset_node.attr("in31").set(offset_matrix[3][1])
         offset_node.attr("in32").set(offset_matrix[3][2])
         offset_node.attr("in33").set(offset_matrix[3][3])
-        offset_node.attr("output") >> mul_node.attr("matrixIn[0]")
+        offset_node.attr("output") >> mul_node.attr("matrixIn[0]")  # pyright: ignore [reportUnusedExpression]
 
     decomp_node = pm.createNode("decomposeMatrix")
-    mul_node.attr("matrixSum") >> decomp_node.attr("inputMatrix")
-    decomp_node.attr("outputTranslate") >> target.attr("translate")
-    decomp_node.attr("outputRotate") >> target.attr("rotate")
+    mul_node.attr("matrixSum") >> decomp_node.attr("inputMatrix")  # pyright: ignore [reportUnusedExpression]
+    decomp_node.attr("outputTranslate") >> target.attr("translate")  # pyright: ignore [reportUnusedExpression]
+    decomp_node.attr("outputRotate") >> target.attr("rotate")  # pyright: ignore [reportUnusedExpression]
 
     return cns
     
@@ -954,7 +971,7 @@ def applyPathConstrainLocal(target, src_curve):
         ma = target.getMatrix(worldSpace=True)
         mb = src_curve.getMatrix(worldSpace=True)
         m = ma * mb.inverse()
-        pos = datatypes.Vector(m[3][0], m[3][1], m[3][2])
+        pos = dt.Vector(m[3][0], m[3][1], m[3][2])
         param, length = getCurveParamAtPosition(src_curve, pos)
         u_length = findLenghtFromParam(src_curve, param)
         u_param = u_length / length
