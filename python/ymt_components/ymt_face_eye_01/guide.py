@@ -52,7 +52,7 @@ class Guide(guide.ComponentGuide):
     def postInit(self):
         """Initialize the position for the guide"""
 
-        self.save_transform = ["root", "eyeMesh", "#_uploc", "#_lowloc", "inloc", "outloc", "uploc", "lowloc", "tan"]
+        self.save_transform = ["root", "pivotAndSizeRef", "#_uploc", "#_lowloc", "inloc", "outloc", "uploc", "lowloc", "tan"]
         self.save_blade = ["blade"]
         self.addMinMax("#_uploc", 1, -1)
         self.addMinMax("#_lowloc", 1, -1)
@@ -89,7 +89,7 @@ class Guide(guide.ComponentGuide):
         self.addDispCurve("crvRef", centers, 3)
 
         v = transform.getTranslation(self.root)
-        self.eyeMesh = self.addEyeMesh("eyeMesh", self.root, v)
+        self.eyeMesh = self.addEyeMesh("pivotAndSizeRef", self.root, v)
 
         v = transform.getOffsetPosition(self.root, [0, 0.0000001, 2.5])
         self.tan = self.addLoc("tan", self.root, v)

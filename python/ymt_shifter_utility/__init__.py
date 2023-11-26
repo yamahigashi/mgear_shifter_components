@@ -1175,8 +1175,10 @@ def create_dummy_edges_from_objects(objects):
     return create_dummy_edges_from_positions(positions)
 
 
-def draw_plane_from_positions(positions):
-    # type: (List[Tuple[float, float, float]]) -> om.MFnMesh
+def draw_plane_from_positions(positions, t=None):
+    # type: (List[Tuple[float, float, float]], dt.Matrix) -> om.MFnMesh
+    if t is not None:
+        positions = [x - t.translate for x in positions]
 
     mean_x = sum(p[0] for p in positions) / len(positions)
     mean_y = sum(p[1] for p in positions) / len(positions)
