@@ -20,6 +20,23 @@ from mgear.core.transform import (
     getTransform,
 )
 
+from logging import (  # noqa:F401 pylint: disable=unused-import, wrong-import-order
+    StreamHandler,
+    getLogger,
+    WARN,  # noqa: F401
+    DEBUG,
+    INFO
+)
+
+handler = StreamHandler()
+handler.setLevel(DEBUG)
+logger = getLogger(__name__)
+logger.setLevel(INFO)
+logger.setLevel(DEBUG)
+logger.addHandler(handler)
+logger.propagate = False
+
+
 if sys.version_info > (3, 0):
     from typing import TYPE_CHECKING
     if TYPE_CHECKING:
@@ -249,17 +266,15 @@ def createCurveFromCurve(srcCrv, name, nbPoints, parent=None, m=dt.Matrix(), clo
     paramEnd = sc.findParamFromLength(length)
     paramLength = paramEnd - paramStart
 
-    if not close:
-        increment = paramLength / (nbPoints - 1)
-    else:
-        increment = paramLength / nbPoints
-
     p = paramStart
     # if curve is close, we need to find start param to be offset to find nearest point to 0
     if close:
+        increment = paramLength / nbPoints
+
         retry = 0
         tolerance = 0.0001
         while retry < 10000:
+            # FIXME: this is a workaround
             try:
                 p = sc.getParamAtPoint(sc.cvPosition(0), tolerance)
                 break
@@ -268,21 +283,24 @@ def createCurveFromCurve(srcCrv, name, nbPoints, parent=None, m=dt.Matrix(), clo
             retry += 1
             tolerance += length / 10000.0
 
-    if close:
-        p = p
     else:
+        increment = paramLength / nbPoints
         p = paramStart
 
     positions = []
 
-    for x in range(nbPoints):
+    for _ in range(nbPoints):
         point = sc.getPointAtParam(p, space=space)
         pos = (point[0], point[1], point[2])
         positions.append(pos)
 
         p += increment
         if p > paramEnd:
-            p -= paramLength
+
+            if close:
+                p -= paramLength
+            else:
+                p = paramEnd
 
     crv = addCurve(parent, name, positions, close=close, degree=3, m=m)
     return crv
@@ -335,8 +353,6 @@ def getCurveParamByRatio(crv, ratio):
 
     sc = getMFnNurbsCurve(crv.name())
     length = sc.length()
-    print(length)
-    print(crv.name())
     paramStart = sc.findParamFromLength(0.0)
     paramEnd = sc.findParamFromLength(length)
     param = (paramEnd - paramStart) * ratio + paramStart
@@ -1180,3 +1196,32 @@ def gear_curvecns_op(crv, inputs=[]):
         pm.connectAttr(item + ".worldMatrix", node + ".inputs[%s]" % i)
 
     return node
+
+
+def applyCurveParamCns(src, target):
+    # type: (dt.Transform, dt.Transform) -> None
+
+    if isinstance(src, six.string_types) or isinstance(src, six.text_type):
+        src = pm.PyNode(src)
+
+    if isinstance(target, six.string_types) or isinstance(target, six.text_type):
+        target = pm.PyNode(target)
+
+    numPoints = cmds.getAttr(target + ".controlPoints", size=True)
+
+    src_crv = getMFnNurbsCurve(src)
+    tgt_crv = getMFnNurbsCurve(target)
+
+    src_length = src_crv.length()
+    target_length = tgt_crv.length()
+
+    for i in range(numPoints):
+        pos = cmds.pointPosition(target + ".controlPoints[%s]" % i, local=True)
+        param, length = getCurveParamAtPosition(target, pos)
+        ratio = param / target_length
+        new_param = src_crv.findParamFromLength(src_length * ratio)
+
+        pointOnCurveInfo = cmds.createNode("pointOnCurveInfo")
+        cmds.connectAttr(src + ".local", pointOnCurveInfo + ".inputCurve")
+        cmds.setAttr(pointOnCurveInfo + ".parameter", new_param)
+        cmds.connectAttr(pointOnCurveInfo + ".position", target + ".controlPoints[%s]" % i, force=True)

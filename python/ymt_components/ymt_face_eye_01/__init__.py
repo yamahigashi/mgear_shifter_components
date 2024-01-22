@@ -601,6 +601,10 @@ class Component(component.Main):
         self.w1 = pm.wire(self.upCrv, w=self.upBlink)[0]
         self.w2 = pm.wire(self.lowCrv, w=self.lowBlink)[0]
 
+        # WIP: adding curve param cns
+        # curve.applyCurveParamCns(self.upBlink, self.upCrv)
+        # curve.applyCurveParamCns(self.lowBlink, self.lowCrv)
+
         self.w3 = pm.wire(self.upTarget, w=self.upCrv_ctl)[0]
         self.w4 = pm.wire(self.lowTarget, w=self.lowCrv_ctl)[0]
 
@@ -836,6 +840,7 @@ class Component(component.Main):
             ref = self.rig.findComponent(self.surfRef)
             self.sliding_surface = ref.sliding_surface
 
+        return
         if self.connect_surface_slider:
             try:
                 self.connect_slide_ghost()

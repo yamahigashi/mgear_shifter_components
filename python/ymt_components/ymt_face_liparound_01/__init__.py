@@ -321,6 +321,7 @@ class Component(component.Main):
 
         cvsObject = self.getCurveCVs(crv, "object")
 
+        xforms = []  # type: List[datatypes.Matrix] # to store xforms for each cv
         for i, _ in enumerate(cvsObject):
 
             mirror = i > self.num_locs / 2
@@ -351,12 +352,9 @@ class Component(component.Main):
                     _index = (tmp - i + self.right_index - 1)
 
             with ymt_util.overrideNamingAttributeTemporary(self, side=oSide):
-                cvOS = cvsObject[i]
-                # cvOSoffset = [cvOS[0], cvOS[1], cvOS[2] + self.FRONT_OFFSET]
 
-                # upv = addTransform(rope_root, self.getName("rope_{}_upv".format(sub_comp)))
+                cvOS = cvsObject[i]
                 cns = addTransform(rope_root, self.getName("rope_{}_cns".format(_index)))
-                # applyPathCnsLocal(upv, self.crv_upv, rope_upv, cvOSoffset)
                 applyPathCnsLocal(cns, self.crv_ctl, rope, cvOS)
 
                 m = getTransform(cns)
@@ -383,9 +381,15 @@ class Component(component.Main):
                         xform = setMatrixScale(xform, scl=[1, 1, 1])
                     # aimVec = (0, 0, 1)
 
-                if i == self.left_index:
-                    prev = getTransform(controls[i-1]).rotate
-                    # xform = setMatrixRotation(xform, prev)
+                xforms.append(xform)
+
+                if i == (self.left_index + 1):
+                    sideCtl = controls[self.left_index]
+                    sideNpo = sideCtl.getParent()
+                    pos = cmds.xform(sideNpo.fullPath(), q=True, ws=True, translation=True)
+                    pm.xform(sideNpo, ws=True, matrix=xforms[self.left_index - 1])
+                    pm.xform(sideNpo, ws=True, translation=pos)
+
                 if i == self.right_index + 1:
                     rightCtl = controls[self.right_index]
                     rightNpo = rightCtl.getParent()

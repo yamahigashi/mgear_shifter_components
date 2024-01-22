@@ -345,7 +345,7 @@ class Component(component.Main):
             mirrorConf=self.mirror_conf)
 
         self.addToSubGroup(fk_ctl, self.detailControllersGroupName)
-        ymt_util.setKeyableAttributesDontLockVisibility(self.fk_ctl)
+        ymt_util.setKeyableAttributesDontLockVisibility(self.fk_ctl, self.tr_params)
         attribute.setRotOrder(fk_ctl, "ZXY")
         self.fk_ctl.append(fk_ctl)
         self.preiviousCtlTag = fk_ctl

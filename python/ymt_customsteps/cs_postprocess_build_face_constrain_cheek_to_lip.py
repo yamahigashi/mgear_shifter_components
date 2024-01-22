@@ -122,9 +122,10 @@ class CustomShifterStep(cstp.customShifterMainStep):
                     "nose_C0_ctl",
                     "mouth_C0_lipup_ctl",
                     "mouthSlide_C0_ctl",
+                    "aroundlip_C0_rope"
                 ],
                 "dst": "aroundlip_C0_upcenter_ctl",
-                "rates": [0.10, 0.50, 0.40],
+                "rates": [0.10, 0.50, 0.05, 0.35],
                 "mode": "addNpo",
             },
             # {
