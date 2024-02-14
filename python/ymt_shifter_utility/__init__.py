@@ -390,7 +390,7 @@ def addJointCtl(self,
     attribute.addAttribute(
         ctl, "ctl_role", "string", keyable=False, value=name)
 
-    # locator reference for quick guide matching
+    # locator reference for quickguide matching
     # TODO: this is a temporal implementation. We should store the full
     # guide data in future iterations
     if guide_loc_ref:
@@ -1373,3 +1373,37 @@ def addNPOPreservingMatrixConnections(ctl):
             cmds.connectAttr(decompMatrix + ".outputScale", dst, force=True)
 
     return newNPO
+
+
+def demote_controller(ctl):
+    # type: (dt.Transform|str) -> dt.Transform
+
+    if isinstance(ctl, str):
+        ctl = pm.PyNode(ctl)
+
+    for shape in ctl.getShapes():
+        cmds.delete(shape.fullPathName())
+
+    for attr in ["t", "r", "s"]:
+        for axis in "xyz":
+            try:
+                cmds.setAttr("{}.{}{}".format(ctl.getName(), attr, axis), lock=True)
+            except RuntimeError:
+                pass
+
+    message_connections = cmds.listConnections(
+        ctl.fullPathName() + ".message",
+        s=False,
+        d=True,
+        plugs=True,
+        connections=True
+    ) or []
+
+    for src, dst in zip(message_connections[::2], message_connections[1::2]):
+        cmds.disconnectAttr(src, dst)
+
+    if "isCtl" in cmds.listAttr(ctl.fullPathName()):
+        cmds.deleteAttr(ctl.fullPathName(), at="isCtl")
+
+    for ctl_grp in cmds.listSets(object=ctl.fullPathName()):
+        cmds.sets(ctl.fullPathName(), rm=ctl_grp)
