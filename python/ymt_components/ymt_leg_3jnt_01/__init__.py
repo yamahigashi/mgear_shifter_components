@@ -1,5 +1,5 @@
 """Component Leg 3 joints 01 module"""
-
+from maya.api import OpenMaya as om2
 from maya import cmds
 import pymel.core as pm
 from pymel.core import datatypes
@@ -434,7 +434,6 @@ class Component(component.Main):
                                             self.normal,
                                             False,
                                             self.WIP)
-
         self.tws0_loc = primitive.addTransform(
             self.rollRef[0],
             self.getName("tws0_loc"),
@@ -733,12 +732,10 @@ class Component(component.Main):
                                               self.upv_ctl)
 
         # TwistTest
-        if [round(elem, 4)
-                for elem in transform.getTranslation(self.chain3bones[1])] \
-                != [round(elem, 4) for elem in self.guide.apos[1]]:
-            add_nodeTwist = node.createAddNode(180.0, self.roll_att)
-        else:
-            add_nodeTwist = node.createAddNode(0, self.roll_att)
+        chainPos = [x.getTranslation(space="world") for x in self.chain3bones]
+        sameDir = self.verifyAlignmentAccuracy(chainPos, self.guide.apos[:2])
+        angle = 0 if sameDir else 180
+        add_nodeTwist = node.createAddNode(angle, self.roll_att)
         if self.negate:
             mulVal = 1
         else:
@@ -1128,7 +1125,39 @@ class Component(component.Main):
         pm.parentConstraint(self.legBones[1], self.match_fk1_off, mo=True)
         pm.parentConstraint(self.legBones[2], self.match_fk2_off, mo=True)
 
-        return
+
+    def verifyAlignmentAccuracy(self, jnts, guides, degree=10):
+        # type: (List[Tuple[float]], List[Tuple[float]], Optional[int]) -> Bool
+        """
+        Validate if the joint is in the same direction as the guides.
+
+
+        Args:
+            jnts (List[float]): The joint world position
+            guides (List[float]): The guides to validate
+            degree (Optional[int]): The degree of tolerance
+
+        Returns:
+            Bool: True if the joint is in the same direction as the guides
+        """
+        startToEnd1 = om2.MVector(
+                jnts[0][0] - jnts[-1][0],
+                jnts[0][1] - jnts[-1][1],
+                jnts[0][2] - jnts[-1][2])
+
+        startToEnd2 = om2.MVector(
+                guides[0][0] - guides[-1][0],
+                guides[0][1] - guides[-1][1],
+                guides[0][2] - guides[-1][2])
+
+        # Normalize the vectors to prepare for angle calculation
+        startToEnd1.normalize()
+        startToEnd2.normalize()
+
+        # Calculate the angle between the two vectors
+        angle = startToEnd1.angle(startToEnd2) * (180 / 3.141592653589793) 
+
+        return angle < degree
 
     # =====================================================
     # CONNECTOR
@@ -1138,9 +1167,9 @@ class Component(component.Main):
         """Set the relation beetween object from guide to rig"""
         self.relatives["root"] = self.legBones[0]
         self.relatives["knee"] = self.legBones[1]
-        self.relatives["ankle"] = self.legBones[2]
-        self.relatives["foot"] = self.legBones[3]
-        self.relatives["eff"] = self.legBones[3]
+        self.relatives["ankle"] = self.div_cns[-2]
+        self.relatives["foot"] = self.div_cns[-1]
+        self.relatives["eff"] = self.div_cns[-1]
 
         self.controlRelatives["root"] = self.fk0_ctl
         self.controlRelatives["knee"] = self.fk1_ctl

@@ -16,6 +16,7 @@ import mgear.core.primitive as pri
 import mgear.core.transform as tra
 import mgear.core.attribute as att
 import mgear.core.vector as vec
+import ymt_shifter_utility as ymtutil
 
 if sys.version_info >= (3, 0):  # pylint: disable=using-constant-test
     # For type annotation
@@ -53,7 +54,7 @@ class Component(MainComponent):
 
             w = self.size * 0.5
             ctl = self.addCtl(npo, "fk{}_ctl".format(i), t, self.color_ik, "cube", w=w)
-            att.setKeyableAttributes(ctl)
+            ymtutil.setKeyableAttributesDontLockVisibility(ctl, ["tx", "ty", "tz", "rx", "ry", "rz", "sx", "sy", "sz", "ro"])
             att.setRotOrder(ctl, "ZXY")
             att.setInvertMirror(ctl, ["tx", "ry", "rz"])
 
@@ -103,6 +104,7 @@ class Component(MainComponent):
         po = dt.Vector(0, dist * 0.5, 0)
 
         self.head_ctl = self.addCtl(self.head_npo, "head_ctl", t, self.color_fk, "compas", w=w, h=h, d=d, po=po)
+        ymtutil.setKeyableAttributesDontLockVisibility(self.head_ctl, ["tx", "ty", "tz", "rx", "ry", "rz", "sx", "sy", "sz", "ro"])
         att.setRotOrder(self.head_ctl, "ZXY")
         att.setInvertMirror(self.head_ctl, ["tx", "ry", "rz"])
 

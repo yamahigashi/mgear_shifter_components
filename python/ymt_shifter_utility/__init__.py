@@ -1407,3 +1407,18 @@ def demote_controller(ctl):
 
     for ctl_grp in cmds.listSets(object=ctl.fullPathName()):
         cmds.sets(ctl.fullPathName(), rm=ctl_grp)
+
+
+def make_steady_posture(obj):
+    # type: (dt.Transform|str) -> None
+    """Make the given object steady.
+
+    make steady by connecting its inverse matrix to its offset parent matrix"""
+
+    if isinstance(obj, str):
+        obj = pm.PyNode(obj)
+
+    cmds.connectAttr(
+        "{}.inverseMatrix".format(obj.fullPathName()),
+        "{}.offsetParentMatrix".format(obj.fullPathName())
+    )

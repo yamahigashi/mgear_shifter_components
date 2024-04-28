@@ -357,7 +357,7 @@ class Component(component.Main):
             mirrorConf=self.mirror_conf)
 
         self.addToSubGroup(fk_ctl, self.detailControllersGroupName)
-        ymtutil.setKeyableAttributesDontLockVisibility(self.fk_ctl, ["tx", "ty", "tz", "rx", "ry", "rz", "sx", "sy", "sz"])
+        ymtutil.setKeyableAttributesDontLockVisibility(fk_ctl, ["tx", "ty", "tz", "rx", "ry", "rz", "sx", "sy", "sz", "ro"])
         attribute.setRotOrder(fk_ctl, "ZXY")
         self.fk_ctl.append(fk_ctl)
         self.preiviousCtlTag = fk_ctl
@@ -392,6 +392,8 @@ class Component(component.Main):
                 tp=self.preiviousCtlTag,
                 mirrorConf=self.mirror_conf)
             hip_scl_ref = addTransform(self.fk_hip_ctl, self.getName("hip_scl_ref"), t)
+            ymtutil.setKeyableAttributesDontLockVisibility(
+                    self.fk_hip_ctl, ["tx", "ty", "tz", "rx", "ry", "rz", "sx", "sy", "sz", "ro"])
 
         # Deformers (Shadow)
         if self.settings["addJoints"]:
@@ -543,17 +545,11 @@ class Component(component.Main):
             fk_local_npo_xfoms.append(xform)
 
         # break FK hierarchical orient
-        # if i not in [len(self.guide.apos), 0]:
-        if self.surplusFkNb > 1:
-            tail_count = len(self.guide.apos) - self.surplusFkNb + 1
-        else:
-            tail_count = len(self.guide.apos)
+        tail_count = len(self.guide.apos) - self.surplusFkNb + 1
 
-        # if i not in [len(self.guide.apos), 0]:
-        if not (
-            i == 0
-            or i == len(self.guide.apos)
-        ):
+        print(f"{i=}, {tail_count=}, {len(self.guide.apos)=}, {self.surplusFkNb=}")
+        if i not in (0, len(self.guide.apos)):
+
             s = self.fk_ctl[i - 1]
             s2 = self.fk_npo[i]
             d = self.fk_local_npo[i]
