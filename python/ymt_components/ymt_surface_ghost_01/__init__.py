@@ -123,6 +123,9 @@ class Component(component.Main):
             h=self.size,
             d=self.size,
         )
+        if self.negate:
+            self.npo.attr("sz").set(-1)
+
         if self.settings["addJoints"]:
             self.jnt_pos = [[self.surfaceCtl , "0"]]
 
