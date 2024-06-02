@@ -916,6 +916,8 @@ def serialize_nurbs_surface(surface_name):
     degreeV = cmds.getAttr("{0}.degreeV".format(surface_name))
     patchU = cmds.getAttr("{0}.spansU".format(surface_name))
     patchV = cmds.getAttr("{0}.spansV".format(surface_name))
+    formU = cmds.getAttr("{0}.formU".format(surface_name))
+    formV = cmds.getAttr("{0}.formV".format(surface_name))
 
     # Create a dictionary to hold the serialized data
     serialized_data = {
@@ -924,6 +926,8 @@ def serialize_nurbs_surface(surface_name):
         "degreeV": degreeV,
         "patchU": patchU,
         "patchV": patchV,
+        "formU": formU,
+        "formV": formV,
         "localRotatePivot": cmds.xform(surface_name, q=True, os=True, rp=True),
         "localScalePivot": cmds.xform(surface_name, q=True, os=True, sp=True),
         "rotate": cmds.xform(surface_name, q=True, os=True, ro=True),
@@ -955,6 +959,8 @@ def deserialize_nurbs_surface(surface_name, serialized_data):
     degreeV = deserializedData["degreeV"]
     patchU = deserializedData["patchU"]
     patchV = deserializedData["patchV"]
+    formU = deserializedData["formU"]
+    formV = deserializedData["formV"]
     localRotatePivot = deserializedData["localRotatePivot"]
     localScalePivot = deserializedData["localScalePivot"]
     rotate = deserializedData["rotate"]
@@ -962,14 +968,44 @@ def deserialize_nurbs_surface(surface_name, serialized_data):
     translate = deserializedData["translate"]
 
     # Create a new NURBS surface
-    new_surface = cmds.nurbsPlane(
-        n=surface_name,
-        d=3,
-        u=patchU,
-        v=patchV,
-        width=0,
-        lengthRatio=0,
-        constructionHistory=False)[0]  # type: str
+    if formU == 0 and formV == 2:  # Open, Periodic
+        new_surface = cmds.sphere(
+            n=surface_name,
+            spans=patchU,
+            sections=patchV,
+            degree=degreeU,
+            polygon=0,  # means NURBS
+            constructionHistory=False)[0]  # type: ignore
+
+    elif formU == 2 and formV == 2:  # Periodic, Periodic
+        new_surface = cmds.nurbsPlane(
+            n=surface_name,
+            d=3,
+            u=patchU,
+            v=patchV,
+            width=0,
+            lengthRatio=0,
+            constructionHistory=False)[0]  # type: ignore
+
+    elif formU == 0 and formV == 0:  # Open, Open
+        new_surface = cmds.nurbsPlane(
+            n=surface_name,
+            d=3,
+            u=patchU,
+            v=patchV,
+            width=0,
+            lengthRatio=0,
+            constructionHistory=False)[0]  # type: ignore
+    else:
+        logger.warning("Unsupported formU and formV values: {0}, {1}".format(formU, formV))
+        new_surface = cmds.nurbsPlane(
+            n=surface_name,
+            d=3,
+            u=patchU,
+            v=patchV,
+            width=0,
+            lengthRatio=0,
+            constructionHistory=False)[0]  # type: ignore
 
     cmds.xform(new_surface, os=True, rp=localRotatePivot)
     cmds.xform(new_surface, os=True, sp=localScalePivot)
@@ -987,7 +1023,7 @@ def deserialize_nurbs_surface(surface_name, serialized_data):
     return new_surface
 
 
-def apply_rivet_constrain(mesh_name, position, name=None):
+def create_rivet_pin(mesh_name, position, name=None):
     # type: (Text, Tuple[Text, Text, Text], Optional[Text]) -> Text
     """Apply uvPin constrain to given world position"""
 
@@ -1112,8 +1148,10 @@ def get_uv_at_nurbs_surface_position(surface_name, position):
 
     point = om.MPoint(position)
     closest_point, u, v = mfn_surface.closestPoint(point, space=om.MSpace.kWorld)
+    max_range_u = mfn_surface.numSpansInU
+    max_range_v = mfn_surface.numSpansInV
 
-    return u, v
+    return u / max_range_u, v / max_range_v
 
 
 def apply_rivet_constrain_on_vertex(mesh, vertex_id):
@@ -1126,7 +1164,7 @@ def apply_rivet_constrain_on_vertex(mesh, vertex_id):
     mfn_mesh = om.MFnMesh(mesh_dag)
     position = mfn_mesh.getPoint(vertex_id)
 
-    return apply_rivet_constrain(mesh, position)
+    return create_rivet_pin(mesh, position)
 
 
 def apply_rivet_constrain_to_selected(mesh, targets):
@@ -1150,7 +1188,7 @@ def apply_rivet_constrain_to_selected(mesh, targets):
             raise Exception("target({}) {} not found".format(type(target), target))
 
         pos = cmds.xform(target, q=True, ws=True, t=True)
-        pin = apply_rivet_constrain(mesh, pos)
+        pin = create_rivet_pin(mesh, pos)
         pin = cmds.rename(pin, target + "_rivet")
         pins.append(pin)
 
@@ -1407,18 +1445,3 @@ def demote_controller(ctl):
 
     for ctl_grp in cmds.listSets(object=ctl.fullPathName()):
         cmds.sets(ctl.fullPathName(), rm=ctl_grp)
-
-
-def make_steady_posture(obj):
-    # type: (dt.Transform|str) -> None
-    """Make the given object steady.
-
-    make steady by connecting its inverse matrix to its offset parent matrix"""
-
-    if isinstance(obj, str):
-        obj = pm.PyNode(obj)
-
-    cmds.connectAttr(
-        "{}.inverseMatrix".format(obj.fullPathName()),
-        "{}.offsetParentMatrix".format(obj.fullPathName())
-    )
