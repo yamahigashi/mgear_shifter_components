@@ -914,7 +914,7 @@ def applyPathCnsLocal(target, curve, u, maintainOffset=True):
     cmds.setAttr(cns + ".worldUpVectorX", 0)
     cmds.setAttr(cns + ".worldUpVectorY", 1)
     cmds.setAttr(cns + ".worldUpVectorZ", 0)
-    cmds.connectAttr(curve.fullPathName() + ".worldMatrix", cns + ".worldUpMatrix")  # object rotation up
+    cmds.connectAttr(curve.fullPathName() + ".matrix", cns + ".worldUpMatrix")  # object rotation up
     cmds.setAttr(cns + ".frontAxis", 2)  # front axis x
     cmds.setAttr(cns + ".upAxis", 1)  # up axis y
     pm.connectAttr(curve.attr("local"), cns.attr("geometryPath"), f=True)
