@@ -959,8 +959,8 @@ def deserialize_nurbs_surface(surface_name, serialized_data):
     degreeV = deserializedData["degreeV"]
     patchU = deserializedData["patchU"]
     patchV = deserializedData["patchV"]
-    formU = deserializedData["formU"]
-    formV = deserializedData["formV"]
+    formU = deserializedData.get("formU", 0)
+    formV = deserializedData.get("formV", 0)
     localRotatePivot = deserializedData["localRotatePivot"]
     localScalePivot = deserializedData["localScalePivot"]
     rotate = deserializedData["rotate"]
@@ -1148,8 +1148,15 @@ def get_uv_at_nurbs_surface_position(surface_name, position):
 
     point = om.MPoint(position)
     closest_point, u, v = mfn_surface.closestPoint(point, space=om.MSpace.kWorld)
-    max_range_u = mfn_surface.numSpansInU
-    max_range_v = mfn_surface.numSpansInV
+
+    formU = cmds.getAttr("{0}.formU".format(surface_name))
+    formV = cmds.getAttr("{0}.formV".format(surface_name))
+    if formU == 0 and formV == 0:
+        max_range_u = cmds.getAttr("{0}.minMaxRangeU".format(surface_name))[0][1]
+        max_range_v = cmds.getAttr("{0}.minMaxRangeV".format(surface_name))[0][1]
+    else:
+        max_range_u = mfn_surface.numSpansInU
+        max_range_v = mfn_surface.numSpansInV
 
     return u / max_range_u, v / max_range_v
 
