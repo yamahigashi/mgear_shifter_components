@@ -11,7 +11,7 @@ except ImportError:
         "skeleposerEditor not found. Please install it from "
         "https://github.com/azagoruyko/skeleposer"
     )
-import ymt_shifter_utility as ymt_utility
+import ymt_shifter_utility as ymt_util
 
 
 class CustomShifterStep(cstp.customShifterMainStep):
@@ -24,37 +24,49 @@ class CustomShifterStep(cstp.customShifterMainStep):
 
         cmds.loadPlugin("skeleposer.mll")
 
-        self.rig = stepDict["mgearRun"]
-        self.insert_adj_node()
+        rig = stepDict.get("mgearRun")
+        if rig is None:
+            self.rig_name = cmds.ls(sl=True)[0]
+        else:
+            self.rig_name = rig.model.name()
+
+        self.insert_adj_nodes()
         self.add_skeleposer_node()
 
-    def insert_adj_node(self):
+    def insert_adj_nodes(self):
         # type: () -> None
         """Insert an adjust node for skeleposer."""
 
-        self.adj_nodes = []
+        self.adj_node_uuids = []
 
-        for ctrl in self.get_controllers():
+        for uuid in self.get_controller_uuids():
+            ctrl = cmds.ls(uuid, long=True)[0]
             try:
-                npo = ymt_util.addNPOPreservingMatrixConnections(pm.PyNode(ctrl))[0]  # type: pm.PyNode
-            except RuntimeError:
+                npo = ymt_util.addNPOPreservingMatrixConnections(ctrl)[0]  # type: pm.PyNode
+            except RuntimeError as e:
                 print("addNPO failed for {}".format(ctrl))
+                print(e)
                 continue
 
-            self.insert_add_node(npo, pm.PyNode(ctrl))
+            # The hierarchy has changed, so get it again
+            ctrl = cmds.ls(uuid, long=True)[0]
+            # self.insert_add_node(npo, pm.PyNode(ctrl))
 
             new_name = ctrl.split("|")[-1].replace("_ctl", "_adj")
-            if cmds.objExists(new_name):
+            new_full_path = "|".join(ctrl.split("|")[:-1] + [new_name])
+            if cmds.objExists(new_full_path):
                 print("already exists: {}".format(new_name))
+                continue
 
-            new_node = cmds.rename(npo.fullPath(), new_name)
-            self.adj_nodes.append(new_node)
+            cmds.rename(npo.fullPath(), new_name)
+            uuid = cmds.ls(npo.getName(), uuid=True)[0]
+            self.adj_node_uuids.append(uuid)
 
     def add_skeleposer_node(self):
         # type: () -> None
         """Add a skeleposer node to the rig and register joints."""
 
-        name = self.rig.model.name() + "_skeleposer"
+        name = self.rig_name + "_skeleposer"
 
         try:
             poser = editor.Skeleposer(cmds.createNode("skeleposer", name=name))
@@ -63,23 +75,24 @@ class CustomShifterStep(cstp.customShifterMainStep):
             return
 
         try:
-            joints = [pm.PyNode(jnt) for jnt in self.adj_nodes]
+            joints = [pm.PyNode(cmds.ls(jnt, uuid=True)[0]) for jnt in self.adj_node_uuids]
             poser.addJoints(joints)
         except RuntimeError:
             print("Failed to add joints to skeleposer")
             return
 
-    def get_controllers(self):
+    def get_controller_uuids(self):
         # type: () -> list[str]
         """Get all controllers from the rig using rig sets."""
 
         res = []
-        grp_name = self.rig.model.name() + "_controllers_grp"
+        grp_name = self.rig_name + "_controllers_grp"
         members = cmds.sets(grp_name, q=True) or []  # type: any
 
         for elem in members:
             if "_ctl" in elem and cmds.nodeType(elem) == "transform":
-                res.append(elem)
+                uuid = cmds.ls(elem, uuid=True)[0]
+                res.append(uuid)
 
         return res
 

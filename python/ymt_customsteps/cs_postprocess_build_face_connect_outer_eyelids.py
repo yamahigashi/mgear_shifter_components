@@ -81,6 +81,7 @@ class CustomShifterStep(cstp.customShifterMainStep):
 
         # TODO: extract number of CVs, fixed to 30 for now.
         dest = curve.createCurveFromCurve(tmp, name, 30)
+        # print("curve.createCurveFromCurve(\"{}\", \"{}\", 30).fullPath()".format(brow_crv, name))
         target1 = curve.createCurveFromCurve(brow_crv, name, 30).fullPath()
         cmds.wire(target1, w=brow_crv, n=name + "_wire")
         bs = pm.blendShape(target1, blink_crv, dest.fullPath())

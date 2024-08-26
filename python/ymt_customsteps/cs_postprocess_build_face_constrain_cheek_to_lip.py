@@ -170,10 +170,11 @@ class CustomShifterStep(cstp.customShifterMainStep):
             {
                 "src": [
                     "lip_L0_2_crvdetail_ctl",
-                    "aroundlip_L0_1_crvdetail_ctl",
+                    "aroundlip_L0_2_crvdetail_ctl",
+                    "aroundlip_L0_3_crvdetail_ctl",
                 ],
                 "dst": "surfaceWire_L0_2_ctl",
-                "rates": [0.4, 0.5],
+                "rates": [0.3, 0.35, 0.35],
                 "mode": "self",
             },
             {
@@ -188,10 +189,11 @@ class CustomShifterStep(cstp.customShifterMainStep):
             {
                 "src": [
                     "lip_R0_2_crvdetail_ctl",
-                    "aroundlip_R0_1_crvdetail_ctl",
+                    "aroundlip_R0_2_crvdetail_ctl",
+                    "aroundlip_R0_3_crvdetail_ctl",
                 ],
                 "dst": "surfaceWire_R0_2_ctl",
-                "rates": [0.4, 0.5],
+                "rates": [0.3, 0.35, 0.35],
                 "mode": "self",
             },
         ]
