@@ -888,12 +888,110 @@ def __has_make_nurbs_surface_hostory(surface_name):
     return False
 
 
+def serialize_mesh_shape(mesh_name):
+    # type: (str) -> str
+    """Serialize a mesh shape to a string"""
+    meshes = cmds.ls(mesh_name, dag=True, type="mesh")
+    
+    def _serialize_mesh(mesh_name):
+        # to store the mesh shape, we need to store the vertices, faces, normals, and uvs
+        # using OpenMaya to get the data
+        mesh = getAsMFnNode(mesh_name, om.MFnMesh)
+        vertices = mesh.getVertices()
+        points = mesh.getPoints()
+        normals = mesh.getNormals()
+        uvs = mesh.getUVs()
+
+        return {
+            "vertices": ([v for v in vertices[0]], [v for v in vertices[1]]),
+            "points": [(p[0], p[1], p[2]) for p in points],
+            "normals": [(p[0], p[1], p[2]) for p in normals],
+            "uvs": [(p[0], p[1]) for p in uvs],
+        }
+
+    res = []
+    for mesh in meshes:
+        res.append(_serialize_mesh(mesh))
+
+    serialized_data = {
+        "localRotatePivot": cmds.xform(mesh_name, q=True, os=True, rp=True),
+        "localScalePivot": cmds.xform(mesh_name, q=True, os=True, sp=True),
+        "rotate": cmds.xform(mesh_name, q=True, os=True, ro=True),
+        "scale": cmds.xform(mesh_name, q=True, os=True, s=True),
+        "translate": cmds.xform(mesh_name, q=True, os=True, t=True),
+        "meshes": res,
+    }
+
+    return str(serialized_data)
+
+
+def deserialize_mesh_shape(mesh_name, serialized_data):
+    # type: (str, str) -> str
+    """Deserialize a NURBS surface from a string"""
+
+    if not isinstance(mesh_name, (str, unicode)):
+        raise TypeError("surface_name must be a string but got {0}".format(type(mesh_name)))
+
+    deserializedData = eval(serialized_data)
+    if deserializedData.get("controlVertices"):
+        return deserialize_nurbs_surface(mesh_name, serialized_data)
+
+    # Retrieve the necessary information from the deserialized data
+    localRotatePivot = deserializedData["localRotatePivot"]
+    localScalePivot = deserializedData["localScalePivot"]
+    rotate = deserializedData["rotate"]
+    scale = deserializedData["scale"]
+    translate = deserializedData["translate"]
+    meshes = deserializedData["meshes"]
+
+    # Create a new mesh
+    container = cmds.createNode("transform", name=mesh_name)
+    cmds.delete(container, constructionHistory=True)
+    cmds.xform(container, os=True, rp=localRotatePivot)
+    cmds.xform(container, os=True, sp=localScalePivot)
+    cmds.xform(container, os=True, ro=rotate)
+    cmds.xform(container, os=True, s=scale)
+    cmds.xform(container, os=True, t=translate)
+
+    fn_container = getAsMFnNode(container, om.MFnTransform)
+
+    for mesh in meshes:
+
+        mesh_fn = om.MFnMesh()
+        vertices = mesh["vertices"]
+        points = mesh["points"]
+        normals = mesh["normals"]
+        uvs = mesh["uvs"]
+
+        vertex_array = om.MFloatPointArray()
+        for p in points:
+            vertex_array.append(om.MFloatPoint(*p))
+
+        # create(vertices, polygonCounts, polygonConnects, uValues=None, vValues=None, parent=kNullObj) -> MObject
+        # create(vertices, edges, edgeConnectsCount, edgeFaceConnects, edgeFaceDesc, storeDoubles=False, parent=kNullObj) -> MObject
+        # create(vertices, edges, polygonCounts, polygonConnects, uValues=None, vValues=None, parent=kNullObj) -> MObject
+        mesh_fn.create(
+            vertex_array,
+            vertices[0],
+            vertices[1],
+            uvs[0],
+            uvs[1],
+            parent=fn_container.object()
+        )
+
+    return container
+
+
 def serialize_nurbs_surface(surface_name):
     # type: (str) -> str
     """Serialize a NURBS surface to a string"""
 
     if not isinstance(surface_name, (str, unicode)):
         raise TypeError("surface_name must be a string")
+
+    for shape in cmds.listRelatives(surface_name, shapes=True) or []:
+        if cmds.objectType(shape) == "mesh":
+            return serialize_mesh_shape(surface_name)
 
     # if has make history, then freeze history
     if __has_make_nurbs_surface_hostory(surface_name):
@@ -952,6 +1050,8 @@ def deserialize_nurbs_surface(surface_name, serialized_data):
         raise TypeError("surface_name must be a string but got {0}".format(type(surface_name)))
 
     deserializedData = eval(serialized_data)
+    if deserializedData.get("meshes"):
+        return deserialize_mesh_shape(surface_name, serialized_data)
 
     # Retrieve the necessary information from the deserialized data
     control_vertices = deserializedData["controlVertices"]

@@ -710,6 +710,9 @@ class Component(component.Main):
 
         # remove elements from controllers group
         for comp in (slide_c_comp, corner_l_comp, corner_r_comp):
+            if not comp:
+                continue
+
             for k, v in comp.groups.items():
                 if "componentsRoots" in k:
                     continue

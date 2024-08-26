@@ -112,6 +112,7 @@ class Component(component.Main):
             raise Exception("No surface reference specified")
         self.numLocs = len(self.guide.atra) - 2
         self.ctlSize = (self.size / self.numLocs) * self.settings["ctlSize"] * 0.5
+        self.size = self.size * self.settings["ctlSize"]
         # --------------------------------------------------------
 
         self.float_ctls = []

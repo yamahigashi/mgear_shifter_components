@@ -257,13 +257,19 @@ def createCurveFromCurve(srcCrv, name, nbPoints, parent=None, m=dt.Matrix(), clo
     Returns:
         dagNode: The newly created curve.
     """
+
     if isinstance(srcCrv, six.string_types) or isinstance(srcCrv, six.text_type):
         srcCrv = pm.PyNode(srcCrv)
 
+    cmds.dgeval(srcCrv.name())
+    cmds.refresh()
     sc = getMFnNurbsCurve(srcCrv)
     length = sc.length()
     paramStart = sc.findParamFromLength(0.0)
-    paramEnd = sc.findParamFromLength(length)
+    try:
+        paramEnd = sc.findParamFromLength(length)
+    except RuntimeError:
+        paramEnd = sc.findParamFromLength(length - 0.001)
     paramLength = paramEnd - paramStart
 
     p = paramStart
