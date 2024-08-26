@@ -588,6 +588,7 @@ class Component(component.Main):
                 traceback.print_exc()
 
         if self.settings["addJoints"]:
+            self.jnt_pos.append([self.mainControl, "main"])
             for i, ctl in enumerate(self.secondaryControls):
                 self.jnt_pos.append([ctl, str(i).zfill(2)])
 

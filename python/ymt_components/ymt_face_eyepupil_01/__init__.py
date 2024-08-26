@@ -201,11 +201,24 @@ class Component(component.Main):
             except Exception:
                 import traceback
                 traceback.print_exc()
-
+        else:
+            try:
+                self.connect_ctl_to_aim()
+            except Exception:
+                import traceback
+                traceback.print_exc()
 
     def connect_orientation(self):
         """Orient connection definition for the component"""
         self.connect_orientCns()
+
+    def connect_ctl_to_aim(self):
+        """Connect the control to the aim cns"""
+        cmds.parentConstraint(
+                self.aim_cns.name(),
+                self.lookat_cns.name(),
+                mo=True
+        )
 
     def connect_slide_ghost(self):
 

@@ -608,6 +608,10 @@ class Component(component.Main):
         self.w3 = pm.wire(self.upTarget, w=self.upCrv_ctl)[0]
         self.w4 = pm.wire(self.lowTarget, w=self.lowCrv_ctl)[0]
 
+        for wire in (self.w1, self.w2, self.w3, self.w4):
+            wire.attr("dropoffDistance[0]").set(self.size)
+            wire.attr("dropoffDistance[1]").set(self.size)
+
         # adding blendshapes
         self.bs_upBlink  = pm.blendShape(self.upTarget, self.lowTarget, self.upBlink, n=self.getName("blendShapeUpBlink"))
         self.bs_lowBlink = pm.blendShape(self.lowTarget, self.upTarget, self.lowBlink, n=self.getName("blendShapeLowBlink"))
@@ -836,21 +840,28 @@ class Component(component.Main):
     def connect_standard(self):
 
         self.parent.addChild(self.root)
-        if self.surfRef:
+        if self.connect_surface_slider and self.surfRef:
             ref = self.rig.findComponent(self.surfRef)
             self.sliding_surface = ref.sliding_surface
 
-        return
         if self.connect_surface_slider:
             try:
-                self.connect_slide_ghost()
+                # TODO: extract conditions to a settings dictionary
+                if False:
+                    self.connect_slide_ghost()
+                else:
+                    self.connect_detail_controller_to_slide_ghost()
 
             except Exception as _:
                 import traceback
                 traceback.print_exc()
 
     def connect_pupil(self):
-        self.connect_standard()
+        try:
+            self.connect_standard()
+        except Exception as _:
+            import traceback
+            traceback.print_exc()
 
         lookat = self.rig.findRelative("pupil_{}0_lookat".format(self.side))
         if not lookat:
@@ -998,6 +1009,61 @@ class Component(component.Main):
 
         # self.setRelation()  # MUST re-setRelation, swapped ghost and real controls
         return ghostCtl
+
+    def connect_detail_controller_to_slide_ghost(self):
+
+        for i, ctl in enumerate(self.upDetailControllers):
+            self._connect_slide_ghost2(ctl, "upEyelid_crvdetail" + str(i))
+
+        for i, ctl in enumerate(self.lowDetailControllers):
+            self._connect_slide_ghost2(ctl, "lowEyelid_crvdetail" + str(i))
+
+    def _connect_slide_ghost2(self, surfaceCtl, index):
+
+        # create ghost controls
+        t = surfaceCtl.getMatrix(worldSpace=True)
+        slider = primitive.addTransform(
+                self.sliding_surface.getParent(),
+                surfaceCtl.name() + "_slideDriven",
+                t)
+
+        slideNpo = primitive.addTransform(
+                surfaceCtl.getParent(),
+                surfaceCtl.name() + "_slideNpo",
+                t)
+
+        down, _, up = ymt_util.findPathAtoB(surfaceCtl.getParent(), self.sliding_surface.getParent())
+        mul_node = pm.createNode("multMatrix")
+        j = k = 0
+        for j, d in enumerate(down):
+            d.attr("matrix") >> mul_node.attr("matrixIn[{}]".format(j))  # pyright: ignore [reportUnusedExpression]
+        for k, u in enumerate(up):
+            u.attr("inverseMatrix") >> mul_node.attr("matrixIn[{}]".format(k + j + 1))  # pyright: ignore [reportUnusedExpression]
+
+        dm_node = node.createDecomposeMatrixNode(mul_node.attr("matrixSum"))
+
+        cps_node = pm.createNode("closestPointOnSurface")
+        dm_node.attr("outputTranslate") >> cps_node.attr("inPosition")  # pyright: ignore [reportUnusedExpression]
+        surfaceShape = self.sliding_surface.getShape()
+        surfaceShape.attr("local") >> cps_node.attr("inputSurface")  # pyright: ignore [reportUnusedExpression]
+        cps_node.attr("position") >> slider.attr("translate")  # pyright: ignore [reportUnusedExpression]
+
+        if self.negate:
+            aim = [0, 0, -1]
+        else:
+            aim = [0, 0, 1]
+        pm.normalConstraint(surfaceShape,
+                            slider,
+                            aimVector=aim,
+                            upVector=[0, 1, 0],
+                            worldUpType="objectrotation",
+                            worldUpVector=[0, 1, 0],
+                            worldUpObject=self.root)
+        pm.parentConstraint(slider, slideNpo, mo=True)
+        cmds.parent(surfaceCtl.getName(), slideNpo.getName())
+
+        ymt_util.setKeyableAttributesDontLockVisibility(slideNpo, [])
+        ymt_util.setKeyableAttributesDontLockVisibility(slider, [])
 
     # =====================================================
     # CONNECTOR
