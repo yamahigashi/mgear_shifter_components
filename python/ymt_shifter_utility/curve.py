@@ -174,13 +174,18 @@ def createCurveFromOrderedEdges(edgeLoop,
 
     # return orderedEdges
     orderedVertex = [startVertex]
-    orderedVertexPos = [startVertex.getPosition(space='world')]
+    startPos = startVertex.getPosition(space="world") 
+    startPos = __applyInverseMatrixToPosition(startPos, m)
+    orderedVertexPos = [startPos]
     for e in orderedEdges:
 
         for v in e.connectedVertices():
             if v not in orderedVertex:
                 orderedVertex.append(v)
-                orderedVertexPos.append(v.getPosition(space='world'))
+                pos = v.getPosition(space="world")
+                pos = __applyInverseMatrixToPosition(pos, m)
+         
+                orderedVertexPos.append(pos)
 
     crv = addCurve(parent, name, orderedVertexPos, degree=degree, m=m, close=close)
     return crv
@@ -224,10 +229,10 @@ def createCurveFromEdges(edgeList,
     for x in vList:
         vtx = pm.PyNode(x)
         for v in vtx:
-            centers.append(v.getPosition(space='world'))
+            centers.append(v.getPosition(space="world"))
             # we use index [0] to order in X axis
-            xOrder.append(v.getPosition(space='world')[axis])
-            xReOrder.append(v.getPosition(space='world')[axis])
+            xOrder.append(v.getPosition(space="world")[axis])
+            xReOrder.append(v.getPosition(space="world")[axis])
 
     if reverse:
         xReOrder = sorted(xReOrder, reverse=True)
@@ -236,14 +241,38 @@ def createCurveFromEdges(edgeList,
 
     for x in xReOrder:
         i = xOrder.index(x)
-        centersOrdered.append(centers[i])
+        point = centers[i]
+        point = __applyInverseMatrixToPosition(point, m)
+        centersOrdered.append(point)
 
     crv = addCurve(parent, name, centersOrdered, degree=degree, m=m, close=close)
     return crv
 
 
+def __applyInverseMatrixToPosition(pos, m):
+    # type: (list[float], dt.Matrix|om2.MMatrix|None) -> list[float]
+
+    if m is None:
+        return pos
+
+    if isinstance(m, dt.Matrix):
+        m = om2.MMatrix(m)
+
+    np = om2.MMatrix()
+    np.setToIdentity()
+    np[12] = pos[0]
+    np[13] = pos[1]
+    np[14] = pos[2]
+
+    pos[0] = (m.inverse() * np)[12]
+    pos[1] = (m.inverse() * np)[13]
+    pos[2] = (m.inverse() * np)[14]
+
+    return pos
+
+
 def createCurveFromCurve(srcCrv, name, nbPoints, parent=None, m=dt.Matrix(), close=False, space=om2.MSpace.kWorld):
-    # type: (Union[str, pm.PyNode], str, int, Union[str, pm.PyNode, None], dt.Matrix, bool) -> pm.PyNode
+    # type: (Union[str, pm.PyNode], str, int, Union[str, pm.PyNode, None], dt.Matrix, bool, str) -> pm.PyNode
     """Create a curve from a curve
 
     Arguments:
@@ -294,9 +323,9 @@ def createCurveFromCurve(srcCrv, name, nbPoints, parent=None, m=dt.Matrix(), clo
         p = paramStart
 
     positions = []
-
     for _ in range(nbPoints):
-        point = sc.getPointAtParam(p, space=space)
+        point = sc.getPointAtParam(p, space=om2.MSpace.kWorld)
+        point = __applyInverseMatrixToPosition(point, m)
         pos = (point[0], point[1], point[2])
         positions.append(pos)
 

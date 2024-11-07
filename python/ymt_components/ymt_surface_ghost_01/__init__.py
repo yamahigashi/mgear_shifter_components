@@ -298,8 +298,7 @@ class Component(component.Main):
 
     def setRelation(self):
         """Set the relation beetween object from guide to rig"""
-        self.relatives["root"] = self.root
-        self.relatives["ctl"] = self.surfaceCtl
+        self.relatives["root"] = self.surfaceCtl
 
     # =====================================================
     # UTILITY

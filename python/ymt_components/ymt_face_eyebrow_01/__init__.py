@@ -219,7 +219,6 @@ class Component(component.Main):
         # type: () -> om.MFnMesh
 
         return draw_eye_guide_mesh_plane(self.uplocsPos, self.root)
-        # return mgear_util.draw_eye_guide_mesh_plane(joint_points)
 
     def addCurve(self):
 
@@ -231,7 +230,6 @@ class Component(component.Main):
     def addCurves(self, crv_root, plane):
 
         t = getTransform(self.root)
-        gen = curve.createCurveFromOrderedEdges
         planeNode = pm.PyNode(plane.fullPathName())
 
         # -------------------------------------------------------------------
@@ -241,7 +239,13 @@ class Component(component.Main):
         edgeList = [pm.PyNode(x) for x in edgeList]
 
         name = "main_crv"
-        crv = gen(edgeList, planeNode.verts[1], self.getName("{}Crv".format(name)), parent=crv_root, m=t)
+        crv = curve.createCurveFromOrderedEdges(
+            edgeList,
+            planeNode.verts[1],
+            self.getName("{}Crv".format(name)),
+            parent=crv_root,
+            m=t
+        )
         crv.attr("visibility").set(False)
         ymt_util.setKeyableAttributesDontLockVisibility(crv, [])
 
@@ -356,7 +360,8 @@ class Component(component.Main):
 
         # create upvector curve to drive secondary control
         if self.secondary_ctl_check:
-            mainCtlUpv = helpers.addCurve(self.crv_root, self.getName("mainCtl_upv"), ctls, crv_degree)
+            points = [ctl.getTranslation(space="world") for ctl in ctls]
+            mainCtlUpv = curve.addCurve(self.crv_root, self.getName("mainCtl_upv"), points, degree=crv_degree, m=t)
             ymt_util.setKeyableAttributesDontLockVisibility(mainCtlUpv, [])
             v = self.root.getTranslation(space="world")
             mainCtlUpv.setTranslation(v, om.MSpace.kWorld)
@@ -477,7 +482,7 @@ class Component(component.Main):
         # create hooks on the main ctl curve
         for j, crv in enumerate(self.secondaryCurves):
 
-            lvlType = 'transform'
+            lvlType = "transform"
             cvs = crv.getCVs(space="object")
 
             for i, cv in enumerate(cvs):
@@ -824,7 +829,7 @@ class Component(component.Main):
 
 
 def draw_eye_guide_mesh_plane(points, t):
-    # type: (Tuple[float, float, float], datatypes.MMatrix) -> om.MFnMesh
+    # type: (Tuple[float, float, float], datatypes.Matrix) -> om.MFnMesh
 
     mesh = om.MFnMesh()
 
@@ -862,7 +867,6 @@ def draw_eye_guide_mesh_plane(points, t):
             polygonConnects.append(0)
 
     mesh_obj = mesh.create(vertices, polygonCounts, polygonConnects)
-    return mesh
 
     mesh_trans = om.MFnTransform(mesh_obj)
     n = pm.PyNode(mesh_trans.name())

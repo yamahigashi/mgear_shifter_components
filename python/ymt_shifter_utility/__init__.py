@@ -279,7 +279,7 @@ def edit_controller_shape(name, pos=None, rot=None, scl=None, color=None):
     if not locator:
         return
 
-    shapes = cmds.listRelatives(locator, shapes=True) or []
+    shapes = cmds.listRelatives(locator, shapes=True, fullPath=True) or []
 
     if scl:
         if scl[0] == 0 and scl[1] == 0 and scl[1] == 0:
@@ -901,12 +901,29 @@ def serialize_mesh_shape(mesh_name):
         points = mesh.getPoints()
         normals = mesh.getNormals()
         uvs = mesh.getUVs()
+        poly_uvs = []
+        uv_idices = []
+
+        iter_poly = om.MItMeshPolygon(mesh.object())
+        while not iter_poly.isDone():
+            poly_uv = iter_poly.getUVs()
+            us = list(poly_uv[0])
+            vs = list(poly_uv[1])
+            poly_uvs.append((us, vs))
+            indices = []
+            for i in range(iter_poly.polygonVertexCount()):
+                indices.append(iter_poly.getUVIndex(i))
+            uv_idices.extend(indices)
+
+            iter_poly.next()
 
         return {
             "vertices": ([v for v in vertices[0]], [v for v in vertices[1]]),
             "points": [(p[0], p[1], p[2]) for p in points],
             "normals": [(p[0], p[1], p[2]) for p in normals],
-            "uvs": [(p[0], p[1]) for p in uvs],
+            "uvs": (list(uvs[0]), list(uvs[1])),
+            "polyUvs": poly_uvs,
+            "uvIndices": uv_idices,
         }
 
     res = []
@@ -962,22 +979,23 @@ def deserialize_mesh_shape(mesh_name, serialized_data):
         points = mesh["points"]
         normals = mesh["normals"]
         uvs = mesh["uvs"]
+        poly_uvs = mesh["polyUvs"]
+        uv_indices = mesh["uvIndices"]
 
         vertex_array = om.MFloatPointArray()
         for p in points:
             vertex_array.append(om.MFloatPoint(*p))
 
-        # create(vertices, polygonCounts, polygonConnects, uValues=None, vValues=None, parent=kNullObj) -> MObject
-        # create(vertices, edges, edgeConnectsCount, edgeFaceConnects, edgeFaceDesc, storeDoubles=False, parent=kNullObj) -> MObject
-        # create(vertices, edges, polygonCounts, polygonConnects, uValues=None, vValues=None, parent=kNullObj) -> MObject
         mesh_fn.create(
             vertex_array,
             vertices[0],
             vertices[1],
-            uvs[0],
-            uvs[1],
             parent=fn_container.object()
         )
+
+        mesh_fn.setUVs(uvs[0], uvs[1])
+        uv_counts = [len(uv[0]) for uv in poly_uvs]
+        mesh_fn.assignUVs(uv_counts, uv_indices)
 
     return container
 
@@ -989,7 +1007,7 @@ def serialize_nurbs_surface(surface_name):
     if not isinstance(surface_name, (str, unicode)):
         raise TypeError("surface_name must be a string")
 
-    for shape in cmds.listRelatives(surface_name, shapes=True) or []:
+    for shape in cmds.listRelatives(surface_name, shapes=True, fullPath=True) or []:
         if cmds.objectType(shape) == "mesh":
             return serialize_mesh_shape(surface_name)
 
@@ -1131,25 +1149,22 @@ def create_rivet_pin(mesh_name, position, name=None):
     orig, deformed = get_original_and_deformed_mesh(mesh_name)
     obj_type = cmds.objectType(mesh_name)
     if obj_type == "transform":
-        mesh_name = cmds.listRelatives(mesh_name, shapes=True)[0]
+        mesh_name = cmds.listRelatives(mesh_name, shapes=True, fullPath=True)[0]
 
     if orig and deformed:
         obj_type = cmds.objectType(mesh_name)
 
         if obj_type == "mesh":
             orig_attr = "{}.outMesh".format(orig)
-            deform_attr = "{}.worldMesh".format(deformed)
+            deform_attr = "{}.outMesh".format(deformed)
 
         elif obj_type == "nurbsSurface":
             orig_attr = "{}.local".format(orig)
             deform_attr = "{}.local".format(deformed)
-            # deform_attr = "{}.local".format(deformed)
 
         else:
             raise TypeError("mesh_name({}) must be a mesh or nurbsSurface but got {}".format(mesh_name, obj_type))
 
-        # cmds.connectAttr("{}.outMesh".format(orig), "{}.originalGeometry".format(pin))
-        # cmds.connectAttr("{}.worldMesh".format(deformed), "{}.deformedGeometry".format(pin))
         cmds.connectAttr(orig_attr, "{}.originalGeometry".format(pin))
         cmds.connectAttr(deform_attr, "{}.deformedGeometry".format(pin))
 
@@ -1164,17 +1179,25 @@ def create_rivet_pin(mesh_name, position, name=None):
     for attr in ["t", "r", "s"]:
         for axis in ("x", "y", "z"):
             cmds.setAttr("{}.{}{}".format(output, attr, axis), 0.0)
+
     return output
 
 
 def get_original_and_deformed_mesh(mesh_name):
     # type: (Text) -> Tuple[Text, Text]
+    """Get original and deformed mesh shape.
+
+    Args:
+        mesh_name (str): The mesh name.
+
+    Returns:
+        tuple: The original and deformed mesh shape.
+    """
 
     try:
-        shapes = cmds.listRelatives(mesh_name, shapes=True) or []
+        shapes = cmds.listRelatives(mesh_name, shapes=True, fullPath=True) or []
     except TypeError:
-        print(mesh_name)
-        print(type(mesh_name))
+        logger.error("mesh_name: {}, type is: {}".format(mesh_name, type(mesh_name)))
         raise
     if len(shapes) < 1:
         raise Exception("shape not found for mesh: {}".format(mesh_name))
@@ -1190,10 +1213,9 @@ def get_original_and_deformed_mesh(mesh_name):
             deform = shape
             break
 
-    if cmds.objectType(shapes[0]) == "nurbsSurface":
-        if not orig:
-            # create new orig
-            orig = cmds.deformableShape(shapes[0], createOriginalGeometry=True)[0]
+    if not orig:
+        # create new orig
+        orig = cmds.deformableShape(shapes[0], createOriginalGeometry=True)[0]
 
     return orig.split(".")[0], deform
 
@@ -1205,7 +1227,7 @@ def get_uv_at_position(mesh_name, position):
     obj_type = cmds.objectType(mesh_name)
     if obj_type == "transform":
         try:
-            shape = cmds.listRelatives(mesh_name, shapes=True)[0]
+            shape = cmds.listRelatives(mesh_name, shapes=True, fullPath=True)[0]
         except IndexError:
             raise TypeError("mesh_name must be a mesh or nurbsSurface but got {0}".format(obj_type))
 
@@ -1286,10 +1308,8 @@ def apply_rivet_constrain_to_selected(mesh, targets):
 
     pins = []
     for target in targets:
-        # print("target({}) type is {}".format(target, type(target)))
         if isinstance(target, nodetypes.Transform):
             target = target.name()
-            # print("target({}) type is {}".format(target, type(target)))
 
         if not cmds.objExists(target):
             raise Exception("target({}) {} not found".format(type(target), target))
@@ -1321,7 +1341,7 @@ def create_dummy_edges_from_objects(objects):
 
 
 def draw_plane_from_positions(positions, t=None):
-    # type: (List[Tuple[float, float, float]], dt.Matrix) -> om.MFnMesh
+    # type: (List[Tuple[float, float, float]], datatypes.Matrix|None) -> om.MFnMesh
     if t is not None:
         positions = [x - t.translate for x in positions]
 
@@ -1356,7 +1376,14 @@ def draw_plane_from_positions(positions, t=None):
             polygonConnects.append(0)
 
     mesh = om.MFnMesh()
-    _mesh_obj = mesh.create(vertices, polygonCounts, polygonConnects)
+    mesh_obj = mesh.create(vertices, polygonCounts, polygonConnects)
+    mesh_trans = om.MFnTransform(mesh_obj)
+
+    if t is not None:
+        n = pm.PyNode(mesh_trans.name())
+        v = t.translate
+        n.setTranslation(v, om.MSpace.kWorld)
+
     return mesh
 
 
