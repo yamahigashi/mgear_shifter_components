@@ -292,7 +292,10 @@ def createCurveFromCurve(srcCrv, name, nbPoints, parent=None, m=dt.Matrix(), clo
 
     cmds.dgeval(srcCrv.name())
     cmds.refresh()
+
     sc = getMFnNurbsCurve(srcCrv)
+    sc.updateCurve()
+
     length = sc.length()
     paramStart = sc.findParamFromLength(0.0)
     try:
@@ -336,6 +339,45 @@ def createCurveFromCurve(srcCrv, name, nbPoints, parent=None, m=dt.Matrix(), clo
                 p -= paramLength
             else:
                 p = paramEnd
+
+    crv = addCurve(parent, name, positions, close=close, degree=3, m=m)
+    return crv
+
+
+def createCurveFromCurveEvenLength(srcCrv, name, nbPoints, parent=None, m=dt.Matrix(), close=False, space=om2.MSpace.kWorld):
+    # type: (Union[str, pm.PyNode], str, int, Union[str, pm.PyNode, None], dt.Matrix, bool, str) -> pm.PyNode
+    """Create a curve from a curve
+
+    Arguments:
+        srcCrv (curve): The source curve.
+        name (str): The new curve name.
+        nbPoints (int): Number of control points for the new curve.
+        parent (dagNode): Parent of the new curve.
+        m (matrix): Global transform.
+        close (bool): True to close the curve.
+
+    Returns:
+        dagNode: The newly created curve.
+    """
+
+    if isinstance(srcCrv, six.string_types) or isinstance(srcCrv, six.text_type):
+        srcCrv = pm.PyNode(srcCrv)
+
+    cmds.dgeval(srcCrv.name())
+    cmds.refresh()
+
+    sc = getMFnNurbsCurve(srcCrv)
+    sc.updateCurve()
+
+    totalLength = sc.length()
+
+    positions = []
+    for i in range(nbPoints):
+        length = totalLength * i / (nbPoints - 1)
+        param = sc.findParamFromLength(length)
+        pos = sc.getPointAtParam(param, space=space)
+        pos = __applyInverseMatrixToPosition(pos, m)
+        positions.append((pos[0], pos[1], pos[2]))
 
     crv = addCurve(parent, name, positions, close=close, degree=3, m=m)
     return crv
@@ -1260,3 +1302,83 @@ def applyCurveParamCns(src, target):
         cmds.connectAttr(src + ".local", pointOnCurveInfo + ".inputCurve")
         cmds.setAttr(pointOnCurveInfo + ".parameter", new_param)
         cmds.connectAttr(pointOnCurveInfo + ".position", target + ".controlPoints[%s]" % i, force=True)
+
+
+def getCvParamRatio(crv):
+    # type: (str) -> list[float]
+    """Return the ratio of each control point in a curve"""
+
+    sc = getMFnNurbsCurve(crv)
+    sc.updateCurve()
+
+    length = sc.length()
+    paramStart = sc.findParamFromLength(0.0)
+    try:
+        paramEnd = sc.findParamFromLength(length)
+    except RuntimeError:
+        paramEnd = sc.findParamFromLength(length - 0.001)
+
+    paramLength = paramEnd - paramStart
+
+    ratios = []
+    for pos in sc.cvPositions():
+        closest = sc.closestPoint(pos)[0]
+        param = sc.getParamAtPoint(closest)
+        ratio = (param - paramStart) / paramLength
+        ratios.append(ratio)
+
+    return ratios
+
+
+def getCvLengthRatio(crv):
+    # type: (str) -> list[float]
+    """Return the ratio of each control point in a curve"""
+
+    sc = getMFnNurbsCurve(crv)
+    sc.updateCurve()
+
+    totalLength = sc.length()
+    paramStart = sc.findParamFromLength(0.0)
+    try:
+        paramEnd = sc.findParamFromLength(totalLength)
+    except RuntimeError:
+        paramEnd = sc.findParamFromLength(totalLength - 0.001)
+
+    paramLength = paramEnd - paramStart
+
+    ratios = []
+    for pos in sc.cvPositions():
+        closest = sc.closestPoint(pos)[0]
+        param = sc.getParamAtPoint(closest)
+        length = sc.findLengthFromParam(param)
+        try:
+            ratio = length / totalLength
+        except ZeroDivisionError:
+            ratio = 0.0
+        ratios.append(ratio)
+
+    return ratios
+
+
+def setCvParamRatio(crv, ratios):
+    # type: (str, list[float]) -> None
+    """Set the ratio of each control point in a curve"""
+
+    sc = getMFnNurbsCurve(crv)
+    sc.updateCurve()
+
+    length = sc.length()
+    paramStart = sc.findParamFromLength(0.0)
+    try:
+        paramEnd = sc.findParamFromLength(length)
+    except RuntimeError:
+        paramEnd = sc.findParamFromLength(length - 0.001)
+
+    newPositions = []
+    for ratio in ratios:
+        param = sc.findParamFromLength(ratio * length)
+        point = sc.getPointAtParam(param, space=om2.MSpace.kObject)
+        newPositions.append(point)
+
+    sc.setCVPositions(newPositions)
+    sc.updateCurve()

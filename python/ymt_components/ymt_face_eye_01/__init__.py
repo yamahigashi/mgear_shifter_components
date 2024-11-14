@@ -147,19 +147,6 @@ class Component(component.Main):
         self.lowControls = []
         self.trackLvl = []
 
-        # self.arrow_ctl = None
-        # self.arrow_npo = None
-        # self.upCrv = None
-        # self.lowCrv = None
-        # self.upCrv_ctl = None
-        # self.lowCrv_ctl = None
-        # self.upBlink = None
-        # self.lowBlink = None
-        # self.upTarget = None
-        # self.lowTarget = None
-        # self.midTarget = None
-        # self.midTargetLower = None
-
         self.previusTag = self.parentCtlTag
         self.guide.eyeMesh = self.guide.getObjects(self.guide.root)["pivotAndSizeRef"]
         # --------------------------------------------------------
@@ -181,8 +168,10 @@ class Component(component.Main):
         self.lowCrv_ctl = crvs[3]
         self.upBlink = crvs[4]
         self.lowBlink = crvs[5]
-        self.upTarget = crvs[6]
-        self.lowTarget = crvs[7]
+        self.upTarget4Up = crvs[6]
+        self.lowTarget4Low = crvs[7]
+        self.upTarget4Low = crvs[8]
+        self.lowTarget4Up = crvs[9]
 
         self.addControllers()
 
@@ -217,7 +206,7 @@ class Component(component.Main):
 
     def addCurves(self, upPositions, lowPositions):
 
-        gen2 = curve.createCurveFromCurve
+        gen2 = curve.createCurveFromCurveEvenLength
         gen3 = curve.addCurve
 
         t = getTransform(self.root)
@@ -241,26 +230,29 @@ class Component(component.Main):
         pm.rebuildCurve(lowCrv_ctl, s=2, rt=0, rpo=True, ch=False)
 
         # -------------------------------------------------------------------
-        _ = gen2(upCrv, self.getName("upblink_crv"), nbPoints=30, parent=crv_root, m=t)
-        pm.delete(_)
-        upBlink = gen2(upCrv, self.getName("upblink_crv"), nbPoints=30, parent=crv_root, m=t)
-        _ = gen2(lowCrv, self.getName("lowBlink_crv"), nbPoints=30, parent=crv_root, m=t)
-        pm.delete(_)
+        upBlink = gen2(upCrv, self.getName("upBlink_crv"), nbPoints=30, parent=crv_root, m=t)
         lowBlink = gen2(lowCrv, self.getName("lowBlink_crv"), nbPoints=30, parent=crv_root, m=t)
 
-        upTarget = gen2(upCrv, self.getName("upblink_target"), nbPoints=30, parent=crv_root, m=t)
-        lowTarget = gen2(lowCrv, self.getName("lowBlink_target"), nbPoints=30, parent=crv_root, m=t)
+        upTarget = gen2(upCrv, self.getName("upBlink4Up_target"), nbPoints=30, parent=crv_root, m=t)
+        lowTarget = gen2(lowCrv, self.getName("lowBlink4Low_target"), nbPoints=30, parent=crv_root, m=t)
+
+        upTargetForLow = gen2(upCrv, self.getName("upBlink4Low_target"), nbPoints=30, parent=crv_root, m=t)
+        lowTargetForUp = gen2(lowCrv, self.getName("lowBlink4Up_target"), nbPoints=30, parent=crv_root, m=t)
 
         # -------------------------------------------------------------------
-        rigCrvs = [upCrv,
-                   lowCrv,
-                   upCrv_ctl,
-                   lowCrv_ctl,
-                   upBlink,
-                   lowBlink,
-                   upTarget,
-                   lowTarget,
+        rigCrvs = [
+            upCrv,
+            lowCrv,
+            upCrv_ctl,
+            lowCrv_ctl,
+            upBlink,
+            lowBlink,
+            upTarget,
+            lowTarget,
+            upTargetForLow,
+            lowTargetForUp,
         ]
+        self.crv_root = crv_root
 
         for crv in rigCrvs:
             crv.attr("visibility").set(False)
@@ -620,30 +612,30 @@ class Component(component.Main):
         # curve.applyCurveParamCns(self.upBlink, self.upCrv)
         # curve.applyCurveParamCns(self.lowBlink, self.lowCrv)
 
-        self.w3 = pm.wire(self.upTarget, w=self.upCrv_ctl)[0]
-        self.w4 = pm.wire(self.lowTarget, w=self.lowCrv_ctl)[0]
+        self.w3 = pm.wire(self.upTarget4Up, w=self.upCrv_ctl)[0]
+        self.w4 = pm.wire(self.lowTarget4Low, w=self.lowCrv_ctl)[0]
 
         for wire in (self.w1, self.w2, self.w3, self.w4):
             wire.attr("dropoffDistance[0]").set(self.size)
             wire.attr("dropoffDistance[1]").set(self.size)
 
         # adding blendshapes
-        self.bs_upBlink  = pm.blendShape(self.upTarget, self.lowTarget, self.upBlink, n=self.getName("blendShapeUpBlink"))
-        self.bs_lowBlink = pm.blendShape(self.lowTarget, self.upTarget, self.lowBlink, n=self.getName("blendShapeLowBlink"))
+        self.bs_upBlink  = pm.blendShape(self.upTarget4Up, self.lowTarget4Up, self.upBlink, n=self.getName("blendShapeUpBlink"))
+        self.bs_lowBlink = pm.blendShape(self.lowTarget4Low, self.upTarget4Low, self.lowBlink, n=self.getName("blendShapeLowBlink"))
 
         # setting blendshape reverse connections
         rev_node = pm.createNode("reverse")
-        pm.connectAttr(self.bs_upBlink[0].attr(self.lowTarget.name().split("|")[-1]), rev_node + ".inputX")
-        pm.connectAttr(rev_node + ".outputX", self.bs_upBlink[0].attr(self.upTarget.name().split("|")[-1]))
+        pm.connectAttr(self.bs_upBlink[0].attr(self.lowTarget4Up.name().split("|")[-1]), rev_node + ".inputX")
+        pm.connectAttr(rev_node + ".outputX", self.bs_upBlink[0].attr(self.upTarget4Up.name().split("|")[-1]))
 
         rev_node = pm.createNode("reverse")
         rev_nodeLower = pm.createNode("reverse")
-        pm.connectAttr(self.bs_lowBlink[0].attr(self.upTarget.name().split("|")[-1]), rev_node + ".inputX")
-        pm.connectAttr(rev_node + ".outputX", self.bs_lowBlink[0].attr(self.lowTarget.name().split("|")[-1]))
+        pm.connectAttr(self.bs_lowBlink[0].attr(self.upTarget4Low.name().split("|")[-1]), rev_node + ".inputX")
+        pm.connectAttr(rev_node + ".outputX", self.bs_lowBlink[0].attr(self.lowTarget4Low.name().split("|")[-1]))
 
         rev_node = pm.createNode("reverse")
-        pm.connectAttr(self.bs_lowBlink[0].attr(self.upTarget.name().split("|")[-1]), rev_node + ".inputX")
-        pm.connectAttr(self.bs_upBlink[0].attr(self.lowTarget.name().split("|")[-1]), rev_nodeLower + ".inputX")
+        pm.connectAttr(self.bs_lowBlink[0].attr(self.upTarget4Low.name().split("|")[-1]), rev_node + ".inputX")
+        pm.connectAttr(self.bs_upBlink[0].attr(self.lowTarget4Up.name().split("|")[-1]), rev_nodeLower + ".inputX")
 
     # =====================================================
     # ATTRIBUTES
@@ -702,8 +694,8 @@ class Component(component.Main):
         self.loHeightRatio.input1X.set(invHeight)
         self.blink_lower_ctl.attr("translateY").connect(self.loHeightRatio.input2X)
 
-        pm.connectAttr(self.upHeightRatio + ".outputX", self.bs_upBlink[0].attr(self.lowTarget.name()))
-        pm.connectAttr(self.loHeightRatio + ".outputX", self.bs_lowBlink[0].attr(self.upTarget.name()))
+        pm.connectAttr(self.upHeightRatio + ".outputX", self.bs_upBlink[0].attr(self.lowTarget4Up.name()))
+        pm.connectAttr(self.loHeightRatio + ".outputX", self.bs_lowBlink[0].attr(self.upTarget4Low.name()))
 
     def addEyeTrackingAttributes(self):
 
@@ -919,15 +911,15 @@ class Component(component.Main):
         self.lowCrv_ctl = crvs[3]
         self.upBlink = crvs[4]
         self.lowBlink = crvs[5]
-        self.upTarget = crvs[6]
-        self.lowTarget = crvs[7]
+        self.upTarget4Up = crvs[6]
+        self.lowTarget4Low = crvs[7]
 
         curve.gear_curvecns_op_local(self.upCrv_ctl, upGhostControls)
         curve.gear_curvecns_op_local(self.lowCrv_ctl, lowGhostControls)
 
         self.addWires()
-        pm.connectAttr(self.upHeightRatio + ".outputX", self.bs_upBlink[0].attr(self.lowTarget.name().split("|")[-1]))
-        pm.connectAttr(self.loHeightRatio + ".outputX", self.bs_lowBlink[0].attr(self.upTarget.name().split("|")[-1]))
+        pm.connectAttr(self.upHeightRatio + ".outputX", self.bs_upBlink[0].attr(self.lowTarget4Up.name().split("|")[-1]))
+        pm.connectAttr(self.loHeightRatio + ".outputX", self.bs_lowBlink[0].attr(self.upTarget4Low.name().split("|")[-1]))
 
         # rebind DetailControls
         bt = transform.getTransform(self.root)
