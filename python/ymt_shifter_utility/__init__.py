@@ -1577,5 +1577,10 @@ def demote_controller(ctl):
     if "isCtl" in cmds.listAttr(ctl.fullPathName()):
         cmds.deleteAttr(ctl.fullPathName(), at="isCtl")
 
-    for ctl_grp in cmds.listSets(object=ctl.fullPathName()):
+    members = cmds.listSets(object=ctl.fullPathName()) or []
+    if not members:
+        logger.warning(
+            "No members found in the set for {}".format(ctl.fullPathName()))
+
+    for ctl_grp in members:
         cmds.sets(ctl.fullPathName(), rm=ctl_grp)

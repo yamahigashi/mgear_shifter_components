@@ -22,7 +22,7 @@ class CustomShifterStep(cstp.customShifterMainStep):
     def run(self, stepDict):
         # type: (dict) -> None
 
-        cmds.loadPlugin("skeleposer.mll")
+        cmds.loadPlugin("skeleposer.mll", quiet=True)
 
         rig = stepDict.get("mgearRun")
         if rig is None:
@@ -42,7 +42,7 @@ class CustomShifterStep(cstp.customShifterMainStep):
         for uuid in self.get_controller_uuids():
             ctrl = cmds.ls(uuid, long=True)[0]
             try:
-                npo = ymt_util.addNPOPreservingMatrixConnections(ctrl)[0]  # type: pm.PyNode
+                npo = ymt_util.addNPOPreservingMatrixConnections(pm.PyNode(ctrl))[0]  # type: pm.PyNode
             except RuntimeError as e:
                 print("addNPO failed for {}".format(ctrl))
                 print(e)

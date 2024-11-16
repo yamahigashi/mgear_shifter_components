@@ -268,13 +268,11 @@ class Component(component.Main):
         # -------------------------------------------------------------------
         self.crv_ctl  = curveFromCurve(self.crv, "ctl_crv",  12,  False)
         self.rope     = curveFromCurve(self.crv, "rope_crv", self.NB_ROPE, False)
-        self.crv_upv  = curveFromCurve(self.crv, "ctl_upv",  12,  True)
-        self.rope_upv = curveFromCurve(self.crv, "rope_upv", self.NB_ROPE, True)
 
     def addControlJoints(self):
-        self.tweakControllers = self._addDetailControls(self.crv, self.rope_root, self.rope, self.rope_upv)
+        self.tweakControllers = self._addDetailControls(self.crv, self.rope_root, self.rope)
 
-    def _addDetailControls(self, crv, rope_root, rope, rope_upv):
+    def _addDetailControls(self, crv, rope_root, rope):
 
         local_cvs = self.getCurveCVs(crv, "object")
         controls = []
@@ -319,10 +317,7 @@ class Component(component.Main):
                     _index = (tmp - i + self.right_index - 2)
 
             with ymt_util.overrideNamingAttributeTemporary(self, side=oSide):
-                # cvOSoffset = [cvo[0], cvo[1], cvo[2] + self.FRONT_OFFSET]
-                # upv = addTransform(rope_root, self.getName("rope_{}_upv".format(sub_comp)))
                 cns = addTransform(rope_root, self.getName("rope_{}_cns".format(_index)))
-                # applyPathCnsLocal(upv, self.crv_upv, rope_upv, cvOSoffset)
                 applyPathCnsLocal(cns, self.crv_ctl, rope, cvo)
 
                 m = getTransform(cns)
@@ -394,8 +389,8 @@ class Component(component.Main):
     def addControllers(self):
 
         paramsMain = ["tx", "ty", "tz", "rx", "ry", "rz", "sx", "sy", "sz", "ro"]
-        paramsSub = ["tx", "ty", "tz", "rx"]
         paramsSub = ["tx", "ty", "tz", "rx", "ry", "rz", "sx", "sy", "sz", "ro"]
+        paramsSub = ["tx", "ty", "tz"]
 
         ctlOptions = [
             # name,      side, icon,   color, width, keyable
@@ -413,7 +408,7 @@ class Component(component.Main):
             ["upInner",  "R", "circle", 14, .03, paramsSub],         # 11
         ]
 
-        self.upNpos, self.upCtls, self.upUpvs = self._addControls(self.crv_ctl, ctlOptions)
+        self.upNpos, self.upCtls = self._addControls(self.crv_ctl, ctlOptions)
 
         self.lips_C_upper_ctl  = self.upCtls[0]
         self.lips_C_lower_ctl  = self.upCtls[6]
@@ -421,16 +416,15 @@ class Component(component.Main):
         self.lips_L_Corner_npo = self.upNpos[3]
         self.lips_R_Corner_npo = self.upNpos[9]
 
-        upvec = self.upUpvs
-
         # Connecting control crvs with controls
         curve.gear_curvecns_op_local_skip_rotate(self.crv_ctl, self.upCtls)
-        curve.gear_curvecns_op_local_skip_rotate(self.crv_upv, upvec)
 
         # adding wires
-        pm.wire(self.crv, w=self.crv_ctl, dropoffDistance=[0, self.size * 10])
-        pm.wire(self.rope, w=self.crv_ctl, dropoffDistance=[0, self.size * 10])
-        pm.wire(self.rope_upv, w=self.crv_upv, dropoffDistance=[0, self.size * 10])
+        w1 = pm.wire(self.crv, w=self.crv_ctl, dropoffDistance=[0, self.size * 10])[0]
+        w2 = pm.wire(self.rope, w=self.crv_ctl, dropoffDistance=[0, self.size * 10])[0]
+
+        cmds.setAttr(w1.name() + ".rotation", 0.0)
+        cmds.setAttr(w2.name() + ".rotation", 0.0)
 
     def addConstraints(self):
 
@@ -493,7 +487,6 @@ class Component(component.Main):
 
         npos = []
         ctls = []
-        upvs = []
 
         for i, cv in enumerate(cvs):
 
@@ -533,15 +526,10 @@ class Component(component.Main):
                 )
 
                 ctls.append(ctl)
-
                 ymt_util.setKeyableAttributesDontLockVisibility(ctl, oPar)
-
-                upv = addTransform(ctl, self.getName("%s_upv" % oName), t)
-                upv.attr("tz").set(self.FRONT_OFFSET)
-                upvs.append(upv)
                 self.addToSubGroup(ctl, self.primaryControllersGroupName)
 
-        return npos, ctls, upvs
+        return npos, ctls
 
     def _constrainCtlRotToCurve(self, ctls, crv): 
 
@@ -597,7 +585,7 @@ class Component(component.Main):
             cmds.parent(oriCns, ctl.fullPath(), relative=True)
             cmds.connectAttr(outpath, oriCns + ".target[0].targetRotateZ")
             cmds.connectAttr(oriCns + ".constraintRotateZ", ctl + ".rotateZ")
-            # cmds.setAttr("{}.rotateZ".format(ctl), lock=True)
+            cmds.setAttr("{}.rotateZ".format(ctl), lock=True)
 
     # =====================================================
     # ATTRIBUTES

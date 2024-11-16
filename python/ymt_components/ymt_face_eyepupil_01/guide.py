@@ -12,7 +12,10 @@ from mgear.core import string
 from mgear.core import dag
 from mgear.vendor.Qt import QtWidgets, QtCore
 from mgear import shifter
-from mgear.core import transform
+from mgear.core import (
+    transform,
+    string,
+)
 
 from mgear.core.primitive import addTransform
 
@@ -173,6 +176,21 @@ class Guide(guide.ComponentGuide):
 
         sliding_surface = ymt_utility.deserialize_nurbs_surface(self.getName("sliding_surface"), c_dict["sliding_surface"])
         self.sliding_surface = pm.PyNode(sliding_surface)
+
+    def symmetrize(self):
+        """Inverse the transform of each element of the guide."""
+
+        if not super(Guide, self).symmetrize():
+            # no need to continue if the base class method returns False, meaning the guide is not symmetrical
+            return False
+
+        new_name =string.convertRLName(self.sliding_surface.name())
+        self.sliding_surface = cmds.duplicate(
+            self.sliding_surface.name(),
+            name=new_name
+        )[0]
+
+        return True
 
 
 ##########################################################

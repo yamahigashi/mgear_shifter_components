@@ -202,6 +202,8 @@ class Component(component.Main):
         self.ctl_root = addTransform(self.root, self.getName("ctls"), t)
         self.rope_root = addTransform(self.root, self.getName("rope"), t)
 
+        self.crv_root.visibility.set(False)
+
     def getNumberOfLocators(self, query):
         # type: (Text) -> int
         """ _uplocs."""
