@@ -20,6 +20,23 @@ from mgear.core.transform import (
     getTransform,
 )
 
+from logging import (  # noqa:F401 pylint: disable=unused-import, wrong-import-order
+    StreamHandler,
+    getLogger,
+    WARN,  # noqa: F401
+    DEBUG,
+    INFO
+)
+
+handler = StreamHandler()
+handler.setLevel(DEBUG)
+logger = getLogger(__name__)
+logger.setLevel(INFO)
+logger.setLevel(DEBUG)
+logger.addHandler(handler)
+logger.propagate = False
+
+
 if sys.version_info > (3, 0):
     from typing import TYPE_CHECKING
     if TYPE_CHECKING:
@@ -157,13 +174,18 @@ def createCurveFromOrderedEdges(edgeLoop,
 
     # return orderedEdges
     orderedVertex = [startVertex]
-    orderedVertexPos = [startVertex.getPosition(space='world')]
+    startPos = startVertex.getPosition(space="world") 
+    startPos = __applyInverseMatrixToPosition(startPos, m)
+    orderedVertexPos = [startPos]
     for e in orderedEdges:
 
         for v in e.connectedVertices():
             if v not in orderedVertex:
                 orderedVertex.append(v)
-                orderedVertexPos.append(v.getPosition(space='world'))
+                pos = v.getPosition(space="world")
+                pos = __applyInverseMatrixToPosition(pos, m)
+         
+                orderedVertexPos.append(pos)
 
     crv = addCurve(parent, name, orderedVertexPos, degree=degree, m=m, close=close)
     return crv
@@ -207,10 +229,10 @@ def createCurveFromEdges(edgeList,
     for x in vList:
         vtx = pm.PyNode(x)
         for v in vtx:
-            centers.append(v.getPosition(space='world'))
+            centers.append(v.getPosition(space="world"))
             # we use index [0] to order in X axis
-            xOrder.append(v.getPosition(space='world')[axis])
-            xReOrder.append(v.getPosition(space='world')[axis])
+            xOrder.append(v.getPosition(space="world")[axis])
+            xReOrder.append(v.getPosition(space="world")[axis])
 
     if reverse:
         xReOrder = sorted(xReOrder, reverse=True)
@@ -219,14 +241,38 @@ def createCurveFromEdges(edgeList,
 
     for x in xReOrder:
         i = xOrder.index(x)
-        centersOrdered.append(centers[i])
+        point = centers[i]
+        point = __applyInverseMatrixToPosition(point, m)
+        centersOrdered.append(point)
 
     crv = addCurve(parent, name, centersOrdered, degree=degree, m=m, close=close)
     return crv
 
 
+def __applyInverseMatrixToPosition(pos, m):
+    # type: (list[float], dt.Matrix|om2.MMatrix|None) -> list[float]
+
+    if m is None:
+        return pos
+
+    if isinstance(m, dt.Matrix):
+        m = om2.MMatrix(m)
+
+    np = om2.MMatrix()
+    np.setToIdentity()
+    np[12] = pos[0]
+    np[13] = pos[1]
+    np[14] = pos[2]
+
+    pos[0] = (m.inverse() * np)[12]
+    pos[1] = (m.inverse() * np)[13]
+    pos[2] = (m.inverse() * np)[14]
+
+    return pos
+
+
 def createCurveFromCurve(srcCrv, name, nbPoints, parent=None, m=dt.Matrix(), close=False, space=om2.MSpace.kWorld):
-    # type: (Union[str, pm.PyNode], str, int, Union[str, pm.PyNode, None], dt.Matrix, bool) -> pm.PyNode
+    # type: (Union[str, pm.PyNode], str, int, Union[str, pm.PyNode, None], dt.Matrix, bool, str) -> pm.PyNode
     """Create a curve from a curve
 
     Arguments:
@@ -240,26 +286,33 @@ def createCurveFromCurve(srcCrv, name, nbPoints, parent=None, m=dt.Matrix(), clo
     Returns:
         dagNode: The newly created curve.
     """
+
     if isinstance(srcCrv, six.string_types) or isinstance(srcCrv, six.text_type):
         srcCrv = pm.PyNode(srcCrv)
 
+    cmds.dgeval(srcCrv.name())
+    cmds.refresh()
+
     sc = getMFnNurbsCurve(srcCrv)
+    sc.updateCurve()
+
     length = sc.length()
     paramStart = sc.findParamFromLength(0.0)
-    paramEnd = sc.findParamFromLength(length)
+    try:
+        paramEnd = sc.findParamFromLength(length)
+    except RuntimeError:
+        paramEnd = sc.findParamFromLength(length - 0.001)
     paramLength = paramEnd - paramStart
-
-    if not close:
-        increment = paramLength / (nbPoints - 1)
-    else:
-        increment = paramLength / nbPoints
 
     p = paramStart
     # if curve is close, we need to find start param to be offset to find nearest point to 0
     if close:
+        increment = paramLength / nbPoints
+
         retry = 0
         tolerance = 0.0001
         while retry < 10000:
+            # FIXME: this is a workaround
             try:
                 p = sc.getParamAtPoint(sc.cvPosition(0), tolerance)
                 break
@@ -268,21 +321,63 @@ def createCurveFromCurve(srcCrv, name, nbPoints, parent=None, m=dt.Matrix(), clo
             retry += 1
             tolerance += length / 10000.0
 
-    if close:
-        p = p
     else:
+        increment = paramLength / nbPoints
         p = paramStart
 
     positions = []
-
-    for x in range(nbPoints):
-        point = sc.getPointAtParam(p, space=space)
+    for _ in range(nbPoints):
+        point = sc.getPointAtParam(p, space=om2.MSpace.kWorld)
+        point = __applyInverseMatrixToPosition(point, m)
         pos = (point[0], point[1], point[2])
         positions.append(pos)
 
         p += increment
         if p > paramEnd:
-            p -= paramLength
+
+            if close:
+                p -= paramLength
+            else:
+                p = paramEnd
+
+    crv = addCurve(parent, name, positions, close=close, degree=3, m=m)
+    return crv
+
+
+def createCurveFromCurveEvenLength(srcCrv, name, nbPoints, parent=None, m=dt.Matrix(), close=False, space=om2.MSpace.kWorld):
+    # type: (Union[str, pm.PyNode], str, int, Union[str, pm.PyNode, None], dt.Matrix, bool, str) -> pm.PyNode
+    """Create a curve from a curve
+
+    Arguments:
+        srcCrv (curve): The source curve.
+        name (str): The new curve name.
+        nbPoints (int): Number of control points for the new curve.
+        parent (dagNode): Parent of the new curve.
+        m (matrix): Global transform.
+        close (bool): True to close the curve.
+
+    Returns:
+        dagNode: The newly created curve.
+    """
+
+    if isinstance(srcCrv, six.string_types) or isinstance(srcCrv, six.text_type):
+        srcCrv = pm.PyNode(srcCrv)
+
+    cmds.dgeval(srcCrv.name())
+    cmds.refresh()
+
+    sc = getMFnNurbsCurve(srcCrv)
+    sc.updateCurve()
+
+    totalLength = sc.length()
+
+    positions = []
+    for i in range(nbPoints):
+        length = totalLength * i / (nbPoints - 1)
+        param = sc.findParamFromLength(length)
+        pos = sc.getPointAtParam(param, space=space)
+        pos = __applyInverseMatrixToPosition(pos, m)
+        positions.append((pos[0], pos[1], pos[2]))
 
     crv = addCurve(parent, name, positions, close=close, degree=3, m=m)
     return crv
@@ -335,8 +430,6 @@ def getCurveParamByRatio(crv, ratio):
 
     sc = getMFnNurbsCurve(crv.name())
     length = sc.length()
-    print(length)
-    print(crv.name())
     paramStart = sc.findParamFromLength(0.0)
     paramEnd = sc.findParamFromLength(length)
     param = (paramEnd - paramStart) * ratio + paramStart
@@ -898,7 +991,7 @@ def applyPathCnsLocal(target, curve, u, maintainOffset=True):
     cmds.setAttr(cns + ".worldUpVectorX", 0)
     cmds.setAttr(cns + ".worldUpVectorY", 1)
     cmds.setAttr(cns + ".worldUpVectorZ", 0)
-    cmds.connectAttr(curve.fullPathName() + ".worldMatrix", cns + ".worldUpMatrix")  # object rotation up
+    cmds.connectAttr(curve.fullPathName() + ".matrix", cns + ".worldUpMatrix")  # object rotation up
     cmds.setAttr(cns + ".frontAxis", 2)  # front axis x
     cmds.setAttr(cns + ".upAxis", 1)  # up axis y
     pm.connectAttr(curve.attr("local"), cns.attr("geometryPath"), f=True)
@@ -1180,3 +1273,112 @@ def gear_curvecns_op(crv, inputs=[]):
         pm.connectAttr(item + ".worldMatrix", node + ".inputs[%s]" % i)
 
     return node
+
+
+def applyCurveParamCns(src, target):
+    # type: (dt.Transform, dt.Transform) -> None
+
+    if isinstance(src, six.string_types) or isinstance(src, six.text_type):
+        src = pm.PyNode(src)
+
+    if isinstance(target, six.string_types) or isinstance(target, six.text_type):
+        target = pm.PyNode(target)
+
+    numPoints = cmds.getAttr(target + ".controlPoints", size=True)
+
+    src_crv = getMFnNurbsCurve(src)
+    tgt_crv = getMFnNurbsCurve(target)
+
+    src_length = src_crv.length()
+    target_length = tgt_crv.length()
+
+    for i in range(numPoints):
+        pos = cmds.pointPosition(target + ".controlPoints[%s]" % i, local=True)
+        param, length = getCurveParamAtPosition(target, pos)
+        ratio = param / target_length
+        new_param = src_crv.findParamFromLength(src_length * ratio)
+
+        pointOnCurveInfo = cmds.createNode("pointOnCurveInfo")
+        cmds.connectAttr(src + ".local", pointOnCurveInfo + ".inputCurve")
+        cmds.setAttr(pointOnCurveInfo + ".parameter", new_param)
+        cmds.connectAttr(pointOnCurveInfo + ".position", target + ".controlPoints[%s]" % i, force=True)
+
+
+def getCvParamRatio(crv):
+    # type: (str) -> list[float]
+    """Return the ratio of each control point in a curve"""
+
+    sc = getMFnNurbsCurve(crv)
+    sc.updateCurve()
+
+    length = sc.length()
+    paramStart = sc.findParamFromLength(0.0)
+    try:
+        paramEnd = sc.findParamFromLength(length)
+    except RuntimeError:
+        paramEnd = sc.findParamFromLength(length - 0.001)
+
+    paramLength = paramEnd - paramStart
+
+    ratios = []
+    for pos in sc.cvPositions():
+        closest = sc.closestPoint(pos)[0]
+        param = sc.getParamAtPoint(closest)
+        ratio = (param - paramStart) / paramLength
+        ratios.append(ratio)
+
+    return ratios
+
+
+def getCvLengthRatio(crv):
+    # type: (str) -> list[float]
+    """Return the ratio of each control point in a curve"""
+
+    sc = getMFnNurbsCurve(crv)
+    sc.updateCurve()
+
+    totalLength = sc.length()
+    paramStart = sc.findParamFromLength(0.0)
+    try:
+        paramEnd = sc.findParamFromLength(totalLength)
+    except RuntimeError:
+        paramEnd = sc.findParamFromLength(totalLength - 0.001)
+
+    paramLength = paramEnd - paramStart
+
+    ratios = []
+    for pos in sc.cvPositions():
+        closest = sc.closestPoint(pos)[0]
+        param = sc.getParamAtPoint(closest)
+        length = sc.findLengthFromParam(param)
+        try:
+            ratio = length / totalLength
+        except ZeroDivisionError:
+            ratio = 0.0
+        ratios.append(ratio)
+
+    return ratios
+
+
+def setCvParamRatio(crv, ratios):
+    # type: (str, list[float]) -> None
+    """Set the ratio of each control point in a curve"""
+
+    sc = getMFnNurbsCurve(crv)
+    sc.updateCurve()
+
+    length = sc.length()
+    paramStart = sc.findParamFromLength(0.0)
+    try:
+        paramEnd = sc.findParamFromLength(length)
+    except RuntimeError:
+        paramEnd = sc.findParamFromLength(length - 0.001)
+
+    newPositions = []
+    for ratio in ratios:
+        param = sc.findParamFromLength(ratio * length)
+        point = sc.getPointAtParam(param, space=om2.MSpace.kObject)
+        newPositions.append(point)
+
+    sc.setCVPositions(newPositions)
+    sc.updateCurve()

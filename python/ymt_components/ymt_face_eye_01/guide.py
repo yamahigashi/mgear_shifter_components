@@ -7,8 +7,10 @@ from mgear.core import string
 from mgear.core import dag
 from mgear.vendor.Qt import QtWidgets, QtCore
 from mgear import shifter
-from mgear.core import transform
-
+from mgear.core import (
+    transform,
+    vector
+)
 from mgear.core.primitive import addTransform
 
 

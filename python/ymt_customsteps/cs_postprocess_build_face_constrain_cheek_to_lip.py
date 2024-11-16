@@ -122,9 +122,10 @@ class CustomShifterStep(cstp.customShifterMainStep):
                     "nose_C0_ctl",
                     "mouth_C0_lipup_ctl",
                     "mouthSlide_C0_ctl",
+                    "aroundlip_C0_rope"
                 ],
                 "dst": "aroundlip_C0_upcenter_ctl",
-                "rates": [0.10, 0.50, 0.40],
+                "rates": [0.10, 0.50, 0.05, 0.35],
                 "mode": "addNpo",
             },
             # {
@@ -169,10 +170,11 @@ class CustomShifterStep(cstp.customShifterMainStep):
             {
                 "src": [
                     "lip_L0_2_crvdetail_ctl",
-                    "aroundlip_L0_1_crvdetail_ctl",
+                    "aroundlip_L0_2_crvdetail_ctl",
+                    "aroundlip_L0_3_crvdetail_ctl",
                 ],
                 "dst": "surfaceWire_L0_2_ctl",
-                "rates": [0.4, 0.5],
+                "rates": [0.3, 0.35, 0.35],
                 "mode": "self",
             },
             {
@@ -187,10 +189,11 @@ class CustomShifterStep(cstp.customShifterMainStep):
             {
                 "src": [
                     "lip_R0_2_crvdetail_ctl",
-                    "aroundlip_R0_1_crvdetail_ctl",
+                    "aroundlip_R0_2_crvdetail_ctl",
+                    "aroundlip_R0_3_crvdetail_ctl",
                 ],
                 "dst": "surfaceWire_R0_2_ctl",
-                "rates": [0.4, 0.5],
+                "rates": [0.3, 0.35, 0.35],
                 "mode": "self",
             },
         ]

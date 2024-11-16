@@ -3,6 +3,9 @@ import maya.cmds as cmds
 import pymel.core as pm
 
 from mgear import rigbits
+from mgear.core.transform import (
+    getTransform,
+)
 import mgear.shifter.custom_step as cstp
 import ymt_shifter_utility as ymt_utility
 import ymt_shifter_utility.curve as curve
@@ -52,7 +55,7 @@ class CustomShifterStep(cstp.customShifterMainStep):
         brow_crv = self.get_brow_crv(left=True)
         blink_crv = self.get_blink_crv(left=True)
         eyelids, dummy_start, dummy_end = self.get_npos(left=True)
-        dest_crv = self.blendShape("eyelidline_L0_surface_crv", brow_crv, blink_crv, eyelids)
+        dest_crv = self.blendShape("eyelidline_L0_", brow_crv, blink_crv, eyelids)
         for npo in eyelids:
             curve.applyPathConstrainLocal(npo, dest_crv)
 
@@ -63,7 +66,7 @@ class CustomShifterStep(cstp.customShifterMainStep):
         brow_crv = self.get_brow_crv(left=False)
         blink_crv = self.get_blink_crv(left=False)
         eyelids, dummy_start, dummy_end = self.get_npos(left=False)
-        dest_crv = self.blendShape("eyelidline_R0_surface_crv", brow_crv, blink_crv, eyelids, False)
+        dest_crv = self.blendShape("eyelidline_R0_", brow_crv, blink_crv, eyelids, False)
         for npo in eyelids:
             curve.applyPathConstrainLocal(npo, dest_crv)
         cmds.delete(dummy_start)
@@ -76,13 +79,14 @@ class CustomShifterStep(cstp.customShifterMainStep):
         else:
             sortingAxis = "-x"
 
+        t = getTransform(pm.PyNode(self.parent))
         edges, dummy_plane = ymt_utility.create_dummy_edges_from_objects(eyelids)
-        tmp = curve.createCurveFromEdges(edges, name, sortingAxis=sortingAxis)
+        tmp = curve.createCurveFromEdges(edges, name + "eyelid_crv", sortingAxis=sortingAxis, m=t)
 
         # TODO: extract number of CVs, fixed to 30 for now.
-        dest = curve.createCurveFromCurve(tmp, name, 30)
-        target1 = curve.createCurveFromCurve(brow_crv, name, 30).fullPath()
-        cmds.wire(target1, w=brow_crv, n=name + "_wire")
+        dest = curve.createCurveFromCurve(tmp, name + "eyelid_crv2", 30, m=t)
+        target1 = curve.createCurveFromCurve(brow_crv, name + "brow_crv", 30, m=t).fullPath()
+        cmds.wire(target1, w=brow_crv, n=name + "wire")
         bs = pm.blendShape(target1, blink_crv, dest.fullPath())
         cmds.setAttr(bs[0] + "." + target1.split("|")[-1], 0.16)
         cmds.setAttr(bs[0] + "." + blink_crv, 0.25)

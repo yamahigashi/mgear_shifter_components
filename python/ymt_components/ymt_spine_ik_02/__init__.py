@@ -296,7 +296,7 @@ class Component(component.Main):
             tp=self.preiviousCtlTag,
             mirrorConf=self.mirror_conf)
 
-        ymtutil.setKeyableAttributesDontLockVisibility(self.fk_ctl)
+        ymtutil.setKeyableAttributesDontLockVisibility(self.fk_ctl, params=["tx", "ty", "tz", "ro", "rx", "ry", "rz", "sx", "sy", "sz"])
         attribute.setRotOrder(fk_ctl, "ZXY")
         self.fk_ctl.append(fk_ctl)
         self.preiviousCtlTag = fk_ctl

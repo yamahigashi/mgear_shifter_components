@@ -5,8 +5,6 @@ import math
 import functools
 
 import maya.cmds as cmds
-# import maya.OpenMaya as om1
-# import maya.api.OpenMaya as om
 
 import pymel.core as pm
 from pymel.core import datatypes
@@ -15,12 +13,8 @@ from mgear.shifter import component
 
 from mgear.core import (
     transform,
-    # curve,
     applyop,
     attribute,
-    # icon,
-    # fcurve,
-    # vector,
     meshNavigation,
     node,
     primitive,
@@ -30,8 +24,6 @@ from mgear.core import (
 from mgear.core.transform import (
     getTransform,
     resetTransform,
-    # getTransformLookingAt,
-    # getChainTransform2,
     setMatrixPosition,
 )
 
@@ -147,19 +139,6 @@ class Component(component.Main):
         self.lowControls = []
         self.trackLvl = []
 
-        # self.arrow_ctl = None
-        # self.arrow_npo = None
-        # self.upCrv = None
-        # self.lowCrv = None
-        # self.upCrv_ctl = None
-        # self.lowCrv_ctl = None
-        # self.upBlink = None
-        # self.lowBlink = None
-        # self.upTarget = None
-        # self.lowTarget = None
-        # self.midTarget = None
-        # self.midTargetLower = None
-
         self.previusTag = self.parentCtlTag
         self.guide.eyeMesh = self.guide.getObjects(self.guide.root)["pivotAndSizeRef"]
         # --------------------------------------------------------
@@ -181,8 +160,10 @@ class Component(component.Main):
         self.lowCrv_ctl = crvs[3]
         self.upBlink = crvs[4]
         self.lowBlink = crvs[5]
-        self.upTarget = crvs[6]
-        self.lowTarget = crvs[7]
+        self.upTarget4Up = crvs[6]
+        self.lowTarget4Low = crvs[7]
+        self.upTarget4Low = crvs[8]
+        self.lowTarget4Up = crvs[9]
 
         self.addControllers()
 
@@ -217,7 +198,7 @@ class Component(component.Main):
 
     def addCurves(self, upPositions, lowPositions):
 
-        gen2 = curve.createCurveFromCurve
+        gen2 = curve.createCurveFromCurveEvenLength
         gen3 = curve.addCurve
 
         t = getTransform(self.root)
@@ -241,26 +222,29 @@ class Component(component.Main):
         pm.rebuildCurve(lowCrv_ctl, s=2, rt=0, rpo=True, ch=False)
 
         # -------------------------------------------------------------------
-        _ = gen2(upCrv, self.getName("upblink_crv"), nbPoints=30, parent=crv_root)
-        pm.delete(_)
-        upBlink = gen2(upCrv, self.getName("upblink_crv"), nbPoints=30, parent=crv_root)
-        _ = gen2(lowCrv, self.getName("lowBlink_crv"), nbPoints=30, parent=crv_root)
-        pm.delete(_)
-        lowBlink = gen2(lowCrv, self.getName("lowBlink_crv"), nbPoints=30, parent=crv_root)
+        upBlink = gen2(upCrv, self.getName("upBlink_crv"), nbPoints=30, parent=crv_root, m=t)
+        lowBlink = gen2(lowCrv, self.getName("lowBlink_crv"), nbPoints=30, parent=crv_root, m=t)
 
-        upTarget = gen2(upCrv, self.getName("upblink_target"), nbPoints=30, parent=crv_root)
-        lowTarget = gen2(lowCrv, self.getName("lowBlink_target"), nbPoints=30, parent=crv_root)
+        upTarget = gen2(upCrv, self.getName("upBlink4Up_target"), nbPoints=30, parent=crv_root, m=t)
+        lowTarget = gen2(lowCrv, self.getName("lowBlink4Low_target"), nbPoints=30, parent=crv_root, m=t)
+
+        upTargetForLow = gen2(upCrv, self.getName("upBlink4Low_target"), nbPoints=30, parent=crv_root, m=t)
+        lowTargetForUp = gen2(lowCrv, self.getName("lowBlink4Up_target"), nbPoints=30, parent=crv_root, m=t)
 
         # -------------------------------------------------------------------
-        rigCrvs = [upCrv,
-                   lowCrv,
-                   upCrv_ctl,
-                   lowCrv_ctl,
-                   upBlink,
-                   lowBlink,
-                   upTarget,
-                   lowTarget,
+        rigCrvs = [
+            upCrv,
+            lowCrv,
+            upCrv_ctl,
+            lowCrv_ctl,
+            upBlink,
+            lowBlink,
+            upTarget,
+            lowTarget,
+            upTargetForLow,
+            lowTargetForUp,
         ]
+        self.crv_root = crv_root
 
         for crv in rigCrvs:
             crv.attr("visibility").set(False)
@@ -341,8 +325,6 @@ class Component(component.Main):
             params=["tx", "ty", "tz", "ro", "rx", "ry", "rz", "sx", "sy", "sz"])
 
     def addLookAtControlers(self, t_root, t_look):
-        # Tracking
-        # Eye aim control
 
         self.center_lookat = addTransform(self.over_ctl, self.getName("center_lookat"), t_root)
 
@@ -444,12 +426,12 @@ class Component(component.Main):
         skip = not self.settings.get("isSplitCorners", False)
 
         # upper eyelid controls
-        ctls, npos, aim_npos =  self._addCurveDetailControllers(t, self.upCrv, "upEyelid")
+        ctls, npos, aim_npos =  self._addCurveDetailControllers(t, self.upCrv, self.upBlink, "upEyelid")
         self.upDetailControllers = ctls
         self.upDetailNpos = npos
         self.upDetailAimNpos = aim_npos
 
-        ctls, npos, aim_npos = self._addCurveDetailControllers(t, self.lowCrv, "lowEyelid", skipHeadAndTail=skip)
+        ctls, npos, aim_npos = self._addCurveDetailControllers(t, self.lowCrv, self.lowBlink, "lowEyelid", skipHeadAndTail=skip)
         self.lowDetailControllers = ctls
         self.lowDetailNpos = npos
         self.lowDetailAimNpos = aim_npos
@@ -528,14 +510,27 @@ class Component(component.Main):
 
         self.addToGroup(obj, group_name, parentGrp=ctlGrp)
 
-    def _addCurveDetailControllers(self, t, crv, name, skipHeadAndTail=False):
+    def _selectNearestCvIndex(self, crv, pos):
+
+        cvs = crv.getCVs(space="world")
+        min_dist = 9999999999
+        nearest = None
+        for i, cv in enumerate(cvs):
+            dist = (pos - cv).length()
+            if dist < min_dist:
+                min_dist = dist
+                nearest = i
+
+        return nearest
+
+    def _addCurveDetailControllers(self, t, crv, detailCrv, name, skipHeadAndTail=False):
 
         controls = []
         npos = []
         aim_npos = []
 
         cvs = crv.getCVs(space="world")
-        crv_info = node.createCurveInfoNode(crv)
+        crv_info = node.createCurveInfoNode(detailCrv)
 
         if self.negate:
             pass
@@ -555,12 +550,14 @@ class Component(component.Main):
             if skipHeadAndTail and (i == len(cvs) - 1):
                 continue
 
+            nearestCvId = self._selectNearestCvIndex(detailCrv, cv)
+
             # aim targets
             trn_name = self.getName("{}_aimTarget{}".format(name, i))
             trn = primitive.addTransformFromPos(self.eyeTargets_root, trn_name, pos=cv)
 
             # connecting positions with crv
-            pm.connectAttr(crv_info + ".controlPoints[%s]" % str(i), trn.attr("translate"))
+            pm.connectAttr(crv_info + ".controlPoints[%s]" % str(nearestCvId), trn.attr("translate"))
 
             # joints
             xform = setMatrixPosition(t, self.bboxCenter)
@@ -601,26 +598,32 @@ class Component(component.Main):
         self.w1 = pm.wire(self.upCrv, w=self.upBlink)[0]
         self.w2 = pm.wire(self.lowCrv, w=self.lowBlink)[0]
 
-        self.w3 = pm.wire(self.upTarget, w=self.upCrv_ctl)[0]
-        self.w4 = pm.wire(self.lowTarget, w=self.lowCrv_ctl)[0]
+        self.w3 = pm.wire(self.upTarget4Up, w=self.upCrv_ctl)[0]
+        self.w4 = pm.wire(self.lowTarget4Low, w=self.lowCrv_ctl)[0]
+        self.w5 = pm.wire(self.upTarget4Low, w=self.upCrv_ctl)[0]
+        self.w6 = pm.wire(self.lowTarget4Up, w=self.lowCrv_ctl)[0]
+
+        for wire in (self.w1, self.w2, self.w3, self.w4, self.w5, self.w6):
+            wire.attr("dropoffDistance[0]").set(self.size)
+            wire.attr("dropoffDistance[1]").set(self.size)
 
         # adding blendshapes
-        self.bs_upBlink  = pm.blendShape(self.upTarget, self.lowTarget, self.upBlink, n=self.getName("blendShapeUpBlink"))
-        self.bs_lowBlink = pm.blendShape(self.lowTarget, self.upTarget, self.lowBlink, n=self.getName("blendShapeLowBlink"))
+        self.bs_upBlink  = pm.blendShape(self.upTarget4Up, self.lowTarget4Up, self.upBlink, n=self.getName("blendShapeUpBlink"))
+        self.bs_lowBlink = pm.blendShape(self.lowTarget4Low, self.upTarget4Low, self.lowBlink, n=self.getName("blendShapeLowBlink"))
 
         # setting blendshape reverse connections
         rev_node = pm.createNode("reverse")
-        pm.connectAttr(self.bs_upBlink[0].attr(self.lowTarget.name().split("|")[-1]), rev_node + ".inputX")
-        pm.connectAttr(rev_node + ".outputX", self.bs_upBlink[0].attr(self.upTarget.name().split("|")[-1]))
+        pm.connectAttr(self.bs_upBlink[0].attr(self.lowTarget4Up.name().split("|")[-1]), rev_node + ".inputX")
+        pm.connectAttr(rev_node + ".outputX", self.bs_upBlink[0].attr(self.upTarget4Up.name().split("|")[-1]))
 
         rev_node = pm.createNode("reverse")
         rev_nodeLower = pm.createNode("reverse")
-        pm.connectAttr(self.bs_lowBlink[0].attr(self.upTarget.name().split("|")[-1]), rev_node + ".inputX")
-        pm.connectAttr(rev_node + ".outputX", self.bs_lowBlink[0].attr(self.lowTarget.name().split("|")[-1]))
+        pm.connectAttr(self.bs_lowBlink[0].attr(self.upTarget4Low.name().split("|")[-1]), rev_node + ".inputX")
+        pm.connectAttr(rev_node + ".outputX", self.bs_lowBlink[0].attr(self.lowTarget4Low.name().split("|")[-1]))
 
         rev_node = pm.createNode("reverse")
-        pm.connectAttr(self.bs_lowBlink[0].attr(self.upTarget.name().split("|")[-1]), rev_node + ".inputX")
-        pm.connectAttr(self.bs_upBlink[0].attr(self.lowTarget.name().split("|")[-1]), rev_nodeLower + ".inputX")
+        pm.connectAttr(self.bs_lowBlink[0].attr(self.upTarget4Low.name().split("|")[-1]), rev_node + ".inputX")
+        pm.connectAttr(self.bs_upBlink[0].attr(self.lowTarget4Up.name().split("|")[-1]), rev_nodeLower + ".inputX")
 
     # =====================================================
     # ATTRIBUTES
@@ -652,7 +655,6 @@ class Component(component.Main):
         self.blinkMult_att = self.addAnimParam("blinkMult", "Blink Multiplyer", "float", 1, minValue=1, maxValue=2)
         self.blinkUpper_att = addAttrNonAnim(self.blink_upper_ctl, "upperBlink", "float", value=0, minValue=-1.0, maxValue=1.0)
         self.blinkLower_att = addAttrNonAnim(self.blink_upper_ctl, "lowerBlink", "float", value=0, minValue=-1.0, maxValue=1.0)
-        # self.midBlinkH_att = addAttrNonAnim(self.blink_upper_ctl, "blinkHeight", "float", value=self.blinkH)
 
         height = (self.upPos - self.lowPos).length()
         invHeight = 1.0 / height
@@ -679,8 +681,8 @@ class Component(component.Main):
         self.loHeightRatio.input1X.set(invHeight)
         self.blink_lower_ctl.attr("translateY").connect(self.loHeightRatio.input2X)
 
-        pm.connectAttr(self.upHeightRatio + ".outputX", self.bs_upBlink[0].attr(self.lowTarget.name()))
-        pm.connectAttr(self.loHeightRatio + ".outputX", self.bs_lowBlink[0].attr(self.upTarget.name()))
+        pm.connectAttr(self.upHeightRatio + ".outputX", self.bs_upBlink[0].attr(self.lowTarget4Up.name()))
+        pm.connectAttr(self.loHeightRatio + ".outputX", self.bs_lowBlink[0].attr(self.upTarget4Low.name()))
 
     def addEyeTrackingAttributes(self):
 
@@ -832,27 +834,42 @@ class Component(component.Main):
     def connect_standard(self):
 
         self.parent.addChild(self.root)
-        if self.surfRef:
+        if self.connect_surface_slider and self.surfRef:
             ref = self.rig.findComponent(self.surfRef)
             self.sliding_surface = ref.sliding_surface
 
         if self.connect_surface_slider:
             try:
-                self.connect_slide_ghost()
+                # TODO: extract conditions to a settings dictionary
+                if False:
+                    self.connect_slide_ghost()
+                else:
+                    self.connect_detail_controller_to_slide_ghost()
 
             except Exception as _:
                 import traceback
                 traceback.print_exc()
 
     def connect_pupil(self):
-        self.connect_standard()
+        try:
+            self.connect_standard()
+        except Exception as _:
+            import traceback
+            traceback.print_exc()
 
         lookat = self.rig.findRelative("pupil_{}0_lookat".format(self.side))
         if not lookat:
             print("error: pupil_{}0_lookat not found".format(self.side))
             raise Exception("pupil_{}0_lookat not found".format(self.side))
 
-        _cns_node = pm.aimConstraint(lookat, self.arrow_npo, maintainOffset=True)
+        _cns_node = cmds.aimConstraint(lookat.getName(), self.arrow_npo.getName(), maintainOffset=True)[0]  # type: ignore
+        cmds.setAttr(_cns_node + ".worldUpType", 2)  # 2 means object rotation up
+        cmds.setAttr(_cns_node + ".worldUpVector", 0, 1, 0)
+        cmds.connectAttr(
+            lookat.getName() + ".worldMatrix[0]",
+            _cns_node + ".worldUpMatrix",
+            force=True
+        )
 
     def connect_slide_ghost(self):
 
@@ -881,15 +898,15 @@ class Component(component.Main):
         self.lowCrv_ctl = crvs[3]
         self.upBlink = crvs[4]
         self.lowBlink = crvs[5]
-        self.upTarget = crvs[6]
-        self.lowTarget = crvs[7]
+        self.upTarget4Up = crvs[6]
+        self.lowTarget4Low = crvs[7]
 
         curve.gear_curvecns_op_local(self.upCrv_ctl, upGhostControls)
         curve.gear_curvecns_op_local(self.lowCrv_ctl, lowGhostControls)
 
         self.addWires()
-        pm.connectAttr(self.upHeightRatio + ".outputX", self.bs_upBlink[0].attr(self.lowTarget.name().split("|")[-1]))
-        pm.connectAttr(self.loHeightRatio + ".outputX", self.bs_lowBlink[0].attr(self.upTarget.name().split("|")[-1]))
+        pm.connectAttr(self.upHeightRatio + ".outputX", self.bs_upBlink[0].attr(self.lowTarget4Up.name().split("|")[-1]))
+        pm.connectAttr(self.loHeightRatio + ".outputX", self.bs_lowBlink[0].attr(self.upTarget4Low.name().split("|")[-1]))
 
         # rebind DetailControls
         bt = transform.getTransform(self.root)
@@ -993,6 +1010,61 @@ class Component(component.Main):
 
         # self.setRelation()  # MUST re-setRelation, swapped ghost and real controls
         return ghostCtl
+
+    def connect_detail_controller_to_slide_ghost(self):
+
+        for i, ctl in enumerate(self.upDetailControllers):
+            self._connect_slide_ghost2(ctl, "upEyelid_crvdetail" + str(i))
+
+        for i, ctl in enumerate(self.lowDetailControllers):
+            self._connect_slide_ghost2(ctl, "lowEyelid_crvdetail" + str(i))
+
+    def _connect_slide_ghost2(self, surfaceCtl, index):
+
+        # create ghost controls
+        t = surfaceCtl.getMatrix(worldSpace=True)
+        slider = primitive.addTransform(
+                self.sliding_surface.getParent(),
+                surfaceCtl.name() + "_slideDriven",
+                t)
+
+        slideNpo = primitive.addTransform(
+                surfaceCtl.getParent(),
+                surfaceCtl.name() + "_slideNpo",
+                t)
+
+        down, _, up = ymt_util.findPathAtoB(surfaceCtl.getParent(), self.sliding_surface.getParent())
+        mul_node = pm.createNode("multMatrix")
+        j = k = 0
+        for j, d in enumerate(down):
+            d.attr("matrix") >> mul_node.attr("matrixIn[{}]".format(j))  # pyright: ignore [reportUnusedExpression]
+        for k, u in enumerate(up):
+            u.attr("inverseMatrix") >> mul_node.attr("matrixIn[{}]".format(k + j + 1))  # pyright: ignore [reportUnusedExpression]
+
+        dm_node = node.createDecomposeMatrixNode(mul_node.attr("matrixSum"))
+
+        cps_node = pm.createNode("closestPointOnSurface")
+        dm_node.attr("outputTranslate") >> cps_node.attr("inPosition")  # pyright: ignore [reportUnusedExpression]
+        surfaceShape = self.sliding_surface.getShape()
+        surfaceShape.attr("local") >> cps_node.attr("inputSurface")  # pyright: ignore [reportUnusedExpression]
+        cps_node.attr("position") >> slider.attr("translate")  # pyright: ignore [reportUnusedExpression]
+
+        if self.negate:
+            aim = [0, 0, -1]
+        else:
+            aim = [0, 0, 1]
+        pm.normalConstraint(surfaceShape,
+                            slider,
+                            aimVector=aim,
+                            upVector=[0, 1, 0],
+                            worldUpType="objectrotation",
+                            worldUpVector=[0, 1, 0],
+                            worldUpObject=self.root)
+        pm.parentConstraint(slider, slideNpo, mo=True)
+        cmds.parent(surfaceCtl.getName(), slideNpo.getName())
+
+        ymt_util.setKeyableAttributesDontLockVisibility(slideNpo, [])
+        ymt_util.setKeyableAttributesDontLockVisibility(slider, [])
 
     # =====================================================
     # CONNECTOR

@@ -279,7 +279,7 @@ def edit_controller_shape(name, pos=None, rot=None, scl=None, color=None):
     if not locator:
         return
 
-    shapes = cmds.listRelatives(locator, shapes=True) or []
+    shapes = cmds.listRelatives(locator, shapes=True, fullPath=True) or []
 
     if scl:
         if scl[0] == 0 and scl[1] == 0 and scl[1] == 0:
@@ -390,7 +390,7 @@ def addJointCtl(self,
     attribute.addAttribute(
         ctl, "ctl_role", "string", keyable=False, value=name)
 
-    # locator reference for quick guide matching
+    # locator reference for quickguide matching
     # TODO: this is a temporal implementation. We should store the full
     # guide data in future iterations
     if guide_loc_ref:
@@ -888,12 +888,128 @@ def __has_make_nurbs_surface_hostory(surface_name):
     return False
 
 
+def serialize_mesh_shape(mesh_name):
+    # type: (str) -> str
+    """Serialize a mesh shape to a string"""
+    meshes = cmds.ls(mesh_name, dag=True, type="mesh")
+    
+    def _serialize_mesh(mesh_name):
+        # to store the mesh shape, we need to store the vertices, faces, normals, and uvs
+        # using OpenMaya to get the data
+        mesh = getAsMFnNode(mesh_name, om.MFnMesh)
+        vertices = mesh.getVertices()
+        points = mesh.getPoints()
+        normals = mesh.getNormals()
+        uvs = mesh.getUVs()
+        poly_uvs = []
+        uv_idices = []
+
+        iter_poly = om.MItMeshPolygon(mesh.object())
+        while not iter_poly.isDone():
+            poly_uv = iter_poly.getUVs()
+            us = list(poly_uv[0])
+            vs = list(poly_uv[1])
+            poly_uvs.append((us, vs))
+            indices = []
+            for i in range(iter_poly.polygonVertexCount()):
+                indices.append(iter_poly.getUVIndex(i))
+            uv_idices.extend(indices)
+
+            iter_poly.next()
+
+        return {
+            "vertices": ([v for v in vertices[0]], [v for v in vertices[1]]),
+            "points": [(p[0], p[1], p[2]) for p in points],
+            "normals": [(p[0], p[1], p[2]) for p in normals],
+            "uvs": (list(uvs[0]), list(uvs[1])),
+            "polyUvs": poly_uvs,
+            "uvIndices": uv_idices,
+        }
+
+    res = []
+    for mesh in meshes:
+        res.append(_serialize_mesh(mesh))
+
+    serialized_data = {
+        "localRotatePivot": cmds.xform(mesh_name, q=True, os=True, rp=True),
+        "localScalePivot": cmds.xform(mesh_name, q=True, os=True, sp=True),
+        "rotate": cmds.xform(mesh_name, q=True, os=True, ro=True),
+        "scale": cmds.xform(mesh_name, q=True, os=True, s=True),
+        "translate": cmds.xform(mesh_name, q=True, os=True, t=True),
+        "meshes": res,
+    }
+
+    return str(serialized_data)
+
+
+def deserialize_mesh_shape(mesh_name, serialized_data):
+    # type: (str, str) -> str
+    """Deserialize a NURBS surface from a string"""
+
+    if not isinstance(mesh_name, (str, unicode)):
+        raise TypeError("surface_name must be a string but got {0}".format(type(mesh_name)))
+
+    deserializedData = eval(serialized_data)
+    if deserializedData.get("controlVertices"):
+        return deserialize_nurbs_surface(mesh_name, serialized_data)
+
+    # Retrieve the necessary information from the deserialized data
+    localRotatePivot = deserializedData["localRotatePivot"]
+    localScalePivot = deserializedData["localScalePivot"]
+    rotate = deserializedData["rotate"]
+    scale = deserializedData["scale"]
+    translate = deserializedData["translate"]
+    meshes = deserializedData["meshes"]
+
+    # Create a new mesh
+    container = cmds.createNode("transform", name=mesh_name)
+    cmds.delete(container, constructionHistory=True)
+    cmds.xform(container, os=True, rp=localRotatePivot)
+    cmds.xform(container, os=True, sp=localScalePivot)
+    cmds.xform(container, os=True, ro=rotate)
+    cmds.xform(container, os=True, s=scale)
+    cmds.xform(container, os=True, t=translate)
+
+    fn_container = getAsMFnNode(container, om.MFnTransform)
+
+    for mesh in meshes:
+
+        mesh_fn = om.MFnMesh()
+        vertices = mesh["vertices"]
+        points = mesh["points"]
+        normals = mesh["normals"]
+        uvs = mesh["uvs"]
+        poly_uvs = mesh["polyUvs"]
+        uv_indices = mesh["uvIndices"]
+
+        vertex_array = om.MFloatPointArray()
+        for p in points:
+            vertex_array.append(om.MFloatPoint(*p))
+
+        mesh_fn.create(
+            vertex_array,
+            vertices[0],
+            vertices[1],
+            parent=fn_container.object()
+        )
+
+        mesh_fn.setUVs(uvs[0], uvs[1])
+        uv_counts = [len(uv[0]) for uv in poly_uvs]
+        mesh_fn.assignUVs(uv_counts, uv_indices)
+
+    return container
+
+
 def serialize_nurbs_surface(surface_name):
     # type: (str) -> str
     """Serialize a NURBS surface to a string"""
 
     if not isinstance(surface_name, (str, unicode)):
         raise TypeError("surface_name must be a string")
+
+    for shape in cmds.listRelatives(surface_name, shapes=True, fullPath=True) or []:
+        if cmds.objectType(shape) == "mesh":
+            return serialize_mesh_shape(surface_name)
 
     # if has make history, then freeze history
     if __has_make_nurbs_surface_hostory(surface_name):
@@ -916,6 +1032,8 @@ def serialize_nurbs_surface(surface_name):
     degreeV = cmds.getAttr("{0}.degreeV".format(surface_name))
     patchU = cmds.getAttr("{0}.spansU".format(surface_name))
     patchV = cmds.getAttr("{0}.spansV".format(surface_name))
+    formU = cmds.getAttr("{0}.formU".format(surface_name))
+    formV = cmds.getAttr("{0}.formV".format(surface_name))
 
     # Create a dictionary to hold the serialized data
     serialized_data = {
@@ -924,6 +1042,8 @@ def serialize_nurbs_surface(surface_name):
         "degreeV": degreeV,
         "patchU": patchU,
         "patchV": patchV,
+        "formU": formU,
+        "formV": formV,
         "localRotatePivot": cmds.xform(surface_name, q=True, os=True, rp=True),
         "localScalePivot": cmds.xform(surface_name, q=True, os=True, sp=True),
         "rotate": cmds.xform(surface_name, q=True, os=True, ro=True),
@@ -948,6 +1068,8 @@ def deserialize_nurbs_surface(surface_name, serialized_data):
         raise TypeError("surface_name must be a string but got {0}".format(type(surface_name)))
 
     deserializedData = eval(serialized_data)
+    if deserializedData.get("meshes"):
+        return deserialize_mesh_shape(surface_name, serialized_data)
 
     # Retrieve the necessary information from the deserialized data
     control_vertices = deserializedData["controlVertices"]
@@ -955,6 +1077,8 @@ def deserialize_nurbs_surface(surface_name, serialized_data):
     degreeV = deserializedData["degreeV"]
     patchU = deserializedData["patchU"]
     patchV = deserializedData["patchV"]
+    formU = deserializedData.get("formU", 0)
+    formV = deserializedData.get("formV", 0)
     localRotatePivot = deserializedData["localRotatePivot"]
     localScalePivot = deserializedData["localScalePivot"]
     rotate = deserializedData["rotate"]
@@ -962,14 +1086,44 @@ def deserialize_nurbs_surface(surface_name, serialized_data):
     translate = deserializedData["translate"]
 
     # Create a new NURBS surface
-    new_surface = cmds.nurbsPlane(
-        n=surface_name,
-        d=3,
-        u=patchU,
-        v=patchV,
-        width=0,
-        lengthRatio=0,
-        constructionHistory=False)[0]  # type: str
+    if formU == 0 and formV == 2:  # Open, Periodic
+        new_surface = cmds.sphere(
+            n=surface_name,
+            spans=patchU,
+            sections=patchV,
+            degree=degreeU,
+            polygon=0,  # means NURBS
+            constructionHistory=False)[0]  # type: ignore
+
+    elif formU == 2 and formV == 2:  # Periodic, Periodic
+        new_surface = cmds.nurbsPlane(
+            n=surface_name,
+            d=3,
+            u=patchU,
+            v=patchV,
+            width=0,
+            lengthRatio=0,
+            constructionHistory=False)[0]  # type: ignore
+
+    elif formU == 0 and formV == 0:  # Open, Open
+        new_surface = cmds.nurbsPlane(
+            n=surface_name,
+            d=3,
+            u=patchU,
+            v=patchV,
+            width=0,
+            lengthRatio=0,
+            constructionHistory=False)[0]  # type: ignore
+    else:
+        logger.warning("Unsupported formU and formV values: {0}, {1}".format(formU, formV))
+        new_surface = cmds.nurbsPlane(
+            n=surface_name,
+            d=3,
+            u=patchU,
+            v=patchV,
+            width=0,
+            lengthRatio=0,
+            constructionHistory=False)[0]  # type: ignore
 
     cmds.xform(new_surface, os=True, rp=localRotatePivot)
     cmds.xform(new_surface, os=True, sp=localScalePivot)
@@ -987,7 +1141,7 @@ def deserialize_nurbs_surface(surface_name, serialized_data):
     return new_surface
 
 
-def apply_rivet_constrain(mesh_name, position, name=None):
+def create_rivet_pin(mesh_name, position, name=None):
     # type: (Text, Tuple[Text, Text, Text], Optional[Text]) -> Text
     """Apply uvPin constrain to given world position"""
 
@@ -995,25 +1149,22 @@ def apply_rivet_constrain(mesh_name, position, name=None):
     orig, deformed = get_original_and_deformed_mesh(mesh_name)
     obj_type = cmds.objectType(mesh_name)
     if obj_type == "transform":
-        mesh_name = cmds.listRelatives(mesh_name, shapes=True)[0]
+        mesh_name = cmds.listRelatives(mesh_name, shapes=True, fullPath=True)[0]
 
     if orig and deformed:
         obj_type = cmds.objectType(mesh_name)
 
         if obj_type == "mesh":
             orig_attr = "{}.outMesh".format(orig)
-            deform_attr = "{}.worldMesh".format(deformed)
+            deform_attr = "{}.outMesh".format(deformed)
 
         elif obj_type == "nurbsSurface":
             orig_attr = "{}.local".format(orig)
             deform_attr = "{}.local".format(deformed)
-            # deform_attr = "{}.local".format(deformed)
 
         else:
             raise TypeError("mesh_name({}) must be a mesh or nurbsSurface but got {}".format(mesh_name, obj_type))
 
-        # cmds.connectAttr("{}.outMesh".format(orig), "{}.originalGeometry".format(pin))
-        # cmds.connectAttr("{}.worldMesh".format(deformed), "{}.deformedGeometry".format(pin))
         cmds.connectAttr(orig_attr, "{}.originalGeometry".format(pin))
         cmds.connectAttr(deform_attr, "{}.deformedGeometry".format(pin))
 
@@ -1028,17 +1179,25 @@ def apply_rivet_constrain(mesh_name, position, name=None):
     for attr in ["t", "r", "s"]:
         for axis in ("x", "y", "z"):
             cmds.setAttr("{}.{}{}".format(output, attr, axis), 0.0)
+
     return output
 
 
 def get_original_and_deformed_mesh(mesh_name):
     # type: (Text) -> Tuple[Text, Text]
+    """Get original and deformed mesh shape.
+
+    Args:
+        mesh_name (str): The mesh name.
+
+    Returns:
+        tuple: The original and deformed mesh shape.
+    """
 
     try:
-        shapes = cmds.listRelatives(mesh_name, shapes=True) or []
+        shapes = cmds.listRelatives(mesh_name, shapes=True, fullPath=True) or []
     except TypeError:
-        print(mesh_name)
-        print(type(mesh_name))
+        logger.error("mesh_name: {}, type is: {}".format(mesh_name, type(mesh_name)))
         raise
     if len(shapes) < 1:
         raise Exception("shape not found for mesh: {}".format(mesh_name))
@@ -1054,10 +1213,9 @@ def get_original_and_deformed_mesh(mesh_name):
             deform = shape
             break
 
-    if cmds.objectType(shapes[0]) == "nurbsSurface":
-        if not orig:
-            # create new orig
-            orig = cmds.deformableShape(shapes[0], createOriginalGeometry=True)[0]
+    if not orig:
+        # create new orig
+        orig = cmds.deformableShape(shapes[0], createOriginalGeometry=True)[0]
 
     return orig.split(".")[0], deform
 
@@ -1069,7 +1227,7 @@ def get_uv_at_position(mesh_name, position):
     obj_type = cmds.objectType(mesh_name)
     if obj_type == "transform":
         try:
-            shape = cmds.listRelatives(mesh_name, shapes=True)[0]
+            shape = cmds.listRelatives(mesh_name, shapes=True, fullPath=True)[0]
         except IndexError:
             raise TypeError("mesh_name must be a mesh or nurbsSurface but got {0}".format(obj_type))
 
@@ -1113,7 +1271,16 @@ def get_uv_at_nurbs_surface_position(surface_name, position):
     point = om.MPoint(position)
     closest_point, u, v = mfn_surface.closestPoint(point, space=om.MSpace.kWorld)
 
-    return u, v
+    formU = cmds.getAttr("{0}.formU".format(surface_name))
+    formV = cmds.getAttr("{0}.formV".format(surface_name))
+    if formU == 0 and formV == 0:
+        max_range_u = cmds.getAttr("{0}.minMaxRangeU".format(surface_name))[0][1]
+        max_range_v = cmds.getAttr("{0}.minMaxRangeV".format(surface_name))[0][1]
+    else:
+        max_range_u = mfn_surface.numSpansInU
+        max_range_v = mfn_surface.numSpansInV
+
+    return u / max_range_u, v / max_range_v
 
 
 def apply_rivet_constrain_on_vertex(mesh, vertex_id):
@@ -1126,7 +1293,7 @@ def apply_rivet_constrain_on_vertex(mesh, vertex_id):
     mfn_mesh = om.MFnMesh(mesh_dag)
     position = mfn_mesh.getPoint(vertex_id)
 
-    return apply_rivet_constrain(mesh, position)
+    return create_rivet_pin(mesh, position)
 
 
 def apply_rivet_constrain_to_selected(mesh, targets):
@@ -1141,16 +1308,14 @@ def apply_rivet_constrain_to_selected(mesh, targets):
 
     pins = []
     for target in targets:
-        # print("target({}) type is {}".format(target, type(target)))
         if isinstance(target, nodetypes.Transform):
             target = target.name()
-            # print("target({}) type is {}".format(target, type(target)))
 
         if not cmds.objExists(target):
             raise Exception("target({}) {} not found".format(type(target), target))
 
         pos = cmds.xform(target, q=True, ws=True, t=True)
-        pin = apply_rivet_constrain(mesh, pos)
+        pin = create_rivet_pin(mesh, pos)
         pin = cmds.rename(pin, target + "_rivet")
         pins.append(pin)
 
@@ -1176,7 +1341,7 @@ def create_dummy_edges_from_objects(objects):
 
 
 def draw_plane_from_positions(positions, t=None):
-    # type: (List[Tuple[float, float, float]], dt.Matrix) -> om.MFnMesh
+    # type: (List[Tuple[float, float, float]], datatypes.Matrix|None) -> om.MFnMesh
     if t is not None:
         positions = [x - t.translate for x in positions]
 
@@ -1211,7 +1376,14 @@ def draw_plane_from_positions(positions, t=None):
             polygonConnects.append(0)
 
     mesh = om.MFnMesh()
-    _mesh_obj = mesh.create(vertices, polygonCounts, polygonConnects)
+    mesh_obj = mesh.create(vertices, polygonCounts, polygonConnects)
+    mesh_trans = om.MFnTransform(mesh_obj)
+
+    if t is not None:
+        n = pm.PyNode(mesh_trans.name())
+        v = t.translate
+        n.setTranslation(v, om.MSpace.kWorld)
+
     return mesh
 
 
@@ -1373,3 +1545,42 @@ def addNPOPreservingMatrixConnections(ctl):
             cmds.connectAttr(decompMatrix + ".outputScale", dst, force=True)
 
     return newNPO
+
+
+def demote_controller(ctl):
+    # type: (dt.Transform|str) -> dt.Transform
+
+    if isinstance(ctl, str):
+        ctl = pm.PyNode(ctl)
+
+    for shape in ctl.getShapes():
+        cmds.delete(shape.fullPathName())
+
+    for attr in ["t", "r", "s"]:
+        for axis in "xyz":
+            try:
+                cmds.setAttr("{}.{}{}".format(ctl.getName(), attr, axis), lock=True)
+            except RuntimeError:
+                pass
+
+    message_connections = cmds.listConnections(
+        ctl.fullPathName() + ".message",
+        s=False,
+        d=True,
+        plugs=True,
+        connections=True
+    ) or []
+
+    for src, dst in zip(message_connections[::2], message_connections[1::2]):
+        cmds.disconnectAttr(src, dst)
+
+    if "isCtl" in cmds.listAttr(ctl.fullPathName()):
+        cmds.deleteAttr(ctl.fullPathName(), at="isCtl")
+
+    members = cmds.listSets(object=ctl.fullPathName()) or []
+    if not members:
+        logger.warning(
+            "No members found in the set for {}".format(ctl.fullPathName()))
+
+    for ctl_grp in members:
+        cmds.sets(ctl.fullPathName(), rm=ctl_grp)

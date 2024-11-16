@@ -166,7 +166,7 @@ class Component(component.Main):
                                  tp=self.previousTag)
 
             self.previousTag = fk_ctl
-            ymt_util.setKeyableAttributesDontLockVisibility(fk_ctl)
+            ymt_util.setKeyableAttributesDontLockVisibility(fk_ctl, self.r_params)
             self.jnt_pos.append([fk_ctl, i])
 
             parent = fk_ctl

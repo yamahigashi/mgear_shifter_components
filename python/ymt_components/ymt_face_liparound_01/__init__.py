@@ -202,6 +202,8 @@ class Component(component.Main):
         self.ctl_root = addTransform(self.root, self.getName("ctls"), t)
         self.rope_root = addTransform(self.root, self.getName("rope"), t)
 
+        self.crv_root.visibility.set(False)
+
     def getNumberOfLocators(self, query):
         # type: (Text) -> int
         """ _uplocs."""
@@ -245,24 +247,11 @@ class Component(component.Main):
     def addCurves(self, crv_root):
 
         t = getTransform(self.root)
-        gen = curve.createCurveFromOrderedEdges
         plane = self.addDummyPlane()
         planeNode = pm.PyNode(plane.fullPathName())
 
         # -------------------------------------------------------------------
         def _inner(edges):
-            crv = gen(edges, planeNode.verts[1], self.getName("crv"), parent=crv_root, m=t, close=True)
-            ctl = gen(edges, planeNode.verts[1], self.getName("ctl_crv"), parent=crv_root, m=t, close=True)
-            crv.attr("visibility").set(False)
-            ctl.attr("visibility").set(False)
-
-            cvs = self.getCurveCVs(crv)
-            center_pos = sum(cvs) / len(cvs)  # type: ignore
-            for i, cv in enumerate(cvs):
-                offset = (cv - center_pos).normal() * self.thickness
-                new_pos = [cv[0] + offset[0], cv[1] + offset[1], cv[2] + offset[2]]
-                crv.setCV(i, new_pos, space="world")
-
             return crv, ctl
 
         # -------------------------------------------------------------------
@@ -270,7 +259,24 @@ class Component(component.Main):
         for i in range(1, self.num_locs + 1):
             edgeList.append("{}.e[{}]".format(plane.fullPathName(), i * 2 + 1))
         edgeList = [pm.PyNode(x) for x in edgeList]
-        self.crv, self.crv_ctl = _inner(edgeList)
+
+        self.crv = curve.createCurveFromOrderedEdges(
+            edgeList,
+            planeNode.verts[1],
+            self.getName("crv"),
+            parent=crv_root,
+            m=t,
+            close=True
+        )
+        self.ctl = curve.createCurveFromOrderedEdges(
+            edgeList,
+            planeNode.verts[1],
+            self.getName("crv"),
+            parent=crv_root,
+            m=t,
+            close=True
+        )
+
         cmds.delete(cmds.listRelatives(plane.fullPathName(), parent=True))
 
     def addCurveBaseControllers(self, crv_root):
@@ -280,22 +286,6 @@ class Component(component.Main):
 
             new_crv = curve.createCurveFromCurve(crv, self.getName(name), nbPoints=nbPoints, parent=crv_root, m=t, close=True)
             new_crv.attr("visibility").set(False)
-
-            # double translation denial
-            cvs = self.getCurveCVs(new_crv)
-
-            for i, cv in enumerate(cvs):
-                x, y, z = transform.getTranslation(new_crv)
-                offset = [cv[0] - x, cv[1] - y, cv[2] - z]
-                new_crv.setCV(i, offset, space="world")
-
-            if not tobe_offset:
-                return new_crv
-
-            cvs = self.getCurveCVs(new_crv)
-            for i, cv in enumerate(cvs):
-                offset = [cv[0], cv[1], cv[2] + self.FRONT_OFFSET]
-                new_crv.setCV(i, offset, space="world")
 
             return new_crv
 
@@ -321,6 +311,7 @@ class Component(component.Main):
 
         cvsObject = self.getCurveCVs(crv, "object")
 
+        xforms = []  # type: List[datatypes.Matrix] # to store xforms for each cv
         for i, _ in enumerate(cvsObject):
 
             mirror = i > self.num_locs / 2
@@ -351,12 +342,9 @@ class Component(component.Main):
                     _index = (tmp - i + self.right_index - 1)
 
             with ymt_util.overrideNamingAttributeTemporary(self, side=oSide):
-                cvOS = cvsObject[i]
-                # cvOSoffset = [cvOS[0], cvOS[1], cvOS[2] + self.FRONT_OFFSET]
 
-                # upv = addTransform(rope_root, self.getName("rope_{}_upv".format(sub_comp)))
+                cvOS = cvsObject[i]
                 cns = addTransform(rope_root, self.getName("rope_{}_cns".format(_index)))
-                # applyPathCnsLocal(upv, self.crv_upv, rope_upv, cvOSoffset)
                 applyPathCnsLocal(cns, self.crv_ctl, rope, cvOS)
 
                 m = getTransform(cns)
@@ -383,9 +371,15 @@ class Component(component.Main):
                         xform = setMatrixScale(xform, scl=[1, 1, 1])
                     # aimVec = (0, 0, 1)
 
-                if i == self.left_index:
-                    prev = getTransform(controls[i-1]).rotate
-                    # xform = setMatrixRotation(xform, prev)
+                xforms.append(xform)
+
+                if i == (self.left_index + 1):
+                    sideCtl = controls[self.left_index]
+                    sideNpo = sideCtl.getParent()
+                    pos = cmds.xform(sideNpo.fullPath(), q=True, ws=True, translation=True)
+                    pm.xform(sideNpo, ws=True, matrix=xforms[self.left_index - 1])
+                    pm.xform(sideNpo, ws=True, translation=pos)
+
                 if i == self.right_index + 1:
                     rightCtl = controls[self.right_index]
                     rightNpo = rightCtl.getParent()
@@ -706,6 +700,9 @@ class Component(component.Main):
 
         # remove elements from controllers group
         for comp in (slide_c_comp, corner_l_comp, corner_r_comp):
+            if not comp:
+                continue
+
             for k, v in comp.groups.items():
                 if "componentsRoots" in k:
                     continue

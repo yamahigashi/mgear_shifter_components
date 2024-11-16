@@ -176,7 +176,7 @@ def load_modules(component_list):
 
         try:
             dirs = shifter.getComponentDirectories()
-            defFmt = "mgear.core.shifter.component.{}.rmbmenu"
+            defFmt = "mgear.shifter.component.{}.rmbmenu"
             customFmt = "{}.rmbmenu"
 
             module = utils.importFromStandardOrCustomDirectories(

@@ -825,7 +825,7 @@ class IkFkTransfer(anim_utils.AbstractAnimationTransfer):
         ui.setCtrls(fks, ik, upv, ikRot)
         ui.setComboBoxItemsFormList(["IK", "FK"])
         ui.getValue = lambda: 0.0 if "fk" in switchTo.lower() else 1.0
-        ui.transfer(startFrame, endFrame, onlyKeyframes, ikRot, switchTo="fk")
+        ui.transfer(startFrame, endFrame, onlyKeyframes, ikRot, switchTo=switchTo)
 
     @staticmethod
     def toIK(model, ikfk_attr, uihost, fks, ik, upv, ikRot, **kwargs):
