@@ -637,11 +637,20 @@ class Component(component.Main):
         mult.input1X.set(radius)
         deg2rad_mul.outputX.connect(mult.input2X)
 
+        # avoid zero division
+        cond = pm.createNode("condition")
+        pm.setAttr(cond + ".colorIfTrueR", 0.0001)
+        pm.connectAttr(mult + ".outputX", cond + ".firstTerm")
+        pm.setAttr(cond + ".secondTerm", 0)
+        pm.setAttr(cond + ".operation", 0)  # equal
+        pm.connectAttr(mult + ".outputX", cond + ".colorIfFalseR")
+
         # smoothstep 3x^2 - 2x^3
         div = pm.createNode("multiplyDivide")
         div.operation.set(2)  # divide
         aim.attr(attr).connect(div.input1X)
-        mult.outputX.connect(div.input2X)
+        cond.outColorR.connect(div.input2X)
+        # mult.outputX.connect(div.input2X)
 
         clamp = pm.createNode("clamp")
         clamp.minR.set(clamp_neg)
