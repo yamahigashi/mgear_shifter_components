@@ -1,10 +1,9 @@
 """modifyed mgear.core.curve for adding matrix keyword arguments"""
 
-# TODO: Finish documentation
-
 #############################################
 # GLOBAL
 #############################################
+import math
 import six
 import sys
 import pymel.core as pm
@@ -326,7 +325,7 @@ def createCurveFromCurve(srcCrv, name, nbPoints, parent=None, m=dt.Matrix(), clo
         p = paramStart
 
     positions = []
-    for _ in range(nbPoints):
+    for i in range(nbPoints):
         point = sc.getPointAtParam(p, space=om2.MSpace.kWorld)
         point = __applyInverseMatrixToPosition(point, m)
         pos = (point[0], point[1], point[2])
@@ -370,10 +369,41 @@ def createCurveFromCurveEvenLength(srcCrv, name, nbPoints, parent=None, m=dt.Mat
     sc.updateCurve()
 
     totalLength = sc.length()
+    if close:
+        cycleNb = nbPoints
+    else:
+        cycleNb = nbPoints - 1
+
+    paramStart = sc.findParamFromLength(0.0)
+    try:
+        paramEnd = sc.findParamFromLength(totalLength)
+    except RuntimeError:
+        paramEnd = sc.findParamFromLength(totalLength - 0.001)
+    paramLength = paramEnd - paramStart
+
+    if close:
+
+        retry = 0
+        tolerance = 0.0001
+        while retry < 10000:
+            # FIXME: this is a workaround
+            try:
+                pStart = sc.getParamAtPoint(sc.cvPosition(0), tolerance)
+                break
+            except RuntimeError:
+                pass
+            retry += 1
+            tolerance += totalLength / 10000.0
+        paramOffset = pStart + paramStart
+
+    else:
+        paramOffset = 0.0
 
     positions = []
+    segmentLength = totalLength / cycleNb
     for i in range(nbPoints):
-        length = totalLength * i / (nbPoints - 1)
+        length = segmentLength * i
+
         param = sc.findParamFromLength(length)
         pos = sc.getPointAtParam(param, space=space)
         pos = __applyInverseMatrixToPosition(pos, m)
@@ -1076,6 +1106,87 @@ def applyPathConstrainLocal(target, src_curve):
         raise
 
     return cns
+
+
+def applyRopeCnsLocal(target, ctl_curve, rope, cv):
+
+    def _searchNearestEditPoint(curve, cv):
+
+        candidate = math.inf
+        index = 0
+        numberOfSpans = cmds.getAttr(curve + ".spans")
+
+        for i in range(numberOfSpans):
+            point = cmds.getAttr(curve + ".editPoints["+str(i)+"]")[0]
+            dist = math.sqrt((point[0] - cv[0])**2 + (point[1] - cv[1])**2 + (point[2] - cv[2])**2)
+            if dist < candidate:
+                candidate = dist
+                index = i
+
+        return index
+
+    nearestIndex = _searchNearestEditPoint(rope, cv)
+
+    nearestPointOnCurve = cmds.createNode("nearestPointOnCurve")
+    cmds.connectAttr(rope+ ".editPoints["+str(nearestIndex)+"]", nearestPointOnCurve + ".inPosition")
+    cmds.connectAttr(rope + ".local", nearestPointOnCurve + ".inputCurve")
+
+    motionPath = cmds.createNode("motionPath")
+    cmds.connectAttr(nearestPointOnCurve + ".parameter", motionPath + ".uValue")
+    cmds.connectAttr(rope + ".local", motionPath + ".geometryPath")
+
+    cmds.setAttr(motionPath + ".fractionMode", 0)
+    cmds.setAttr(motionPath + ".frontAxis", 0)
+    cmds.setAttr(motionPath + ".worldUpType", 2)
+    cmds.setAttr(motionPath + ".worldUpVector", 0, 1, 0)
+    cmds.connectAttr(ctl_curve.fullPathName() + ".matrix", motionPath + ".worldUpMatrix")  # object rotation up
+    cmds.setAttr(motionPath + ".frontAxis", 0)
+    cmds.setAttr(motionPath + ".upAxis", 2)
+
+    cmds.connectAttr(nearestPointOnCurve + ".position", target.fullPath() + ".translate")
+    cmds.connectAttr(motionPath + ".rotate", target.fullPath() + ".rotate")
+
+
+def applyRopeCnsLocalWithUpv(target, upv, ctl_curve, rope, cv):
+
+    def _searchNearestEditPoint(curve, cv):
+
+        candidate = math.inf
+        index = 0
+        numberOfSpans = cmds.getAttr(curve + ".spans")
+
+        for i in range(numberOfSpans):
+            point = cmds.getAttr(curve + ".editPoints["+str(i)+"]")[0]
+            dist = math.sqrt((point[0] - cv[0])**2 + (point[1] - cv[1])**2 + (point[2] - cv[2])**2)
+            if dist < candidate:
+                candidate = dist
+                index = i
+
+        return index
+
+    nearestIndex = _searchNearestEditPoint(rope, cv)
+
+    nearestPointOnCurve = cmds.createNode("nearestPointOnCurve")
+    cmds.connectAttr(rope+ ".editPoints["+str(nearestIndex)+"]", nearestPointOnCurve + ".inPosition")
+    cmds.connectAttr(rope + ".local", nearestPointOnCurve + ".inputCurve")
+
+    motionPath = cmds.createNode("motionPath")
+    cmds.connectAttr(nearestPointOnCurve + ".parameter", motionPath + ".uValue")
+    cmds.connectAttr(rope + ".local", motionPath + ".geometryPath")
+
+    cmds.setAttr(motionPath + ".fractionMode", 0)
+
+    cmds.connectAttr(nearestPointOnCurve + ".position", target.fullPath() + ".translate")
+    _cns = cmds.aimConstraint(
+        upv.fullPath(),
+        target.fullPath(),
+        maintainOffset=False,
+        aimVector=(0, 0, 1),
+        upVector=(1, 0, 0),
+        worldUpType="objectrotation",
+        worldUpObject=upv.fullPath(),
+        worldUpVector=(1, 0, 0)
+    )
 
 
 def curvecns_op(crv, inputs=[]):

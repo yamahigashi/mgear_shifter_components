@@ -210,6 +210,18 @@ class CustomShifterStep(cstp.customShifterMainStep):
             rates = entry["rates"]
             mode = entry.get("mode", "addNpo")
 
+            skip = False
+            for s in src:
+                if not cmds.objExists(s):
+                    print("Source object not found: {}".format(s))
+                    skip = True
+            if skip:
+                continue
+
+            if not cmds.objExists(dst):
+                print("Destination object not found: {}".format(dst))
+                continue
+
             self.connect(src, dst, rates, mode=mode)
 
     def connect(self, src, dst, rates, mode="addNpo"):

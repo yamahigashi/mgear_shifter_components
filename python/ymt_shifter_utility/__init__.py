@@ -1497,8 +1497,9 @@ def addNPOPreservingMatrixConnections(ctl):
         for src, dst in zip(matrix_connections[::2], matrix_connections[1::2]):
             cmds.connectAttr(multMatrix + ".matrixSum", dst, force=True)
 
+    ctlName = ctl.fullPathName()
     pos_connections = cmds.listConnections(
-        ctl.fullPathName() + ".t",
+        ctlName + ".t",
         s=False,
         d=True,
         plugs=True,
@@ -1506,7 +1507,7 @@ def addNPOPreservingMatrixConnections(ctl):
     ) or []
 
     rot_connections = cmds.listConnections(
-        ctl.fullPathName() + ".r",
+        ctlName + ".r",
         s=False,
         d=True,
         plugs=True,
@@ -1514,7 +1515,7 @@ def addNPOPreservingMatrixConnections(ctl):
     ) or []
 
     scl_connections = cmds.listConnections(
-        ctl.fullPathName() + ".s",
+        ctlName + ".s",
         s=False,
         d=True,
         plugs=True,
@@ -1522,9 +1523,17 @@ def addNPOPreservingMatrixConnections(ctl):
     ) or []
 
     if pos_connections or rot_connections or scl_connections:
+        compMatrix = cmds.createNode("composeMatrix")
+        if pos_connections:
+            cmds.connectAttr(ctlName + ".t", compMatrix + ".inputTranslate", force=True)
+        if rot_connections:
+            cmds.connectAttr(ctlName + ".r", compMatrix + ".inputRotate", force=True)
+        if scl_connections:
+            cmds.connectAttr(ctlName + ".s", compMatrix + ".inputScale", force=True)
+
         multMatrix = cmds.createNode("multMatrix")
         cmds.connectAttr(
-            ctl.fullPathName() + ".matrix",
+            compMatrix + ".outputMatrix",
             multMatrix + ".matrixIn[0]"
         )
         cmds.connectAttr(

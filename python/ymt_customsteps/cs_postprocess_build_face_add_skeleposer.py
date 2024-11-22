@@ -38,6 +38,7 @@ class CustomShifterStep(cstp.customShifterMainStep):
         """Insert an adjust node for skeleposer."""
 
         self.adj_node_uuids = []
+        self.adj_to_ctrl = {}
 
         for uuid in self.get_controller_uuids():
             ctrl = cmds.ls(uuid, long=True)[0]
@@ -50,7 +51,6 @@ class CustomShifterStep(cstp.customShifterMainStep):
 
             # The hierarchy has changed, so get it again
             ctrl = cmds.ls(uuid, long=True)[0]
-            # self.insert_add_node(npo, pm.PyNode(ctrl))
 
             new_name = ctrl.split("|")[-1].replace("_ctl", "_adj")
             new_full_path = "|".join(ctrl.split("|")[:-1] + [new_name])
@@ -59,8 +59,10 @@ class CustomShifterStep(cstp.customShifterMainStep):
                 continue
 
             cmds.rename(npo.fullPath(), new_name)
-            uuid = cmds.ls(npo.getName(), uuid=True)[0]
-            self.adj_node_uuids.append(uuid)
+
+            adj_uuid = cmds.ls(npo.getName(), uuid=True)[0]
+            self.adj_node_uuids.append(adj_uuid)
+            self.adj_to_ctrl[adj_uuid] = uuid
 
     def add_skeleposer_node(self):
         # type: () -> None
@@ -81,6 +83,24 @@ class CustomShifterStep(cstp.customShifterMainStep):
             print("Failed to add joints to skeleposer")
             return
 
+        for adj_uuid, ctrl_uuid in self.adj_to_ctrl.items():
+            adj = cmds.ls(adj_uuid, long=True)[0]
+            ctrl = cmds.ls(ctrl_uuid, long=True)[0]
+            for a in ("t", "r", "s"):
+                if is_all_axis_connected_or_locked(ctrl, a):
+                    conns = cmds.listConnections(adj + "." + a, source=True, destination=False, plugs=True) or []
+                    for conn in conns:
+                        cmds.disconnectAttr(conn, adj + "." + a)
+                    val = 1.0 if a == "s" else 0.0
+                    cmds.setAttr(adj + "." + a + "x", val)
+                    cmds.setAttr(adj + "." + a + "x", lock=True)
+                    cmds.setAttr(adj + "." + a + "y", val)
+                    cmds.setAttr(adj + "." + a + "y", lock=True)
+                    cmds.setAttr(adj + "." + a + "z", val)
+                    cmds.setAttr(adj + "." + a + "z", lock=True)
+
+                    cmds.setAttr(adj + "." + a, lock=True)
+
     def get_controller_uuids(self):
         # type: () -> list[str]
         """Get all controllers from the rig using rig sets."""
@@ -96,38 +116,36 @@ class CustomShifterStep(cstp.customShifterMainStep):
 
         return res
 
-    def insert_add_node(self, adj, ctl):
-        # type: (pm.PyNode, pm.PyNode) -> None
-        """Insert an add node between from the controller to the other node.
 
-        If there is an attribute that is directly connected from the controller,
-        it is necessary to add the adj node and pass it.
-        """
+def is_connected_or_locked(node, attr):
+    # type: (str, str) -> bool
+    """Check if the attribute is connected or locked."""
 
-        def __inner(attr_name, adj, ctl, dst):
-            add_node = pm.createNode("addDoubleLinear")
-            add_node.input1.set(0.0)
-            add_node.input2.set(0.0)
+    if not cmds.objExists(node):
+        print("Node does not exist: {}".format(node))
+        return False
 
-            ctl.attr(attr_name) >> add_node.input1
-            adj.attr(attr_name) >> add_node.input2
-            add_node.output >> dst
+    # long name is not supported...
+    node = cmds.ls(node)[0]
 
-        for attr in ("translate", "rotate", "scale"):
-            for axis in ("X", "Y", "Z"):
-                attr_name = attr + axis
+    if cmds.connectionInfo(node + "." + attr, isDestination=True):
+        return True
+    if cmds.getAttr(node + "." + attr, lock=True):
+        return True
 
-                connections = cmds.listConnections(
-                    "{}.{}".format(ctl.fullPath(), attr_name),
-                    s=False,
-                    d=True,
-                    p=True
-                )
+    return False
+    
 
-                if not connections:
-                    continue
+def is_all_axis_connected_or_locked(node, attr):
+    # type: (str, str) -> bool
+    """Check if the attribute is connected or locked."""
 
-                # FIXME
-                for conn in connections:
-                    print("insert add node: {}{} -> {}".format(ctl, attr_name, conn))
-                    __inner(attr_name, adj, ctl, conn)
+    if not cmds.objExists(node):
+        print("Node does not exist: {}".format(node))
+        return False
+
+    for axis in ["x", "y", "z"]:
+        if not is_connected_or_locked(node, attr + axis):
+            return False
+
+    return True
