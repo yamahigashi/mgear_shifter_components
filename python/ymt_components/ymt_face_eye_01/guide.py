@@ -54,7 +54,7 @@ class Guide(guide.ComponentGuide):
     def postInit(self):
         """Initialize the position for the guide"""
 
-        self.save_transform = ["root", "pivotAndSizeRef", "#_uploc", "#_lowloc", "inloc", "outloc", "uploc", "lowloc", "tan"]
+        self.save_transform = ["root", "eyeball_pivot", "eyelid_pivot", "#_uploc", "#_lowloc", "inloc", "outloc", "uploc", "lowloc", "tan"]
         self.save_blade = ["blade"]
         self.addMinMax("#_uploc", 1, -1)
         self.addMinMax("#_lowloc", 1, -1)
@@ -91,7 +91,9 @@ class Guide(guide.ComponentGuide):
         self.addDispCurve("crvRef", centers, 3)
 
         v = transform.getTranslation(self.root)
-        self.eyeMesh = self.addEyeMesh("pivotAndSizeRef", self.root, v)
+        # eyelidPivot is Former known as "pivotAndSizeRef"
+        self.eyelidPivot = self.addEyeMesh("eyelid_pivot", self.root, v)
+        self.eyeballPivot = self.addLoc("eyeball_pivot", self.root, v)
 
         v = transform.getOffsetPosition(self.root, [0, 0.0000001, 2.5])
         self.tan = self.addLoc("tan", self.root, v)
@@ -182,6 +184,24 @@ class Guide(guide.ComponentGuide):
                         self.tra[localName] = transform.getTransformFromPos(
                             newPosition)
         return True
+
+    def set_from_dict(self, c_dict):
+        """Override for compatibility"""
+        super(Guide, self).set_from_dict(c_dict)
+
+    def setFromHierarchy(self, root):
+        """For compatibility between the old guide"""
+
+        super(Guide, self).setFromHierarchy(root)
+
+        node = dag.findChild(root, self.getName("pivotAndSizeRef"))
+        if node:
+            node.rename(self.getName("eyelid_pivot"))
+
+        node = dag.findChild(root, self.getName("eyeball_pivot"))
+        if not node:
+            v = transform.getTranslation(self.root)
+            self.eyeballPivot = self.addLoc("eyeball_pivot", self.root, v)
 
 
 ##########################################################

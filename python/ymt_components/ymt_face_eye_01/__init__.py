@@ -101,6 +101,10 @@ class Component(component.Main):
                                 0, 0, 0]
 
         # -------------------------------------------------------
+        self.eyeballPivotPos = self.guide.apos[1]
+        self.eyelidPivotPos = self.guide.apos[2]
+        # self.eyeballPivotTra = self.guide.tra[1]
+        # self.eyelidPivotTra = self.guide.tra[2]
 
         self.num_uplocs = self.getNumberOfLocators("_uploc")
         self.num_lowlocs = self.getNumberOfLocators("_lowloc")
@@ -113,8 +117,8 @@ class Component(component.Main):
         self.rootPos = self.guide.apos[0]
         self.normalVec = self.upPos - self.lowPos
 
-        self.uplocsPos = self.guide.apos[2:self.num_uplocs + 2]
-        self.lowlocsPos = self.guide.apos[2 + self.num_uplocs:-5]
+        self.uplocsPos = self.guide.apos[3:self.num_uplocs + 2]
+        self.lowlocsPos = self.guide.apos[3 + self.num_uplocs:-5]
 
         self.offset = self.frontPos - self.rootPos
         if self.negate:
@@ -140,7 +144,7 @@ class Component(component.Main):
         self.trackLvl = []
 
         self.previusTag = self.parentCtlTag
-        self.guide.eyeMesh = self.guide.getObjects(self.guide.root)["pivotAndSizeRef"]
+        self.guide.eyeMesh = self.guide.getObjects(self.guide.root)["eyelid_pivot"]
         # --------------------------------------------------------
 
         positions = [self.inPos]
@@ -620,7 +624,7 @@ class Component(component.Main):
 
         self.addBlinkAttributes()
         self.addEyeTrackingAttributes()
-        # self.addTensionOnBlinkAttributes()
+        self.addTensionOnBlinkAttributes()
 
     def addBlinkAttributes(self):
 
