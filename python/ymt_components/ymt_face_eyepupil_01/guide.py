@@ -8,29 +8,23 @@ from maya.app.general.mayaMixin import MayaQDockWidget
 
 from mgear.shifter.component import guide
 from mgear.core import pyqt
-from mgear.core import string
-from mgear.core import dag
 from mgear.vendor.Qt import QtWidgets, QtCore
-from mgear import shifter
 from mgear.core import (
     transform,
-    string,
 )
 
-from mgear.core.primitive import addTransform
-
 from mgear.core import (
-    transform,
-    curve,
-    applyop,
+    # transform,
+    # curve,
+    # applyop,
     attribute,
-    icon,
-    fcurve,
-    vector,
-    meshNavigation,
-    node,
-    primitive,
-    utils,
+    # icon,
+    # fcurve,
+    # vector,
+    # meshNavigation,
+    # node,
+    # primitive,
+    # utils,
 )
 
 from . import settingsUI as sui
@@ -66,7 +60,7 @@ class Guide(guide.ComponentGuide):
     email = EMAIL
     version = VERSION
 
-    connectors = ["orientation"]
+    connectors = []
 
     # =====================================================
     ##
