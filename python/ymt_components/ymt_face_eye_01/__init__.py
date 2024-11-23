@@ -282,6 +282,7 @@ class Component(component.Main):
         if self.negate:
             scl = [-1, 1, 1]
         t = transform.setMatrixScale(t, scl)
+        t_arrow = transform.setMatrixScale(t_arrow, scl)
 
         self.addOverControllers(t)
         self.addLookAtControlers(t, t_arrow)
