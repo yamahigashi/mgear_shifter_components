@@ -3,7 +3,6 @@
 import re
 import six
 import sys
-import math
 import traceback
 
 import maya.cmds as cmds
@@ -18,8 +17,6 @@ from mgear.shifter import component
 
 from mgear.core import (
     transform,
-    applyop,
-    # vector,
     node,
     primitive,
 )
@@ -27,7 +24,6 @@ from mgear.core import (
 from mgear.core.transform import (
     getTransform,
     setMatrixPosition,
-    setMatrixRotation,
     setMatrixScale,
 )
 

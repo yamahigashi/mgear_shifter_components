@@ -113,7 +113,7 @@ class Component(component.Main):
         self.rootPos = self.guide.apos[0]
         self.normalVec = self.upPos - self.lowPos
 
-        self.uplocsPos = self.guide.apos[3:self.num_uplocs + 2]
+        self.uplocsPos = self.guide.apos[3:self.num_uplocs + 3]
         self.lowlocsPos = self.guide.apos[3 + self.num_uplocs:-5]
 
         self.offset = rotate_vector(self.frontPos - self.rootPos, self.front)
