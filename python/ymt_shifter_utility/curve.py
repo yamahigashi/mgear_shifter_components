@@ -307,18 +307,8 @@ def createCurveFromCurve(srcCrv, name, nbPoints, parent=None, m=dt.Matrix(), clo
     # if curve is close, we need to find start param to be offset to find nearest point to 0
     if close:
         increment = paramLength / nbPoints
-
-        retry = 0
-        tolerance = 0.0001
-        while retry < 10000:
-            # FIXME: this is a workaround
-            try:
-                p = sc.getParamAtPoint(sc.cvPosition(0), tolerance)
-                break
-            except RuntimeError:
-                pass
-            retry += 1
-            tolerance += length / 10000.0
+        pos0 = sc.cvPosition(0)
+        _, p = sc.closestPoint(pos0, space=space)
 
     else:
         increment = paramLength / nbPoints
@@ -374,35 +364,22 @@ def createCurveFromCurveEvenLength(srcCrv, name, nbPoints, parent=None, m=dt.Mat
     else:
         cycleNb = nbPoints - 1
 
-    paramStart = sc.findParamFromLength(0.0)
-    try:
-        paramEnd = sc.findParamFromLength(totalLength)
-    except RuntimeError:
-        paramEnd = sc.findParamFromLength(totalLength - 0.001)
-    paramLength = paramEnd - paramStart
-
     if close:
-
-        retry = 0
-        tolerance = 0.0001
-        while retry < 10000:
-            # FIXME: this is a workaround
-            try:
-                pStart = sc.getParamAtPoint(sc.cvPosition(0), tolerance)
-                break
-            except RuntimeError:
-                pass
-            retry += 1
-            tolerance += totalLength / 10000.0
-        paramOffset = pStart + paramStart
-
+        pos0 = sc.cvPosition(0)
+        _, p = sc.closestPoint(pos0)
+        startLength = sc.findLengthFromParam(p)
     else:
-        paramOffset = 0.0
+        startLength = 0.0
 
     positions = []
     segmentLength = totalLength / cycleNb
     for i in range(nbPoints):
-        length = segmentLength * i
+        length = segmentLength * i + startLength
+        if length > totalLength:
+            if close:
+                length -= totalLength
+            else:
+                length = totalLength
 
         param = sc.findParamFromLength(length)
         pos = sc.getPointAtParam(param, space=space)
@@ -1148,6 +1125,19 @@ def applyRopeCnsLocal(target, ctl_curve, rope, cv):
 
 
 def applyRopeCnsLocalWithUpv(target, upv, ctl_curve, rope, cv):
+    # type: (dt.Transform, dt.Transform, dt.Transform, dt.Transform, om2.MPoint) -> None
+    """Apply a rope constraint to a target object.
+
+    Arguments:
+        target (dt.Transform): The target object to constraint.
+        upv (dt.Transform): The up vector object.
+        ctl_curve (dt.Transform): The control curve object.
+        rope (dt.Transform): The rope object.
+        cv (dt.Vector): The control vertex position.
+
+    Returns:
+        None
+    """
 
     def _searchNearestEditPoint(curve, cv):
 

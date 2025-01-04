@@ -11,6 +11,7 @@ from mgear.core import pyqt
 from mgear.vendor.Qt import QtWidgets, QtCore
 from mgear.core import (
     transform,
+    string
 )
 
 from mgear.core import (

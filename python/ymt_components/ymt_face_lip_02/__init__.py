@@ -182,14 +182,6 @@ class Component(component.Main):
 
         return num
 
-    def addDummyPlane(self):
-        # type: () -> om.MFnMesh
-
-        positions = []
-        positions.extend(self.locsPos)
-
-        return draw_eye_guide_mesh_plane(positions, self.root)
-
     def addCurve(self):
 
         self.addCurves(self.crv_root)
@@ -214,22 +206,14 @@ class Component(component.Main):
         return cvs
 
     def addCurves(self, crv_root):
+        m = getTransform(self.root)
+        positions = [self._worldToObj(x) for x in self.locsPos]
 
-        t = getTransform(self.root)
-        plane = self.addDummyPlane()
-        planeNode = pm.PyNode(plane.fullPathName())
-
-        # -------------------------------------------------------------------
-        edgeList = ["{}.e[{}]".format(plane.fullPathName(), 0)]
-        for i in range(1, self.num_locs + 1):
-            edgeList.append("{}.e[{}]".format(plane.fullPathName(), i * 2 + 1))
-        edgeList = [pm.PyNode(x) for x in edgeList]
-        crv = curve.createCurveFromOrderedEdges(
-            edgeList,
-            planeNode.verts[1],
+        crv = curve.addCurve(
+            crv_root,
             self.getName("crv"),
-            parent=crv_root,
-            m=t,
+            positions,
+            m=m,
             close=True
         )
         crv.attr("visibility").set(False)
@@ -240,7 +224,6 @@ class Component(component.Main):
             new_pos = [cv[0] + offset[0], cv[1] + offset[1], cv[2] + offset[2]]
             crv.setCV(i, new_pos, space="world")
         self.crv = crv
-        cmds.delete(cmds.listRelatives(plane.fullPathName(), parent=True))
 
     def addCurveBaseControllers(self, crv_root):
 
@@ -272,6 +255,10 @@ class Component(component.Main):
             return new_crv
 
         # -------------------------------------------------------------------
+        self.rope = curveFromCurve(self.crv, "rope_crv", self.NB_ROPE, False)
+        self.upv_crv = curveFromCurve(self.crv, "upv_crv", self.NB_ROPE, True)
+
+        # -------------------------------------------------------------------
         posTop = self.locsPos[0]
         posLeft = self.locsPos[self.left_index]
         posBottom = self.locsPos[self.bottom_index]
@@ -289,26 +276,31 @@ class Component(component.Main):
         intRightTop1 = posRight + (posTop - posRight) * 0.333
         intRightTop2 = posRight + (posTop - posRight) * 0.666
 
-        tol = crvFn.length() * 0.1
+        ropeFn = curve.getMFnNurbsCurve(self.rope)
+        ropeLength = ropeFn.length()
+
         positions = [
             posTop,
-            crvFn.closestPoint(om.MPoint(intTopLeft1), space=om.MSpace.kWorld, tolerance=tol)[0],
-            crvFn.closestPoint(om.MPoint(intTopLeft2), space=om.MSpace.kWorld, tolerance=tol)[0],
+            ropeFn.getPointAtParam(ropeFn.findParamFromLength(ropeLength * 1.0 / 12.0), om.MSpace.kObject),
+            ropeFn.getPointAtParam(ropeFn.findParamFromLength(ropeLength * 2.0 / 12.0), om.MSpace.kObject),
             posLeft,
-            crvFn.closestPoint(om.MPoint(intBottomLeft1), space=om.MSpace.kWorld, tolerance=tol)[0],
-            crvFn.closestPoint(om.MPoint(intBottomLeft2), space=om.MSpace.kWorld, tolerance=tol)[0],
+            ropeFn.getPointAtParam(ropeFn.findParamFromLength(ropeLength * 4.0 / 12.0), om.MSpace.kObject),
+            ropeFn.getPointAtParam(ropeFn.findParamFromLength(ropeLength * 5.0 / 12.0), om.MSpace.kObject),
             posBottom,
-            crvFn.closestPoint(om.MPoint(intBottomRight1), space=om.MSpace.kWorld, tolerance=tol)[0],
-            crvFn.closestPoint(om.MPoint(intBottomRight2), space=om.MSpace.kWorld, tolerance=tol)[0],
+            ropeFn.getPointAtParam(ropeFn.findParamFromLength(ropeLength * 7.0 / 12.0), om.MSpace.kObject),
+            ropeFn.getPointAtParam(ropeFn.findParamFromLength(ropeLength * 8.0 / 12.0), om.MSpace.kObject),
             posRight,
-            crvFn.closestPoint(om.MPoint(intRightTop1), space=om.MSpace.kWorld, tolerance=tol)[0],
-            crvFn.closestPoint(om.MPoint(intRightTop2), space=om.MSpace.kWorld, tolerance=tol)[0],
+            ropeFn.getPointAtParam(ropeFn.findParamFromLength(ropeLength * 10.0 / 12.0), om.MSpace.kObject),
+            ropeFn.getPointAtParam(ropeFn.findParamFromLength(ropeLength * 11.0 / 12.0), om.MSpace.kObject),
         ]
         positions = [datatypes.Vector(x[0], x[1], x[2]) for x in positions]
-
-        self.crv_ctl = curve.addCurve(crv_root, self.getName("crv_ctl"), positions, close=True)
-        self.rope = curveFromCurve(self.crv, "rope_crv", self.NB_ROPE, False)
-        self.upv_crv = curveFromCurve(self.crv, "upv_crv", self.NB_ROPE, True)
+        self.crv_ctl = curve.addCurve(crv_root, self.getName("crv_ctl"), positions, close=True, degree=3, m=t)
+        cvs = self.getCurveCVs(self.crv_ctl)
+        center_pos = sum(cvs) / len(cvs)  # type: ignore
+        for i, cv in enumerate(cvs):
+            offset = (cv - center_pos).normal() * self.thickness
+            new_pos = [cv[0] + offset[0], cv[1] + offset[1], cv[2] + offset[2]]
+            self.crv_ctl.setCV(i, new_pos, space="world")
 
     def addControlJoints(self):
 
@@ -363,7 +355,7 @@ class Component(component.Main):
                 curve.applyRopeCnsLocalWithUpv(cns, upv, self.crv_ctl, self.rope, cvo)
 
                 m = getTransform(cns)
-                m = setMatrixPosition(m, self.locsPos[i])
+                m = setMatrixPosition(m, self._objToWorld(self.locsPos[i]))
      
                 if mirror:
                     if lower:
@@ -624,6 +616,45 @@ class Component(component.Main):
             cmds.connectAttr(outpath, oriCns + ".target[0].targetRotateZ")
             cmds.connectAttr(oriCns + ".constraintRotateZ", ctl + ".rotateZ")
             cmds.setAttr("{}.rotateZ".format(ctl), lock=True)
+
+    def _worldToObj(self, pos):
+        # type: (list[float]) -> dt.Vector
+
+        m = getTransform(self.root)
+        m = om.MMatrix(m)
+
+        np = om.MMatrix()
+        np.setToIdentity()
+        np[12] = pos[0]
+        np[13] = pos[1]
+        np[14] = pos[2]
+
+        pos[0] = (m.inverse() * np)[12]
+        pos[1] = (m.inverse() * np)[13]
+        pos[2] = (m.inverse() * np)[14]
+        positions = datatypes.Vector(pos[0], pos[1], pos[2])
+
+        return positions
+
+    def _objToWorld(self, pos):
+        # type: (list[float]) -> dt.Vector
+
+        m = getTransform(self.root)
+        m = om.MMatrix(m)
+
+        np = om.MMatrix()
+        np.setToIdentity()
+        np[12] = pos[0]
+        np[13] = pos[1]
+        np[14] = pos[2]
+
+        pos[0] = (m * np)[12]
+        pos[1] = (m * np)[13]
+        pos[2] = (m * np)[14]
+
+        positions = datatypes.Vector(pos[0], pos[1], pos[2])
+
+        return positions
 
     # =====================================================
     # ATTRIBUTES
@@ -959,7 +990,7 @@ def ghostSliderForMouth(ghostControls, intTra, surface, sliderParent):
         ctl = pm.listConnections(ctlGhost, t="transform")[-1]
         t = ctl.getMatrix(worldSpace=True)
 
-        gDriver = primitive.addTransform(surface.getParent(), "{}_slideDriver".format(ctl.name()), t)
+        gDriver = addTransform(surface.getParent(), "{}_slideDriver".format(ctl.name()), t)
         drivers.append(gDriver)
 
         if 0 == i:
@@ -974,7 +1005,7 @@ def ghostSliderForMouth(ghostControls, intTra, surface, sliderParent):
         oTra.setTransformation(ctlGhost.getMatrix())
         pm.parent(ctlGhost, oTra)
 
-        slider = primitive.addTransform(sliderParent, ctl.name() + "_slideDriven", t)
+        slider = addTransform(sliderParent, ctl.name() + "_slideDriven", t)
         sliders.append(slider)
 
         # connexion
