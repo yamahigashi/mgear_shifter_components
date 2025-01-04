@@ -302,6 +302,9 @@ class Component(component.Main):
         if self.negate:
             po.x *= -1.0
 
+        width = (self.upPos - self.lowPos).length() / 3.3 + self.size * 0.15
+        height = (self.upPos - self.lowPos).length() + self.size * 0.3
+
         self.over_npo = addTransform(self.root, self.getName("center_lookatRoot"), t)
         self.over_ctl = self.addCtl(
             self.over_npo,
@@ -309,8 +312,8 @@ class Component(component.Main):
             t,
             self.color_ik,
             "square",
-            w=self.getBboxRadius()[0] * 0.15,
-            d=self.getBboxRadius()[1] * 0.7,
+            w=width,
+            d=height,
             ro=datatypes.Vector(1.57079633, 0, 0),
             po=po,
         )
