@@ -1,5 +1,6 @@
 # pylint: disable=import-error,W0201,C0111,C0112
 from functools import partial
+import copy
 
 from mgear.shifter.component import guide
 from mgear.core import pyqt
@@ -54,10 +55,13 @@ class Guide(guide.ComponentGuide):
     def postInit(self):
         """Initialize the position for the guide"""
 
-        self.save_transform = ["root", "pivotAndSizeRef", "#_uploc", "#_lowloc", "inloc", "outloc", "uploc", "lowloc", "tan"]
+        self.save_transform = ["root", "eyeballPivot", "eyelidPivot", "#_uploc", "#_lowloc", "inloc", "outloc", "uploc", "lowloc", "front"]
         self.save_blade = ["blade"]
         self.addMinMax("#_uploc", 1, -1)
         self.addMinMax("#_lowloc", 1, -1)
+
+    def postDraw(self):
+        pass
 
     def addObjects(self):
         """Add the Guide Root, blade and locators"""
@@ -81,21 +85,22 @@ class Guide(guide.ComponentGuide):
         centers = [self.inPos]
         centers.extend(self.uplocs)
         centers.append(self.outPos)
-        self.dispcrv = self.addDispCurve("crv", centers)
-        self.addDispCurve("crvRef", centers, 3)
+        self.dispcrv = self.addDispCurve("upCrv", centers)
+        self.addDispCurve("upCrvRef", centers, 3)
 
         centers = [self.inPos]
         centers.extend(self.lowlocs)
         centers.append(self.outPos)
-        self.dispcrv = self.addDispCurve("crv", centers)
-        self.addDispCurve("crvRef", centers, 3)
+        self.dispcrv = self.addDispCurve("lowCrv", centers)
+        self.addDispCurve("lowCrvRef", centers, 3)
 
         v = transform.getTranslation(self.root)
-        self.eyeMesh = self.addEyeMesh("pivotAndSizeRef", self.root, v)
+        self.eyelidPivot = self.addEyeMesh("eyelidPivot", self.root, v)
+        self.eyeballPivot = self.addEyeMesh("eyeballPivot", self.root, v)
 
         v = transform.getOffsetPosition(self.root, [0, 0.0000001, 2.5])
-        self.tan = self.addLoc("tan", self.root, v)
-        self.blade = self.addBlade("blade", self.root, self.tan)
+        self.front = self.addLoc("front", self.root, v)
+        self.blade = self.addBlade("blade", self.root, self.front)
 
     def addEyeMesh(self, name, parent, position=None):
         """Add a loc object to the guide.
@@ -113,18 +118,19 @@ class Guide(guide.ComponentGuide):
             dagNode: The locator object.
 
         """
+        t = transform.getTransform(self.root)
         if name not in self.tra.keys():
-            self.tra[name] = transform.getTransformFromPos(position)
+            t = transform.setMatrixPosition(t, position)
+            self.tra[name] = t
+        tra = self.tra[name]
 
         eyeMesh = pm.polySphere(
             name=self.getName(name),
             subdivisionsX=30,
             subdivisionsY=45,
             radius=0.5)[0]
-        eyeMesh.setTransformation(self.tra[name])
+        eyeMesh.setTransformation(tra)
         pm.parent(eyeMesh, parent)
-
-        eyeMesh.setTranslation
 
         return eyeMesh
 
@@ -182,6 +188,50 @@ class Guide(guide.ComponentGuide):
                         self.tra[localName] = transform.getTransformFromPos(
                             newPosition)
         return True
+
+    def set_from_dict(self, c_dict):
+        """Override for compatibility"""
+
+        # eyelidPivot is Former known as "pivotAndSizeRef"
+        eyeMeshPos = c_dict.get("pos", {}).get("pivotAndSizeRef")
+        eyeMeshTra = c_dict.get("tra", {}).get("pivotAndSizeRef")
+        if eyeMeshPos:
+            c_dict["pos"]["eyelidPivot"] = eyeMeshPos
+        if eyeMeshTra:
+            c_dict["tra"]["eyelidPivot"] = eyeMeshTra
+
+        # front is Former known as "tan"
+        frontPos = c_dict.get("pos", {}).get("tan")
+        frontTra = c_dict.get("tra", {}).get("tan")
+        if frontPos:
+            c_dict["pos"]["eyelidPivot"] = frontPos
+        if frontTra:
+            c_dict["tra"]["eyelidPivot"] = frontTra
+
+        super(Guide, self).set_from_dict(c_dict)
+
+    def setFromHierarchy(self, root):
+        """For compatibility between the old guide"""
+
+        super(Guide, self).setFromHierarchy(root)
+
+        # eyelidPivot is Former known as "pivotAndSizeRef"
+        self.eyelidPivot = dag.findChild(root, self.getName("pivotAndSizeRef"))
+        if self.eyelidPivot:
+            self.tra["eyelidPivot"] = transform.getTransform(self.eyelidPivot)
+            self.eyelidPivot.rename(self.getName("eyelidPivot"))
+
+        # front is Former known as "tan"
+        self.front = dag.findChild(root, self.getName("tan"))
+        if self.front:
+            self.tra["front"] = transform.getTransform(self.front)
+            self.front.rename(self.getName("front"))
+
+        # eyeballPivot does not exist in the old guide
+        node = dag.findChild(root, self.getName("eyeballPivot"))
+        if not node:
+            v = transform.getTranslation(self.root)
+            self.eyeballPivot = self.addEyeMesh("eyeballPivot", self.root, v)
 
 
 ##########################################################

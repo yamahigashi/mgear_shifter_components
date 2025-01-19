@@ -84,7 +84,8 @@ class Component(component.Main):
         self.primaryControllersGroupName = "controllers_primary"  # TODO: extract to settings
         self.connect_surface_slider = self.settings["isSlidingSurface"]
 
-        self.lookat_cns = primitive.addTransform(self.root, self.getName("lookat_cns"), t)
+        pivot_t = self.guide.tra["sliding_surface"]
+        self.lookat_cns = primitive.addTransform(self.root, self.getName("lookat_cns"), pivot_t)
         self.ctl = self.addCtl(self.lookat_cns,
                                "ctl",
                                t,
@@ -152,10 +153,6 @@ class Component(component.Main):
                     0,
                     ref_names)
 
-        # Anim -------------------------------------------
-        self.dist_att = self.addAnimParam(
-            "moverate", "Rate", "double", self.initialDist, 0, 100)
-
     def addOperators(self):
         cmds.aimConstraint(
                 self.lookat.name(),
@@ -165,8 +162,6 @@ class Component(component.Main):
                 wut="objectrotation",
                 wuo=self.root.name()
         )
-
-        pm.connectAttr(self.dist_att, self.proj_cns.tz)
 
     # =====================================================
     # CONNECTOR
@@ -184,7 +179,6 @@ class Component(component.Main):
     def addConnection(self):
         """Add more connection definition to the set"""
         self.connections["standard"] = self.connect_standard
-        self.connections["orientation"] = self.connect_orientation
 
     def connect_standard(self):
         """standard connection definition for the component"""
@@ -197,6 +191,14 @@ class Component(component.Main):
         if self.connect_surface_slider:
             try:
                 self.connect_slide_ghost()
+                parentGuide = self.guide.parentComponent
+                if parentGuide is not None and "face_eye" in parentGuide.compType:
+                    arrow = self.parent_comp.arrow_ctl
+                    cmds.parentConstraint(
+                        arrow.name(),
+                        self.proj_cns.name(),
+                        mo=True
+                    )
 
             except Exception:
                 import traceback
@@ -208,17 +210,29 @@ class Component(component.Main):
                 import traceback
                 traceback.print_exc()
 
-    def connect_orientation(self):
-        """Orient connection definition for the component"""
-        self.connect_orientCns()
+        ymt_util.setKeyableAttributesDontLockVisibility(self.proj_cns, [])
+        ymt_util.setKeyableAttributesDontLockVisibility(self.aim_cns, [])
 
     def connect_ctl_to_aim(self):
         """Connect the control to the aim cns"""
-        cmds.parentConstraint(
-                self.aim_cns.name(),
+
+        parentGuide = self.guide.parentComponent
+        if parentGuide is not None and "face_eye" in parentGuide.compType:
+            arrow = self.parent_comp.arrow_ctl
+            cmds.parentConstraint(
+                arrow.name(),
                 self.lookat_cns.name(),
                 mo=True
-        )
+            )
+
+        else:
+            cmds.parentConstraint(
+                self.aim_cns.name(),
+                self.lookat_cns.name(),
+                mo=True,
+                skipTranslate=["x", "y", "z"]
+            )
+ 
 
     def connect_slide_ghost(self):
 
@@ -249,8 +263,6 @@ def ghostSliderForPupil(ctl, ghostCtl, surface, sliderParent):
 
     t = ctl.getMatrix(worldSpace=True)
 
-    gDriver = primitive.addTransform(ghostCtl.getParent(), "{}_slideDriver".format(ctl.name()), t)
-
     oParent = ghostCtl.getParent()
     npoName = "_".join(ghostCtl.name().split("_")[:-1]) + "_npo"
     oTra = pm.PyNode(pm.createNode("transform", n=npoName, p=oParent, ss=True))
@@ -280,6 +292,8 @@ def ghostSliderForPupil(ctl, ghostCtl, surface, sliderParent):
                         upVector=[0, 1, 0],
                         worldUpType="objectrotation",
                         worldUpVector=[0, 1, 0],
-                        worldUpObject=gDriver)
+                        worldUpObject=sliderParent)
 
     pm.parent(ghostCtl.getParent(), slider)
+    ymt_util.setKeyableAttributesDontLockVisibility(slider, [])
+    ymt_util.setKeyableAttributesDontLockVisibility(oTra, [])
