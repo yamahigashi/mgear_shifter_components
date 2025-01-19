@@ -264,18 +264,6 @@ class Component(component.Main):
         posBottom = self.locsPos[self.bottom_index]
         posRight = self.locsPos[self.right_index]
 
-        intTopLeft1 = posTop + (posLeft - posTop) * 0.333
-        intTopLeft2 = posTop + (posLeft - posTop) * 0.666
-
-        intBottomLeft1 = posLeft + (posBottom - posLeft) * 0.333
-        intBottomLeft2 = posLeft + (posBottom - posLeft) * 0.666
-
-        intBottomRight1 = posBottom + (posRight - posBottom) * 0.333
-        intBottomRight2 = posBottom + (posRight - posBottom) * 0.666
-
-        intRightTop1 = posRight + (posTop - posRight) * 0.333
-        intRightTop2 = posRight + (posTop - posRight) * 0.666
-
         ropeFn = curve.getMFnNurbsCurve(self.rope)
         ropeLength = ropeFn.length()
 
@@ -315,7 +303,11 @@ class Component(component.Main):
         cvsObject = self.getCurveCVs(self.crv, "object")
         cvsWorld = self.getCurveCVs(self.crv, "world")
         cvPairs = list(zip(cvsObject, cvsWorld))
-        cvs = cvPairs[0:-1]
+
+        if self.num_locs % 2 == 0:
+            cvs = cvPairs[0:]
+        else:
+            cvs = cvPairs[0:-1]
 
         controls = []
         for i, (cvo, cvw) in enumerate(cvs):
@@ -342,9 +334,10 @@ class Component(component.Main):
                 tmp = self.num_locs - self.right_index
                 oSide = "R"
                 if i < self.right_index:
-                    _index = (i - self.bottom_index + tmp - 2)
+                    _index = (i - self.bottom_index + tmp - 1)
                 else:
-                    _index = (tmp - i + self.right_index - 2)
+                    _index = (tmp - i + self.right_index - 1)
+            print(f"index: {i}, {oSide}{_index}")
 
             with ymt_util.overrideNamingAttributeTemporary(self, side=oSide):
                 cvu = datatypes.Vector(cvo[0], cvo[1], cvo[2] + self.FRONT_OFFSET)

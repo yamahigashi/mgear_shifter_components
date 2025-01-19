@@ -308,11 +308,12 @@ def createCurveFromCurve(srcCrv, name, nbPoints, parent=None, m=dt.Matrix(), clo
     if close:
         increment = paramLength / nbPoints
         pos0 = sc.cvPosition(0)
-        _, p = sc.closestPoint(pos0, space=space)
+        _, p = sc.closestPoint(pos0, space=om2.MSpace.kObject)
 
     else:
         increment = paramLength / nbPoints
         p = paramStart
+
 
     positions = []
     for i in range(nbPoints):

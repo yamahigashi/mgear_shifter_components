@@ -13,6 +13,7 @@ import pymel.core as pm
 
 import maya.cmds as cmds
 import maya.api.OpenMaya as om
+import maya.api.OpenMayaAnim as oma
 
 from Qt import QtWidgets
 
@@ -1320,6 +1321,94 @@ def apply_rivet_constrain_to_selected(mesh, targets):
         pins.append(pin)
 
     return pins
+
+
+def apply_rivet_constrain_using_skin_weight(mesh, targets):
+    # type: (Text, List[Text]|Text) -> List[Text]
+    """Apply parent constrain to given objects with weight from skinCluster"""
+
+    if not isinstance(targets, list):
+        targets = [targets]
+
+    if isinstance(mesh, nodetypes.Transform):
+        mesh = mesh.name()
+
+    pins = []
+    for target in targets:
+        if isinstance(target, nodetypes.Transform):
+            target = target.name()
+
+        if not cmds.objExists(target):
+            raise Exception("target({}) {} not found".format(type(target), target))
+
+        weights = __get_skin_weights(mesh, target)
+        if not weights:
+            continue
+
+        parents = list(weights.keys())
+        cns = cmds.parentConstraint(*parents, target, mo=True)
+        for i, parent in enumerate(parents):
+            short = parent.split("|")[-1].split(":")[-1].split("|")[0]
+            cmds.setAttr("{0}.{1}W{2}".format(cns[0], short, i), weights[parent])
+
+    return pins
+
+
+def __get_skin_weights(mesh_name, cns_name):
+    # type: (Text, Text) -> Dict[Text, float]
+
+    # find closest vertex
+    mesh_path = om.MGlobal.getSelectionListByName(mesh_name).getDagPath(0)
+    pos = cmds.xform(cns_name, q=True, ws=True, t=True)
+    point = om.MPoint(pos)
+
+    vertex, distance = get_nearest_vertex_on_point(mesh_path, point)
+    comp = om.MFnSingleIndexedComponent().create(om.MFn.kMeshVertComponent)
+
+    # get weights
+    skin_cluster = cmds.listConnections(mesh_name + ".inMesh", type="skinCluster")[0]
+    sel = om.MGlobal.getSelectionListByName(skin_cluster).getDependNode(0)
+    skin_fn = oma.MFnSkinCluster(sel)
+    weights, count = skin_fn.getWeights(mesh_path, comp)
+
+    w = weights[vertex * count:(vertex + 1) * count]
+    influences = get_influences(skin_fn, w)
+    return influences
+
+
+def get_influences(skin_fn, weights):
+    # type: (oma.MFnSkinCluster, list[float]) -> dict[str, float]
+    influences = skin_fn.influenceObjects()
+    res = {}
+
+    for i, w in enumerate(weights):
+        if w > 0:
+            res[influences[i].partialPathName()] = w
+
+    return res
+
+
+def get_nearest_vertex_on_point(mesh_fn, pos1):
+    # type: (om.MFnMesh, om.MPoint) -> tuple[int, float]
+
+    it_vertex = om.MItMeshVertex(mesh_fn)
+
+    min_distance = float("inf")
+    nearest_vertex = -1
+
+    while not it_vertex.isDone():
+        vertex_pos = it_vertex.position(om.MSpace.kWorld)
+        distance = (vertex_pos - pos1).length()
+        if distance < min_distance:
+            min_distance = distance
+            nearest_vertex = it_vertex.index()
+        it_vertex.next()
+
+    if nearest_vertex == -1:
+        om.MGlobal.displayError("Vertex not found")
+        raise ValueError("Vertex not found")
+
+    return nearest_vertex, min_distance
 
 
 def create_dummy_edges_from_positions(positions):

@@ -216,8 +216,7 @@ class Component(component.Main):
         npoName = "_".join(self.ghostCtl.name().split("_")[:-1]) + "_npo"
         npo = pm.PyNode(pm.createNode("transform", n=npoName, p=oParent, ss=True))
         npo.setTransformation(self.ghostCtl.getMatrix())
-        if self.negate:
-            npo.attr("sz").set(-1)
+
         pm.parent(self.ghostCtl, npo, absolute=True)
         self.ghostCtl.attr("sz").set(1)
 

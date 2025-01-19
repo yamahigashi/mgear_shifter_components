@@ -3,7 +3,6 @@
 import re
 import six
 import sys
-import math
 import traceback
 
 import maya.cmds as cmds
@@ -19,7 +18,7 @@ from mgear.shifter import component
 from mgear.core import (
     transform,
     applyop,
-    vector,
+    # vector,
     node,
     primitive,
 )
@@ -27,7 +26,7 @@ from mgear.core import (
 from mgear.core.transform import (
     getTransform,
     setMatrixPosition,
-    setMatrixRotation,
+    # setMatrixRotation,
     setMatrixScale,
 )
 
@@ -322,9 +321,9 @@ class Component(component.Main):
             return new_crv
 
         # -------------------------------------------------------------------
-        self.crv_ctl = curveFromCurve(self.crv, "ctl_crv",  self.NB_CVS,  False)
         self.rope = curveFromCurve(self.crv, "rope_crv", self.NB_ROPE, False)
         self.upv_crv = curveFromCurve(self.crv, "upv_crv", self.NB_ROPE, True)
+        self.crv_ctl = curveFromCurve(self.crv, "ctl_crv",  self.NB_CVS,  False)
 
     def addControlJoints(self):
         self.joints = self._addControlJoints(self.crv, self.rope_root, self.rope)
