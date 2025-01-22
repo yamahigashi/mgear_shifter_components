@@ -42,6 +42,9 @@ class CustomShifterStep(cstp.customShifterMainStep):
 
         for uuid in self.get_controller_uuids():
             ctrl = cmds.ls(uuid, long=True)[0]
+            if "isCtl" not in cmds.listAttr(ctrl):
+                continue
+
             try:
                 npo = ymt_util.addNPOPreservingMatrixConnections(pm.PyNode(ctrl))[0]  # type: pm.PyNode
             except RuntimeError as e:
@@ -106,15 +109,21 @@ class CustomShifterStep(cstp.customShifterMainStep):
         """Get all controllers from the rig using rig sets."""
 
         res = []
+
+        def _recursive_get_children(sets_name):
+            members = cmds.sets(sets_name, q=True) or []  # type: any
+            for elem in members:
+                if "_ctl" in elem and cmds.nodeType(elem) == "transform":
+                    uuid = cmds.ls(elem, uuid=True)[0]
+                    res.append(uuid)
+
+                if cmds.nodeType(elem) == "objectSet":
+                    _recursive_get_children(elem)
+
         grp_name = self.rig_name + "_controllers_grp"
-        members = cmds.sets(grp_name, q=True) or []  # type: any
+        _recursive_get_children(grp_name)
 
-        for elem in members:
-            if "_ctl" in elem and cmds.nodeType(elem) == "transform":
-                uuid = cmds.ls(elem, uuid=True)[0]
-                res.append(uuid)
-
-        return res
+        return list(set(res))
 
 
 def is_connected_or_locked(node, attr):
