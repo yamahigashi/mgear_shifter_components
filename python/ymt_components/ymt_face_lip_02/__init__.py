@@ -3,6 +3,7 @@
 import re
 import six
 import sys
+import math
 import traceback
 
 import maya.cmds as cmds
@@ -117,7 +118,7 @@ class Component(component.Main):
         self.primaryControllersGroupName = "controllers_primary"  # TODO: extract to settings
 
         self.thickness = 0.07
-        self.FRONT_OFFSET = self.size * 0.01
+        self.FRONT_OFFSET = self.size * 0.1
         self.NB_CVS = 2 * 4 + 4  # means 4 spans with 2 controllers each + 4 controllers for the corners
 
         # odd / event
@@ -227,10 +228,9 @@ class Component(component.Main):
 
     def addCurveBaseControllers(self, crv_root):
 
-        crvFn = curve.getMFnNurbsCurve(self.crv)
         t = getTransform(self.root)
 
-        def curveFromCurve(crv, name, nbPoints, tobe_offset):
+        def curveFromCurve(crv, name, nbPoints):
 
             new_crv = curve.createCurveFromCurveEvenLength(
                 crv,
@@ -241,28 +241,21 @@ class Component(component.Main):
                 close=True
             )
             new_crv.attr("visibility").set(False)
-            crvFn = curve.getMFnNurbsCurve(new_crv)
-
-            if tobe_offset:
-                cvs = crvFn.cvPositions(om.MSpace.kObject)
-                points = []
-                for i, cv in enumerate(cvs):
-                    offset = [cv[0], cv[1], cv[2] + self.FRONT_OFFSET]
-                    point = om.MPoint(offset)
-                    points.append(point)
-                crvFn.setCVPositions(points, om.MSpace.kObject)
 
             return new_crv
 
         # -------------------------------------------------------------------
-        self.rope = curveFromCurve(self.crv, "rope_crv", self.NB_ROPE, False)
-        self.upv_crv = curveFromCurve(self.crv, "upv_crv", self.NB_ROPE, True)
+        self.rope = curveFromCurve(self.crv, "rope_crv", self.NB_ROPE)
+        self.upv_crv = curveFromCurve(self.crv, "upv_crv", self.NB_ROPE)
 
         # -------------------------------------------------------------------
         posTop = self.locsPos[0]
         posLeft = self.locsPos[self.left_index]
         posBottom = self.locsPos[self.bottom_index]
         posRight = self.locsPos[self.right_index]
+
+        posLeft = inflate_position_by_curve_flattness(self.crv, posLeft)
+        posRight = inflate_position_by_curve_flattness(self.crv, posRight)
 
         ropeFn = curve.getMFnNurbsCurve(self.rope)
         ropeLength = ropeFn.length()
@@ -337,10 +330,9 @@ class Component(component.Main):
                     _index = (i - self.bottom_index + tmp - 1)
                 else:
                     _index = (tmp - i + self.right_index - 1)
-            print(f"index: {i}, {oSide}{_index}")
 
             with ymt_util.overrideNamingAttributeTemporary(self, side=oSide):
-                cvu = datatypes.Vector(cvo[0], cvo[1], cvo[2] + self.FRONT_OFFSET)
+                cvu = datatypes.Vector(cvo[0], cvo[1], cvo[2])
 
                 upv = addTransform(self.upv_root, self.getName("rope_{}_upv".format(_index)))
                 cns = addTransform(self.rope_root, self.getName("rope_{}_cns".format(_index)))
@@ -448,6 +440,12 @@ class Component(component.Main):
         cmds.setAttr(w1.name() + ".rotation", 0.0)
         cmds.setAttr(w2.name() + ".rotation", 0.0)
         cmds.setAttr(w3.name() + ".rotation", 0.0)
+
+        # offset upv with FRONT_OFFSET
+        cvs = self.getCurveCVs(self.upv_crv)
+        for i, cv in enumerate(cvs):
+            new_pos = [cv[0], cv[1], cv[2] + self.FRONT_OFFSET]
+            self.upv_crv.setCV(i, new_pos, space="world")
 
     def addConstraints(self):
 
@@ -903,53 +901,6 @@ class Component(component.Main):
             self.controlRelatives["%s_loc" % i] = ctl
 
 
-def draw_eye_guide_mesh_plane(points, t):
-    # type: (Tuple[float, float, float], datatypes.MMatrix) -> om.MFnMesh
-
-    mesh = om.MFnMesh()
-
-    points = [x - t.getTranslation(space="world") for x in points]
-    # points = [x - t.getTranslation(space="world") for x in points]
-
-    mean_x = sum(p[0] for p in points) / len(points)
-    mean_y = sum(p[1] for p in points) / len(points)
-    mean_z = sum(p[2] for p in points) / len(points)
-    mean = (mean_x, mean_y, mean_z)
-
-    # Simple unitCube coordinates
-    vertices = [om.MPoint(mean), ]
-    polygonCounts = []
-    polygonConnects = []
-
-    for i, p in enumerate(points):
-        vertices.append(om.MPoint(p))    # 0
-
-        if 1 < i:
-            polygonCounts.append(3)
-            polygonConnects.append(i)
-            polygonConnects.append(i - 1)
-            polygonConnects.append(0)
-
-        if len(points) == (i + 1):
-            polygonCounts.append(3)
-            polygonConnects.append(i + 1)
-            polygonConnects.append(i)
-            polygonConnects.append(0)
-
-            polygonCounts.append(3)
-            polygonConnects.append(1)
-            polygonConnects.append(i + 1)
-            polygonConnects.append(0)
-
-    mesh_obj = mesh.create(vertices, polygonCounts, polygonConnects)
-    mesh_trans = om.MFnTransform(mesh_obj)
-    n = pm.PyNode(mesh_trans.name())
-    v = t.getTranslation(space="world")
-    n.setTranslation(v, om.MSpace.kWorld)
-
-    return mesh
-
-
 def ghostSliderForMouth(ghostControls, intTra, surface, sliderParent):
     """Modify the ghost control behaviour to slide on top of a surface
 
@@ -1101,3 +1052,323 @@ def _visi_off_lock(node):
         ymt_util.setKeyableAttributesDontLockVisibility(node, [])
     except:
         pass
+
+
+def calculate_flatness_ratio(points):
+    # type: (list[tuple[float, float, float]]) -> tuple[tuple[float, float, float], float]
+
+    try:
+        import numpy as np  # type: ignore  # noqa: F401
+        return calculate_flatness_ratio_using_numpy(points)
+
+    except ImportError:
+        logger.warning("This function requires numpy, using simple calculation instead.")
+        return calculate_flatness_ratio_simple(points)
+
+
+def calculate_flatness_ratio_using_numpy(points):
+    # type: (list[tuple[float, float, float]]) -> tuple[tuple[float, float, float], float]
+
+    import numpy as np  # type: ignore  # noqa: F401
+    mean = np.mean(points, axis=0)
+    centered_points = points - mean
+
+    cov_matrix = np.cov(centered_points, rowvar=False)
+
+    eigenvalues, eigenvectors = np.linalg.eigh(cov_matrix)
+
+    sorted_idx = np.argsort(eigenvalues)[::-1]
+    sorted_eigenvalues = eigenvalues[sorted_idx]
+    sorted_eigenvectors = eigenvectors[:, sorted_idx]
+
+    principal_directions = sorted_eigenvectors
+
+    lambda1 = sorted_eigenvalues[0]
+    lambda2 = sorted_eigenvalues[1]
+    lambda3 = sorted_eigenvalues[2]
+
+    flatness_ratio = (lambda3 * 0.3 + lambda2) / lambda1
+
+    # direction = [
+    #     principal_directions[0][0],
+    #     principal_directions[0][1],
+    #     principal_directions[0][2]
+    # ]
+
+    return principal_directions, flatness_ratio
+
+
+def calculate_flatness_ratio_simple(points):
+    # type: (list[tuple[float, float, float]]) -> tuple[tuple[float, float, float], float]
+
+    if not points:
+        raise ValueError("ポイントリストが空です。")
+
+    n = len(points)
+    
+    # 1. データの中心化
+    mean_x = sum(p[0] for p in points) / n
+    mean_y = sum(p[1] for p in points) / n
+    mean_z = sum(p[2] for p in points) / n
+
+    centered = [(p[0] - mean_x, p[1] - mean_y, p[2] - mean_z) for p in points]
+
+    # 2. 共分散行列の計算
+    cov_xx = sum(p[0] * p[0] for p in centered) / (n - 1)
+    cov_xy = sum(p[0] * p[1] for p in centered) / (n - 1)
+    cov_xz = sum(p[0] * p[2] for p in centered) / (n - 1)
+    cov_yy = sum(p[1] * p[1] for p in centered) / (n - 1)
+    cov_yz = sum(p[1] * p[2] for p in centered) / (n - 1)
+    cov_zz = sum(p[2] * p[2] for p in centered) / (n - 1)
+
+    cov_matrix = [
+        [cov_xx, cov_xy, cov_xz],
+        [cov_xy, cov_yy, cov_yz],
+        [cov_xz, cov_yz, cov_zz]
+    ]
+
+    # 3. 固有値と固有ベクトルの計算
+    # 3x3 対称行列の固有値を解析的に計算
+    eigenvalues, eigenvectors = eigen_decomposition_3x3(cov_matrix)
+
+    # 4. 固有値のソート（降順）
+    sorted_indices = sorted(range(3), key=lambda i: eigenvalues[i], reverse=True)
+    sorted_eigenvalues = [eigenvalues[i] for i in sorted_indices]
+    sorted_eigenvectors = [[eigenvectors[i][j] for i in sorted_indices] for j in range(3)]
+
+    lambda1, lambda2, lambda3 = sorted_eigenvalues
+
+    # 5. 扁平率の計算
+    flatness_ratio = (lambda3 * 0.3 + lambda2) / lambda1
+
+    # 主成分の方向（固有ベクトル）の取得
+    # 主成分3（最小の固有値）の固有ベクトル
+    principal_direction = tuple(sorted_eigenvectors[2])
+
+    return principal_direction, flatness_ratio
+
+
+def eigen_decomposition_3x3(matrix):
+    """
+    3x3 対称行列の固有値と固有ベクトルを計算する関数。
+    数値的な精度は低く、実際の用途では numpy を使用することを推奨します。
+    
+    Parameters:
+        matrix (list of list of float): 3x3 対称行列
+    
+    Returns:
+        tuple: (固有値リスト, 固有ベクトルリスト)
+    """
+    # ヘッセ行列の固有値を求めるための特性方程式を解く
+    # |A - λI| = 0
+    # ここでは3x3の対称行列を仮定
+    a = matrix[0][0]
+    b = matrix[0][1]
+    c = matrix[0][2]
+    d = matrix[1][1]
+    e = matrix[1][2]
+    f = matrix[2][2]
+
+    # 計算を簡略化するために変数を定義
+    p1 = b**2 + c**2 + e**2
+    if p1 == 0:
+        # 対角行列の場合
+        eigenvalues = [a, d, f]
+        eigenvectors = [
+            [1, 0, 0],
+            [0, 1, 0],
+            [0, 0, 1]
+        ]
+        return eigenvalues, eigenvectors
+
+    # カルダノの方法を用いて固有値を求める
+    q = (a + d + f) / 3
+    p2 = (a - q)**2 + (d - q)**2 + (f - q)**2 + 2 * p1
+    p = math.sqrt(p2 / 6)
+    B = [
+        [(matrix[i][j] - q if i == j else matrix[i][j]) / p for j in range(3)]
+        for i in range(3)
+    ]
+
+    r = determinant_3x3(B) / 2
+
+    # 確定
+    if r <= -1:
+        phi = math.pi / 3
+    elif r >= 1:
+        phi = 0
+    else:
+        phi = math.acos(r) / 3
+
+    # 固有値
+    eig1 = q + 2 * p * math.cos(phi)
+    eig3 = q + 2 * p * math.cos(phi + (2 * math.pi / 3))
+    eig2 = 3 * q - eig1 - eig3  # 因式分解を使用
+
+    eigenvalues = [eig1, eig2, eig3]
+
+    # 固有ベクトルの計算
+    eigenvectors = []
+    for eig in eigenvalues:
+        # (A - λI)v = 0 を解く
+        A_minus_lambda_I = [
+            [matrix[0][0] - eig, matrix[0][1], matrix[0][2]],
+            [matrix[1][0], matrix[1][1] - eig, matrix[1][2]],
+            [matrix[2][0], matrix[2][1], matrix[2][2] - eig]
+        ]
+        # 3つの式の中から2つを選び、解を求める
+        # ここでは最初の2行を使用
+        v = solve_linear_system_3x3(A_minus_lambda_I)
+        if v is not None:
+            # 正規化
+            norm = math.sqrt(v[0]**2 + v[1]**2 + v[2]**2)
+            if norm != 0:
+                v = [v[i] / norm for i in range(3)]
+            eigenvectors.append(v)
+        else:
+            # 解けない場合は単位ベクトルを使用
+            eigenvectors.append([1, 0, 0])
+
+    return eigenvalues, eigenvectors
+
+def determinant_3x3(m):
+    """
+    3x3行列の行列式を計算する関数。
+    
+    Parameters:
+        m (list of list of float): 3x3行列
+    
+    Returns:
+        float: 行列式の値
+    """
+    return (
+        m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) -
+        m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) +
+        m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0])
+    )
+
+def solve_linear_system_3x3(m):
+    """
+    3x3行列の線形方程式を解く関数。
+    解が一意でない場合は None を返す。
+    
+    Parameters:
+        m (list of list of float): 3x3行列 (A)
+    
+    Returns:
+        list of float or None: 解ベクトル [x, y, z] または None
+    """
+    # 拡大係数行列を作成 (A | 0)
+    A = [
+        [m[0][0], m[0][1], m[0][2]],
+        [m[1][0], m[1][1], m[1][2]],
+        [m[2][0], m[2][1], m[2][2]]
+    ]
+
+    # ランクを計算して解の存在を確認
+    # 簡易的なランクチェック
+    rank = matrix_rank_3x3(A)
+    if rank < 2:
+        return None  # 無限に多くの解が存在するか、解が存在しない
+
+    # 2つの方程式を選び、3つ目を無視して解を求める
+    # ここでは最初の2行を使用
+    a1, b1, c1 = A[0]
+    a2, b2, c2 = A[1]
+
+    # 例えば、x = 1 と仮定して y と z を求める
+    # しかし、これは一般的ではないため、別の方法を使用
+    # クラメールの法則を用いて解を求める
+
+    # ラインを見つけるために、小さい値を無視
+    epsilon = 1e-6
+    if abs(a1) > epsilon or abs(b1) > epsilon:
+        # 解を y と z に対して表現
+        # 例: a1 * x + b1 * y + c1 * z = 0
+        #       a2 * x + b2 * y + c2 * z = 0
+        # ここでは z をパラメータとする
+        z = 1.0
+        if c1 != 0:
+            y = (-a1 * 0 - c1 * z) / b1 if b1 != 0 else 0
+        else:
+            y = 0
+        x = 0  # 任意の値
+        return [x, y, z]
+    elif abs(a2) > epsilon or abs(b2) > epsilon:
+        # 同様に他の行を使用
+        z = 1.0
+        y = (-a2 * 0 - c2 * z) / b2 if b2 != 0 else 0
+        x = 0
+        return [x, y, z]
+    else:
+        return None
+
+def matrix_rank_3x3(m):
+    """
+    3x3行列のランクを計算する関数。
+    
+    Parameters:
+        m (list of list of float): 3x3行列
+    
+    Returns:
+        int: ランク (0, 1, 2, 3)
+    """
+    det = determinant_3x3(m)
+    if det != 0:
+        return 3
+    # チェック2x2の小行列
+    submatrices = [
+        [m[0][0], m[0][1]],
+        [m[0][0], m[0][2]],
+        [m[0][1], m[0][2]],
+        [m[1][0], m[1][1]],
+        [m[1][0], m[1][2]],
+        [m[1][1], m[1][2]],
+        [m[2][0], m[2][1]],
+        [m[2][0], m[2][2]],
+        [m[2][1], m[2][2]],
+    ]
+    for sm in submatrices:
+        det2 = sm[0] * sm[1] - sm[1] * sm[0]  # 2x2の行列式
+        if det2 != 0:
+            return 2
+    # チェック1x1の小行列
+    for row in m:
+        for val in row:
+            if val != 0:
+                return 1
+    return 0
+
+
+def calculate_principal_direction_and_flatness_ratio(crv):
+
+    fnCurve = curve.getMFnNurbsCurve(crv)
+    u_min, u_max = fnCurve.knotDomain
+
+    samplePos = []
+    for i in range(100):
+        u = u_min + (u_max - u_min) * i / 100
+        p = fnCurve.getPointAtParam(u)
+        samplePos.append(p)
+
+    direction, flatness_ratio = calculate_flatness_ratio(samplePos)
+    return direction, flatness_ratio
+
+
+def inflate_position_by_curve_flattness(crv, position):
+    # type: (pm.PyNode, tuple[float, float, float]) -> tuple[float, float, float]
+
+    directions, flatness_ratio = calculate_principal_direction_and_flatness_ratio(crv)
+
+    ratio = math.pow(max(1.0, (1.0 - flatness_ratio)), 0.8) * 0.1
+    for i, vec in enumerate(directions[0]):
+        if i > 2:
+            break
+        position[i] *= (abs(vec) * ratio + 1.0)
+
+    for i, vec in enumerate(directions[1]):
+        if i > 2:
+            break
+        position[i] *= (abs(vec) * ratio * 0.3 + 1.0)
+
+    return position
