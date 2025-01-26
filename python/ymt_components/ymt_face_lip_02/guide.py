@@ -1,5 +1,6 @@
 # pylint: disable=import-error,W0201,C0111,C0112
 import os
+import re
 from functools import partial
 
 from mgear.shifter.component import guide
@@ -155,6 +156,32 @@ class Guide(guide.ComponentGuide):
         self.pMouthCenterReference = self.addParam("mouthCenterReference", "string", "mouthSlide_C0_root")
         self.pMouthLeftReference = self.addParam("mouthLeftReference", "string", "mouthCorner_L0_root")
         self.pMouthRightReference = self.addParam("mouthRightReference", "string", "mouthCorner_R0_root")
+
+        self.pUpperPuckerRoll_profile = self.addFCurveParam(
+                "upperPuckerRoll_profile",
+                [[0, 0], [0.25, 0.6], [0.5, 1.0], [0.75, 0.6], [1, 0]])
+        self.pLowerPuckerRoll_profile = self.addFCurveParam(
+                "lowerPuckerRoll_profile",
+                [[0, 0], [0.25, -0.6], [0.5, -1.0], [0.75, -0.6], [1, 0]])
+
+    def get_divisions(self):
+        """ Returns correct segments divisions """
+
+        self.divisions = int(self.getNumberOfLocators() / 2) + 1
+
+        return self.divisions
+
+    def getNumberOfLocators(self):
+        # type: (Text) -> int
+        """ _uplocs."""
+        num = 0
+        xforms = self.root.listRelatives(ad=True, type="transform")
+        for x in xforms:
+            if x.name().endswith("_loc"):
+                index = int(re.search(r"_(\d+)_loc", x.name()).group(1))
+                num = max(num, index + 1)
+
+        return num
 
     def modalPositions(self):
         """Launch a modal dialog to set position of the guide."""
@@ -363,6 +390,9 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
                 "mouthRightReference"
             )
         )
+
+        self.settingsTab.puckerRollProfile_pushButton.clicked.connect(
+            self.setProfile)
 
     def addReference(self, lineEdit, targetAttr):
         oSel = pm.selected()
