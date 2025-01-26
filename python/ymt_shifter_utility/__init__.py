@@ -1671,10 +1671,10 @@ def addNPOPreservingMatrixConnections(ctl):
 
     if invmatrix_connections:
         multMatrix = cmds.createNode("multMatrix")
-        cmds.connectAttr(ctlName + ".inverseMatrix", multMatrix + ".matrixIn[0]")
-        cmds.connectAttr(newNPO[0].fullPathName() + ".inverseMatrix", multMatrix + ".matrixIn[1]")
+        cmds.connectAttr(newNPO[0].fullPathName() + ".inverseMatrix", multMatrix + ".matrixIn[0]")
+        cmds.connectAttr(ctlName + ".inverseMatrix", multMatrix + ".matrixIn[1]")
 
-        for dst in matrix_connections[1::2]:
+        for dst in invmatrix_connections[1::2]:
             cmds.connectAttr(multMatrix + ".matrixSum", dst, force=True)
 
     if parent_connections:
