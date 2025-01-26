@@ -1484,3 +1484,31 @@ def setCvParamRatio(crv, ratios):
 
     sc.setCVPositions(newPositions)
     sc.updateCurve()
+
+
+def getCenterPosition(crv, sampleCount=100):
+    # type: (str) -> om2.MPoint
+
+    sc = getMFnNurbsCurve(crv)
+    sc.updateCurve()
+
+    length = sc.length()
+    paramStart = sc.findParamFromLength(0.0)
+    try:
+        paramEnd = sc.findParamFromLength(length)
+    except RuntimeError:
+        paramEnd = sc.findParamFromLength(length - 0.001)
+
+    paramLength = paramEnd - paramStart
+
+    points = []
+    for i in range(sampleCount):
+        param = paramStart + (paramLength / sampleCount) * i
+        point = sc.getPointAtParam(param, space=om2.MSpace.kObject)
+        points.append(point)
+
+    return om2.MPoint(
+        sum([p.x for p in points]) / sampleCount,
+        sum([p.y for p in points]) / sampleCount,
+        sum([p.z for p in points]) / sampleCount
+    )
