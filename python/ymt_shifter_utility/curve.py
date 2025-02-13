@@ -64,39 +64,39 @@ if sys.version_info > (3, 0):
 #############################################
 
 
-def addCnsCurve(parent, name, centers, degree=1, m=dt.Matrix(), close=False, local=False):
-    """Create a curve attached to given centers. One point per center
+def addCnsCurve(parent, name, drivers, degree=1, m=dt.Matrix(), close=False, local=False):
+    """Create a curve attached to given drivers. One point per center
 
     Arguments:
         parent (dagNode): Parent object.
         name (str): Name
-        centers (list of dagNode): Object that will drive the curve.
+        drivers (list of dagNode): Object that will drive the curve.
         degree (int): 1 for linear curve, 3 for Cubic.
 
     Returns:
         dagNode: The newly created curve.
     """
     # rebuild list to avoid input list modification
-    centers = centers[:]
+    drivers = drivers[:]
     if degree == 3:
-        if len(centers) == 2:
-            centers.insert(0, centers[0])
-            centers.append(centers[-1])
-        elif len(centers) == 3:
-            centers.insert(1, centers[1])
+        if len(drivers) == 2:
+            drivers.insert(0, drivers[0])
+            drivers.append(drivers[-1])
+        elif len(drivers) == 3:
+            drivers.insert(1, drivers[1])
 
-    for c in centers:
+    for c in drivers:
         if isinstance(c, str):
             c = pm.PyNode(c)
 
-    points = [dt.Vector() for center in centers]
+    points = [dt.Vector() for center in drivers]
 
     node = addCurve(parent, name, points, degree=degree, m=m, close=close)
 
     if local:
-        gear_curvecns_op_local(node, centers)
+        gear_curvecns_op_local(node, drivers)
     else:
-        applyop.gear_curvecns_op(node, centers)
+        applyop.gear_curvecns_op(node, drivers)
 
     return node
 
@@ -1242,7 +1242,7 @@ def gear_curvecns_op_local(crv, inputs=[]):
 
     cmds.disconnectAttr(src, dst)
     cmds.connectAttr(
-        src.replace(".worldSpace[0]", ".local"),
+        src.split(".")[0] + ".local",
         deformer_name + ".input[0].inputGeometry"
     )
 
