@@ -260,19 +260,19 @@ class Component(component.Main):
         self.upv_crv = curveFromCurve(self.rope, "upv_crv", self.NB_ROPE)
 
         # -------------------------------------------------------------------
-        posTop = datatypes.Point()
-        posLeft = datatypes.Point()
+        posTop = datatypes.Point(self.locsPos[0])
+        posLeft = datatypes.Point(self.locsPos[self.left_index])
         posBottom = datatypes.Point(self.locsPos[self.bottom_index])
         posRight = datatypes.Point(self.locsPos[self.right_index])
         ctlName = self.getName("crv_ctl")
-        self.crv_ctl = createCurveControl(
+        self.crv_ctl = self.createCurveControl(
             self.rope,
             posTop,
             posLeft,
             posBottom,
             posRight,
             ctlName,
-            t,
+            m=t,
             parent=crv_root)
 
     def addControlJoints(self):
@@ -821,13 +821,13 @@ class Component(component.Main):
         corner_l_comp = self.rig.findComponent(self.mouthLeftRef)
         corner_r_comp = self.rig.findComponent(self.mouthRightRef)
 
-        if slide_c_comp.root.parent(0) != self.parent:
+        if slide_c_comp.root.getParent() != self.parent:
             self.parent.addChild(slide_c_comp.root)
 
-        if corner_l_comp.root.parent(0) != self.parent:
+        if corner_l_comp.root.getParent() != self.parent:
             self.parent.addChild(corner_l_comp.root)
 
-        if corner_r_comp.root.parent(0) != self.parent:
+        if corner_r_comp.root.getParent() != self.parent:
             self.parent.addChild(corner_r_comp.root)
 
         # create interpose lvl for the ctl
@@ -1008,60 +1008,60 @@ class Component(component.Main):
             self.controlRelatives["%s_loc" % i] = ctl
 
 
-def createCurveControl(crv, posTop, posLeft, posBottom, posRight, name, m=None, parent=None, symmetry=True):
-    # type: (str, list[float], list[float], list[float], list[float], dt.Matrix, pm.nodetypes.Transform, bool) -> pm.nodetypes.Transform
-
-    # For now, we are not using this function, but we are keeping it here for future reference
-    # posTop = inflate_position_by_curve_flattness(crv, posTop)
-    # posLeft = inflate_position_by_curve_flattness(crv, posLeft)
-    # posRight = inflate_position_by_curve_flattness(crv, posRight)
-    # posBottom = inflate_position_by_curve_flattness(crv, posBottom)
-
-    ropeFn = curve.getMFnNurbsCurve(crv)
-    ropeLength = ropeFn.length()
-
-    positions = [
-        posTop,
-        ropeFn.getPointAtParam(ropeFn.findParamFromLength(ropeLength * 1.0 / 12.0), om.MSpace.kObject),
-        ropeFn.getPointAtParam(ropeFn.findParamFromLength(ropeLength * 2.0 / 12.0), om.MSpace.kObject),
-        posLeft,
-        ropeFn.getPointAtParam(ropeFn.findParamFromLength(ropeLength * 4.0 / 12.0), om.MSpace.kObject),
-        ropeFn.getPointAtParam(ropeFn.findParamFromLength(ropeLength * 5.0 / 12.0), om.MSpace.kObject),
-        posBottom,
-        ropeFn.getPointAtParam(ropeFn.findParamFromLength(ropeLength * 7.0 / 12.0), om.MSpace.kObject),
-        ropeFn.getPointAtParam(ropeFn.findParamFromLength(ropeLength * 8.0 / 12.0), om.MSpace.kObject),
-        posRight,
-        ropeFn.getPointAtParam(ropeFn.findParamFromLength(ropeLength * 10.0 / 12.0), om.MSpace.kObject),
-        ropeFn.getPointAtParam(ropeFn.findParamFromLength(ropeLength * 11.0 / 12.0), om.MSpace.kObject),
-    ]
-    positions = [datatypes.Vector(x[0], x[1], x[2]) for x in positions]
-    crv_ctl = curve.addCurve(parent, name, positions, close=True, degree=3, m=m)
-    fit_curve.fit_curve_on_curve(crv_ctl, crv, num_iterations=300)
-
-    cvs = crv_ctl.getCVs(space="object")
-    posTop[1] = cvs[0][1]
-    posTop[2] = cvs[0][2]
-    crv_ctl.setCV(0, posTop, space="object")
-
-    posBottom[1] = cvs[6][1]
-    posBottom[2] = cvs[6][2]
-    crv_ctl.setCV(6, posBottom, space="object")
-
-    if symmetry:
-        for l_index, r_index in [(1, 11), (2, 10), (3, 9), (4, 8), (5, 7)]:
-            pos_l = cvs[l_index]
-            pos_r = cvs[r_index]
-
-            m_x = (abs(pos_l[0]) + abs(pos_r[0])) / 2.0
-            m = (pos_l + pos_r) / 2.0
-
-            new_pos_l = ( m_x, m[1], m[2])
-            new_pos_r = (-m_x, m[1], m[2])
-
-            crv_ctl.setCV(l_index, new_pos_l, space="object")
-            crv_ctl.setCV(r_index, new_pos_r, space="object")
-
-    return crv_ctl
+    def createCurveControl(self, crv, posTop, posLeft, posBottom, posRight, name, m=None, parent=None, symmetry=True):
+        # type: (str, list[float], list[float], list[float], list[float], str, dt.Matrix, dt.Transform, bool) -> pm.nodetypes.Transform
+    
+        # For now, we are not using this function, but we are keeping it here for future reference
+        # posTop = inflate_position_by_curve_flattness(crv, posTop)
+        # posLeft = inflate_position_by_curve_flattness(crv, posLeft)
+        # posRight = inflate_position_by_curve_flattness(crv, posRight)
+        # posBottom = inflate_position_by_curve_flattness(crv, posBottom)
+    
+        ropeFn = curve.getMFnNurbsCurve(crv)
+        ropeLength = ropeFn.length()
+    
+        initial_positions = [
+            posTop,
+            ropeFn.getPointAtParam(ropeFn.findParamFromLength(ropeLength * 1.0 / 12.0), om.MSpace.kObject),
+            ropeFn.getPointAtParam(ropeFn.findParamFromLength(ropeLength * 2.0 / 12.0), om.MSpace.kObject),
+            posLeft,
+            ropeFn.getPointAtParam(ropeFn.findParamFromLength(ropeLength * 4.0 / 12.0), om.MSpace.kObject),
+            ropeFn.getPointAtParam(ropeFn.findParamFromLength(ropeLength * 5.0 / 12.0), om.MSpace.kObject),
+            posBottom,
+            ropeFn.getPointAtParam(ropeFn.findParamFromLength(ropeLength * 7.0 / 12.0), om.MSpace.kObject),
+            ropeFn.getPointAtParam(ropeFn.findParamFromLength(ropeLength * 8.0 / 12.0), om.MSpace.kObject),
+            posRight,
+            ropeFn.getPointAtParam(ropeFn.findParamFromLength(ropeLength * 10.0 / 12.0), om.MSpace.kObject),
+            ropeFn.getPointAtParam(ropeFn.findParamFromLength(ropeLength * 11.0 / 12.0), om.MSpace.kObject),
+        ]
+        initial_positions = [datatypes.Vector(p[0], p[1], p[2]) for p in initial_positions]
+        crv_ctl = curve.addCurve(parent, name, initial_positions, close=True, degree=3, m=m)
+        fit_curve.fit_curve_on_curve(crv_ctl, crv, num_iterations=3)
+    
+        cvs = crv_ctl.getCVs(space="object")
+        posTop[1] = cvs[0][1]
+        posTop[2] = cvs[0][2]
+        crv_ctl.setCV(0, posTop, space="object")
+    
+        posBottom[1] = cvs[6][1]
+        posBottom[2] = cvs[6][2]
+        crv_ctl.setCV(6, posBottom, space="object")
+    
+        if symmetry:
+            for l_index, r_index in [(1, 11), (2, 10), (3, 9), (4, 8), (5, 7)]:
+                pos_l = cvs[l_index]
+                pos_r = cvs[r_index]
+    
+                m_x = (abs(pos_l[0]) + abs(pos_r[0])) / 2.0
+                m = (pos_l + pos_r) / 2.0
+    
+                new_pos_l = ( m_x, m[1], m[2])
+                new_pos_r = (-m_x, m[1], m[2])
+    
+                crv_ctl.setCV(l_index, new_pos_l, space="object")
+                crv_ctl.setCV(r_index, new_pos_r, space="object")
+    
+        return crv_ctl
 
 
 def ghostSliderForMouth(ghostControls, intTra, surface, sliderParent):
@@ -1179,7 +1179,6 @@ def createGhostWithParentConstraint(ctl, parent=None, connect=True):
     for shape in source2.getShapes():
         pm.parent(shape, newCtl, r=True, s=True)
         pm.rename(shape, newCtl.name() + "Shape")
-        pm.parent(shape, newCtl, r=True, s=True)
     pm.delete(source2)
     if parent:
         pm.parent(newCtl, parent)

@@ -989,12 +989,12 @@ class Component(component.Main):
 
         if self.settings["ik0refarray"]:
             npo = self.ik_npo[0]
-            with ymt_util.unlockAttribute(npo.fullPathName()):
+            with ymt_util.unlockAttribute(npo.longName()):
                 self.connectRef(self.settings["ik0refarray"], npo)
 
         if self.settings["ik1refarray"]:
             for npo in self.ik_npo[1:]:
-                with ymt_util.unlockAttribute(npo.fullPathName()):
+                with ymt_util.unlockAttribute(npo.longName()):
                     self.connectRef(self.settings["ik1refarray"], npo)
 
     # =====================================================

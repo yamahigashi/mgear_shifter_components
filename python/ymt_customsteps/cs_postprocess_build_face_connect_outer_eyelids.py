@@ -93,7 +93,7 @@ class CustomShifterStep(cstp.customShifterMainStep):
         bs = pm.blendShape(target1, blink_crv, dest.longName())
         cmds.setAttr(bs[0] + "." + target1.split("|")[-1], 0.16)
         cmds.setAttr(bs[0] + "." + blink_crv, 0.25)
-        cmds.delete(dummy_plane.getPath().fullPathName())
+        cmds.delete(dummy_plane.getPath().longName())
 
         cmds.parent(tmp.longName(), self.parent)
         cmds.parent(dest.longName(), self.parent)

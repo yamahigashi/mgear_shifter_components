@@ -1005,7 +1005,7 @@ def applyPathCnsLocal(target, curve, u, maintainOffset=True):
     cmds.setAttr(cns + ".worldUpVectorX", 0)
     cmds.setAttr(cns + ".worldUpVectorY", 1)
     cmds.setAttr(cns + ".worldUpVectorZ", 0)
-    cmds.connectAttr(curve.fullPathName() + ".matrix", cns + ".worldUpMatrix")  # object rotation up
+    cmds.connectAttr(curve.longName() + ".matrix", cns + ".worldUpMatrix")  # object rotation up
     cmds.setAttr(cns + ".frontAxis", 2)  # front axis x
     cmds.setAttr(cns + ".upAxis", 1)  # up axis y
     pm.connectAttr(curve.attr("local"), cns.attr("geometryPath"), f=True)
@@ -1017,7 +1017,7 @@ def applyPathCnsLocal(target, curve, u, maintainOffset=True):
 
     tmp_output = dt.Matrix(comp_node.attr("outputMatrix").get())
     tmp_global = tmp_output * mb
-    offset_matrix = ma * tmp_global.inverse()
+    offset_matrix = om2.MMatrix(ma * tmp_global.inverse())
 
     if maintainOffset:
         h = 1
@@ -1040,22 +1040,22 @@ def applyPathCnsLocal(target, curve, u, maintainOffset=True):
     if maintainOffset:
         tmp_output = mul_node.attr("matrixSum").get()
         offset_node = pm.createNode("fourByFourMatrix")
-        offset_node.attr("in00").set(offset_matrix[0][0])
-        offset_node.attr("in01").set(offset_matrix[0][1])
-        offset_node.attr("in02").set(offset_matrix[0][2])
-        offset_node.attr("in03").set(offset_matrix[0][3])
-        offset_node.attr("in10").set(offset_matrix[1][0])
-        offset_node.attr("in11").set(offset_matrix[1][1])
-        offset_node.attr("in12").set(offset_matrix[1][2])
-        offset_node.attr("in13").set(offset_matrix[1][3])
-        offset_node.attr("in20").set(offset_matrix[2][0])
-        offset_node.attr("in21").set(offset_matrix[2][1])
-        offset_node.attr("in22").set(offset_matrix[2][2])
-        offset_node.attr("in23").set(offset_matrix[2][3])
-        offset_node.attr("in30").set(offset_matrix[3][0])
-        offset_node.attr("in31").set(offset_matrix[3][1])
-        offset_node.attr("in32").set(offset_matrix[3][2])
-        offset_node.attr("in33").set(offset_matrix[3][3])
+        offset_node.attr("in00").set(offset_matrix[0])
+        offset_node.attr("in01").set(offset_matrix[1])
+        offset_node.attr("in02").set(offset_matrix[2])
+        offset_node.attr("in03").set(offset_matrix[3])
+        offset_node.attr("in10").set(offset_matrix[4])
+        offset_node.attr("in11").set(offset_matrix[5])
+        offset_node.attr("in12").set(offset_matrix[6])
+        offset_node.attr("in13").set(offset_matrix[7])
+        offset_node.attr("in20").set(offset_matrix[8])
+        offset_node.attr("in21").set(offset_matrix[9])
+        offset_node.attr("in22").set(offset_matrix[10])
+        offset_node.attr("in23").set(offset_matrix[11])
+        offset_node.attr("in30").set(offset_matrix[12])
+        offset_node.attr("in31").set(offset_matrix[13])
+        offset_node.attr("in32").set(offset_matrix[13])
+        offset_node.attr("in33").set(offset_matrix[15])
         offset_node.attr("output") >> mul_node.attr("matrixIn[0]")  # pyright: ignore [reportUnusedExpression]
 
     decomp_node = pm.createNode("decomposeMatrix")
@@ -1077,8 +1077,8 @@ def applyPathConstrainLocal(target, src_curve):
     try:
         ma = target.getMatrix(worldSpace=True)
         mb = src_curve.getMatrix(worldSpace=True)
-        m = ma * mb.inverse()
-        pos = dt.Vector(m[3][0], m[3][1], m[3][2])
+        m = om2.MMatrix(ma * mb.inverse())
+        pos = dt.Vector(m[12], m[13], m[14])
         param, length = getCurveParamAtPosition(src_curve, pos)
         u_length = findLenghtFromParam(src_curve, param)
         u_param = u_length / length
@@ -1288,9 +1288,12 @@ def gear_curvecns_op_local_skip_rotate(crv, inputs=[]):
 
 
 def createCurveOnSurfaceFromCurve(crv, surface, name):
+
     import ymt_shifter_utility
-    nbPoints = crv.numEPs()
-    close = crv.form() == 3
+
+    src_crv = getMFnNurbsCurve(crv)
+    close = src_crv.form == 3
+    nbPoints = src_crv.numCVs + src_crv.degree
 
     t = getTransform(crv)
     targetCrv = createCurveFromCurve(

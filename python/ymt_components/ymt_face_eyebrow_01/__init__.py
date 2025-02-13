@@ -332,6 +332,9 @@ class Component(component.Main):
         crv_degree = 2
 
         t = getTransform(self.root)
+        rootPos = self.root.getTranslation(space="world")
+        points = [ctl.getTranslation(space="world") - rootPos for ctl in ctls]
+
         crv = curve.addCnsCurve(
                 self.crv_root,
                 self.getName("mainCtl_crv"),
@@ -348,7 +351,7 @@ class Component(component.Main):
 
         # create upvector curve to drive secondary control
         if self.secondary_ctl_check:
-            points = [ctl.getTranslation(space="world") for ctl in ctls]
+            points = [ctl.getTranslation(space="world") - rootPos for ctl in ctls]
             mainCtlUpv = curve.addCurve(self.crv_root, self.getName("mainCtl_upv"), points, degree=crv_degree, m=t)
             ymt_util.setKeyableAttributesDontLockVisibility(mainCtlUpv, [])
             v = self.root.getTranslation(space="world")

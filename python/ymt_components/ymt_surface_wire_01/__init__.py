@@ -175,7 +175,7 @@ class Component(component.Main):
             self.float_npos.append(npo)
             self.float_ctls.append(ctl)
 
-        # cmds.delete(self.dummyCurve.fullPathName())
+        # cmds.delete(self.dummyCurve.longName())
 
     def addController(self, index, t):
 
@@ -217,7 +217,7 @@ class Component(component.Main):
         )
         cmds.dgeval(self.curve.name() + ".v", self.curve.name() + ".v")
         self.target = curve.createCurveFromCurve(
-            self.curve.fullPathName(),
+            self.curve.longName(),
             self.getName("curve_target"),
             nbPoints=8,
             parent=self.crv_root,
@@ -249,7 +249,7 @@ class Component(component.Main):
             cmds.setAttr(cns + ".worldUpVectorX", 0)
             cmds.setAttr(cns + ".worldUpVectorY", 0)
             cmds.setAttr(cns + ".worldUpVectorZ", 1)
-            # cmds.connectAttr(self.root.fullPathName() + ".worldMatrix", cns + ".worldUpMatrix")  # object rotation up
+            # cmds.connectAttr(self.root.longName() + ".worldMatrix", cns + ".worldUpMatrix")  # object rotation up
             cmds.setAttr(cns + ".frontAxis", 0)  # front axis y
             cmds.setAttr(cns + ".upAxis", 2)  # up axis x
             cmds.setAttr(cns + ".inverseFront", True)

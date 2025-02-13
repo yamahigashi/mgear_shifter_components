@@ -1418,9 +1418,9 @@ def create_dummy_edges_from_positions(positions):
     # type: (List[Tuple[float, float, float]]) -> Tuple[List[Text], om.MFnMesh]
     plane = draw_plane_from_positions(positions)  # type: ignore
 
-    edge_list = ["{}.e[{}]".format(plane.fullPathName(), 0)]
+    edge_list = ["{}.e[{}]".format(plane.longName(), 0)]
     for i in range(1, len(positions) + 1):
-        edge_list.append("{}.e[{}]".format(plane.fullPathName(), i * 2 + 1))
+        edge_list.append("{}.e[{}]".format(plane.longName(), i * 2 + 1))
     # edge_list = [pm.PyNode(x) for x in edge_list]
 
     return edge_list, plane
@@ -1570,14 +1570,14 @@ def addNPOPreservingMatrixConnections(ctl):
         ctl = pm.PyNode(ctl)
 
     newNPO = addNPO(ctl)
-    ctlName = ctl.fullPathName()
+    ctlName = ctl.longName()
 
     def get_connections(attributes):
         # type: (list[str]) -> list[str]
         connections = []
         for attr in attributes:
             connections.extend(cmds.listConnections(
-                ctl.fullPathName() + attr,
+                ctl.longName() + attr,
                 s=False,
                 d=True,
                 plugs=True,
@@ -1593,7 +1593,7 @@ def addNPOPreservingMatrixConnections(ctl):
         if pos_connections and rot_connections and scl_connections:
             mult = cmds.createNode("multMatrix")
             cmds.connectAttr(node + ".matrix", mult + ".matrixIn[0]")
-            cmds.connectAttr(newNPO[0].fullPathName() + ".matrix", mult + ".matrixIn[1]")
+            cmds.connectAttr(newNPO[0].longName() + ".matrix", mult + ".matrixIn[1]")
 
             decompMatrix = cmds.createNode("decomposeMatrix")
             cmds.connectAttr(mult + ".matrixSum", decompMatrix + ".inputMatrix")
@@ -1627,7 +1627,7 @@ def addNPOPreservingMatrixConnections(ctl):
                 capitla = attributes[-1][1:].capitalize()
                 cmds.connectAttr(node + attributes[-1], comp + ".input" + capitla)
                 cmds.connectAttr(comp + ".outputMatrix", mult + ".matrixIn[0]")
-                cmds.connectAttr(newNPO[0].fullPathName() + ".matrix", mult + ".matrixIn[1]")
+                cmds.connectAttr(newNPO[0].longName() + ".matrix", mult + ".matrixIn[1]")
 
                 decompMatrix = cmds.createNode("decomposeMatrix")
                 cmds.connectAttr(mult + ".matrixSum", decompMatrix + ".inputMatrix")
@@ -1667,14 +1667,14 @@ def addNPOPreservingMatrixConnections(ctl):
     if matrix_connections:
         multMatrix = cmds.createNode("multMatrix")
         cmds.connectAttr(ctlName + ".matrix", multMatrix + ".matrixIn[0]")
-        cmds.connectAttr(newNPO[0].fullPathName() + ".matrix", multMatrix + ".matrixIn[1]")
+        cmds.connectAttr(newNPO[0].longName() + ".matrix", multMatrix + ".matrixIn[1]")
 
         for dst in matrix_connections[1::2]:
             cmds.connectAttr(multMatrix + ".matrixSum", dst, force=True)
 
     if invmatrix_connections:
         multMatrix = cmds.createNode("multMatrix")
-        cmds.connectAttr(newNPO[0].fullPathName() + ".inverseMatrix", multMatrix + ".matrixIn[0]")
+        cmds.connectAttr(newNPO[0].longName() + ".inverseMatrix", multMatrix + ".matrixIn[0]")
         cmds.connectAttr(ctlName + ".inverseMatrix", multMatrix + ".matrixIn[1]")
 
         for dst in invmatrix_connections[1::2]:
@@ -1683,7 +1683,7 @@ def addNPOPreservingMatrixConnections(ctl):
     if parent_connections:
         for src, dst in zip(parent_connections[::2], parent_connections[1::2]):
             src_attr = src.split(".")[-1]
-            cmds.connectAttr(newNPO[0].fullPathName() + "." + src_attr, dst, force=True)
+            cmds.connectAttr(newNPO[0].longName() + "." + src_attr, dst, force=True)
 
     if pos_connections or rot_connections or scl_connections:
         mimic_connections(ctlName, pos_connections, rot_connections, scl_connections)
@@ -1698,7 +1698,7 @@ def demote_controller(ctl):
         ctl = pm.PyNode(ctl)
 
     for shape in ctl.getShapes():
-        cmds.delete(shape.fullPathName())
+        cmds.delete(shape.longName())
 
     for attr in ["t", "r", "s"]:
         for axis in "xyz":
@@ -1708,7 +1708,7 @@ def demote_controller(ctl):
                 pass
 
     message_connections = cmds.listConnections(
-        ctl.fullPathName() + ".message",
+        ctl.longName() + ".message",
         s=False,
         d=True,
         plugs=True,
@@ -1718,13 +1718,13 @@ def demote_controller(ctl):
     for src, dst in zip(message_connections[::2], message_connections[1::2]):
         cmds.disconnectAttr(src, dst)
 
-    if "isCtl" in cmds.listAttr(ctl.fullPathName()):
-        cmds.deleteAttr(ctl.fullPathName(), at="isCtl")
+    if "isCtl" in cmds.listAttr(ctl.longName()):
+        cmds.deleteAttr(ctl.longName(), at="isCtl")
 
-    members = cmds.listSets(object=ctl.fullPathName()) or []
+    members = cmds.listSets(object=ctl.longName()) or []
     if not members:
         logger.warning(
-            "No members found in the set for {}".format(ctl.fullPathName()))
+            "No members found in the set for {}".format(ctl.longName()))
 
     for ctl_grp in members:
-        cmds.sets(ctl.fullPathName(), rm=ctl_grp)
+        cmds.sets(ctl.longName(), rm=ctl_grp)

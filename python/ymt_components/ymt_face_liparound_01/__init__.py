@@ -253,12 +253,12 @@ class Component(component.Main):
         t = getTransform(self.root)
         positions = [self._worldToObj(x) for x in self.locsPos]
         # plane = self.addDummyPlane()
-        # planeNode = pm.PyNode(plane.fullPathName())
+        # planeNode = pm.PyNode(plane.longName())
 
         # -------------------------------------------------------------------
-        # edgeList = ["{}.e[{}]".format(plane.fullPathName(), 0)]
+        # edgeList = ["{}.e[{}]".format(plane.longName(), 0)]
         # for i in range(1, self.num_locs + 1):
-        #     edgeList.append("{}.e[{}]".format(plane.fullPathName(), i * 2 + 1))
+        #     edgeList.append("{}.e[{}]".format(plane.longName(), i * 2 + 1))
         # edgeList = [pm.PyNode(x) for x in edgeList]
 
         self.crv = curve.addCurve(
@@ -391,7 +391,8 @@ class Component(component.Main):
                     else:
                         m = setMatrixScale(m, scl=[1, 1, 1])
 
-                xforms.append([item for tup in m.get() for item in tup])
+                mAsList = [item for tup in m.get() for item in tup]
+                xforms.append(mAsList)
 
                 if i == (self.left_index + 1):
                     sideCtl = controls[self.left_index]
@@ -404,7 +405,7 @@ class Component(component.Main):
                     rightCtl = controls[self.right_index]
                     rightNpo = rightCtl.getParent()
                     pos = cmds.xform(rightNpo.longName(), q=True, ws=True, translation=True)
-                    pm.xform(rightNpo, ws=True, matrix=m)
+                    pm.xform(rightNpo, ws=True, matrix=mAsList)
                     pm.xform(rightNpo, ws=True, translation=pos)
 
                 npo_name = self.getName("rope_{}_jnt_npo".format(_index))
@@ -546,8 +547,11 @@ class Component(component.Main):
     def _addControls(self, crv_ctl, option):
 
         cvs = self.getCurveCVs(crv_ctl)
+        sum_cvs = datatypes.Vector()
+        for cv in cvs:
+            sum_cvs += cv
 
-        center_pos = sum(cvs) / len(cvs)  # type: ignore
+        center_pos = sum_cvs / len(cvs)  # type: ignore
         total_dist = sum([(x - center_pos).length() for x in cvs])
         average_dist = total_dist / len(cvs)
 
@@ -1021,7 +1025,7 @@ def createGhostWithParentConstraint(ctl, parent=None, connect=True):
                        worldSpace=True)
         pm.parent(newCtl, oTra)
     if connect:
-        with ymt_util.unlockAttribute(ctl.fullPathName()):
+        with ymt_util.unlockAttribute(ctl.longName()):
             pm.parentConstraint(newCtl, ctl, mo=True)
         # rigbits.connectLocalTransform([newCtl, ctl])
         rigbits.connectUserDefinedChannels(newCtl, ctl)
