@@ -25,7 +25,10 @@ try:
 except ImportError:
     import pymel.core as pm
 
-from pymel.core import datatypes
+try:
+    from mgear.pymaya import datatypes
+except ImportError:
+    from pymel.core import datatypes
 
 from . import chain_guide_initializer
 

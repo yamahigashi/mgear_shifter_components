@@ -10,7 +10,10 @@ try:
     import mgear.pymaya as pm
 except ImportError:
     import pymel.core as pm
-from pymel.core import datatypes as dt
+try:
+    from mgear.pymaya import datatypes
+except ImportError:
+    from pymel.core import datatypes as dt
 import json
 
 import maya.cmds as cmds

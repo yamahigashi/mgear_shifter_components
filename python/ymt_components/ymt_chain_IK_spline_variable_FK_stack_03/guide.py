@@ -24,7 +24,10 @@ try:
     import mgear.pymaya as pm
 except ImportError:
     import pymel.core as pm
-from pymel.core import datatypes  # pylint: disable=import-error
+try:
+    from mgear.pymaya import datatypes
+except ImportError:
+    from pymel.core import datatypes  # pylint: disable=import-error
 
 from . import chain_guide_initializer
 

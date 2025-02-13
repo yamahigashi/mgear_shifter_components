@@ -34,7 +34,7 @@ import maya.cmds as cmds
 try:
     import mgear.pymaya as pm
 except ImportError:
-    import pymel.core as pm as pm
+    import pymel.core as pm
 
 import mgear
 import mgear.core.pyqt as gqt

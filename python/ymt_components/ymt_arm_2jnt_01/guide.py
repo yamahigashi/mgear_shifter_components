@@ -37,7 +37,7 @@ from maya.app.general.mayaMixin import MayaQDockWidget
 try:
     import mgear.pymaya as pm
 except ImportError:
-    import pymel.core as pm as pm
+    import pymel.core as pm
 
 # mgear
 from mgear.shifter.component.guide import ComponentGuide
