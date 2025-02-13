@@ -5,7 +5,10 @@
 # Maya
 import maya.cmds as cmds
 import maya.cmds as mel
-import pymel.core as pm
+try:
+    import mgear.pymaya as pm
+except ImportError:
+    import pymel.core as pm
 
 # import maya.OpenMaya as om
 

@@ -1,6 +1,9 @@
 """Component Mouth 01 module"""
 
-import pymel.core as pm
+try:
+    import mgear.pymaya as pm
+except ImportError:
+    import pymel.core as pm
 from pymel.core import datatypes
 
 from mgear.shifter import component

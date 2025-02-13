@@ -29,7 +29,10 @@
 ##########################################################
 from functools import partial
 # pyMel
-import pymel.core as pm
+try:
+    import mgear.pymaya as pm
+except ImportError:
+    import pymel.core as pm
 
 # mgear
 from mgear.shifter.component.guide import ComponentGuide

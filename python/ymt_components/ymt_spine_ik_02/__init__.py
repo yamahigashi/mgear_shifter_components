@@ -4,7 +4,10 @@ import six
 import maya.OpenMaya as om1
 import maya.api.OpenMaya as om
 
-import pymel.core as pm
+try:
+    import mgear.pymaya as pm
+except ImportError:
+    import pymel.core as pm
 from pymel.core import datatypes
 
 from mgear.shifter import component
@@ -363,7 +366,8 @@ class Component(component.Main):
 
         for x in self.fk_ctl:
             attribute.setInvertMirror(x, ["tx", "rz", "ry"])
-        attribute.setInvertMirror(self.fk_hip_ctl, ["tx", "rz", "ry"])
+        if self.settings["isSplitHip"]:
+            attribute.setInvertMirror(self.fk_hip_ctl, ["tx", "rz", "ry"])
 
         return parentdiv, parentctl
 
@@ -836,9 +840,14 @@ class Component(component.Main):
         if self.settings["isGlobalMaster"]:
             return
 
-        self.relatives["root"] = self.fk_hip_ctl
+        if self.settings["isSplitHip"]:
+            self.relatives["root"] = self.fk_hip_ctl
+            self.controlRelatives["root"] = self.fk_hip_ctl
+        else:
+            self.relatives["root"] = self.fk_ctl[0]
+            self.controlRelatives["root"] = self.fk_ctl[0]
+
         self.relatives["eff"] = self.fk_ctl[-1]
-        self.controlRelatives["root"] = self.fk_hip_ctl
         self.jointRelatives["root"] = 0
 
         # for i in range(0, len(self.fk_ctl) - 1):

@@ -1,11 +1,15 @@
 """mGear shifter components"""
 # pylint: disable=import-error
 # pylint: disable=W0201
+import sys
 import math
 import maya.OpenMaya as om1
 import maya.api.OpenMaya as om
 
-import pymel.core as pm
+try:
+    import mgear.pymaya as pm
+except ImportError:
+    import pymel.core as pm
 from pymel.core import datatypes
 
 from mgear.shifter import component
@@ -20,6 +24,8 @@ from mgear.core.transform import setMatrixPosition
 from mgear.core.primitive import addTransform
 
 import ymt_shifter_utility as ymt_util
+if sys.version_info[0] > 2:
+    unicode = str
 
 ##########################################################
 # COMPONENT

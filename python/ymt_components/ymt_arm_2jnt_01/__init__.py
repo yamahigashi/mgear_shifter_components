@@ -4,7 +4,10 @@
 import math
 
 # Maya
-import pymel.core as pm
+try:
+    import mgear.pymaya as pm
+except ImportError:
+    import pymel.core as pm as pm
 import pymel.core.datatypes as dt
 
 # import maya.OpenMaya as om

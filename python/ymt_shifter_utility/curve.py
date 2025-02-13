@@ -6,7 +6,10 @@
 import math
 import six
 import sys
-import pymel.core as pm
+try:
+    import mgear.pymaya as pm
+except ImportError:
+    import pymel.core as pm
 from pymel.core import datatypes as dt
 import json
 

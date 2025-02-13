@@ -9,7 +9,10 @@ from mgear.vendor.Qt import QtWidgets, QtCore
 from maya.app.general.mayaMixin import MayaQWidgetDockableMixin
 from maya.app.general.mayaMixin import MayaQDockWidget
 
-import pymel.core as pm
+try:
+    import mgear.pymaya as pm
+except ImportError:
+    import pymel.core as pm
 from pymel.core import datatypes
 from mgear import shifter
 

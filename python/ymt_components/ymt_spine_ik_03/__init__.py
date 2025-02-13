@@ -5,7 +5,10 @@ import maya.OpenMaya as om1
 import maya.api.OpenMaya as om
 import maya.cmds as cmds
 
-import pymel.core as pm
+try:
+    import mgear.pymaya as pm
+except ImportError:
+    import pymel.core as pm
 from pymel.core import datatypes
 
 from mgear.shifter import component

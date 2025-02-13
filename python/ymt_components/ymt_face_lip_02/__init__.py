@@ -9,7 +9,10 @@ import traceback
 import maya.cmds as cmds
 import maya.api.OpenMaya as om
 
-import pymel.core as pm
+try:
+    import mgear.pymaya as pm
+except ImportError:
+    import pymel.core as pm
 from pymel.core import datatypes
 
 from mgear import rigbits
@@ -121,7 +124,8 @@ class Component(component.Main):
         # self.symmetry = self.settings["symmetry"]  # TODO: extract to settings
         self.symmetry = True
 
-        self.thickness = 0.07
+        self.thickness = self.offset.length()
+        # self.thickness = self.size * 0.05
         self.FRONT_OFFSET = self.size * 0.1
         self.NB_CVS = 2 * 4 + 4  # means 4 spans with 2 controllers each + 4 controllers for the corners
 
@@ -222,12 +226,12 @@ class Component(component.Main):
             close=True
         )
         crv.attr("visibility").set(False)
-        cvs = self.getCurveCVs(crv)
-        center_pos = sum(cvs) / len(cvs)  # type: ignore
-        for i, cv in enumerate(cvs):
-            offset = (cv - center_pos).normal() * self.thickness
-            new_pos = [cv[0] + offset[0], cv[1] + offset[1], cv[2] + offset[2]]
-            crv.setCV(i, new_pos, space="world")
+        # cvs = self.getCurveCVs(crv)
+        # center_pos = sum(cvs) / len(cvs)  # type: ignore
+        # for i, cv in enumerate(cvs):
+        #     offset = (cv - center_pos).normal() * self.FRONT_OFFSET
+        #     new_pos = [cv[0] + offset[0], cv[1] + offset[1], cv[2] + offset[2]]
+        #     crv.setCV(i, new_pos, space="world")
         self.crv = crv
 
     def addCurveBaseControllers(self, crv_root):
@@ -267,14 +271,6 @@ class Component(component.Main):
             ctlName,
             t,
             parent=crv_root)
-
-        # offset upv with FRONT_OFFSET
-        # cvs = self.getCurveCVs(self.upv_crv)
-        # center_pos = self.rootPos
-        # for i, cv in enumerate(cvs):
-        #     offset = (cv - center_pos).normal() * self.thickness
-        #     new_pos = [cv[0] + offset[0], cv[1] + offset[1], cv[2] + offset[2]]
-        #     self.upv_crv.setCV(i, new_pos, space="world")
 
     def addControlJoints(self):
 
@@ -648,7 +644,7 @@ class Component(component.Main):
                     w=wd * distSize,
                     d=wd * distSize,
                     ro=datatypes.Vector(1.57079633, 0, 0),
-                    po=datatypes.Vector(0, 0, .07 * distSize),
+                    po=datatypes.Vector(0, 0, .3 * distSize),
                 )
 
                 ctls.append(ctl)
@@ -1009,6 +1005,7 @@ class Component(component.Main):
 def createCurveControl(crv, posTop, posLeft, posBottom, posRight, name, m=None, parent=None, symmetry=True):
     # type: (str, list[float], list[float], list[float], list[float], dt.Matrix, pm.nodetypes.Transform, bool) -> pm.nodetypes.Transform
 
+    # For now, we are not using this function, but we are keeping it here for future reference
     # posTop = inflate_position_by_curve_flattness(crv, posTop)
     # posLeft = inflate_position_by_curve_flattness(crv, posLeft)
     # posRight = inflate_position_by_curve_flattness(crv, posRight)

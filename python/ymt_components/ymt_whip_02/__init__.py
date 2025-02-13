@@ -10,7 +10,10 @@ import math
 import maya.cmds as cmds
 import maya.api.OpenMaya as om
 
-import pymel.core as pm
+try:
+    import mgear.pymaya as pm
+except ImportError:
+    import pymel.core as pm
 from pymel.core import datatypes
 
 import exprespy.cmd

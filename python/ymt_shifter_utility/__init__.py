@@ -9,7 +9,10 @@ from pymel.core import (
     nodetypes,
 )
 from pymel import versions
-import pymel.core as pm
+try:
+    import mgear.pymaya as pm
+except ImportError:
+    import pymel.core as pm
 
 import maya.cmds as cmds
 import maya.api.OpenMaya as om
@@ -17,7 +20,6 @@ import maya.api.OpenMayaAnim as oma
 
 from Qt import QtWidgets
 
-import mgear.synoptic as synoptic
 from mgear.core import (
     attribute,
     primitive,
@@ -33,6 +35,7 @@ from mgear.core.primitive import addTransform
 
 
 from ymt_shifter_utility import twistSplineBuilder as tsBuilder
+from ymt_shifter_utility import synoptic
 
 from logging import (
     StreamHandler,  # noqa: F401

@@ -4,7 +4,6 @@ import sys
 
 import maya.cmds as cmds
 
-import pymel.core as pm
 
 from mgear.shifter import component
 
@@ -37,6 +36,11 @@ from logging import (  # noqa:F401 pylint: disable=unused-import, wrong-import-o
     INFO
 )
 
+try:
+    import mgear.pymaya as pm
+except ImportError:
+    import pymel.core as pm
+
 handler = StreamHandler()
 handler.setLevel(DEBUG)
 logger = getLogger(__name__)
@@ -60,11 +64,15 @@ class Component(component.Main):
         self.WIP = self.options["mode"]
 
         # --------------------------------------------------------------------
-        self.sliding_surface = pm.duplicate(self.guide.getObjects(self.guide.root)["sliding_surface"])[0]
+        guide_objects = self.guide.getObjects(self.guide.root)
+        for obj in guide_objects:
+            print(obj)
+        guide_surface = guide_objects["sliding_surface"]
+        self.sliding_surface = pm.PyNode(cmds.duplicate(guide_surface)[0])
         cmds.rename(self.sliding_surface.name(), self.getName("surface"))
-        pm.parent(self.sliding_surface, self.root)
+        cmds.parent(self.sliding_surface, self.root)
         self.sliding_surface.visibility.set(False)
-        pm.makeIdentity(self.sliding_surface, apply=True, t=1,  r=1, s=1, n=0, pn=1)
+        cmds.makeIdentity(self.sliding_surface.name(), apply=True, t=1,  r=1, s=1, n=0, pn=1)
 
     def _visi_off_lock(self, obj):
         """Short cuts."""

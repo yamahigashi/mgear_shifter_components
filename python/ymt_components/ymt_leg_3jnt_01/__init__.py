@@ -1,7 +1,10 @@
 """Component Leg 3 joints 01 module"""
 from maya.api import OpenMaya as om2
 from maya import cmds
-import pymel.core as pm
+try:
+    import mgear.pymaya as pm
+except ImportError:
+    import pymel.core as pm
 from pymel.core import datatypes
 
 from mgear.shifter import component
