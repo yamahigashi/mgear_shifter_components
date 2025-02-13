@@ -1,4 +1,4 @@
-"""."""
+"""Module for curve fitting using Lion optimizer."""
 #############################################
 import sys
 
@@ -24,28 +24,10 @@ logger.addHandler(handler)
 logger.propagate = False
 
 
-if sys.version_info > (3, 0):
-    from typing import TYPE_CHECKING
-    if TYPE_CHECKING:
-        from typing import (
-            Optional,  # noqa: F401
-            Dict,  # noqa: F401
-            List,  # noqa: F401
-            Tuple,  # noqa: F401
-            Pattern,  # noqa: F401
-            Callable,  # noqa: F401
-            Any,  # noqa: F401
-            Text,  # noqa: F401
-            Generator,  # noqa: F401
-            Iterable,  # noqa: F401
-            Union  # noqa: F401
-        )
-
-
 #############################################
 
 def sample_points_on_curve(mfn_curve, num_samples=100, space=om2.MSpace.kObject, matrix=None):
-    # type: (om2.MFnNurbsCurve, int, int, om2.MMatrix|None) -> List[om2.MPoint]
+    # type: (om2.MFnNurbsCurve, int, int, om2.MMatrix|None) -> list[om2.MPoint]
     """
     指定した MFnNurbsCurve から、長さを当分割した位置にサンプリングした
     それぞれの位置ベクトル(om2.MPoint)リストを返す（ワールド座標）。
@@ -144,7 +126,7 @@ def compute_cv_intervel_loss(curveA):
 
 
 def set_cv_positions(mfn_curve, new_positions_world):
-    # type: (om2.MFnNurbsCurve, List[om2.MPoint]) -> None
+    # type: (om2.MFnNurbsCurve, list[om2.MPoint]) -> None
     """
     複数CVの位置を一括でセットする。new_positions_world はワールド空間のリスト。
     mfn_curve のCV数と len(new_positions_world) は同じ前提。
@@ -180,7 +162,7 @@ def sign_mvector(v):
 
 
 def compute_finite_diff_gradients(curveA, curveB, cv_indices, epsilon, num_samples):
-    # type: (om2.MFnNurbsCurve, om2.MFnNurbsCurve, List[int], float, int) -> List[om2.MVector]
+    # type: (om2.MFnNurbsCurve, om2.MFnNurbsCurve, list[int], float, int) -> list[om2.MVector]
     """
     有限差分(中心差分)で、指定した複数CVの勾配ベクトルを計算して返す。
     戻り値 grads は CV数と同じ長さで、不要なCVの勾配は (0,0,0)。
@@ -232,7 +214,7 @@ def compute_finite_diff_gradients(curveA, curveB, cv_indices, epsilon, num_sampl
 
 
 def lion_update_positions(base_positions, momentum, grads, cv_indices, beta, learning_rate):
-    # type: (List[om2.MPoint], List[om2.MVector], List[om2.MVector], List[int], float, float) -> List[om2.MPoint]
+    # type: (list[om2.MPoint], list[om2.MVector], list[om2.MVector], list[int], float, float) -> list[om2.MPoint]
     """
     Lion (EvoLved Sign Momentum) による更新処理を行い、更新後のCV位置一覧(ワールド空間)を返す。
     
