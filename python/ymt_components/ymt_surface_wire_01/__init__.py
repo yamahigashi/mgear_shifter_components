@@ -420,8 +420,8 @@ class Component(component.Main):
 
     def connect_rivet(self, npo, index):
         rivets = ymt_util.apply_rivet_constrain_to_selected(self.sliding_surface, npo)
-        cmds.parent(rivets[0], self.sliding_surface.getParent().fullPath(), relative=True)
-        cmds.parentConstraint(rivets[0], npo.fullPath(), mo=True)
+        cmds.parent(rivets[0], self.sliding_surface.getParent().longName(), relative=True)
+        cmds.parentConstraint(rivets[0], npo.longName(), mo=True)
         ymt_util.setKeyableAttributesDontLockVisibility(pm.PyNode(rivets[0]), [])
 
     # =====================================================

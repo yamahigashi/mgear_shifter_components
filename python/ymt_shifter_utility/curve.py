@@ -11,7 +11,7 @@ try:
 except ImportError:
     import pymel.core as pm
 try:
-    from mgear.pymaya import datatypes
+    from mgear.pymaya import datatypes as dt
 except ImportError:
     from pymel.core import datatypes as dt
 import json
@@ -1123,12 +1123,12 @@ def applyRopeCnsLocal(target, ctl_curve, rope, cv):
     cmds.setAttr(motionPath + ".frontAxis", 0)
     cmds.setAttr(motionPath + ".worldUpType", 2)
     cmds.setAttr(motionPath + ".worldUpVector", 0, 1, 0)
-    cmds.connectAttr(ctl_curve.fullPathName() + ".matrix", motionPath + ".worldUpMatrix")  # object rotation up
+    cmds.connectAttr(ctl_curve.longName() + ".matrix", motionPath + ".worldUpMatrix")  # object rotation up
     cmds.setAttr(motionPath + ".frontAxis", 0)
     cmds.setAttr(motionPath + ".upAxis", 2)
 
-    cmds.connectAttr(nearestPointOnCurve + ".position", target.fullPath() + ".translate")
-    cmds.connectAttr(motionPath + ".rotate", target.fullPath() + ".rotate")
+    cmds.connectAttr(nearestPointOnCurve + ".position", target.longName() + ".translate")
+    cmds.connectAttr(motionPath + ".rotate", target.longName() + ".rotate")
 
 
 def applyRopeCnsLocalWithUpv(target, upv, ctl_curve, rope, cv):
@@ -1173,15 +1173,15 @@ def applyRopeCnsLocalWithUpv(target, upv, ctl_curve, rope, cv):
 
     cmds.setAttr(motionPath + ".fractionMode", 0)
 
-    cmds.connectAttr(nearestPointOnCurve + ".position", target.fullPath() + ".translate")
+    cmds.connectAttr(nearestPointOnCurve + ".position", target.longName() + ".translate")
     _cns = cmds.aimConstraint(
-        upv.fullPath(),
-        target.fullPath(),
+        upv.longName(),
+        target.longName(),
         maintainOffset=False,
         aimVector=(0, 0, 1),
         upVector=(1, 0, 0),
         worldUpType="objectrotation",
-        worldUpObject=upv.fullPath(),
+        worldUpObject=upv.longName(),
         worldUpVector=(1, 0, 0)
     )
 
@@ -1235,44 +1235,56 @@ def gear_curvecns_op_local(crv, inputs=[]):
     import ymt_shifter_utility
 
     pm.select(crv)
-    node = pm.deformer(type="mgear_curveCns")[0]
+    deformer_name = cmds.deformer(type="mgear_curveCns")[0]
 
-    con = pm.listConnections(node + ".input", plugs=True, connections=True, source=True, destination=False)[0]
-    pm.disconnectAttr(con[1], con[0])
-    pm.connectAttr(
-        con[1].name().replace(".worldSpace[0]", ".local"),
-        node + ".input[0].inputGeometry"
+    con = cmds.listConnections(deformer_name + ".input", plugs=True, connections=True, source=True, destination=False)
+    dst, src = con
+
+    cmds.disconnectAttr(src, dst)
+    cmds.connectAttr(
+        src.replace(".worldSpace[0]", ".local"),
+        deformer_name + ".input[0].inputGeometry"
     )
 
     for i, item in enumerate(inputs):
         localMat = ymt_shifter_utility.getMultMatrixOfAtoB(item, crv, skip_last=False)
-        pm.connectAttr(localMat + ".matrixSum", node + ".inputs[%s]" % i)
+        pm.connectAttr(localMat + ".matrixSum", deformer_name + ".inputs[%s]" % i)
 
-    return node
+    return deformer_name
 
 
 def gear_curvecns_op_local_skip_rotate(crv, inputs=[]):
     """."""
 
-    node = gear_curvecns_op_local(crv, inputs)
-    for mult in node.attr("inputs").inputs():
-        ctl = mult.attr("matrixIn").inputs()[0]
-        pm.disconnectAttr(
+    deformer_name = gear_curvecns_op_local(crv, inputs)
+    inputs = cmds.listAttr(deformer_name + ".inputs", multi=True)
+    for input_path in inputs:
+        mult = cmds.listConnections(
+            deformer_name + "." + input_path,
+            source=True,
+            destination=False)[0]
+
+        ctl = cmds.listConnections(
+                mult + ".matrixIn[0]",
+                source=True,
+                destination=False)[0]
+
+        cmds.disconnectAttr(
             ctl + ".matrix",
             mult + ".matrixIn[0]"
         )
 
-        compMat = pm.createNode("composeMatrix")
-        pm.connectAttr(
+        compMat = cmds.createNode("composeMatrix")
+        cmds.connectAttr(
             ctl + ".translate",
             compMat + ".inputTranslate"
         )
-        pm.connectAttr(
+        cmds.connectAttr(
             compMat + ".outputMatrix",
             mult + ".matrixIn[0]"
         )
 
-    return node
+    return deformer_name
 
 
 def createCurveOnSurfaceFromCurve(crv, surface, name):
@@ -1282,7 +1294,7 @@ def createCurveOnSurfaceFromCurve(crv, surface, name):
 
     t = getTransform(crv)
     targetCrv = createCurveFromCurve(
-        crv.fullPath(),
+        crv.longName(),
         name,
         nbPoints=nbPoints,
         close=close,

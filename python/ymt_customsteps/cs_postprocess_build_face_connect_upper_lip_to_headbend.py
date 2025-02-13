@@ -36,7 +36,7 @@ class CustomShifterStep(cstp.customShifterMainStep):
 
     def connect_to_bend2(self, src, dst):
         npo = ymt_util.addNPOPreservingMatrixConnections(pm.PyNode(dst))[0]  # type: pm.PyNode
-        cns = cmds.parentConstraint(src, npo.fullPath(), mo=True)[0]
+        cns = cmds.parentConstraint(src, npo.longName(), mo=True)[0]
         cmds.setAttr("{}.interpType".format(cns), 0)  # no flip
 
     def reconnect_slider_matrix(self):

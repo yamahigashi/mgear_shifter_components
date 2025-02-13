@@ -151,7 +151,7 @@ class Component(component.Main):
 
         # --------------------------------------------------------------------
         self.addContainers()
-        self.addCurve()
+        self.addCurves(self.crv_root)
         self.addRope()
         self.attachSecondaryControlsToMainCurve()
         self.connectWires()
@@ -221,37 +221,19 @@ class Component(component.Main):
 
         return num
 
-    def addDummyPlane(self):
-        # type: () -> om.MFnMesh
-
-        return draw_eye_guide_mesh_plane(self.uplocsPos, self.root)
-
-    def addCurve(self):
-
-        plane = self.addDummyPlane()
-
-        self.addCurves(self.crv_root, plane)
-        cmds.delete(cmds.listRelatives(plane.fullPathName(), parent=True))
-
-    def addCurves(self, crv_root, plane):
+    def addCurves(self, crv_root):
 
         t = getTransform(self.root)
-        planeNode = pm.PyNode(plane.fullPathName())
-
-        # -------------------------------------------------------------------
-        edgeList = ["{}.e[{}]".format(plane.fullPathName(), 0)]
-        for i in range(1, self.num_uplocs + 1):
-            edgeList.append("{}.e[{}]".format(plane.fullPathName(), i * 2 + 1))
-        edgeList = [pm.PyNode(x) for x in edgeList]
+        points = [x - self.root.getTranslation(space="world") for x in self.uplocsPos]
 
         name = "main_crv"
-        crv = curve.createCurveFromOrderedEdges(
-            edgeList,
-            planeNode.verts[1],
-            self.getName("{}Crv".format(name)),
-            parent=crv_root,
+        crv = curve.addCurve(
+            self.crv_root,
+            self.getName(name),
+            points,
             m=t
         )
+
         crv.attr("visibility").set(False)
         ymt_util.setKeyableAttributesDontLockVisibility(crv, [])
 

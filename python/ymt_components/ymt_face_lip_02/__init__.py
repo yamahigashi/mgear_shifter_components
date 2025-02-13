@@ -260,10 +260,10 @@ class Component(component.Main):
         self.upv_crv = curveFromCurve(self.rope, "upv_crv", self.NB_ROPE)
 
         # -------------------------------------------------------------------
-        posTop = self.locsPos[0]
-        posLeft = self.locsPos[self.left_index]
-        posBottom = self.locsPos[self.bottom_index]
-        posRight = self.locsPos[self.right_index]
+        posTop = datatypes.Point()
+        posLeft = datatypes.Point()
+        posBottom = datatypes.Point(self.locsPos[self.bottom_index])
+        posRight = datatypes.Point(self.locsPos[self.right_index])
         ctlName = self.getName("crv_ctl")
         self.crv_ctl = createCurveControl(
             self.rope,
@@ -357,9 +357,9 @@ class Component(component.Main):
                 if i == self.right_index + 1:
                     rightCtl = controls[self.right_index]
                     rightNpo = rightCtl.getParent()
-                    pos = cmds.xform(rightNpo.fullPath(), q=True, ws=True, translation=True)
-                    pm.xform(rightNpo, ws=True, matrix=m)
-                    pm.xform(rightNpo, ws=True, translation=pos)
+                    pos = cmds.xform(rightNpo.longName(), q=True, ws=True, translation=True)
+                    cmds.xform(rightNpo.longName(), ws=True, matrix=[item for tup in m.get() for item in tup])
+                    cmds.xform(rightNpo.longName(), ws=True, translation=pos)
      
                 npo_name = self.getName("rope_{}_jnt_npo".format(_index))
                 npo = addTransform(cns, npo_name, m)
@@ -455,9 +455,9 @@ class Component(component.Main):
             src2 = ctls[src2Index]
             dst = ctls[dstIndex]
 
-            src1Path = src1.fullPath()
-            src2Path = src2.fullPath()
-            dstPath = ctls[dstIndex].getParent().fullPath()
+            src1Path = src1.longName()
+            src2Path = src2.longName()
+            dstPath = ctls[dstIndex].getParent().longName()
 
             r2, r1 = calcDistRatio(src1, src2, dst)
 
@@ -531,34 +531,34 @@ class Component(component.Main):
 
             _index = i
             mirror = i > self.num_locs / 2
-            src = self.lips_C_upper_ctl.fullPath()
+            src = self.lips_C_upper_ctl.longName()
 
             # Center
             if i == 0: 
                 pass
 
             elif i == self.bottom_index: 
-                src = self.lips_C_lower_ctl.fullPath()
+                src = self.lips_C_lower_ctl.longName()
 
             # Left
             elif not mirror:
                 if i <= self.left_index:
                     pass
                 else:
-                    src = self.lips_C_lower_ctl.fullPath()
+                    src = self.lips_C_lower_ctl.longName()
 
             # Right
             else:
                 if i > self.right_index:
                     pass
                 else:
-                    src = self.lips_C_lower_ctl.fullPath()
+                    src = self.lips_C_lower_ctl.longName()
 
             ratio = self.evalPuckerRollProfileFcurve(i)
             mult = cmds.createNode("multDoubleLinear")
             cmds.setAttr(mult + ".input2", ratio)
             cmds.connectAttr(src + ".rotateX", mult + ".input1")
-            cmds.connectAttr(mult + ".output", npo.fullPath() + ".rotateX")
+            cmds.connectAttr(mult + ".output", npo.longName() + ".rotateX")
             ymt_util.setKeyableAttributesDontLockVisibility(npo, [])
 
     def evalPuckerRollProfileFcurve(self, i):
@@ -603,8 +603,11 @@ class Component(component.Main):
     def _addControls(self, crv_ctl, option):
 
         cvs = self.getCurveCVs(crv_ctl)
+        sum_cvs = datatypes.Vector()
+        for cv in cvs:
+            sum_cvs += cv
 
-        center_pos = sum(cvs) / len(cvs)  # type: ignore
+        center_pos = sum_cvs / len(cvs)  # type: ignore
         total_dist = sum([(x - center_pos).length() for x in cvs])
         average_dist = total_dist / len(cvs)
 
@@ -660,7 +663,7 @@ class Component(component.Main):
 
         # for i, cv in enumerate(cvs):
         for i in (1, 2, 4, 5, 7, 8, 10, 11):
-            crvShape = crv.getShape().fullPath()
+            crvShape = crv.getShape().longName()
 
             ctl = ctls[i]
             dm_node = ymt_util.getDecomposeMatrixOfAtoB(ctl, crv, skip_last=True)
@@ -671,7 +674,7 @@ class Component(component.Main):
 
             uvalue = cmds.getAttr(point + ".parameter")
             cmds.delete(point)
-            # cmds.delete(dm_node.fullPath())
+            # cmds.delete(dm_node.longName())
 
             motPath = cmds.createNode("motionPath")
             cmds.setAttr(motPath + ".uValue", uvalue)
@@ -707,7 +710,7 @@ class Component(component.Main):
             # dagPose command cannot be applied when connected dilectly to the output
             cmds.setAttr("{}.rotateZ".format(ctl), lock=False)
             oriCns = cmds.createNode("orientConstraint")
-            cmds.parent(oriCns, ctl.fullPath(), relative=True)
+            cmds.parent(oriCns, ctl.longName(), relative=True)
             cmds.connectAttr(outpath, oriCns + ".target[0].targetRotateZ")
             cmds.connectAttr(oriCns + ".constraintRotateZ", ctl + ".rotateZ")
             cmds.setAttr("{}.rotateZ".format(ctl), lock=True)

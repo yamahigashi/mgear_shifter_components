@@ -64,7 +64,7 @@ class CustomShifterStep(cstp.customShifterMainStep):
                 print("already exists: {}".format(new_name))
                 continue
 
-            cmds.rename(npo.fullPath(), new_name)
+            cmds.rename(npo.longName(), new_name)
 
             adj_uuid = cmds.ls(npo.getName(), uuid=True)[0]
             self.adj_node_uuids.append(adj_uuid)

@@ -614,22 +614,27 @@ class Component(component.Main):
             wire.attr("dropoffDistance[1]").set(self.size)
 
         # adding blendshapes
-        self.bs_upBlink  = pm.blendShape(self.upTarget4Up, self.lowTarget4Up, self.upBlink, n=self.getName("blendShapeUpBlink"))
-        self.bs_lowBlink = pm.blendShape(self.lowTarget4Low, self.upTarget4Low, self.lowBlink, n=self.getName("blendShapeLowBlink"))
+        self.bs_upBlink  = pm.blendShape(self.upTarget4Up, self.lowTarget4Up, self.upBlink, n=self.getName("blendShapeUpBlink"))[0]
+        self.bs_lowBlink = pm.blendShape(self.lowTarget4Low, self.upTarget4Low, self.lowBlink, n=self.getName("blendShapeLowBlink"))[0]
+
+        upup = self.bs_upBlink.shortName() + "." + self.upTarget4Up.shortName()
+        uplow = self.bs_upBlink.shortName() + "." + self.lowTarget4Up.shortName()
+        lowup = self.bs_lowBlink.shortName() + "." + self.upTarget4Low.shortName()
+        lowlow = self.bs_lowBlink.shortName() + "." + self.lowTarget4Low.shortName()
 
         # setting blendshape reverse connections
         rev_node = pm.createNode("reverse")
-        pm.connectAttr(self.bs_upBlink[0].attr(self.lowTarget4Up.name().split("|")[-1]), rev_node + ".inputX")
-        pm.connectAttr(rev_node + ".outputX", self.bs_upBlink[0].attr(self.upTarget4Up.name().split("|")[-1]))
+        pm.connectAttr(uplow, rev_node + ".inputX")
+        pm.connectAttr(rev_node + ".outputX", upup)
 
         rev_node = pm.createNode("reverse")
         rev_nodeLower = pm.createNode("reverse")
-        pm.connectAttr(self.bs_lowBlink[0].attr(self.upTarget4Low.name().split("|")[-1]), rev_node + ".inputX")
-        pm.connectAttr(rev_node + ".outputX", self.bs_lowBlink[0].attr(self.lowTarget4Low.name().split("|")[-1]))
+        pm.connectAttr(lowup, rev_node + ".inputX")
+        pm.connectAttr(rev_node + ".outputX", lowlow)
 
         rev_node = pm.createNode("reverse")
-        pm.connectAttr(self.bs_lowBlink[0].attr(self.upTarget4Low.name().split("|")[-1]), rev_node + ".inputX")
-        pm.connectAttr(self.bs_upBlink[0].attr(self.lowTarget4Up.name().split("|")[-1]), rev_nodeLower + ".inputX")
+        pm.connectAttr(lowup, rev_node + ".inputX")
+        pm.connectAttr(uplow, rev_nodeLower + ".inputX")
 
     # =====================================================
     # ATTRIBUTES
@@ -660,8 +665,11 @@ class Component(component.Main):
         self.loHeightRatio.input1X.set(invHeight)
         self.blink_lower_ctl.attr("translateY").connect(self.loHeightRatio.input2X)
 
-        pm.connectAttr(self.upHeightRatio + ".outputX", self.bs_upBlink[0].attr(self.lowTarget4Up.name()))
-        pm.connectAttr(self.loHeightRatio + ".outputX", self.bs_lowBlink[0].attr(self.upTarget4Low.name()))
+        uplow = self.bs_upBlink.shortName() + "." + self.lowTarget4Up.shortName()
+        lowup = self.bs_lowBlink.shortName() + "." + self.upTarget4Low.shortName()
+
+        pm.connectAttr(self.upHeightRatio + ".outputX", uplow)
+        pm.connectAttr(self.loHeightRatio + ".outputX", lowup)
 
     def addEyeTrackingAttributes(self):
 

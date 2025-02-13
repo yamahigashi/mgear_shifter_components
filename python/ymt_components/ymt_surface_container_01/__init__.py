@@ -65,12 +65,10 @@ class Component(component.Main):
 
         # --------------------------------------------------------------------
         guide_objects = self.guide.getObjects(self.guide.root)
-        for obj in guide_objects:
-            print(obj)
         guide_surface = guide_objects["sliding_surface"]
-        self.sliding_surface = pm.PyNode(cmds.duplicate(guide_surface)[0])
+        self.sliding_surface = pm.duplicate(guide_surface)[0]
         cmds.rename(self.sliding_surface.name(), self.getName("surface"))
-        cmds.parent(self.sliding_surface, self.root)
+        cmds.parent(self.sliding_surface.name(), self.root.name())
         self.sliding_surface.visibility.set(False)
         cmds.makeIdentity(self.sliding_surface.name(), apply=True, t=1,  r=1, s=1, n=0, pn=1)
 

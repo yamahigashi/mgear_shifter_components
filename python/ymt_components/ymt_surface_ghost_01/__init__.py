@@ -292,8 +292,8 @@ class Component(component.Main):
 
     def connect_rivet(self):
         rivets = ymt_util.apply_rivet_constrain_to_selected(self.sliding_surface, self.npo)
-        cmds.parent(rivets[0], self.sliding_surface.getParent().fullPath(), relative=True)
-        cmds.parentConstraint(rivets[0], self.npo.fullPath(), mo=True)
+        cmds.parent(rivets[0], self.sliding_surface.getParent().longName(), relative=True)
+        cmds.parentConstraint(rivets[0], self.npo.longName(), mo=True)
 
     # =====================================================
     # CONNECTOR
