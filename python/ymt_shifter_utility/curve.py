@@ -263,17 +263,22 @@ def __applyInverseMatrixToPosition(pos, m):
     if isinstance(m, dt.Matrix):
         m = om2.MMatrix(m)
 
-    np = om2.MMatrix()
-    np.setToIdentity()
-    np[12] = pos[0]
-    np[13] = pos[1]
-    np[14] = pos[2]
+    translationMatrix = om2.MMatrix()
+    translationMatrix.setToIdentity()
+    translationMatrix[12] = pos[0]
+    translationMatrix[13] = pos[1]
+    translationMatrix[14] = pos[2]
 
-    pos[0] = (m.inverse() * np)[12]
-    pos[1] = (m.inverse() * np)[13]
-    pos[2] = (m.inverse() * np)[14]
+    inv = m.inverse()
 
-    return pos
+    mul = translationMatrix * inv
+    res = [
+        mul[12],
+        mul[13],
+        mul[14]
+    ]
+
+    return res
 
 
 def createCurveFromCurve(srcCrv, name, nbPoints, parent=None, m=dt.Matrix(), close=False, space=om2.MSpace.kWorld):
@@ -291,12 +296,6 @@ def createCurveFromCurve(srcCrv, name, nbPoints, parent=None, m=dt.Matrix(), clo
     Returns:
         dagNode: The newly created curve.
     """
-
-    if isinstance(srcCrv, six.string_types) or isinstance(srcCrv, six.text_type):
-        srcCrv = pm.PyNode(srcCrv)
-
-    cmds.dgeval(srcCrv.name())
-    cmds.refresh()
 
     sc = getMFnNurbsCurve(srcCrv)
     sc.updateCurve()
@@ -319,7 +318,6 @@ def createCurveFromCurve(srcCrv, name, nbPoints, parent=None, m=dt.Matrix(), clo
     else:
         increment = paramLength / nbPoints
         p = paramStart
-
 
     positions = []
     for i in range(nbPoints):
@@ -449,6 +447,16 @@ def getCurveParamByRatio(crv, ratio):
     param = (paramEnd - paramStart) * ratio + paramStart
 
     return param, length
+
+
+def getCurveLength(crv):
+    # type: (str|dt.Transform|om2.MObject|om2.MDagPath|om2.MFnNurbsCurve) -> float
+    """Get the length of a curve."""
+
+    if not isinstance(crv, om2.MFnNurbsCurve):
+        crv = getMFnNurbsCurve(crv)
+
+    return crv.length()
 
 
 def getPositionByRatio(crv, ratio):
@@ -991,7 +999,7 @@ def as_mfnmesh(name):
 
 
 def applyPathCnsLocal(target, curve, u, maintainOffset=True):
-    # type: (dt.Transform, dt.Transform, float, bool) -> None
+    # type: (dt.Transform, dt.Transform, float, bool) -> "motionPath"
     import ymt_shifter_utility
 
     # prev_matrix = target.getMatrix(objectSpace=True)
@@ -1020,22 +1028,22 @@ def applyPathCnsLocal(target, curve, u, maintainOffset=True):
     offset_matrix = om2.MMatrix(ma * tmp_global.inverse())
 
     if maintainOffset:
-        h = 1
+        start_index = 1
     else:
-        h = 0
+        start_index = 0
 
     mul_node = pm.createNode("multMatrix")
-    comp_node.attr("outputMatrix") >> mul_node.attr("matrixIn[{}]".format(h))  # pyright: ignore [reportUnusedExpression]
+    comp_node.attr("outputMatrix") >> mul_node.attr("matrixIn[{}]".format(start_index))  # pyright: ignore [reportUnusedExpression]
 
     down, _, up = ymt_shifter_utility.findPathAtoB(curve, target)
     i = 0
     j = 0
     for _i, _d in enumerate(down):
         i = _i
-        _d.attr("matrix") >> mul_node.attr("matrixIn[{}]".format(h + i + 1))  # pyright: ignore [reportUnusedExpression]
+        _d.attr("matrix") >> mul_node.attr("matrixIn[{}]".format(start_index + i + 1))  # pyright: ignore [reportUnusedExpression]
 
     for j, _u in enumerate(up[:-1]):
-        _u.attr("inverseMatrix") >> mul_node.attr("matrixIn[{}]".format(h + i + j + 2))  # pyright: ignore [reportUnusedExpression]
+        _u.attr("inverseMatrix") >> mul_node.attr("matrixIn[{}]".format(start_index + i + j + 2))  # pyright: ignore [reportUnusedExpression]
 
     if maintainOffset:
         tmp_output = mul_node.attr("matrixSum").get()
@@ -1054,7 +1062,7 @@ def applyPathCnsLocal(target, curve, u, maintainOffset=True):
         offset_node.attr("in23").set(offset_matrix[11])
         offset_node.attr("in30").set(offset_matrix[12])
         offset_node.attr("in31").set(offset_matrix[13])
-        offset_node.attr("in32").set(offset_matrix[13])
+        offset_node.attr("in32").set(offset_matrix[14])
         offset_node.attr("in33").set(offset_matrix[15])
         offset_node.attr("output") >> mul_node.attr("matrixIn[0]")  # pyright: ignore [reportUnusedExpression]
 
@@ -1066,7 +1074,7 @@ def applyPathCnsLocal(target, curve, u, maintainOffset=True):
     return cns
     
 
-def applyPathConstrainLocal(target, src_curve):
+def applyPathConstrainLocal(target, src_curve, maintainOffset=True):
     # type: (str, str) -> None
 
     if isinstance(target, six.string_types) or isinstance(target, six.text_type):
@@ -1083,7 +1091,7 @@ def applyPathConstrainLocal(target, src_curve):
         u_length = findLenghtFromParam(src_curve, param)
         u_param = u_length / length
 
-        cns = applyPathCnsLocal(target, src_curve, u_param)
+        cns = applyPathCnsLocal(target, src_curve, u_param, maintainOffset)
     except:
         import traceback as tb
         tb.print_exc()

@@ -252,26 +252,10 @@ class Component(component.Main):
 
         t = getTransform(self.root)
         positions = [self._worldToObj(x) for x in self.locsPos]
-        # plane = self.addDummyPlane()
-        # planeNode = pm.PyNode(plane.longName())
-
-        # -------------------------------------------------------------------
-        # edgeList = ["{}.e[{}]".format(plane.longName(), 0)]
-        # for i in range(1, self.num_locs + 1):
-        #     edgeList.append("{}.e[{}]".format(plane.longName(), i * 2 + 1))
-        # edgeList = [pm.PyNode(x) for x in edgeList]
 
         self.crv = curve.addCurve(
             crv_root,
             self.getName("crv"),
-            positions,
-            m=t,
-            close=True,
-            degree=3,
-        )
-        self.crv_ctl = curve.addCurve(
-            crv_root,
-            self.getName("ctl_crv"),
             positions,
             m=t,
             close=True,
@@ -377,7 +361,7 @@ class Component(component.Main):
                 curve.applyRopeCnsLocalWithUpv(cns, upv, self.crv_ctl, self.rope, cvo)
 
                 m = getTransform(cns)
-                m = setMatrixPosition(m, self.locsPos[i])
+                m = setMatrixPosition(m, self._objToWorld(self.locsPos[i]))
 
                 if mirror:
                     if lower:

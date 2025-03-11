@@ -1,7 +1,5 @@
 """Module for curve fitting using Lion optimizer."""
 #############################################
-import sys
-
 import maya.cmds as cmds
 import maya.mel as mel
 import maya.api.OpenMaya as om2
@@ -28,9 +26,16 @@ logger.propagate = False
 
 def sample_points_on_curve(mfn_curve, num_samples=100, space=om2.MSpace.kObject, matrix=None):
     # type: (om2.MFnNurbsCurve, int, int, om2.MMatrix|None) -> list[om2.MPoint]
-    """
-    指定した MFnNurbsCurve から、長さを当分割した位置にサンプリングした
-    それぞれの位置ベクトル(om2.MPoint)リストを返す（ワールド座標）。
+    """Return a list of sampled points sampled at equal intervals along the curve.
+
+    Args:
+        mfn_curve: MFnNurbsCurve object
+        num_samples: Number of samples
+        space: Space to sample the points
+        matrix: Transformation matrix to apply to the sampled points
+
+    Returns:
+        list[om2.MPoint]: List of sampled points
     """
     if not isinstance(mfn_curve, om2.MFnNurbsCurve):
         mfn_curve = curve.getMFnNurbsCurve(mfn_curve)
@@ -40,28 +45,28 @@ def sample_points_on_curve(mfn_curve, num_samples=100, space=om2.MSpace.kObject,
     mfn_curve.updateCurve()
     close = mfn_curve.form == 3 or mfn_curve.form == 2
 
-    totalLength = mfn_curve.length()
+    total_length = mfn_curve.length()
     if close:
-        cycleNb = num_samples
+        cycle_nb = num_samples
     else:
-        cycleNb = num_samples - 1
+        cycle_nb = num_samples - 1
 
     if close:
         pos0 = mfn_curve.cvPosition(0)
         _, p = mfn_curve.closestPoint(pos0)
-        startLength = mfn_curve.findLengthFromParam(p)
+        start_length = mfn_curve.findLengthFromParam(p)
     else:
-        startLength = 0.0
+        start_length = 0.0
 
     positions = []
-    segmentLength = totalLength / cycleNb
+    segment_length = total_length / cycle_nb
     for i in range(num_samples):
-        length = segmentLength * i + startLength
-        if length > totalLength:
+        length = segment_length * i + start_length
+        if length > total_length:
             if close:
-                length -= totalLength
+                length -= total_length
             else:
-                length = totalLength
+                length = total_length
 
         param = mfn_curve.findParamFromLength(length)
         pos = mfn_curve.getPointAtParam(param, space=om2.MSpace.kWorld)
@@ -73,22 +78,40 @@ def sample_points_on_curve(mfn_curve, num_samples=100, space=om2.MSpace.kObject,
 
 def compute_loss(curveA, curveB, num_samples=100):
     # type: (om2.MFnNurbsCurve, om2.MFnNurbsCurve, int) -> float
+    """Return the loss value between two curves.
+
+    The loss is computed as the sum of the squared distances between the sampled points on the two curves.
+    Additionally, a loss term is added to ensure that the CVs are evenly spaced.
+
+    Args:
+        curveA: MFnNurbsCurve object
+        curveB: MFnNurbsCurve object
+        num_samples: Number of samples to compute the loss
+
+    Returns:
+        float: Loss value
+    """
 
     distance_loss = compute_distance_loss(curveA, curveB, num_samples)
-    cv_interval_loss = compute_cv_intervel_loss(curveA)
+    cv_interval_loss = compute_cv_interval_loss(curveA)
 
     return distance_loss + cv_interval_loss * 0.5
 
 
 def compute_distance_loss(curveA, curveB, num_samples=100):
     # type: (om2.MFnNurbsCurve, om2.MFnNurbsCurve, int) -> float
-    """
-    2つのカーブを同数サンプリングして、
-    点同士の二乗距離の合計を損失として返す。
-    
-    ※ closestPoint ベースにしたい場合は、下記を:
-    return compute_loss_closestPoint(curveA, curveB, num_samples)
-    のように置き換えればOK。
+    """Return the distance loss between two curves.
+
+    The loss is computed as the sum of the squared distances between
+    the sampled points on the two curves.
+
+    Args:
+        curveA: MFnNurbsCurve object
+        curveB: MFnNurbsCurve object
+        num_samples: Number of samples to compute the loss
+
+    Returns:
+        float: Distance loss value between the two curves
     """
     pointsA = sample_points_on_curve(curveA, num_samples)
     pointsB = sample_points_on_curve(curveB, num_samples)
@@ -104,10 +127,18 @@ def compute_distance_loss(curveA, curveB, num_samples=100):
     return loss_val
 
 
-def compute_cv_intervel_loss(curveA):
+def compute_cv_interval_loss(curveA):
     # type: (om2.MFnNurbsCurve) -> float
-    """
-    CV間が等間隔になるように損失を計算する。
+    """Return the loss value to ensure that the CVs are evenly spaced.
+
+    The loss is computed as the sum of the squared differences between the
+    distances of the CVs from the ideal interval.
+
+    Args:
+        curveA: MFnNurbsCurve object
+
+    Returns:
+        float: CV interval loss value in the curve
     """
     cv_positions = curveA.cvPositions(om2.MSpace.kWorld)
     num_cvs = len(cv_positions)
@@ -127,10 +158,20 @@ def compute_cv_intervel_loss(curveA):
 
 def set_cv_positions(mfn_curve, new_positions_world):
     # type: (om2.MFnNurbsCurve, list[om2.MPoint]) -> None
+    """Set the positions of multiple CVs at once.
+
+    The new_positions_world is a list of positions in world space.
+
+    Args:
+        mfn_curve: MFnNurbsCurve object
+        new_positions_world: List of new positions in world space
+
+    Returns:
+        None
     """
-    複数CVの位置を一括でセットする。new_positions_world はワールド空間のリスト。
-    mfn_curve のCV数と len(new_positions_world) は同じ前提。
-    """
+
+    assert len(new_positions_world) == mfn_curve.numCVs
+
     # オブジェクト空間で更新するため、まず現在のCVリスト(オブジェクト空間)を取得
     current_cvs_obj = mfn_curve.cvPositions(om2.MSpace.kObject)
     
@@ -150,9 +191,11 @@ def set_cv_positions(mfn_curve, new_positions_world):
 
 def sign_mvector(v):
     # type: (om2.MVector) -> om2.MVector
-    """
-    MVector の符号関数: 成分ごとにsignを返す。
-    v.x > 0 なら +1, v.x < 0 なら -1, それ以外は 0 (同様に y,z)
+    """Return the sign of the MVector components.
+
+    If v.x > 0, return +1.0,
+    if v.x < 0, return -1.0,
+    otherwise return 0.0 (same for y, z).
     """
     sx = 1.0 if v.x > 0 else (-1.0 if v.x < 0 else 0.0)
     sy = 1.0 if v.y > 0 else (-1.0 if v.y < 0 else 0.0)
@@ -163,17 +206,22 @@ def sign_mvector(v):
 
 def compute_finite_diff_gradients(curveA, curveB, cv_indices, epsilon, num_samples):
     # type: (om2.MFnNurbsCurve, om2.MFnNurbsCurve, list[int], float, int) -> list[om2.MVector]
+    """Compute the gradients vector using finite differences (central differences).
+
+    The function computes the gradients for the specified multiple CVs using finite differences.
+    The return value grads is a list of the same length as the number of CVs, and the gradients of the unnecessary CVs are (0, 0, 0).
+
+    Args:
+        curveA: MFnNurbsCurve object
+        curveB: MFnNurbsCurve object
+        cv_indices: List of CV indices to compute the gradients
+        epsilon: Small value for finite differences
+        num_samples: Number of samples to compute the loss
+
+    Returns:
+        list[om2.MVector]: List of gradients for the specified CV
     """
-    有限差分(中心差分)で、指定した複数CVの勾配ベクトルを計算して返す。
-    戻り値 grads は CV数と同じ長さで、不要なCVの勾配は (0,0,0)。
-    
-    Parameters:
-        curveA      : 最適化対象のカーブ (MFnNurbsCurve)
-        curveB      : 比較対象のカーブ
-        cv_indices  : 勾配を計算するCVのリスト (例: [0,1,2])
-        epsilon     : 微小量
-        num_samples : 損失計算用のサンプリング点数
-    """
+
     base_positions = curveA.cvPositions(om2.MSpace.kWorld)
     num_cvs = len(base_positions)
     grads = [om2.MVector(0.0, 0.0, 0.0) for _ in range(num_cvs)]
@@ -244,12 +292,13 @@ def optimize_multiple_cvs(
         learning_rate=0.01,
         beta=0.9,
         num_samples=100):
-    """
-    複数のCVをLionで最適化するメインループ。
-    1. 現在の損失計算
-    2. 有限差分で勾配を求める
-    3. Lionのモメンタム更新&パラメータ(CV位置)更新
-    4. 損失のログ表示
+    # type: (om2.MFnNurbsCurve, om2.MFnNurbsCurve, list[int], int, float, float, float, int) -> None
+    """This function optimizes multiple CVs of curveA to fit curveB using Lion optimizer.
+
+    1. Compute the initial loss
+    2. Compute the gradients using finite differences
+    3. Update the CV positions using Lion optimizer
+    4. Display the loss value
     """
     init_loss = compute_loss(curveA, curveB, num_samples)
     om2.MGlobal.displayInfo("初期損失: {}".format(init_loss))
@@ -298,10 +347,19 @@ def optimize_multiple_cvs(
 
 def fit_curve_on_curve(curveA, curveB, cv_indices=None, num_samples=100, num_iterations=100):
     # type: (om2.MFnNurbsCurve|str, om2.MFnNurbsCurve|str, list[int]|None, int, int) -> None
+    """Fit curveA on curveB using Lion optimizer.
+
+    Args:
+        curveA: MFnNurbsCurve or curve name
+        curveB: MFnNurbsCurve or curve name
+        cv_indices: List of CV indices to optimize (default: all CVs)
+        num_samples: Number of samples to compute the loss
+        num_iterations: Number of optimization iterations
+
+    Returns:
+        None
     """
-    curveA を curveB にフィットさせる。
-    両カーブのCV数は同じ前提。
-    """
+
     if not isinstance(curveA, om2.MFnNurbsCurve):
         curveA = curve.getMFnNurbsCurve(curveA)
 

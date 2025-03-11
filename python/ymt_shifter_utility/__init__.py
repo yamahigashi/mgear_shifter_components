@@ -4,8 +4,14 @@ import math
 import sys
 import contextlib
 
+from Qt import QtWidgets
+
+import maya.cmds as cmds
+import maya.api.OpenMaya as om
+import maya.api.OpenMayaAnim as oma
+
 from pymel.core import (
-    datatypes,
+    datatypes as dt,
     nodetypes,
 )
 from pymel import versions
@@ -13,12 +19,6 @@ try:
     import mgear.pymaya as pm
 except ImportError:
     import pymel.core as pm
-
-import maya.cmds as cmds
-import maya.api.OpenMaya as om
-import maya.api.OpenMayaAnim as oma
-
-from Qt import QtWidgets
 
 from mgear.core import (
     attribute,
@@ -32,7 +32,6 @@ from mgear.core.transform import (
     getTransformLookingAt,
 )
 from mgear.core.primitive import addTransform
-
 
 from ymt_shifter_utility import twistSplineBuilder as tsBuilder
 from ymt_shifter_utility import synoptic
@@ -204,7 +203,10 @@ def _findPathAtoB(aPath, bPath):
         down.append(u)
 
     try:
-        idx = bPath.index(sharedNode)
+        if sharedNode:
+            idx = bPath.index(sharedNode)
+        else:
+            idx = 0
     except ValueError:
         idx = 0
         logger.warning("No shared node found in path {} and {}".format(aPath, bPath))
@@ -235,7 +237,7 @@ def applyPathCnsLocal(target, curve, u):
 
 
 def addCtlMetadata(self, ctl):
-    # type: (component.Main, pm.datatypes.Transform) -> None
+    # type: (component.Main, pm.dt.Transform) -> None
 
     name = ctl.name()
 
@@ -455,16 +457,17 @@ def addJointCtl(self,
     # set controller tag
     if versions.current() >= 201650:
         try:
-            oldTag = pm.PyNode(ctl.name() + "_tag")
-            if not oldTag.controllerObject.connections():
-                # NOTE:  The next line is comment out. Because this will
-                # happend alot since core does't clean
-                # controller tags after deleting the control Object of the
-                # tag. This have been log to Autodesk.
-                # If orphane tags are found, it will be clean in silence.
-                # pm.displayWarning("Orphane Tag: %s  will be delete and
-                # created new for: %s"%(oldTag.name(), ctl.name()))
-                pm.delete(oldTag)
+            if cmds.objExists(ctl.name() + "_tag"):
+                oldTag = pm.PyNode(ctl.name() + "_tag")
+                if not oldTag.controllerObject.connections():
+                    # NOTE:  The next line is comment out. Because this will
+                    # happend alot since core does't clean
+                    # controller tags after deleting the control Object of the
+                    # tag. This have been log to Autodesk.
+                    # If orphane tags are found, it will be clean in silence.
+                    # pm.displayWarning("Orphane Tag: %s  will be delete and
+                    # created new for: %s"%(oldTag.name(), ctl.name()))
+                    pm.delete(oldTag)
 
         except TypeError:
             pass
@@ -475,7 +478,7 @@ def addJointCtl(self,
     return ctl
 
 
-def addJointTransform(parent, name, m=datatypes.Matrix()):
+def addJointTransform(parent, name, m=dt.Matrix()):
     """Create a transform dagNode.
 
     Arguments:
@@ -497,7 +500,7 @@ def addJointTransform(parent, name, m=datatypes.Matrix()):
     return node
 
 
-def addJointTransformFromPos(parent, name, pos=datatypes.Vector(0, 0, 0)):
+def addJointTransformFromPos(parent, name, pos=dt.Vector(0, 0, 0)):
     """Create a transform dagNode.
 
     Arguments:
@@ -528,8 +531,12 @@ def getAsMFnNode(name, ctor):
 
 
 def transform_to_euler(t):
-    # type: (om.MTransformationMatrix) -> Tuple[float, float, float]
-    rot = t.rotate.asEulerRotation().asVector()
+    # type: (om.MTransformationMatrix|dt.Matrix) -> tuple[float, float, float]
+
+    if not isinstance(t, om.MTransformationMatrix):
+        t = om.MTransformationMatrix(t)
+
+    rot = t.rotation()
     rot = (math.degrees(rot[0]), math.degrees(rot[1]), math.degrees(rot[2]))
 
     return rot
@@ -1418,9 +1425,9 @@ def create_dummy_edges_from_positions(positions):
     # type: (List[Tuple[float, float, float]]) -> Tuple[List[Text], om.MFnMesh]
     plane = draw_plane_from_positions(positions)  # type: ignore
 
-    edge_list = ["{}.e[{}]".format(plane.longName(), 0)]
+    edge_list = ["{}.e[{}]".format(plane.fullPathName(), 0)]
     for i in range(1, len(positions) + 1):
-        edge_list.append("{}.e[{}]".format(plane.longName(), i * 2 + 1))
+        edge_list.append("{}.e[{}]".format(plane.fullPathName(), i * 2 + 1))
     # edge_list = [pm.PyNode(x) for x in edge_list]
 
     return edge_list, plane
@@ -1433,7 +1440,7 @@ def create_dummy_edges_from_objects(objects):
 
 
 def draw_plane_from_positions(positions, t=None):
-    # type: (List[Tuple[float, float, float]], datatypes.Matrix|None) -> om.MFnMesh
+    # type: (List[Tuple[float, float, float]], dt.Matrix|None) -> om.MFnMesh
     if t is not None:
         positions = [x - t.translate for x in positions]
 
