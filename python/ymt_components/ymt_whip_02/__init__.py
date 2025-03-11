@@ -10,8 +10,14 @@ import math
 import maya.cmds as cmds
 import maya.api.OpenMaya as om
 
-import pymel.core as pm
-from pymel.core import datatypes
+try:
+    import mgear.pymaya as pm
+except ImportError:
+    import pymel.core as pm
+try:
+    from mgear.pymaya import datatypes
+except ImportError:
+    from pymel.core import datatypes
 
 import exprespy.cmd
 from mgear.shifter import component
@@ -983,12 +989,12 @@ class Component(component.Main):
 
         if self.settings["ik0refarray"]:
             npo = self.ik_npo[0]
-            with ymt_util.unlockAttribute(npo.fullPathName()):
+            with ymt_util.unlockAttribute(npo.longName()):
                 self.connectRef(self.settings["ik0refarray"], npo)
 
         if self.settings["ik1refarray"]:
             for npo in self.ik_npo[1:]:
-                with ymt_util.unlockAttribute(npo.fullPathName()):
+                with ymt_util.unlockAttribute(npo.longName()):
                     self.connectRef(self.settings["ik1refarray"], npo)
 
     # =====================================================

@@ -4,20 +4,22 @@ import math
 import sys
 import contextlib
 
-from pymel.core import (
-    datatypes,
-    nodetypes,
-)
-from pymel import versions
-import pymel.core as pm
+from Qt import QtWidgets
 
 import maya.cmds as cmds
 import maya.api.OpenMaya as om
 import maya.api.OpenMayaAnim as oma
 
-from Qt import QtWidgets
+from pymel.core import (
+    datatypes as dt,
+    nodetypes,
+)
+from pymel import versions
+try:
+    import mgear.pymaya as pm
+except ImportError:
+    import pymel.core as pm
 
-import mgear.synoptic as synoptic
 from mgear.core import (
     attribute,
     primitive,
@@ -31,8 +33,8 @@ from mgear.core.transform import (
 )
 from mgear.core.primitive import addTransform
 
-
 from ymt_shifter_utility import twistSplineBuilder as tsBuilder
+from ymt_shifter_utility import synoptic
 
 from logging import (
     StreamHandler,  # noqa: F401
@@ -201,7 +203,10 @@ def _findPathAtoB(aPath, bPath):
         down.append(u)
 
     try:
-        idx = bPath.index(sharedNode)
+        if sharedNode:
+            idx = bPath.index(sharedNode)
+        else:
+            idx = 0
     except ValueError:
         idx = 0
         logger.warning("No shared node found in path {} and {}".format(aPath, bPath))
@@ -232,7 +237,7 @@ def applyPathCnsLocal(target, curve, u):
 
 
 def addCtlMetadata(self, ctl):
-    # type: (component.Main, pm.datatypes.Transform) -> None
+    # type: (component.Main, pm.dt.Transform) -> None
 
     name = ctl.name()
 
@@ -452,16 +457,17 @@ def addJointCtl(self,
     # set controller tag
     if versions.current() >= 201650:
         try:
-            oldTag = pm.PyNode(ctl.name() + "_tag")
-            if not oldTag.controllerObject.connections():
-                # NOTE:  The next line is comment out. Because this will
-                # happend alot since core does't clean
-                # controller tags after deleting the control Object of the
-                # tag. This have been log to Autodesk.
-                # If orphane tags are found, it will be clean in silence.
-                # pm.displayWarning("Orphane Tag: %s  will be delete and
-                # created new for: %s"%(oldTag.name(), ctl.name()))
-                pm.delete(oldTag)
+            if cmds.objExists(ctl.name() + "_tag"):
+                oldTag = pm.PyNode(ctl.name() + "_tag")
+                if not oldTag.controllerObject.connections():
+                    # NOTE:  The next line is comment out. Because this will
+                    # happend alot since core does't clean
+                    # controller tags after deleting the control Object of the
+                    # tag. This have been log to Autodesk.
+                    # If orphane tags are found, it will be clean in silence.
+                    # pm.displayWarning("Orphane Tag: %s  will be delete and
+                    # created new for: %s"%(oldTag.name(), ctl.name()))
+                    pm.delete(oldTag)
 
         except TypeError:
             pass
@@ -472,7 +478,7 @@ def addJointCtl(self,
     return ctl
 
 
-def addJointTransform(parent, name, m=datatypes.Matrix()):
+def addJointTransform(parent, name, m=dt.Matrix()):
     """Create a transform dagNode.
 
     Arguments:
@@ -494,7 +500,7 @@ def addJointTransform(parent, name, m=datatypes.Matrix()):
     return node
 
 
-def addJointTransformFromPos(parent, name, pos=datatypes.Vector(0, 0, 0)):
+def addJointTransformFromPos(parent, name, pos=dt.Vector(0, 0, 0)):
     """Create a transform dagNode.
 
     Arguments:
@@ -525,8 +531,12 @@ def getAsMFnNode(name, ctor):
 
 
 def transform_to_euler(t):
-    # type: (om.MTransformationMatrix) -> Tuple[float, float, float]
-    rot = t.rotate.asEulerRotation().asVector()
+    # type: (om.MTransformationMatrix|dt.Matrix) -> tuple[float, float, float]
+
+    if not isinstance(t, om.MTransformationMatrix):
+        t = om.MTransformationMatrix(t)
+
+    rot = t.rotation()
     rot = (math.degrees(rot[0]), math.degrees(rot[1]), math.degrees(rot[2]))
 
     return rot
@@ -1430,7 +1440,7 @@ def create_dummy_edges_from_objects(objects):
 
 
 def draw_plane_from_positions(positions, t=None):
-    # type: (List[Tuple[float, float, float]], datatypes.Matrix|None) -> om.MFnMesh
+    # type: (List[Tuple[float, float, float]], dt.Matrix|None) -> om.MFnMesh
     if t is not None:
         positions = [x - t.translate for x in positions]
 
@@ -1567,14 +1577,14 @@ def addNPOPreservingMatrixConnections(ctl):
         ctl = pm.PyNode(ctl)
 
     newNPO = addNPO(ctl)
-    ctlName = ctl.fullPathName()
+    ctlName = ctl.longName()
 
     def get_connections(attributes):
         # type: (list[str]) -> list[str]
         connections = []
         for attr in attributes:
             connections.extend(cmds.listConnections(
-                ctl.fullPathName() + attr,
+                ctl.longName() + attr,
                 s=False,
                 d=True,
                 plugs=True,
@@ -1590,7 +1600,7 @@ def addNPOPreservingMatrixConnections(ctl):
         if pos_connections and rot_connections and scl_connections:
             mult = cmds.createNode("multMatrix")
             cmds.connectAttr(node + ".matrix", mult + ".matrixIn[0]")
-            cmds.connectAttr(newNPO[0].fullPathName() + ".matrix", mult + ".matrixIn[1]")
+            cmds.connectAttr(newNPO[0].longName() + ".matrix", mult + ".matrixIn[1]")
 
             decompMatrix = cmds.createNode("decomposeMatrix")
             cmds.connectAttr(mult + ".matrixSum", decompMatrix + ".inputMatrix")
@@ -1624,7 +1634,7 @@ def addNPOPreservingMatrixConnections(ctl):
                 capitla = attributes[-1][1:].capitalize()
                 cmds.connectAttr(node + attributes[-1], comp + ".input" + capitla)
                 cmds.connectAttr(comp + ".outputMatrix", mult + ".matrixIn[0]")
-                cmds.connectAttr(newNPO[0].fullPathName() + ".matrix", mult + ".matrixIn[1]")
+                cmds.connectAttr(newNPO[0].longName() + ".matrix", mult + ".matrixIn[1]")
 
                 decompMatrix = cmds.createNode("decomposeMatrix")
                 cmds.connectAttr(mult + ".matrixSum", decompMatrix + ".inputMatrix")
@@ -1664,23 +1674,23 @@ def addNPOPreservingMatrixConnections(ctl):
     if matrix_connections:
         multMatrix = cmds.createNode("multMatrix")
         cmds.connectAttr(ctlName + ".matrix", multMatrix + ".matrixIn[0]")
-        cmds.connectAttr(newNPO[0].fullPathName() + ".matrix", multMatrix + ".matrixIn[1]")
+        cmds.connectAttr(newNPO[0].longName() + ".matrix", multMatrix + ".matrixIn[1]")
 
         for dst in matrix_connections[1::2]:
             cmds.connectAttr(multMatrix + ".matrixSum", dst, force=True)
 
     if invmatrix_connections:
         multMatrix = cmds.createNode("multMatrix")
-        cmds.connectAttr(ctlName + ".inverseMatrix", multMatrix + ".matrixIn[0]")
-        cmds.connectAttr(newNPO[0].fullPathName() + ".inverseMatrix", multMatrix + ".matrixIn[1]")
+        cmds.connectAttr(newNPO[0].longName() + ".inverseMatrix", multMatrix + ".matrixIn[0]")
+        cmds.connectAttr(ctlName + ".inverseMatrix", multMatrix + ".matrixIn[1]")
 
-        for dst in matrix_connections[1::2]:
+        for dst in invmatrix_connections[1::2]:
             cmds.connectAttr(multMatrix + ".matrixSum", dst, force=True)
 
     if parent_connections:
         for src, dst in zip(parent_connections[::2], parent_connections[1::2]):
             src_attr = src.split(".")[-1]
-            cmds.connectAttr(newNPO[0].fullPathName() + "." + src_attr, dst, force=True)
+            cmds.connectAttr(newNPO[0].longName() + "." + src_attr, dst, force=True)
 
     if pos_connections or rot_connections or scl_connections:
         mimic_connections(ctlName, pos_connections, rot_connections, scl_connections)
@@ -1695,7 +1705,7 @@ def demote_controller(ctl):
         ctl = pm.PyNode(ctl)
 
     for shape in ctl.getShapes():
-        cmds.delete(shape.fullPathName())
+        cmds.delete(shape.longName())
 
     for attr in ["t", "r", "s"]:
         for axis in "xyz":
@@ -1705,7 +1715,7 @@ def demote_controller(ctl):
                 pass
 
     message_connections = cmds.listConnections(
-        ctl.fullPathName() + ".message",
+        ctl.longName() + ".message",
         s=False,
         d=True,
         plugs=True,
@@ -1715,13 +1725,13 @@ def demote_controller(ctl):
     for src, dst in zip(message_connections[::2], message_connections[1::2]):
         cmds.disconnectAttr(src, dst)
 
-    if "isCtl" in cmds.listAttr(ctl.fullPathName()):
-        cmds.deleteAttr(ctl.fullPathName(), at="isCtl")
+    if "isCtl" in cmds.listAttr(ctl.longName()):
+        cmds.deleteAttr(ctl.longName(), at="isCtl")
 
-    members = cmds.listSets(object=ctl.fullPathName()) or []
+    members = cmds.listSets(object=ctl.longName()) or []
     if not members:
         logger.warning(
-            "No members found in the set for {}".format(ctl.fullPathName()))
+            "No members found in the set for {}".format(ctl.longName()))
 
     for ctl_grp in members:
-        cmds.sets(ctl.fullPathName(), rm=ctl_grp)
+        cmds.sets(ctl.longName(), rm=ctl_grp)

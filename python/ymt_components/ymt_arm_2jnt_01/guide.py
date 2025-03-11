@@ -34,7 +34,10 @@ from maya.app.general.mayaMixin import MayaQWidgetDockableMixin
 from maya.app.general.mayaMixin import MayaQDockWidget
 # import maya.OpenMayaUI as omui
 
-import pymel.core as pm
+try:
+    import mgear.pymaya as pm
+except ImportError:
+    import pymel.core as pm
 
 # mgear
 from mgear.shifter.component.guide import ComponentGuide

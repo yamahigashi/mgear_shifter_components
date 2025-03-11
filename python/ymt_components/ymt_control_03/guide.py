@@ -30,7 +30,10 @@
 from functools import partial
 
 # pyMel
-import pymel.core as pm
+try:
+    import mgear.pymaya as pm
+except ImportError:
+    import pymel.core as pm
 import pymel.core.datatypes as dt
 
 # mgear

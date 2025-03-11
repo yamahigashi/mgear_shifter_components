@@ -5,7 +5,10 @@ import re
 import traceback
 
 import maya.cmds as cmds
-import pymel.core as pm
+try:
+    import mgear.pymaya as pm
+except ImportError:
+    import pymel.core as pm  # noqa: F401
 
 import mgear
 import mgear.core.pyqt as gqt

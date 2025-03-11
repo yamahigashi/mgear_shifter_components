@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 import maya.cmds as cmds
-import pymel.core as pm
+try:
+    import mgear.pymaya as pm
+except ImportError:
+    import pymel.core as pm
 
 from mgear import rigbits
 from mgear.core.transform import (
@@ -85,20 +88,20 @@ class CustomShifterStep(cstp.customShifterMainStep):
 
         # TODO: extract number of CVs, fixed to 30 for now.
         dest = curve.createCurveFromCurve(tmp, name + "eyelid_crv2", 30, m=t)
-        target1 = curve.createCurveFromCurve(brow_crv, name + "brow_crv", 30, m=t).fullPath()
+        target1 = curve.createCurveFromCurve(brow_crv, name + "brow_crv", 30, m=t).longName()
         cmds.wire(target1, w=brow_crv, n=name + "wire")
-        bs = pm.blendShape(target1, blink_crv, dest.fullPath())
+        bs = pm.blendShape(target1, blink_crv, dest.longName())
         cmds.setAttr(bs[0] + "." + target1.split("|")[-1], 0.16)
         cmds.setAttr(bs[0] + "." + blink_crv, 0.25)
         cmds.delete(dummy_plane.getPath().fullPathName())
 
-        cmds.parent(tmp.fullPath(), self.parent)
-        cmds.parent(dest.fullPath(), self.parent)
+        cmds.parent(tmp.longName(), self.parent)
+        cmds.parent(dest.longName(), self.parent)
         cmds.parent(target1, self.parent)
 
         cmds.hide(target1.split("|")[-1])
-        cmds.hide(tmp.fullPath())
-        cmds.hide(dest.fullPath())
+        cmds.hide(tmp.longName())
+        cmds.hide(dest.longName())
 
         return dest
 

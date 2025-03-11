@@ -3,7 +3,10 @@ import math
 # Maya
 import maya.cmds as cmds
 
-import pymel.core as pm
+try:
+    import mgear.pymaya as pm
+except ImportError:
+    import pymel.core as pm
 import pymel.core.datatypes as dt
 
 # mgear

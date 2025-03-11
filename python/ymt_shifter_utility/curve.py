@@ -6,8 +6,14 @@
 import math
 import six
 import sys
-import pymel.core as pm
-from pymel.core import datatypes as dt
+try:
+    import mgear.pymaya as pm
+except ImportError:
+    import pymel.core as pm
+try:
+    from mgear.pymaya import datatypes as dt
+except ImportError:
+    from pymel.core import datatypes as dt
 import json
 
 import maya.cmds as cmds
@@ -58,39 +64,39 @@ if sys.version_info > (3, 0):
 #############################################
 
 
-def addCnsCurve(parent, name, centers, degree=1, m=dt.Matrix(), close=False, local=False):
-    """Create a curve attached to given centers. One point per center
+def addCnsCurve(parent, name, drivers, degree=1, m=dt.Matrix(), close=False, local=False):
+    """Create a curve attached to given drivers. One point per center
 
     Arguments:
         parent (dagNode): Parent object.
         name (str): Name
-        centers (list of dagNode): Object that will drive the curve.
+        drivers (list of dagNode): Object that will drive the curve.
         degree (int): 1 for linear curve, 3 for Cubic.
 
     Returns:
         dagNode: The newly created curve.
     """
     # rebuild list to avoid input list modification
-    centers = centers[:]
+    drivers = drivers[:]
     if degree == 3:
-        if len(centers) == 2:
-            centers.insert(0, centers[0])
-            centers.append(centers[-1])
-        elif len(centers) == 3:
-            centers.insert(1, centers[1])
+        if len(drivers) == 2:
+            drivers.insert(0, drivers[0])
+            drivers.append(drivers[-1])
+        elif len(drivers) == 3:
+            drivers.insert(1, drivers[1])
 
-    for c in centers:
+    for c in drivers:
         if isinstance(c, str):
             c = pm.PyNode(c)
 
-    points = [dt.Vector() for center in centers]
+    points = [dt.Vector() for center in drivers]
 
     node = addCurve(parent, name, points, degree=degree, m=m, close=close)
 
     if local:
-        gear_curvecns_op_local(node, centers)
+        gear_curvecns_op_local(node, drivers)
     else:
-        applyop.gear_curvecns_op(node, centers)
+        applyop.gear_curvecns_op(node, drivers)
 
     return node
 
@@ -257,17 +263,22 @@ def __applyInverseMatrixToPosition(pos, m):
     if isinstance(m, dt.Matrix):
         m = om2.MMatrix(m)
 
-    np = om2.MMatrix()
-    np.setToIdentity()
-    np[12] = pos[0]
-    np[13] = pos[1]
-    np[14] = pos[2]
+    translationMatrix = om2.MMatrix()
+    translationMatrix.setToIdentity()
+    translationMatrix[12] = pos[0]
+    translationMatrix[13] = pos[1]
+    translationMatrix[14] = pos[2]
 
-    pos[0] = (m.inverse() * np)[12]
-    pos[1] = (m.inverse() * np)[13]
-    pos[2] = (m.inverse() * np)[14]
+    inv = m.inverse()
 
-    return pos
+    mul = translationMatrix * inv
+    res = [
+        mul[12],
+        mul[13],
+        mul[14]
+    ]
+
+    return res
 
 
 def createCurveFromCurve(srcCrv, name, nbPoints, parent=None, m=dt.Matrix(), close=False, space=om2.MSpace.kWorld):
@@ -285,12 +296,6 @@ def createCurveFromCurve(srcCrv, name, nbPoints, parent=None, m=dt.Matrix(), clo
     Returns:
         dagNode: The newly created curve.
     """
-
-    if isinstance(srcCrv, six.string_types) or isinstance(srcCrv, six.text_type):
-        srcCrv = pm.PyNode(srcCrv)
-
-    cmds.dgeval(srcCrv.name())
-    cmds.refresh()
 
     sc = getMFnNurbsCurve(srcCrv)
     sc.updateCurve()
@@ -311,9 +316,8 @@ def createCurveFromCurve(srcCrv, name, nbPoints, parent=None, m=dt.Matrix(), clo
         _, p = sc.closestPoint(pos0, space=om2.MSpace.kObject)
 
     else:
-        increment = paramLength / nbPoints
+        increment = paramLength / (nbPoints - 1)
         p = paramStart
-
 
     positions = []
     for i in range(nbPoints):
@@ -443,6 +447,16 @@ def getCurveParamByRatio(crv, ratio):
     param = (paramEnd - paramStart) * ratio + paramStart
 
     return param, length
+
+
+def getCurveLength(crv):
+    # type: (str|dt.Transform|om2.MObject|om2.MDagPath|om2.MFnNurbsCurve) -> float
+    """Get the length of a curve."""
+
+    if not isinstance(crv, om2.MFnNurbsCurve):
+        crv = getMFnNurbsCurve(crv)
+
+    return crv.length()
 
 
 def getPositionByRatio(crv, ratio):
@@ -985,7 +999,7 @@ def as_mfnmesh(name):
 
 
 def applyPathCnsLocal(target, curve, u, maintainOffset=True):
-    # type: (dt.Transform, dt.Transform, float, bool) -> None
+    # type: (dt.Transform, dt.Transform, float, bool) -> "motionPath"
     import ymt_shifter_utility
 
     # prev_matrix = target.getMatrix(objectSpace=True)
@@ -999,7 +1013,7 @@ def applyPathCnsLocal(target, curve, u, maintainOffset=True):
     cmds.setAttr(cns + ".worldUpVectorX", 0)
     cmds.setAttr(cns + ".worldUpVectorY", 1)
     cmds.setAttr(cns + ".worldUpVectorZ", 0)
-    cmds.connectAttr(curve.fullPathName() + ".matrix", cns + ".worldUpMatrix")  # object rotation up
+    cmds.connectAttr(curve.longName() + ".matrix", cns + ".worldUpMatrix")  # object rotation up
     cmds.setAttr(cns + ".frontAxis", 2)  # front axis x
     cmds.setAttr(cns + ".upAxis", 1)  # up axis y
     pm.connectAttr(curve.attr("local"), cns.attr("geometryPath"), f=True)
@@ -1011,45 +1025,45 @@ def applyPathCnsLocal(target, curve, u, maintainOffset=True):
 
     tmp_output = dt.Matrix(comp_node.attr("outputMatrix").get())
     tmp_global = tmp_output * mb
-    offset_matrix = ma * tmp_global.inverse()
+    offset_matrix = om2.MMatrix(ma * tmp_global.inverse())
 
     if maintainOffset:
-        h = 1
+        start_index = 1
     else:
-        h = 0
+        start_index = 0
 
     mul_node = pm.createNode("multMatrix")
-    comp_node.attr("outputMatrix") >> mul_node.attr("matrixIn[{}]".format(h))  # pyright: ignore [reportUnusedExpression]
+    comp_node.attr("outputMatrix") >> mul_node.attr("matrixIn[{}]".format(start_index))  # pyright: ignore [reportUnusedExpression]
 
     down, _, up = ymt_shifter_utility.findPathAtoB(curve, target)
     i = 0
     j = 0
     for _i, _d in enumerate(down):
         i = _i
-        _d.attr("matrix") >> mul_node.attr("matrixIn[{}]".format(h + i + 1))  # pyright: ignore [reportUnusedExpression]
+        _d.attr("matrix") >> mul_node.attr("matrixIn[{}]".format(start_index + i + 1))  # pyright: ignore [reportUnusedExpression]
 
     for j, _u in enumerate(up[:-1]):
-        _u.attr("inverseMatrix") >> mul_node.attr("matrixIn[{}]".format(h + i + j + 2))  # pyright: ignore [reportUnusedExpression]
+        _u.attr("inverseMatrix") >> mul_node.attr("matrixIn[{}]".format(start_index + i + j + 2))  # pyright: ignore [reportUnusedExpression]
 
     if maintainOffset:
         tmp_output = mul_node.attr("matrixSum").get()
         offset_node = pm.createNode("fourByFourMatrix")
-        offset_node.attr("in00").set(offset_matrix[0][0])
-        offset_node.attr("in01").set(offset_matrix[0][1])
-        offset_node.attr("in02").set(offset_matrix[0][2])
-        offset_node.attr("in03").set(offset_matrix[0][3])
-        offset_node.attr("in10").set(offset_matrix[1][0])
-        offset_node.attr("in11").set(offset_matrix[1][1])
-        offset_node.attr("in12").set(offset_matrix[1][2])
-        offset_node.attr("in13").set(offset_matrix[1][3])
-        offset_node.attr("in20").set(offset_matrix[2][0])
-        offset_node.attr("in21").set(offset_matrix[2][1])
-        offset_node.attr("in22").set(offset_matrix[2][2])
-        offset_node.attr("in23").set(offset_matrix[2][3])
-        offset_node.attr("in30").set(offset_matrix[3][0])
-        offset_node.attr("in31").set(offset_matrix[3][1])
-        offset_node.attr("in32").set(offset_matrix[3][2])
-        offset_node.attr("in33").set(offset_matrix[3][3])
+        offset_node.attr("in00").set(offset_matrix[0])
+        offset_node.attr("in01").set(offset_matrix[1])
+        offset_node.attr("in02").set(offset_matrix[2])
+        offset_node.attr("in03").set(offset_matrix[3])
+        offset_node.attr("in10").set(offset_matrix[4])
+        offset_node.attr("in11").set(offset_matrix[5])
+        offset_node.attr("in12").set(offset_matrix[6])
+        offset_node.attr("in13").set(offset_matrix[7])
+        offset_node.attr("in20").set(offset_matrix[8])
+        offset_node.attr("in21").set(offset_matrix[9])
+        offset_node.attr("in22").set(offset_matrix[10])
+        offset_node.attr("in23").set(offset_matrix[11])
+        offset_node.attr("in30").set(offset_matrix[12])
+        offset_node.attr("in31").set(offset_matrix[13])
+        offset_node.attr("in32").set(offset_matrix[14])
+        offset_node.attr("in33").set(offset_matrix[15])
         offset_node.attr("output") >> mul_node.attr("matrixIn[0]")  # pyright: ignore [reportUnusedExpression]
 
     decomp_node = pm.createNode("decomposeMatrix")
@@ -1060,7 +1074,7 @@ def applyPathCnsLocal(target, curve, u, maintainOffset=True):
     return cns
     
 
-def applyPathConstrainLocal(target, src_curve):
+def applyPathConstrainLocal(target, src_curve, maintainOffset=True):
     # type: (str, str) -> None
 
     if isinstance(target, six.string_types) or isinstance(target, six.text_type):
@@ -1071,13 +1085,13 @@ def applyPathConstrainLocal(target, src_curve):
     try:
         ma = target.getMatrix(worldSpace=True)
         mb = src_curve.getMatrix(worldSpace=True)
-        m = ma * mb.inverse()
-        pos = dt.Vector(m[3][0], m[3][1], m[3][2])
+        m = om2.MMatrix(ma * mb.inverse())
+        pos = dt.Vector(m[12], m[13], m[14])
         param, length = getCurveParamAtPosition(src_curve, pos)
         u_length = findLenghtFromParam(src_curve, param)
         u_param = u_length / length
 
-        cns = applyPathCnsLocal(target, src_curve, u_param)
+        cns = applyPathCnsLocal(target, src_curve, u_param, maintainOffset)
     except:
         import traceback as tb
         tb.print_exc()
@@ -1117,12 +1131,12 @@ def applyRopeCnsLocal(target, ctl_curve, rope, cv):
     cmds.setAttr(motionPath + ".frontAxis", 0)
     cmds.setAttr(motionPath + ".worldUpType", 2)
     cmds.setAttr(motionPath + ".worldUpVector", 0, 1, 0)
-    cmds.connectAttr(ctl_curve.fullPathName() + ".matrix", motionPath + ".worldUpMatrix")  # object rotation up
+    cmds.connectAttr(ctl_curve.longName() + ".matrix", motionPath + ".worldUpMatrix")  # object rotation up
     cmds.setAttr(motionPath + ".frontAxis", 0)
     cmds.setAttr(motionPath + ".upAxis", 2)
 
-    cmds.connectAttr(nearestPointOnCurve + ".position", target.fullPath() + ".translate")
-    cmds.connectAttr(motionPath + ".rotate", target.fullPath() + ".rotate")
+    cmds.connectAttr(nearestPointOnCurve + ".position", target.longName() + ".translate")
+    cmds.connectAttr(motionPath + ".rotate", target.longName() + ".rotate")
 
 
 def applyRopeCnsLocalWithUpv(target, upv, ctl_curve, rope, cv):
@@ -1167,15 +1181,15 @@ def applyRopeCnsLocalWithUpv(target, upv, ctl_curve, rope, cv):
 
     cmds.setAttr(motionPath + ".fractionMode", 0)
 
-    cmds.connectAttr(nearestPointOnCurve + ".position", target.fullPath() + ".translate")
+    cmds.connectAttr(nearestPointOnCurve + ".position", target.longName() + ".translate")
     _cns = cmds.aimConstraint(
-        upv.fullPath(),
-        target.fullPath(),
+        upv.longName(),
+        target.longName(),
         maintainOffset=False,
         aimVector=(0, 0, 1),
         upVector=(1, 0, 0),
         worldUpType="objectrotation",
-        worldUpObject=upv.fullPath(),
+        worldUpObject=upv.longName(),
         worldUpVector=(1, 0, 0)
     )
 
@@ -1229,54 +1243,72 @@ def gear_curvecns_op_local(crv, inputs=[]):
     import ymt_shifter_utility
 
     pm.select(crv)
-    node = pm.deformer(type="mgear_curveCns")[0]
+    deformer_name = cmds.deformer(type="mgear_curveCns")[0]
 
-    con = pm.listConnections(node + ".input", plugs=True, connections=True, source=True, destination=False)[0]
-    pm.disconnectAttr(con[1], con[0])
-    pm.connectAttr(
-        con[1].name().replace(".worldSpace[0]", ".local"),
-        node + ".input[0].inputGeometry"
+    con = cmds.listConnections(deformer_name + ".input", plugs=True, connections=True, source=True, destination=False)
+    dst, src = con
+
+    cmds.disconnectAttr(src, dst)
+    cmds.connectAttr(
+        src.split(".")[0] + ".local",
+        deformer_name + ".input[0].inputGeometry"
     )
 
     for i, item in enumerate(inputs):
         localMat = ymt_shifter_utility.getMultMatrixOfAtoB(item, crv, skip_last=False)
-        pm.connectAttr(localMat + ".matrixSum", node + ".inputs[%s]" % i)
+        pm.connectAttr(localMat + ".matrixSum", deformer_name + ".inputs[%s]" % i)
 
-    return node
+    return deformer_name
 
 
 def gear_curvecns_op_local_skip_rotate(crv, inputs=[]):
     """."""
 
-    node = gear_curvecns_op_local(crv, inputs)
-    for mult in node.attr("inputs").inputs():
-        ctl = mult.attr("matrixIn").inputs()[0]
-        pm.disconnectAttr(
+    deformer_name = gear_curvecns_op_local(crv, inputs)
+    inputs = cmds.listAttr(deformer_name + ".inputs", multi=True)
+    for input_path in inputs:
+        mult = cmds.listConnections(
+            deformer_name + "." + input_path,
+            source=True,
+            destination=False)[0]
+
+        ctl = cmds.listConnections(
+                mult + ".matrixIn[0]",
+                source=True,
+                destination=False)[0]
+
+        cmds.disconnectAttr(
             ctl + ".matrix",
             mult + ".matrixIn[0]"
         )
 
-        compMat = pm.createNode("composeMatrix")
-        pm.connectAttr(
+        compMat = cmds.createNode("composeMatrix")
+        cmds.connectAttr(
             ctl + ".translate",
             compMat + ".inputTranslate"
         )
-        pm.connectAttr(
+        cmds.connectAttr(
             compMat + ".outputMatrix",
             mult + ".matrixIn[0]"
         )
 
-    return node
+    return deformer_name
 
 
 def createCurveOnSurfaceFromCurve(crv, surface, name):
+
     import ymt_shifter_utility
-    nbPoints = crv.numEPs()
-    close = crv.form() == 3
+
+    src_crv = getMFnNurbsCurve(crv)
+    close = src_crv.form == 3
+    if close:
+        nbPoints = src_crv.numCVs + src_crv.degree
+    else:
+        nbPoints = src_crv.numCVs
 
     t = getTransform(crv)
     targetCrv = createCurveFromCurve(
-        crv.fullPath(),
+        crv.longName(),
         name,
         nbPoints=nbPoints,
         close=close,
@@ -1287,11 +1319,13 @@ def createCurveOnSurfaceFromCurve(crv, surface, name):
     localMat = ymt_shifter_utility.getMultMatrixOfAtoB(crv, surface, skip_last=True)
     invLocal = pm.createNode("inverseMatrix")
     pm.connectAttr(localMat + ".matrixSum", invLocal + ".inputMatrix")
+    info = pm.createNode("curveInfo")
+    pm.connectAttr(crv + ".local", info + ".inputCurve")
 
     for pointNumber in range(nbPoints):
         compMat = pm.createNode("composeMatrix")
         pm.connectAttr(
-            crv + ".editPoints[%s]" % pointNumber,
+            info + ".controlPoints[%s]" % pointNumber,
             compMat + ".inputTranslate"
         )
 
@@ -1353,28 +1387,6 @@ def createCurveOnSurfaceFromCurve(crv, surface, name):
         )
 
     return targetCrv
-
-
-def gear_curvecns_op(crv, inputs=[]):
-    """
-    create mGear curvecns node.
-
-    Arguments:
-        crv (nurbsCurve): Nurbs curve.
-        inputs (List of dagNodes): Input object to drive the curve. Should be
-            same number as crv points.
-            Also the order should be the same as the points
-
-    Returns:
-        pyNode: The curvecns node.
-    """
-    pm.select(crv)
-    node = pm.deformer(type="mgear_curveCns")[0]
-
-    for i, item in enumerate(inputs):
-        pm.connectAttr(item + ".worldMatrix", node + ".inputs[%s]" % i)
-
-    return node
 
 
 def applyCurveParamCns(src, target):
@@ -1484,3 +1496,31 @@ def setCvParamRatio(crv, ratios):
 
     sc.setCVPositions(newPositions)
     sc.updateCurve()
+
+
+def getCenterPosition(crv, sampleCount=100):
+    # type: (str) -> om2.MPoint
+
+    sc = getMFnNurbsCurve(crv)
+    sc.updateCurve()
+
+    length = sc.length()
+    paramStart = sc.findParamFromLength(0.0)
+    try:
+        paramEnd = sc.findParamFromLength(length)
+    except RuntimeError:
+        paramEnd = sc.findParamFromLength(length - 0.001)
+
+    paramLength = paramEnd - paramStart
+
+    points = []
+    for i in range(sampleCount):
+        param = paramStart + (paramLength / sampleCount) * i
+        point = sc.getPointAtParam(param, space=om2.MSpace.kObject)
+        points.append(point)
+
+    return om2.MPoint(
+        sum([p.x for p in points]) / sampleCount,
+        sum([p.y for p in points]) / sampleCount,
+        sum([p.z for p in points]) / sampleCount
+    )

@@ -1,7 +1,10 @@
 # import re
 
 import maya.cmds as cmds
-import pymel.core as pm
+try:
+    import mgear.pymaya as pm
+except ImportError:
+    import pymel.core as pm
 
 import mgear
 from mgear.vendor.Qt import QtCore, QtWidgets

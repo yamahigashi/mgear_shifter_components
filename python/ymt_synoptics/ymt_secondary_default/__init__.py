@@ -1,6 +1,9 @@
 from mgear.synoptic.tabs import MainSynopticTab
 from mgear.vendor.Qt import QtWidgets, QtCore
-import pymel.core as pm
+try:
+    import mgear.pymaya as pm
+except ImportError:
+    import pymel.core as pm
 
 from mgear.synoptic import utils
 from . import widget

@@ -1,6 +1,6 @@
 # pylint: disable=import-error,W0201,C0111,C0112
 from functools import partial
-import copy
+from maya import cmds
 
 from mgear.shifter.component import guide
 from mgear.core import pyqt
@@ -19,8 +19,16 @@ from maya.app.general.mayaMixin import MayaQWidgetDockableMixin
 from maya.app.general.mayaMixin import MayaQDockWidget
 
 from . import settingsUI as sui
-import pymel.core as pm
-from pymel.core import datatypes
+
+try:
+    import mgear.pymaya as pm
+except ImportError:
+    import pymel.core as pm
+
+try:
+    from mgear.pymaya import datatypes
+except ImportError:
+    from pymel.core import datatypes
 
 from . import chain_guide_initializer
 
@@ -124,11 +132,13 @@ class Guide(guide.ComponentGuide):
             self.tra[name] = t
         tra = self.tra[name]
 
-        eyeMesh = pm.polySphere(
+        eyeMeshName = cmds.polySphere(
             name=self.getName(name),
             subdivisionsX=30,
             subdivisionsY=45,
             radius=0.5)[0]
+
+        eyeMesh = pm.PyNode(eyeMeshName)
         eyeMesh.setTransformation(tra)
         pm.parent(eyeMesh, parent)
 

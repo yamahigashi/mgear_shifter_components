@@ -2,8 +2,14 @@ import math
 import maya.OpenMaya as om1
 import maya.api.OpenMaya as om
 
-import pymel.core as pm
-from pymel.core import datatypes
+try:
+    import mgear.pymaya as pm
+except ImportError:
+    import pymel.core as pm
+try:
+    from mgear.pymaya import datatypes
+except ImportError:
+    from pymel.core import datatypes
 
 from mgear.shifter import component
 

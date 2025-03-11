@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 import maya.cmds as cmds
-import pymel.core as pm
+try:
+    import mgear.pymaya as pm
+except ImportError:
+    import pymel.core as pm
 
 from mgear import rigbits
 import mgear.shifter.custom_step as cstp
@@ -61,7 +64,7 @@ class CustomShifterStep(cstp.customShifterMainStep):
                 print("already exists: {}".format(new_name))
                 continue
 
-            cmds.rename(npo.fullPath(), new_name)
+            cmds.rename(npo.longName(), new_name)
 
             adj_uuid = cmds.ls(npo.getName(), uuid=True)[0]
             self.adj_node_uuids.append(adj_uuid)

@@ -8,8 +8,14 @@ import traceback
 import maya.cmds as cmds
 import maya.api.OpenMaya as om
 
-import pymel.core as pm
-from pymel.core import datatypes
+try:
+    import mgear.pymaya as pm
+except ImportError:
+    import pymel.core as pm
+try:
+    from mgear.pymaya import datatypes
+except ImportError:
+    from pymel.core import datatypes
 
 from mgear import rigbits
 from mgear.rigbits import ghost
@@ -219,12 +225,6 @@ class Component(component.Main):
 
         return num
 
-    def addDummyPlane(self):
-        # type: () -> om.MFnMesh
-
-        t = getTransform(self.root)
-        return ymt_util.draw_plane_from_positions(self.locsPos, t)
-
     def addCurve(self):
 
         self.addCurves(self.crv_root)
@@ -251,37 +251,16 @@ class Component(component.Main):
     def addCurves(self, crv_root):
 
         t = getTransform(self.root)
-        plane = self.addDummyPlane()
-        planeNode = pm.PyNode(plane.fullPathName())
+        positions = [self._worldToObj(x) for x in self.locsPos]
 
-        # -------------------------------------------------------------------
-        def _inner(edges):
-            return crv, ctl
-
-        # -------------------------------------------------------------------
-        edgeList = ["{}.e[{}]".format(plane.fullPathName(), 0)]
-        for i in range(1, self.num_locs + 1):
-            edgeList.append("{}.e[{}]".format(plane.fullPathName(), i * 2 + 1))
-        edgeList = [pm.PyNode(x) for x in edgeList]
-
-        self.crv = curve.createCurveFromOrderedEdges(
-            edgeList,
-            planeNode.verts[1],
+        self.crv = curve.addCurve(
+            crv_root,
             self.getName("crv"),
-            parent=crv_root,
+            positions,
             m=t,
-            close=True
+            close=True,
+            degree=3,
         )
-        self.ctl = curve.createCurveFromOrderedEdges(
-            edgeList,
-            planeNode.verts[1],
-            self.getName("crv"),
-            parent=crv_root,
-            m=t,
-            close=True
-        )
-
-        cmds.delete(cmds.listRelatives(plane.fullPathName(), parent=True))
 
     def addCurveBaseControllers(self, crv_root):
 
@@ -382,7 +361,7 @@ class Component(component.Main):
                 curve.applyRopeCnsLocalWithUpv(cns, upv, self.crv_ctl, self.rope, cvo)
 
                 m = getTransform(cns)
-                m = setMatrixPosition(m, self.locsPos[i])
+                m = setMatrixPosition(m, self._objToWorld(self.locsPos[i]))
 
                 if mirror:
                     if lower:
@@ -396,20 +375,21 @@ class Component(component.Main):
                     else:
                         m = setMatrixScale(m, scl=[1, 1, 1])
 
-                xforms.append(m)
+                mAsList = [item for tup in m.get() for item in tup]
+                xforms.append(mAsList)
 
                 if i == (self.left_index + 1):
                     sideCtl = controls[self.left_index]
                     sideNpo = sideCtl.getParent()
-                    pos = cmds.xform(sideNpo.fullPath(), q=True, ws=True, translation=True)
+                    pos = cmds.xform(sideNpo.longName(), q=True, ws=True, translation=True)
                     pm.xform(sideNpo, ws=True, matrix=xforms[self.left_index - 1])
                     pm.xform(sideNpo, ws=True, translation=pos)
 
                 if i == self.right_index + 1:
                     rightCtl = controls[self.right_index]
                     rightNpo = rightCtl.getParent()
-                    pos = cmds.xform(rightNpo.fullPath(), q=True, ws=True, translation=True)
-                    pm.xform(rightNpo, ws=True, matrix=m)
+                    pos = cmds.xform(rightNpo.longName(), q=True, ws=True, translation=True)
+                    pm.xform(rightNpo, ws=True, matrix=mAsList)
                     pm.xform(rightNpo, ws=True, translation=pos)
 
                 npo_name = self.getName("rope_{}_jnt_npo".format(_index))
@@ -510,9 +490,9 @@ class Component(component.Main):
             src2 = ctls[src2Index]
             dst = ctls[dstIndex]
 
-            src1Path = src1.fullPath()
-            src2Path = src2.fullPath()
-            dstPath = ctls[dstIndex].getParent().fullPath()
+            src1Path = src1.longName()
+            src2Path = src2.longName()
+            dstPath = ctls[dstIndex].getParent().longName()
 
             r2, r1 = calcDistRatio(src1, src2, dst)
 
@@ -551,8 +531,11 @@ class Component(component.Main):
     def _addControls(self, crv_ctl, option):
 
         cvs = self.getCurveCVs(crv_ctl)
+        sum_cvs = datatypes.Vector()
+        for cv in cvs:
+            sum_cvs += cv
 
-        center_pos = sum(cvs) / len(cvs)  # type: ignore
+        center_pos = sum_cvs / len(cvs)  # type: ignore
         total_dist = sum([(x - center_pos).length() for x in cvs])
         average_dist = total_dist / len(cvs)
 
@@ -843,6 +826,45 @@ class Component(component.Main):
 
         self.relatives["root"] = self.root
 
+    def _worldToObj(self, pos):
+        # type: (list[float]) -> dt.Vector
+
+        m = getTransform(self.root)
+        m = om.MMatrix(m)
+
+        np = om.MMatrix()
+        np.setToIdentity()
+        np[12] = pos[0]
+        np[13] = pos[1]
+        np[14] = pos[2]
+
+        pos[0] = (m.inverse() * np)[12]
+        pos[1] = (m.inverse() * np)[13]
+        pos[2] = (m.inverse() * np)[14]
+        positions = datatypes.Vector(pos[0], pos[1], pos[2])
+
+        return positions
+
+    def _objToWorld(self, pos):
+        # type: (list[float]) -> dt.Vector
+
+        m = getTransform(self.root)
+        m = om.MMatrix(m)
+
+        np = om.MMatrix()
+        np.setToIdentity()
+        np[12] = pos[0]
+        np[13] = pos[1]
+        np[14] = pos[2]
+
+        pos[0] = (m * np)[12]
+        pos[1] = (m * np)[13]
+        pos[2] = (m * np)[14]
+
+        positions = datatypes.Vector(pos[0], pos[1], pos[2])
+
+        return positions
+
 
 def ghostSliderForMouth(ctlGhost, surface, sliderParent):
     """Modify the ghost control behaviour to slide on top of a surface
@@ -987,7 +1009,7 @@ def createGhostWithParentConstraint(ctl, parent=None, connect=True):
                        worldSpace=True)
         pm.parent(newCtl, oTra)
     if connect:
-        with ymt_util.unlockAttribute(ctl.fullPathName()):
+        with ymt_util.unlockAttribute(ctl.longName()):
             pm.parentConstraint(newCtl, ctl, mo=True)
         # rigbits.connectLocalTransform([newCtl, ctl])
         rigbits.connectUserDefinedChannels(newCtl, ctl)

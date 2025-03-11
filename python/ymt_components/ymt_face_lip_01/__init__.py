@@ -9,8 +9,14 @@ import maya.cmds as cmds
 import maya.OpenMaya as om1
 import maya.api.OpenMaya as om
 
-import pymel.core as pm
-from pymel.core import datatypes
+try:
+    import mgear.pymaya as pm
+except ImportError:
+    import pymel.core as pm
+try:
+    from mgear.pymaya import datatypes
+except ImportError:
+    from pymel.core import datatypes
 
 import exprespy.cmd
 
@@ -231,7 +237,7 @@ class Component(component.Main):
 
         self.addCurves(self.crv_root, plane)
         self.addCurveBaseControllers(self.crv_root, plane)
-        cmds.delete(cmds.listRelatives(plane.fullPathName(), parent=True))
+        cmds.delete(cmds.listRelatives(plane.longName(), parent=True))
 
         if not self.surfRef:
             self.sliding_surface = pm.duplicate(self.guide.getObjects(self.guide.root)["sliding_surface"])[0]
@@ -243,7 +249,7 @@ class Component(component.Main):
 
         t = getTransform(self.root)
         gen = curve.createCurveFromOrderedEdges
-        planeNode = pm.PyNode(plane.fullPathName())
+        planeNode = pm.PyNode(plane.longName())
 
         # -------------------------------------------------------------------
         def _inner(edges, name):
@@ -270,16 +276,16 @@ class Component(component.Main):
             return crv, ctl
 
         # -------------------------------------------------------------------
-        edgeList = ["{}.e[{}]".format(plane.fullPathName(), 0)]
+        edgeList = ["{}.e[{}]".format(plane.longName(), 0)]
         for i in range(1, self.num_uplocs + 1):
-            edgeList.append("{}.e[{}]".format(plane.fullPathName(), i * 2 + 1))
+            edgeList.append("{}.e[{}]".format(plane.longName(), i * 2 + 1))
         edgeList = [pm.PyNode(x) for x in edgeList]
         self.upCrv, self.upCrv_ctl = _inner(edgeList, "upper")
 
         # -------------------------------------------------------------------
         edgeList = []
         for i in reversed(range(self.num_uplocs + 1, self.num_uplocs + self.num_lowlocs + 2)):
-            edgeList.append("{}.e[{}]".format(plane.fullPathName(), i * 2 + 1))
+            edgeList.append("{}.e[{}]".format(plane.longName(), i * 2 + 1))
         edgeList = [pm.PyNode(x) for x in edgeList]
         self.lowCrv, self.lowCrv_ctl = _inner(edgeList, "lower")
 

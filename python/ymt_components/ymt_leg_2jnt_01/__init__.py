@@ -1,7 +1,13 @@
 """Component Leg 2 joints 01 module"""
 
-import pymel.core as pm
-from pymel.core import datatypes
+try:
+    import mgear.pymaya as pm
+except ImportError:
+    import pymel.core as pm
+try:
+    from mgear.pymaya import datatypes
+except ImportError:
+    from pymel.core import datatypes
 
 from mgear.shifter import component
 import mgear.shifter_classic_components.leg_2jnt_01 as leg_2jnt_01

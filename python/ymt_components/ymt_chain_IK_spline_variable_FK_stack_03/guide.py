@@ -20,8 +20,14 @@ from maya.app.general.mayaMixin import MayaQWidgetDockableMixin
 from maya.app.general.mayaMixin import MayaQDockWidget
 
 from . import settingsUI as sui
-import pymel.core as pm
-from pymel.core import datatypes  # pylint: disable=import-error
+try:
+    import mgear.pymaya as pm
+except ImportError:
+    import pymel.core as pm
+try:
+    from mgear.pymaya import datatypes
+except ImportError:
+    from pymel.core import datatypes  # pylint: disable=import-error
 
 from . import chain_guide_initializer
 

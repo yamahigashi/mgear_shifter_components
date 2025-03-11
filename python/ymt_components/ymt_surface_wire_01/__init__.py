@@ -6,8 +6,14 @@ import maya.cmds as cmds
 # import maya.OpenMaya as om1
 import maya.api.OpenMaya as om
 
-import pymel.core as pm
-from pymel.core import datatypes
+try:
+    import mgear.pymaya as pm
+except ImportError:
+    import pymel.core as pm
+try:
+    from mgear.pymaya import datatypes
+except ImportError:
+    from pymel.core import datatypes
 
 from mgear.shifter import component
 
@@ -169,7 +175,7 @@ class Component(component.Main):
             self.float_npos.append(npo)
             self.float_ctls.append(ctl)
 
-        # cmds.delete(self.dummyCurve.fullPathName())
+        # cmds.delete(self.dummyCurve.longName())
 
     def addController(self, index, t):
 
@@ -211,7 +217,7 @@ class Component(component.Main):
         )
         cmds.dgeval(self.curve.name() + ".v", self.curve.name() + ".v")
         self.target = curve.createCurveFromCurve(
-            self.curve.fullPathName(),
+            self.curve.longName(),
             self.getName("curve_target"),
             nbPoints=8,
             parent=self.crv_root,
@@ -243,7 +249,7 @@ class Component(component.Main):
             cmds.setAttr(cns + ".worldUpVectorX", 0)
             cmds.setAttr(cns + ".worldUpVectorY", 0)
             cmds.setAttr(cns + ".worldUpVectorZ", 1)
-            # cmds.connectAttr(self.root.fullPathName() + ".worldMatrix", cns + ".worldUpMatrix")  # object rotation up
+            # cmds.connectAttr(self.root.longName() + ".worldMatrix", cns + ".worldUpMatrix")  # object rotation up
             cmds.setAttr(cns + ".frontAxis", 0)  # front axis y
             cmds.setAttr(cns + ".upAxis", 2)  # up axis x
             cmds.setAttr(cns + ".inverseFront", True)
@@ -414,8 +420,8 @@ class Component(component.Main):
 
     def connect_rivet(self, npo, index):
         rivets = ymt_util.apply_rivet_constrain_to_selected(self.sliding_surface, npo)
-        cmds.parent(rivets[0], self.sliding_surface.getParent().fullPath(), relative=True)
-        cmds.parentConstraint(rivets[0], npo.fullPath(), mo=True)
+        cmds.parent(rivets[0], self.sliding_surface.getParent().longName(), relative=True)
+        cmds.parentConstraint(rivets[0], npo.longName(), mo=True)
         ymt_util.setKeyableAttributesDontLockVisibility(pm.PyNode(rivets[0]), [])
 
     # =====================================================

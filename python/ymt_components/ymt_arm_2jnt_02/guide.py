@@ -30,7 +30,10 @@
 
 from functools import partial
 # pyMel
-import pymel.core as pm
+try:
+    import mgear.pymaya as pm
+except ImportError:
+    import pymel.core as pm
 
 # mgear
 import mgear.shifter_classic_components.arm_2jnt_04.guide as arm_2jnt_04
