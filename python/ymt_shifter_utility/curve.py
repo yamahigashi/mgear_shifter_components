@@ -316,7 +316,7 @@ def createCurveFromCurve(srcCrv, name, nbPoints, parent=None, m=dt.Matrix(), clo
         _, p = sc.closestPoint(pos0, space=om2.MSpace.kObject)
 
     else:
-        increment = paramLength / nbPoints
+        increment = paramLength / (nbPoints - 1)
         p = paramStart
 
     positions = []
@@ -1301,7 +1301,10 @@ def createCurveOnSurfaceFromCurve(crv, surface, name):
 
     src_crv = getMFnNurbsCurve(crv)
     close = src_crv.form == 3
-    nbPoints = src_crv.numCVs + src_crv.degree
+    if close:
+        nbPoints = src_crv.numCVs + src_crv.degree
+    else:
+        nbPoints = src_crv.numCVs
 
     t = getTransform(crv)
     targetCrv = createCurveFromCurve(
@@ -1316,11 +1319,13 @@ def createCurveOnSurfaceFromCurve(crv, surface, name):
     localMat = ymt_shifter_utility.getMultMatrixOfAtoB(crv, surface, skip_last=True)
     invLocal = pm.createNode("inverseMatrix")
     pm.connectAttr(localMat + ".matrixSum", invLocal + ".inputMatrix")
+    info = pm.createNode("curveInfo")
+    pm.connectAttr(crv + ".local", info + ".inputCurve")
 
     for pointNumber in range(nbPoints):
         compMat = pm.createNode("composeMatrix")
         pm.connectAttr(
-            crv + ".editPoints[%s]" % pointNumber,
+            info + ".controlPoints[%s]" % pointNumber,
             compMat + ".inputTranslate"
         )
 
@@ -1382,28 +1387,6 @@ def createCurveOnSurfaceFromCurve(crv, surface, name):
         )
 
     return targetCrv
-
-
-def gear_curvecns_op(crv, inputs=[]):
-    """
-    create mGear curvecns node.
-
-    Arguments:
-        crv (nurbsCurve): Nurbs curve.
-        inputs (List of dagNodes): Input object to drive the curve. Should be
-            same number as crv points.
-            Also the order should be the same as the points
-
-    Returns:
-        pyNode: The curvecns node.
-    """
-    pm.select(crv)
-    node = pm.deformer(type="mgear_curveCns")[0]
-
-    for i, item in enumerate(inputs):
-        pm.connectAttr(item + ".worldMatrix", node + ".inputs[%s]" % i)
-
-    return node
 
 
 def applyCurveParamCns(src, target):
