@@ -19,25 +19,14 @@ from mgear.shifter import component
 
 from mgear.core import (
     transform,
-    # curve,
-    # applyop,
-    # attribute,
-    # icon,
-    # fcurve,
-    # vector,
-    # meshNavigation,
     node,
     primitive,
-    # utils,
 )
 from mgear.rigbits import ghost
 
 from mgear.core.transform import (
     getTransform,
-    # resetTransform,
-    # getTransformLookingAt,
-    # getChainTransform2,
-    # setMatrixPosition,
+    setMatrixPosition,
 )
 
 from mgear.core.primitive import (
@@ -149,6 +138,11 @@ class Component(component.Main):
 
     def addControllers(self):
 
+        if self.negate:
+            scl = [1, 1, -1]
+        else:
+            scl = [1, 1, 1]
+
         self.dummyCurve = curve.addCurve(
             self.crv_root,
             self.getName("dummy"),
@@ -171,6 +165,7 @@ class Component(component.Main):
                 position = curve.getPositionByRatio(self.dummyCurve, ratio)
 
             t = transform.setMatrixPosition(self.guide.atra[0], position)
+            t = transform.setMatrixScale(t, scl)
             npo, ctl = self.addController(index, t)
             self.float_npos.append(npo)
             self.float_ctls.append(ctl)
@@ -236,6 +231,10 @@ class Component(component.Main):
         ymt_util.setKeyableAttributesDontLockVisibility(self.target, [])
         ymt_util.setKeyableAttributesDontLockVisibility(self.surfaceCurve, [])
         # ymt_util.setKeyableAttributesDontLockVisibility(self.wire, [])
+        if self.negate:
+            scl = [1, 1, -1]
+        else:
+            scl = [1, 1, 1]
 
         for i, (pos, tra) in enumerate(
                 zip(self.guide.apos[1:-1],
@@ -243,6 +242,7 @@ class Component(component.Main):
                 )
         ):
 
+            tra = transform.setMatrixScale(tra, scl)
             adj = addTransform(self.ctl_root, self.getName("detail{}_adj".format(str(i))), tra)
             cns = curve.applyPathConstrainLocal(adj, self.surfaceCurve)
             cmds.setAttr(cns + ".worldUpType", 2)  # object rotation up
