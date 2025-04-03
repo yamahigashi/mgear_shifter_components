@@ -99,11 +99,11 @@ class Component(arm_2jnt_04.Component):
 
         ref = []
         for ref_name in ref_names:
-            ref.append(self.rig.findRelative(ref_name))
+            ref.append(self.rig.findRelative(ref_name).getName())
 
-        ref.append(cns_obj)
-        cns_node = pm.parentConstraint(*ref, maintainOffset=True)
-        cns_attr = pm.parentConstraint(
+        ref.append(cns_obj.getName())
+        cns_node = cmds.parentConstraint(*ref, maintainOffset=True)[0]
+        cns_attr = cmds.parentConstraint(
             cns_node, query=True, weightAliasList=True)
 
         # check if the ref Array is for IK or Up vector
@@ -124,7 +124,7 @@ class Component(arm_2jnt_04.Component):
                 pm.setAttr(node_name + ".operation", 0)
                 pm.setAttr(node_name + ".colorIfTrueR", 1)
                 pm.setAttr(node_name + ".colorIfFalseR", 0)
-                pm.connectAttr(node_name + ".outColorR", attr)
+                pm.connectAttr(node_name + ".outColorR", cns_node + "." + attr)
 
     def connect_standard(self):
         """standard connection definition for the component"""
