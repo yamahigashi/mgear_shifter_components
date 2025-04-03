@@ -534,7 +534,8 @@ def transform_to_euler(t):
     # type: (om.MTransformationMatrix|dt.Matrix) -> tuple[float, float, float]
 
     if not isinstance(t, om.MTransformationMatrix):
-        t = om.MTransformationMatrix(t)
+        mat = om.MMatrix(t)
+        t = om.MTransformationMatrix(mat)
 
     rot = t.rotation()
     rot = (math.degrees(rot[0]), math.degrees(rot[1]), math.degrees(rot[2]))

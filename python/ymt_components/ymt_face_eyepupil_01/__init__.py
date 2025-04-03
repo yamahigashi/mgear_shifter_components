@@ -5,8 +5,10 @@ import maya.cmds as cmds
 
 try:
     import mgear.pymaya as pm
+    import mgear.pymaya.datatypes as dt
 except ImportError:
     import pymel.core as pm
+    import pymel.core.datatypes as dt
 
 from mgear.shifter import component
 
@@ -94,9 +96,9 @@ class Component(component.Main):
                                t,
                                self.color_ik,
                                self.settings["icon"],
-                               w=self.settings["ctlSize"],
-                               h=self.settings["ctlSize"],
-                               d=self.settings["ctlSize"] * 0.05,
+                               w=self.settings["ctlSize"] * self.size * 0.05,
+                               h=self.settings["ctlSize"] * self.size * 0.05,
+                               d=self.settings["ctlSize"] * self.size * 0.05 * 0.05,
                                tp=self.parentCtlTag)
         self.addToSubGroup(self.ctl, self.primaryControllersGroupName)
 
@@ -109,16 +111,18 @@ class Component(component.Main):
         offset_mat = transform.setMatrixPosition(t, offset)
         self.proj_cns = primitive.addTransform(self.aim_cns, self.getName("proj_cns"), offset_mat)
 
-        t = self.guide.tra["lookat"]
+        pos = self.guide.pos["lookat"]
+        t = transform.setMatrixPosition(t, pos)
         self.ik_cns = primitive.addTransform(self.root, self.getName("ik_cns"), t)
         self.lookat = self.addCtl(self.ik_cns,
                                   "lookat_ctl",
                                   t,
                                   self.color_ik,
                                   "circle",
-                                  w=self.settings["ctlSize"],
-                                  h=self.settings["ctlSize"],
-                                  d=self.settings["ctlSize"],
+                                  w=self.settings["ctlSize"] * self.size * 0.18,
+                                  h=self.settings["ctlSize"] * self.size * 0.18,
+                                  d=self.settings["ctlSize"] * self.size * 0.18,
+                                  ro= dt.Vector([1.5708, 0.0, 0.0]),
                                   tp=self.parentCtlTag)
 
         self.addToSubGroup(self.lookat, self.primaryControllersGroupName)

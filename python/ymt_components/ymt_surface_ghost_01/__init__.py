@@ -115,7 +115,7 @@ class Component(component.Main):
 
         else:
             t = self.guide.tra["root"]
-            t = transform.setMatrixScale(t)
+            t = transform.setMatrixScale(t, [1, 1, 1])
 
         self.npo = addTransform(self.root, self.getName("npo"), t)
         self.surfaceCtl = self.addCtl(

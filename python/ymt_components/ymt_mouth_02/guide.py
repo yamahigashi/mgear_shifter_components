@@ -72,8 +72,7 @@ class Guide(guide.ComponentGuide):
         self.pUseIndex = self.addParam("useIndex", "bool", False)
         self.pParentJointIndex = self.addParam(
             "parentJointIndex", "long", -1, None, None)
-
-        return
+        self.pNormalizeSize = self.addParam("normalizeSize", "bool", False)
 
 
 ##########################################################

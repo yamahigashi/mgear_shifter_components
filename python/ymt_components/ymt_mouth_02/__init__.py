@@ -39,6 +39,8 @@ class Component(component.Main):
         self.detailControllersGroupName = "controllers_detail"  # TODO: extract to settings
         self.primaryControllersGroupName = "controllers_primary"  # TODO: extract to settings
 
+        self.normalizeSize = self.settings.get("normalizeSize", False)
+
         # jaw control
         t = transform.getTransformFromPos(self.guide.pos["jaw"])
 
@@ -193,8 +195,24 @@ class Component(component.Main):
         """
 
         # mouth center rotation
-        pm.connectAttr(self.jaw_ctl + ".rotateZ",
-                       self.mouthCenter + ".rotateZ")
+        pm.connectAttr(self.jaw_ctl + ".rotateZ", self.mouthCenter + ".rotateZ")
+
+        multx = pm.createNode("multDoubleLinear")
+        multy = pm.createNode("multDoubleLinear")
+        multz = pm.createNode("multDoubleLinear")
+
+        pm.connectAttr(self.jaw_ctl + ".translateX", multx + ".input1")
+        pm.connectAttr(self.jaw_ctl + ".translateY", multy + ".input1")
+        pm.connectAttr(self.jaw_ctl + ".translateZ", multz + ".input1")
+
+        if self.normalizeSize:
+            pm.setAttr(multx + ".input2", 10.0 / self.size)
+            pm.setAttr(multy + ".input2", 10.0 / self.size)
+            pm.setAttr(multz + ".input2", 10.0 / self.size)
+        else:
+            pm.setAttr(multx + ".input2", 1.0)
+            pm.setAttr(multy + ".input2", 1.0)
+            pm.setAttr(multz + ".input2", 1.0)
 
         # Node Creation ########
 
@@ -222,24 +240,28 @@ class Component(component.Main):
 
         # Node Conexions ########
 
+        tx = multx + ".output"
+        ty = multy + ".output"
+        tz = multz + ".output"
+
         # md_node_1
-        pm.connectAttr(self.jaw_ctl + ".translateY", md_node_1 + ".input1X")
+        pm.connectAttr(ty, md_node_1 + ".input1X")
         pm.connectAttr(self.vertRotation_att, md_node_1 + ".input2X")
 
         # md_node_2
-        pm.connectAttr(self.jaw_ctl + ".translateX", md_node_2 + ".input1X")
+        pm.connectAttr(tx, md_node_2 + ".input1X")
         pm.connectAttr(self.sideRotation_att, md_node_2 + ".input2X")
 
         # md_node_3
-        pm.connectAttr(self.jaw_ctl + ".translateY", md_node_3 + ".input1X")
+        pm.connectAttr(ty, md_node_3 + ".input1X")
         pm.connectAttr(self.lipsAlignSpeed_att, md_node_3 + ".input2X")
 
         # md_node_4
-        pm.connectAttr(self.jaw_ctl + ".translateY", md_node_4 + ".input1X")
+        pm.connectAttr(ty, md_node_4 + ".input1X")
         pm.connectAttr(self.verticalTranslation_att, md_node_4 + ".input2X")
 
         # md_node_5
-        pm.connectAttr(self.jaw_ctl + ".translateZ", md_node_5 + ".input1X")
+        pm.connectAttr(tz, md_node_5 + ".input1X")
         pm.connectAttr(self.frontalTranslation_att, md_node_5 + ".input2X")
 
         # md_node_6
