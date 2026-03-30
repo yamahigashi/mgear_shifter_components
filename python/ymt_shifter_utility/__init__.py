@@ -64,6 +64,11 @@ if sys.version_info > (3, 0):
         )
         import mgear.shifter.component as component  # noqa: F401
 
+    from typing import (
+        Union,  # noqa: F401
+        Optional,  # noqa: F401
+    )
+
 
 ##########################################################
 def collect_synoptic_windows(parent=None):
@@ -237,7 +242,7 @@ def applyPathCnsLocal(target, curve, u):
 
 
 def addCtlMetadata(self, ctl):
-    # type: (component.Main, pm.dt.Transform) -> None
+    # type: (component.Main, pm.datatypes.Transform) -> None
 
     name = ctl.name()
 
@@ -545,10 +550,28 @@ def transform_to_euler(t):
 
 # norm = self.guide.blades["blade"].y
 # pfx = self.getName("twistSpline")
-def convertToTwistSpline(comp, prefix, positions, crv, ikNb, norm, isClosed=False, is_cv_ctl=True, is_roll_ctl=True, is_otans_ctl=True, is_itans_ctl=True):
+def convertToTwistSpline(
+    comp: "component.Main",  # type: component.Main
+    prefix: str,
+    positions: list[dt.Vector],
+    crv: Union[pm.nt.NurbsCurve, pm.nt.Transform, str, om.MFnNurbsCurve],
+    ikNb: int,
+    norm: dt.Vector,
+    isClosed: bool=False,
+    is_cv_ctl: bool=True,
+    is_roll_ctl: bool=True,
+    is_otans_ctl: bool=True,
+    is_itans_ctl: bool=True,
+):
 
-    crvShape = crv.getShape()
-    curveFn = getAsMFnNode(crvShape.name(), om.MFnNurbsCurve)
+    if isinstance(crv, om.MFnNurbsCurve):
+        curveFn = crv
+    else:
+        # if crv is a PyNode, ensure it is a NurbsCurve
+        if isinstance(crv, str):
+            crv = pm.PyNode(crv)
+        crvShape = crv.getShape()
+        curveFn = getAsMFnNode(crvShape.name(), om.MFnNurbsCurve)
 
     # Get the curve data
     knots = curveFn.knots()
@@ -1335,7 +1358,7 @@ def apply_rivet_constrain_to_selected(mesh, targets):
 
 
 def apply_rivet_constrain_using_skin_weight(mesh, targets):
-    # type: (Text, List[Text]|Text) -> List[Text]
+    # type: (str, list[str]|str) -> list[str]
     """Apply parent constrain to given objects with weight from skinCluster"""
 
     if not isinstance(targets, list):
@@ -1344,7 +1367,7 @@ def apply_rivet_constrain_using_skin_weight(mesh, targets):
     if isinstance(mesh, nodetypes.Transform):
         mesh = mesh.name()
 
-    pins = []
+    cns = []
     for target in targets:
         if isinstance(target, nodetypes.Transform):
             target = target.name()
@@ -1358,20 +1381,31 @@ def apply_rivet_constrain_using_skin_weight(mesh, targets):
 
         parents = list(weights.keys())
         cns = cmds.parentConstraint(*parents, target, mo=True)
+        cmds.setAttr("{0}.interpType".format(cns[0]), 0)  # set to "no-flip"
         for i, parent in enumerate(parents):
             short = parent.split("|")[-1].split(":")[-1].split("|")[0]
             cmds.setAttr("{0}.{1}W{2}".format(cns[0], short, i), weights[parent])
+        cns.append(cns[0])
 
-    return pins
+    return cns
 
 
 def __get_skin_weights(mesh_name, cns_name):
-    # type: (Text, Text) -> Dict[Text, float]
+    # type: (str, str) -> Dict[str, float]
 
     # find closest vertex
     mesh_path = om.MGlobal.getSelectionListByName(mesh_name).getDagPath(0)
     pos = cmds.xform(cns_name, q=True, ws=True, t=True)
-    point = om.MPoint(pos)
+
+    return __get_skin_weights_of_position(mesh_name, pos)
+
+
+def __get_skin_weights_of_position(mesh_name, position):
+    # type: (str, str) -> dict[str, float]
+
+    # find closest vertex
+    mesh_path = om.MGlobal.getSelectionListByName(mesh_name).getDagPath(0)
+    point = om.MPoint(position)
 
     vertex, distance = get_nearest_vertex_on_point(mesh_path, point)
     comp = om.MFnSingleIndexedComponent().create(om.MFn.kMeshVertComponent)
@@ -1736,3 +1770,22 @@ def demote_controller(ctl):
 
     for ctl_grp in members:
         cmds.sets(ctl.longName(), rm=ctl_grp)
+
+
+_ROT_ORDER = {
+    "xyz": om.MEulerRotation.kXYZ,
+    "yzx": om.MEulerRotation.kYZX,
+    "zxy": om.MEulerRotation.kZXY,
+    "xzy": om.MEulerRotation.kXZY,
+    "yxz": om.MEulerRotation.kYXZ,
+    "zyx": om.MEulerRotation.kZYX,
+}
+
+
+_SPACE = {
+    "transform": om.MSpace.kTransform,    # = オブジェクト／ローカル
+    "object":    om.MSpace.kTransform,
+    "world":     om.MSpace.kWorld,
+    "pre":       om.MSpace.kPreTransform, # 親前
+    "post":      om.MSpace.kPostTransform,# 親後
+}

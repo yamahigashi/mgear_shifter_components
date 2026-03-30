@@ -158,6 +158,7 @@ class Guide(guide.ComponentGuide):
         self.pSurfaceReference = self.addParam("surfaceReference", "string", "")
         self.pCheekLeftReference = self.addParam("cheekLeftReference", "string", "")
         self.pCheekRightReference = self.addParam("cheekRightReference", "string", "")
+        self.pUpperLipJoints = self.addParam("upperLipJoints", "long", 4, 1)
 
     def modalPositions(self):
         """Launch a modal dialog to set position of the guide."""
@@ -275,6 +276,9 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
         cheekRightReference = self.root.attr("cheekRightReference").get()
         self.settingsTab.cheekRight_lineEdit.setText(cheekRightReference)
 
+        self.settingsTab.upperLipSpinBox.setValue(
+            self.root.attr("upperLipJoints").get())
+
     def create_componentLayout(self):
 
         self.settings_layout = QtWidgets.QVBoxLayout()
@@ -345,6 +349,14 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
                 self.removeReference,
                 self.settingsTab.cheekRight_lineEdit,
                 "cheekRightReference"
+            )
+        )
+
+        self.settingsTab.upperLipSpinBox.valueChanged.connect(
+            partial(
+                self.updateSpinBox,
+                self.settingsTab.upperLipSpinBox,
+                "upperLipJoints"
             )
         )
 

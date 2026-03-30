@@ -7,7 +7,7 @@
 #
 # WARNING! All changes made in this file will be lost!
 
-from PySide2 import QtCore, QtGui, QtWidgets
+from Qt import QtCore, QtGui, QtWidgets
 
 class Ui_baker(object):
     def setupUi(self, baker):
@@ -454,7 +454,7 @@ class Ui_baker(object):
         palette.setBrush(QtGui.QPalette.Disabled, QtGui.QPalette.ToolTipText, brush)
         self.b_selB.setPalette(palette)
         font = QtGui.QFont()
-        font.setWeight(75)
+        # font.setWeight(75)
         font.setBold(True)
         self.b_selB.setFont(font)
         self.b_selB.setFlat(False)
@@ -599,7 +599,7 @@ class Ui_baker(object):
         palette.setBrush(QtGui.QPalette.Disabled, QtGui.QPalette.ToolTipText, brush)
         self.b_selF.setPalette(palette)
         font = QtGui.QFont()
-        font.setWeight(75)
+        # font.setWeight(75)
         font.setBold(True)
         self.b_selF.setFont(font)
         self.b_selF.setObjectName("b_selF")
@@ -743,7 +743,7 @@ class Ui_baker(object):
         palette.setBrush(QtGui.QPalette.Disabled, QtGui.QPalette.ToolTipText, brush)
         self.b_selA.setPalette(palette)
         font = QtGui.QFont()
-        font.setWeight(75)
+        # font.setWeight(75)
         font.setBold(True)
         self.b_selA.setFont(font)
         self.b_selA.setObjectName("b_selA")
@@ -1175,7 +1175,7 @@ class Ui_baker(object):
         palette.setBrush(QtGui.QPalette.Disabled, QtGui.QPalette.ToolTipText, brush)
         self.b_selC.setPalette(palette)
         font = QtGui.QFont()
-        font.setWeight(75)
+        # font.setWeight(75)
         font.setBold(True)
         self.b_selC.setFont(font)
         self.b_selC.setObjectName("b_selC")
@@ -1319,7 +1319,7 @@ class Ui_baker(object):
         palette.setBrush(QtGui.QPalette.Disabled, QtGui.QPalette.ToolTipText, brush)
         self.b_selD.setPalette(palette)
         font = QtGui.QFont()
-        font.setWeight(75)
+        # font.setWeight(75)
         font.setBold(True)
         self.b_selD.setFont(font)
         self.b_selD.setObjectName("b_selD")
@@ -1751,7 +1751,7 @@ class Ui_baker(object):
         palette.setBrush(QtGui.QPalette.Disabled, QtGui.QPalette.ToolTipText, brush)
         self.b_selE.setPalette(palette)
         font = QtGui.QFont()
-        font.setWeight(75)
+        # font.setWeight(75)
         font.setBold(True)
         self.b_selE.setFont(font)
         self.b_selE.setObjectName("b_selE")

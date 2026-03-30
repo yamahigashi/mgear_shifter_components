@@ -8,9 +8,9 @@
 ## WARNING! All changes made in this file will be lost when recompiling UI file!
 ################################################################################
 
-from PySide2.QtCore import *
-from PySide2.QtGui import *
-from PySide2.QtWidgets import *
+from Qt.QtCore import *
+from Qt.QtGui import *
+from Qt.QtWidgets import *
 
 from mgear.synoptic.widgets import QuickSelButton
 from mgear.synoptic.widgets import MirrorPoseButton

@@ -229,12 +229,6 @@ class Component(component.Main):
             close=True
         )
         crv.attr("visibility").set(False)
-        # cvs = self.getCurveCVs(crv)
-        # center_pos = sum(cvs) / len(cvs)  # type: ignore
-        # for i, cv in enumerate(cvs):
-        #     offset = (cv - center_pos).normal() * self.FRONT_OFFSET
-        #     new_pos = [cv[0] + offset[0], cv[1] + offset[1], cv[2] + offset[2]]
-        #     crv.setCV(i, new_pos, space="world")
         self.crv = crv
 
     def addCurveBaseControllers(self, crv_root):
@@ -274,6 +268,7 @@ class Component(component.Main):
             ctlName,
             m=t,
             parent=crv_root)
+        fit_curve.fit_curve_on_curve(self.crv_ctl, self.rope, num_iterations=30, num_samples=30)
 
     def addControlJoints(self):
 
@@ -1010,16 +1005,16 @@ class Component(component.Main):
 
     def createCurveControl(self, crv, posTop, posLeft, posBottom, posRight, name, m=None, parent=None, symmetry=True):
         # type: (str, list[float], list[float], list[float], list[float], str, dt.Matrix, dt.Transform, bool) -> pm.nodetypes.Transform
-    
+
         # For now, we are not using this function, but we are keeping it here for future reference
         # posTop = inflate_position_by_curve_flattness(crv, posTop)
         # posLeft = inflate_position_by_curve_flattness(crv, posLeft)
         # posRight = inflate_position_by_curve_flattness(crv, posRight)
         # posBottom = inflate_position_by_curve_flattness(crv, posBottom)
-    
+
         ropeFn = curve.getMFnNurbsCurve(crv)
         ropeLength = ropeFn.length()
-    
+
         initial_positions = [
             posTop,
             ropeFn.getPointAtParam(ropeFn.findParamFromLength(ropeLength * 1.0 / 12.0), om.MSpace.kObject),
@@ -1036,31 +1031,31 @@ class Component(component.Main):
         ]
         initial_positions = [datatypes.Vector(p[0], p[1], p[2]) for p in initial_positions]
         crv_ctl = curve.addCurve(parent, name, initial_positions, close=True, degree=3, m=m)
-        fit_curve.fit_curve_on_curve(crv_ctl, crv, num_iterations=3)
-    
+        fit_curve.fit_curve_on_curve(crv_ctl, crv, num_iterations=300, symmetry=symmetry)
+
         cvs = crv_ctl.getCVs(space="object")
         posTop[1] = cvs[0][1]
         posTop[2] = cvs[0][2]
         crv_ctl.setCV(0, posTop, space="object")
-    
+
         posBottom[1] = cvs[6][1]
         posBottom[2] = cvs[6][2]
         crv_ctl.setCV(6, posBottom, space="object")
-    
+
         if symmetry:
             for l_index, r_index in [(1, 11), (2, 10), (3, 9), (4, 8), (5, 7)]:
                 pos_l = cvs[l_index]
                 pos_r = cvs[r_index]
-    
+
                 m_x = (abs(pos_l[0]) + abs(pos_r[0])) / 2.0
                 m = (pos_l + pos_r) / 2.0
-    
+
                 new_pos_l = ( m_x, m[1], m[2])
                 new_pos_r = (-m_x, m[1], m[2])
-    
+
                 crv_ctl.setCV(l_index, new_pos_l, space="object")
                 crv_ctl.setCV(r_index, new_pos_r, space="object")
-    
+
         return crv_ctl
 
 

@@ -47,6 +47,7 @@ from mgear.core.primitive import addTransform
 
 import ymt_shifter_utility as ymt_util
 from ymt_shifter_utility import twistSplineBuilder as tsBuilder
+from ymt_shifter_utility import pymel_to_pymaya as pym2m
 
 from logging import (  # noqa:F401 pylint: disable=unused-import, wrong-import-order
     # StreamHandler,
@@ -282,20 +283,20 @@ class Component(component.Main):
         roll = theta + math.pi
 
         tm = datatypes.TransformationMatrix(t)
-        tm.addRotation([0., roll, 0], "XYZ", om.MSpace.kObject)
+        pym2m.add_rotation(tm, (0., roll, 0), 'xyz', 'object', 'rad')
 
         return datatypes.Matrix(tm)
 
     def _addObjectsFkControl(self, i, parentdiv, parentctl, t, pt, parent_twistRef):
         # References
         tm = datatypes.TransformationMatrix(t)
-        tm.addRotation([0., 0., math.pi / -2.], "XYZ", om.MSpace.kObject)  # TODO: align with convention
-        tm.addRotation([0., math.pi / -2., 0], "XYZ", om.MSpace.kObject)
+        pym2m.add_rotation(tm, (0., 0., math.pi / -2.), 'xyz', 'object', 'rad')  # TODO: align with convention
+        pym2m.add_rotation(tm, (0., math.pi / -2., 0), 'xyz', 'object', 'rad')
         global_t  = datatypes.Matrix(tm)
 
         tm = datatypes.TransformationMatrix(pt)
-        tm.addRotation([0., 0., math.pi / -2.], "XYZ", om.MSpace.kObject)  # TODO: align with convention
-        tm.addRotation([0., math.pi / -2., 0], "XYZ", om.MSpace.kObject)
+        pym2m.add_rotation(tm, (0., 0., math.pi / -2.), 'xyz', 'object', 'rad')  # TODO: align with convention
+        pym2m.add_rotation(tm, (0., math.pi / -2., 0), 'xyz', 'object', 'rad')
         local_t  = datatypes.Matrix(tm)
 
         # global input

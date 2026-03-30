@@ -162,6 +162,12 @@ class Component(component.Main):
                 peek_x = self.locsPos[i][0]
                 self.right_index = i
 
+        self.upperLipJoints = self.settings.get("upperLipJoints", None)
+        if self.upperLipJoints is not None:
+            self.left_index = self.upperLipJoints
+            self.right_index = self.num_locs - self.upperLipJoints
+        print("left_index: {}, right_index: {}, upperLipJoints: {}".format(self.left_index, self.right_index, self.upperLipJoints))
+
         # --------------------------------------------------------
         self.ik_ctl = []
         self.ik_npo = []
@@ -180,15 +186,7 @@ class Component(component.Main):
         self.trackLvl = []
 
         self.crv = None
-        # self.lowCrv = None
         self.crv_ctl = None
-        self.lowCrv_ctl = None
-        self.upBlink = None
-        self.lowBlink = None
-        self.upTarget = None
-        self.lowTarget = None
-        self.midTarget = None
-        self.midTargetLower = None
 
         self.previusTag = self.parentCtlTag
 
@@ -273,29 +271,19 @@ class Component(component.Main):
                 nbPoints=nbPoints,
                 parent=crv_root,
                 m=t,
-                close=True
+                close=True,
             )
             new_crv.attr("visibility").set(False)
-
-            # new_crv = curve.createCurveFromCurveEvenLength(
-            #     crv,
-            #     self.getName(name),
-            #     nbPoints=nbPoints,
-            #     parent=crv_root,
-            #     m=t,
-            #     close=True
-            # )
-            # new_crv.attr("visibility").set(False)
-            crvFn = curve.getMFnNurbsCurve(new_crv)
+            crv_fn = curve.getMFnNurbsCurve(new_crv)
 
             if tobe_offset:
-                cvs = crvFn.cvPositions(om.MSpace.kObject)
+                cvs = crv_fn.cvPositions(om.MSpace.kObject)
                 points = []
-                for i, cv in enumerate(cvs):
+                for cv in cvs:
                     offset = [cv[0], cv[1], cv[2] + self.FRONT_OFFSET]
                     point = om.MPoint(offset)
                     points.append(point)
-                crvFn.setCVPositions(points, om.MSpace.kObject)
+                crv_fn.setCVPositions(points, om.MSpace.kObject)
 
             return new_crv
 
@@ -320,6 +308,7 @@ class Component(component.Main):
 
         cvsObject = self.getCurveCVs(crv, "object")
 
+        logger.debug("Adding rope control joints... self.left_index: {}, self.right_index: {}".format(self.left_index, self.right_index))
         xforms = []  # type: List[datatypes.Matrix] # to store xforms for each cv
         for i, _ in enumerate(cvsObject):
 
@@ -350,6 +339,7 @@ class Component(component.Main):
                 else:
                     _index = (tmp - i + self.right_index - 1)
 
+            logger.debug("Adding rope control joint: {}, side: {}, index: {}".format(i, oSide, _index))
             with ymt_util.overrideNamingAttributeTemporary(self, side=oSide):
 
                 cvo = cvsObject[i]
@@ -368,7 +358,7 @@ class Component(component.Main):
                         m = setMatrixScale(m, scl=[1, 1, 1])
                     else:
                         m = setMatrixScale(m, scl=[-1, 1, 1])
-     
+
                 else:
                     if lower:
                         m = setMatrixScale(m, scl=[-1, 1, 1])
