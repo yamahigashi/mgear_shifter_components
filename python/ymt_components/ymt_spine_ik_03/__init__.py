@@ -16,7 +16,7 @@ except ImportError:
 
 from mgear.shifter import component
 
-from mgear.core import transform, primitive, curve, applyop
+from mgear.core import transform, curve, applyop
 from mgear.core import attribute, node, icon, fcurve, vector
 
 from mgear.core.transform import getTransform
@@ -28,7 +28,10 @@ from mgear.core.primitive import addTransform
 
 
 import ymt_shifter_utility as ymtutil
-from ymt_shifter_utility import twistSplineBuilder as tsBuilder
+from ymt_shifter_utility import (
+    twistSplineBuilder as tsBuilder,
+    pymel_to_pymaya as pym2m,
+)
 
 
 def initialize_tsbuilder_conventions():
@@ -130,15 +133,27 @@ class Component(component.Main):
         else:
             positions = [x for x in self.guide.apos]
 
-        self.dummy_crv = curve.addCurve(
+        dummy_crv = curve.addCurve(
             self.root,
             self.getName("dummy_crv"),
             positions,
             close=False,
-            degree=min([len(positions) - 1, 3])
+            degree=min([len(positions) - 1, 3]),
         )
         cmds.nurbsCurveToBezier()  # type: ignore
+        shape = dummy_crv.getShape()
+
+        self.dummy_crv = ymtutil.getAsMFnNode(shape.name(), om.MFnNurbsCurve)
+        curveFn = ymtutil.getAsMFnNode(shape.name(), om.MFnNurbsCurve)
+        # Get the curve data
+        knots = curveFn.knots()
+        params = list(knots)[1::3]
+        numCVs = len(params)
+        numJoints = min(len(positions), numCVs + 2)  # head and tail
+
         self.length = self.dummy_crv.length()
+
+        cmds.nurbsCurveToBezier()  # type: ignore
         self.division = len(positions)
 
         norm = self.guide.blades["blade"].y
@@ -156,17 +171,24 @@ class Component(component.Main):
                 is_otans_ctl=True,
                 is_itans_ctl=True
         )
-        cvs, oTans, iTans, joints, master_control, self.spline = tmpRes
-        cmds.delete(master_control)
 
-        self.out_ctl = [pm.PyNode(x) for x in oTans]
-        self.in_ctl = [pm.PyNode(x) for x in iTans]
+        cvs, oTans, iTans, joints, master_control, self.spline = tmpRes
+        # cmds.delete(master_control)
+
+        # self.out_ctl = [pm.PyNode(x) for x in oTans]
+        # self.in_ctl = [pm.PyNode(x) for x in iTans]
         self.bts_joints = [pm.PyNode(x) for x in joints]
 
         for i in range(self.ikNb):
             self.addObjectsChainIk(i, self.dummy_crv, cvs)
 
-        pm.delete(self.dummy_crv)
+        try:
+            if isinstance(dummy_crv, pm.nt.Transform):
+                cmds.delete(dummy_crv.getName())
+            else:
+                cmds.delete(dummy_crv)
+        except RuntimeError:
+            pass
         # Curves -------------------------------------------
         centers = [x for x in self.ik_ctl]
         for _ in range(2):
@@ -177,11 +199,10 @@ class Component(component.Main):
 
     def addObjectsChainIk(self, i, crv, twist_iks):
 
-        cvs = crv.length()
         if i == 0:
             u = 0.
         else:
-            u = crv.findParamFromLength(cvs / i)
+            u = crv.findParamFromLength(self.length / i)
 
         space = om.MSpace.kWorld
         pos = crv.getPointAtParam(u, space)
@@ -247,7 +268,7 @@ class Component(component.Main):
         attribute.setInvertMirror(ik_ctl, ["tx", "rz", "ry"])
 
         # ik global ref
-        ik_global_ref = primitive.addTransform(
+        ik_global_ref = addTransform(
             ik_ctl,
             self.getName("ik%s_global_ref" % i),
             global_t)
@@ -270,9 +291,12 @@ class Component(component.Main):
         roll = math.degrees(theta)
 
         tm = datatypes.TransformationMatrix(t)
-        tm.addRotation([0., roll, 0], 'XYZ', om.MSpace.kObject)
+        rot = (0.0, roll, 0.0)
+        tm = pym2m.add_rotation(tm, rot, "XYZ", om.MSpace.kObject, unit="rad")
+        mat = tm.asMatrix()
+        mat = [x for x in mat]  # Convert to list for compatibility with Maya API
 
-        return datatypes.Matrix(tm)
+        return datatypes.Matrix(mat)
 
     def addObjectsFkControl(self, joints):
 
@@ -301,14 +325,27 @@ class Component(component.Main):
     def _addObjectsFkControl(self, i, parentdiv, parentctl, t, pt):
         # References
         tm = datatypes.TransformationMatrix(t)
-        tm.addRotation([0., 0., math.pi / -2.], 'XYZ', om.MSpace.kObject)  # TODO: align with convention
-        tm.addRotation([0., math.pi / -2., 0], 'XYZ', om.MSpace.kObject)
-        global_t  = datatypes.Matrix(tm)
+        tm = pym2m.add_rotation(tm, [0.0, 0.0, math.pi / -2.0], "XYZ", om.MSpace.kObject, unit="rad")
+        tm = pym2m.add_rotation(tm, [0.0, -math.pi / -2.0, 0], "XYZ", om.MSpace.kObject, unit="rad")
+        mat = tm.asMatrix()
+        global_t  = datatypes.Matrix([
+            mat[0], mat[1], mat[2], mat[3],
+            mat[4], mat[5], mat[6], mat[7],
+            mat[8], mat[9], mat[10], mat[11],
+            mat[12], mat[13], mat[14], mat[15]
+        ])
+            
 
         tm = datatypes.TransformationMatrix(pt)
-        tm.addRotation([0., 0., math.pi / -2.], 'XYZ', om.MSpace.kObject)  # TODO: align with convention
-        tm.addRotation([0., math.pi / -2., 0], 'XYZ', om.MSpace.kObject)
-        local_t  = datatypes.Matrix(tm)
+        tm = pym2m.add_rotation(tm, [0.0, 0.0, math.pi / -2.0], "XYZ", om.MSpace.kObject, unit="rad")
+        tm = pym2m.add_rotation(tm, [0.0, -math.pi / -2.0, 0], "XYZ", om.MSpace.kObject, unit="rad")
+        mat = tm.asMatrix()
+        local_t  = datatypes.Matrix([
+            mat[0], mat[1], mat[2], mat[3],
+            mat[4], mat[5], mat[6], mat[7],
+            mat[8], mat[9], mat[10], mat[11],
+            mat[12], mat[13], mat[14], mat[15]
+        ])
 
         # global input
         div_cns = addTransform(parentdiv, self.getName("%s_cns" % i))
@@ -553,7 +590,6 @@ class Component(component.Main):
         # break FK hierarchical orient
         tail_count = len(self.guide.apos) - self.surplusFkNb + 1
 
-        print(f"{i=}, {tail_count=}, {len(self.guide.apos)=}, {self.surplusFkNb=}")
         if i not in (0, len(self.guide.apos)):
 
             s = self.fk_ctl[i - 1]
@@ -689,11 +725,17 @@ class Component(component.Main):
 
         # for i in range(0, len(self.fk_ctl) - 1):
 
-        for i in range(0, len(self.guide.apos) - 1):
+        if self.settings["isSplitHip"]:
+            self.relatives["root"] = self.fk_hip_ctl
+            self.controlRelatives["root"] = self.fk_hip_ctl
 
-            if self.settings["isSplitHip"]:
-                self.relatives["root"] = self.fk_hip_ctl
-                self.controlRelatives["root"] = self.fk_hip_ctl
+        self.relatives["0_loc"] = self.fk_ctl[1]
+        self.controlRelatives["0_loc"] = self.fk_ctl[1]
+
+        self.jointRelatives["0_loc"] = (2)
+        self.aliasRelatives["0_ctl"] = (2)
+
+        for i in range(0, len(self.guide.apos) - 1):
 
             self.relatives["%s_loc" % i] = self.fk_ctl[i + 1]
             self.controlRelatives["%s_loc" % i] = self.fk_ctl[i + 1]
@@ -701,11 +743,6 @@ class Component(component.Main):
             self.jointRelatives["%s_loc" % (i)] = (i + 2)
             self.aliasRelatives["%s_ctl" % (i)] = (i + 2)
 
-            self.relatives["0_loc"] = self.fk_ctl[1]
-            self.controlRelatives["0_loc"] = self.fk_ctl[1]
-
-            self.jointRelatives["0_loc"] = (2)
-            self.aliasRelatives["0_ctl"] = (2)
 
     def addToSubGroup(self, obj, group_name):
 
@@ -729,8 +766,8 @@ def test():
         n = pm.PyNode(x)
         xf = getTransform(n)[3]
         xf = map(lambda x: "{0:.2f}".format(x), xf)
-        print(x, xf)
-        print(x, map(lambda x: "{0:.2f}".format(x), n.getMatrix(worldSpace=False)[3]))
+        # print(x, xf)
+        # print(x, map(lambda x: "{0:.2f}".format(x), n.getMatrix(worldSpace=False)[3]))
     cmds.refresh(suspend=True)
     cmds.refresh(suspend=False)
 
@@ -752,35 +789,61 @@ def cross(u, v):
     return s
 
 
+def getCurveFn(crv):
+    # type: (pm.nt.NurbsCurve|pm.nt.Transform|str) -> om.MFnNurbsCurve
+
+    objects = om.MSelectionList()
+    objects.add(crv.getName())
+    dag = objects.getDagPath(0)
+
+    return om.MFnNurbsCurve(dag)
+
+    if isinstance(crv, str):
+        sel.add(crv)
+    else:
+        try:
+            sel.add(crv.name())
+        except AttributeError:
+            print(f"Invalid curve object: {crv}")
+            raise
+
+    dag = sel.getDagPath(0)
+    curve_fn = om.MFnNurbsCurve(dag)
+    if curve_fn is not None:
+        return curve_fn
+
+    raise RuntimeError("Failed to get MFnNurbsCurve for the curve: {}".format(crv.name()))
+
+
 def getCurveUAtPoint(crv, position):
     point = om1.MPoint(position[0], position[1], position[2])
 
     dag = om1.MDagPath()
     obj = om1.MObject()
-    oList = om1.MSelectionList()
-    oList.add(crv.name())
-    oList.getDagPath(0, dag, obj)
+    sel = om1.MSelectionList()
+    sel.add(crv.name())
+    sel.getDagPath(0, dag, obj)
 
-    curveFn = om1.MFnNurbsCurve(dag)
-    length = curveFn.length()
+    curve_fn = om1.MFnNurbsCurve(dag)
+    length = curve_fn.length()
     crv.findParamFromLength(length)
 
     paramUtill = om1.MScriptUtil()
     paramPtr = paramUtill.asDoublePtr()
 
-    point = curveFn.closestPoint(point, paramPtr, 0.001, om1.MSpace.kObject)
-    curveFn.getParamAtPoint(point, paramPtr, 0.001, om1.MSpace.kObject)
+    point = curve_fn.closestPoint(point, paramPtr, 0.001, om1.MSpace.kObject)
+    curve_fn.getParamAtPoint(point, paramPtr, 0.001, om1.MSpace.kObject)
 
     param = paramUtill.getDouble(paramPtr)
-    curveFn.getPointAtParam(param, point, om1.MSpace.kObject)
-    length_at = curveFn.findLengthFromParam(param)
+    curve_fn.getPointAtParam(param, point, om1.MSpace.kObject)
+    length_at = curve_fn.findLengthFromParam(param)
 
     return length_at / length
 
 
 def vecProjection(a, b):
 
-    dot = a.dot(b)
+    dot = a * b
     length = b.length()
     tmp = dot / (length * length)
     p = [tmp * b.x, tmp * b.y, tmp * b.z]

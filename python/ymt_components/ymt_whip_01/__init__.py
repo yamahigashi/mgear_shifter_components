@@ -31,6 +31,7 @@ from mgear.core.transform import setMatrixPosition
 from mgear.core.primitive import addTransform
 
 import ymt_shifter_utility as ymt_util
+from ymt_shifter_utility import pymel_to_pymaya as pym2m
 
 ##########################################################
 # COMPONENT
@@ -327,15 +328,15 @@ class Component(component.Main):
         roll = theta + math.pi
 
         tm = datatypes.TransformationMatrix(t)
-        tm.addRotation([0., roll, 0], 'XYZ', om.MSpace.kObject)
+        pym2m.add_rotation(tm, (0., roll, 0), 'xyz', 'object', 'rad')
 
         return datatypes.Matrix(tm)
 
     def _addObjectsFkControl(self, i, parentdiv, parentctl, t, parent_twistRef):
         # References
         tm = datatypes.TransformationMatrix(t)
-        tm.addRotation([0., 0., math.pi / -2.], 'XYZ', om.MSpace.kObject)  # TODO: align with convention
-        tm.addRotation([0., math.pi / -2., 0], 'XYZ', om.MSpace.kObject)
+        pym2m.add_rotation(tm, (0., 0., math.pi / -2.), 'xyz', 'object', 'rad')  # TODO: align with convention
+        pym2m.add_rotation(tm, (0., math.pi / -2., 0), 'xyz', 'object', 'rad')
         global_t  = datatypes.Matrix(tm)
 
         # global input

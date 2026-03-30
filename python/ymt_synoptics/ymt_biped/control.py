@@ -1,6 +1,5 @@
 # import re
 import sys
-import six
 import maya.cmds as cmds
 try:
     import mgear.pymaya as pm
@@ -180,7 +179,8 @@ def applyMirror(nameSpace, mirrorEntry):
         if (
             pm.attributeQuery(attr, node=node, shortName=True, exists=True, keyable=True) and not node.attr(attr).isLocked()
         ):
-            if isinstance(val, (six.string_types, six.text_type)):
+            # if isinstance(val, (six.string_types, six.text_type)):
+            if isinstance(val, (str, Text)):
                 return
 
             node.attr(attr).set(val)

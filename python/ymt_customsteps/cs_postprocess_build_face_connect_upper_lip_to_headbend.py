@@ -53,7 +53,7 @@ class CustomShifterStep(cstp.customShifterMainStep):
             "{}.matrix".format(old),  # type: ignore
             s=False,
             d=True
-        )
+        ) or []
 
         for c in connections:
             sources = cmds.listConnections(

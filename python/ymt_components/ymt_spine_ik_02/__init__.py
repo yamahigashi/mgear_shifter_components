@@ -27,6 +27,7 @@ from mgear.core.primitive import addTransform
 
 
 import ymt_shifter_utility as ymtutil
+from ymt_shifter_utility import pymel_to_pymaya as pym2m
 ##########################################################
 # COMPONENT
 ##########################################################
@@ -247,16 +248,37 @@ class Component(component.Main):
         roll = theta + math.pi
 
         tm = datatypes.TransformationMatrix(t)
-        tm.addRotation([0., roll, 0], 'XYZ', om.MSpace.kObject)
+        pym2m.add_rotation(tm, (0., roll, 0), 'xyz', 'object', 'rad')
 
         return datatypes.Matrix(tm)
 
     def _addObjectsFkControl(self, i, parentdiv, parentctl, t, parent_twistRef):
         # References
         tm = datatypes.TransformationMatrix(t)
-        tm.addRotation([0., 0., math.pi / -2.], 'XYZ', om.MSpace.kObject)  # TODO: align with convention
-        tm.addRotation([0., math.pi / -2., 0], 'XYZ', om.MSpace.kObject)
-        global_t  = datatypes.Matrix(tm)
+        tm = pym2m.add_rotation(tm, (0.0, 0.0, math.pi / -2.0), order="xyz", space=om.MSpace.kObject, unit="rad")
+        tm = pym2m.add_rotation(tm, (0.0, math.pi / -2.0, 0.0), order="xyz", space=om.MSpace.kObject, unit="rad")
+        
+        try:
+            global_t  = datatypes.Matrix(tm)
+        except TypeError:
+            global_t = datatypes.Matrix()
+            _m = tm.asMatrix()
+            global_t.a00 = _m.getElement(0, 0)
+            global_t.a01 = _m.getElement(0, 1)
+            global_t.a02 = _m.getElement(0, 2)
+            global_t.a03 = _m.getElement(0, 3)
+            global_t.a10 = _m.getElement(1, 0)
+            global_t.a11 = _m.getElement(1, 1)
+            global_t.a12 = _m.getElement(1, 2)
+            global_t.a13 = _m.getElement(1, 3)
+            global_t.a20 = _m.getElement(2, 0)
+            global_t.a21 = _m.getElement(2, 1)
+            global_t.a22 = _m.getElement(2, 2)
+            global_t.a23 = _m.getElement(2, 3)
+            global_t.a30 = _m.getElement(3, 0)
+            global_t.a31 = _m.getElement(3, 1)
+            global_t.a32 = _m.getElement(3, 2)
+            global_t.a33 = _m.getElement(3, 3)
 
         # global input
         div_cns = addTransform(parentdiv, self.getName("%s_cns" % i))

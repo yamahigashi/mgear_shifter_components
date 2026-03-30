@@ -1,17 +1,21 @@
 """Module for curve fitting using Lion optimizer."""
 #############################################
+import typing
+
+import maya.api.OpenMaya as om2
 import maya.cmds as cmds
 import maya.mel as mel
-import maya.api.OpenMaya as om2
+
 from . import curve
 
 from logging import (  # noqa:F401 pylint: disable=unused-import, wrong-import-order
-    StreamHandler,
-    getLogger,
-    WARN,  # noqa: F401
     DEBUG,
-    INFO
+    INFO,
+    StreamHandler,
+    WARN,
+    getLogger,
 )
+
 
 handler = StreamHandler()
 handler.setLevel(DEBUG)
@@ -345,28 +349,77 @@ def optimize_multiple_cvs(
         cmds.progressBar(gMainProgressBar, edit=True, endProgress=True)
 
 
-def fit_curve_on_curve(curveA, curveB, cv_indices=None, num_samples=100, num_iterations=100):
-    # type: (om2.MFnNurbsCurve|str, om2.MFnNurbsCurve|str, list[int]|None, int, int) -> None
-    """Fit curveA on curveB using Lion optimizer.
+SYMMETRY_AXIS = typing.Literal["X", "Y", "Z"]
+def fit_curve_on_curve(
+    curve_a,
+    curve_b,
+    cv_indices=None,
+    num_samples=100,
+    num_iterations=30,
+    symmetry=False,
+    symmetry_axis="X",
+):
+    # type: (om2.MFnNurbsCurve|str, om2.MFnNurbsCurve|str, list[int]|None, int, int, bool, MIRROR_AXIS) -> None
+    """Fit curve_a on curve_b using Lion optimizer.
 
     Args:
-        curveA: MFnNurbsCurve or curve name
-        curveB: MFnNurbsCurve or curve name
+        curve_a: MFnNurbsCurve or curve name
+        curve_b: MFnNurbsCurve or curve name
         cv_indices: List of CV indices to optimize (default: all CVs)
         num_samples: Number of samples to compute the loss
         num_iterations: Number of optimization iterations
+        symmetry: Whether to apply symmetrying after optimization
+        symmetry_axis: Axis to symmetry ("X", "Y", or "Z")
 
     Returns:
         None
     """
 
-    if not isinstance(curveA, om2.MFnNurbsCurve):
-        curveA = curve.getMFnNurbsCurve(curveA)
+    if not isinstance(curve_a, om2.MFnNurbsCurve):
+        curve_a = curve.getMFnNurbsCurve(curve_a)
 
-    if not isinstance(curveB, om2.MFnNurbsCurve):
-        curveB = curve.getMFnNurbsCurve(curveB)
+    if not isinstance(curve_b, om2.MFnNurbsCurve):
+        curve_b = curve.getMFnNurbsCurve(curve_b)
 
     if cv_indices is None:
-        cv_indices = list(range(curveA.numCVs))  # type: ignore
+        cv_indices = list(range(curve_a.numCVs))  # type: ignore
 
-    optimize_multiple_cvs(curveA, curveB, cv_indices, num_samples=num_samples, num_iterations=num_iterations)
+    optimize_multiple_cvs(curve_a, curve_b, cv_indices, num_samples=num_samples, num_iterations=num_iterations)
+    if symmetry:
+        symmetry_curve(curve_a, axis=symmetry_axis)
+
+
+def symmetry_curve(mfn_curve, axis="X"):
+    # type: (om2.MFnNurbsCurve, SYMMETRY_AXIS) -> None
+    """Symmetry the curve along the specified axis.
+
+    Args:
+        mfn_curve: MFnNurbsCurve object
+        axis: Axis to symmetry ("X", "Y", or "Z")
+
+    Returns:
+        None
+    """
+    def _get_average_with_symmetry(a, b, axis_index):
+        b[axis_index] = -b[axis_index]
+        avg = om2.MPoint(
+            (a.x + b.x) / 2.0,
+            (a.y + b.y) / 2.0,
+            (a.z + b.z) / 2.0,
+        )
+
+        return avg
+
+    cvs_world = mfn_curve.cvPositions(om2.MSpace.kWorld)
+    num_cvs = len(cvs_world)
+    axis_index = {"X": 0, "Y": 1, "Z": 2}[axis.upper()]
+    mid_index = num_cvs // 2
+    for i in range(mid_index):
+        opposite_index = num_cvs - 1 - i
+        a = cvs_world[i]
+        b = cvs_world[opposite_index]
+        mirrored_pos = _get_average_with_symmetry(a, b, axis_index)
+        cvs_world[i] = mirrored_pos
+
+    mfn_curve.setCVPositions(cvs_world, om2.MSpace.kWorld)
+    mfn_curve.updateCurve()

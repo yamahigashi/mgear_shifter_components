@@ -11,3 +11,8 @@ MGEAR_SHIFTER_CUSTOMSTEP_PATH +:= python/ymt_customsteps
 + MAYAVERSION:2023 PLATFORM:win64 ymtshifterplugins 3.0 ./platforms/win64_2023
 + MAYAVERSION:2024 PLATFORM:win64 ymtshifterplugins 3.0 ./platforms/win64_2024
 + MAYAVERSION:2025 PLATFORM:win64 ymtshifterplugins 3.0 ./platforms/win64_2025
++ MAYAVERSION:2026 PLATFORM:win64 ymtshifterplugins 3.0 ./platforms/win64_2026
++ MAYAVERSION:2027 PLATFORM:win64 ymtshifterplugins 3.0 ./platforms/win64_2027
++ MAYAVERSION:2028 PLATFORM:win64 ymtshifterplugins 3.0 ./platforms/win64_2028
++ MAYAVERSION:2029 PLATFORM:win64 ymtshifterplugins 3.0 ./platforms/win64_2029
++ MAYAVERSION:2030 PLATFORM:win64 ymtshifterplugins 3.0 ./platforms/win64_2030
