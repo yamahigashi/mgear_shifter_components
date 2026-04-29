@@ -14,7 +14,10 @@ try:
     import mgear.pymaya as pm
 except ImportError:
     import pymel.core as pm
-import pymel.core.datatypes as dt
+try:
+    from mgear.pymaya import datatypes as dt
+except ImportError:
+    from pymel.core import datatypes as dt
 
 # mgear
 from mgear.shifter.component import MainComponent

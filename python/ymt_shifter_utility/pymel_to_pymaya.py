@@ -9,7 +9,10 @@ import sys
 from logging import INFO, getLogger
 from typing import Union
 
-from pymel.core import datatypes as dt
+try:
+    from mgear.pymaya import datatypes as dt
+except ImportError:
+    from pymel.core import datatypes as dt
 
 import maya.OpenMaya as om1
 import maya.api.OpenMaya as om

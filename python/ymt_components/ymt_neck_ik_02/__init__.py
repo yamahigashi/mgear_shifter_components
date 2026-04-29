@@ -5,7 +5,10 @@ import textwrap
 import maya.cmds as cmds
 import maya.api.OpenMaya as om2
 import pymel.core as pm
-import pymel.core.datatypes as dt
+try:
+    from mgear.pymaya import datatypes as dt
+except ImportError:
+    from pymel.core import datatypes as dt
 
 
 # mgear
