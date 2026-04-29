@@ -213,10 +213,10 @@ class Ui_Form(object):
         self.gridLayout.addLayout(self.verticalLayout_2, 0, 0, 1, 1)
 
         self.retranslateUi(Form)
-        QtCore.QObject.connect(self.ikfk_slider, QtCore.SIGNAL("sliderMoved(int)"), self.ikfk_spinBox.setValue)
-        QtCore.QObject.connect(self.ikfk_spinBox, QtCore.SIGNAL("valueChanged(int)"), self.ikfk_slider.setValue)
-        QtCore.QObject.connect(self.full3BonesIK_slider, QtCore.SIGNAL("valueChanged(int)"), self.full3BonesIK_spinBox.setValue)
-        QtCore.QObject.connect(self.full3BonesIK_spinBox, QtCore.SIGNAL("valueChanged(int)"), self.full3BonesIK_slider.setValue)
+        self.ikfk_slider.sliderMoved.connect(self.ikfk_spinBox.setValue)
+        self.ikfk_spinBox.valueChanged.connect(self.ikfk_slider.setValue)
+        self.full3BonesIK_slider.valueChanged.connect(self.full3BonesIK_spinBox.setValue)
+        self.full3BonesIK_spinBox.valueChanged.connect(self.full3BonesIK_slider.setValue)
         QtCore.QMetaObject.connectSlotsByName(Form)
 
     def retranslateUi(self, Form):

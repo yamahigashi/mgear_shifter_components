@@ -93,8 +93,8 @@ class Ui_Form(object):
         self.verticalLayout.addWidget(self.neutralPose_checkBox)
 
         self.retranslateUi(Form)
-        QtCore.QObject.connect(self.ikfk_slider, QtCore.SIGNAL("sliderMoved(int)"), self.ikfk_spinBox.setValue)
-        QtCore.QObject.connect(self.ikfk_spinBox, QtCore.SIGNAL("valueChanged(int)"), self.ikfk_slider.setValue)
+        self.ikfk_slider.sliderMoved.connect(self.ikfk_spinBox.setValue)
+        self.ikfk_spinBox.valueChanged.connect(self.ikfk_slider.setValue)
         QtCore.QMetaObject.connectSlotsByName(Form)
 
     def retranslateUi(self, Form):
@@ -108,4 +108,3 @@ class Ui_Form(object):
         self.mode_comboBox.setItemText(2, QtWidgets.QApplication.translate("Form", "FKI/IK", None, -1))
         self.ikfk_label.setText(QtWidgets.QApplication.translate("Form", "IK/FK Blend:", None, -1))
         self.neutralPose_checkBox.setText(QtWidgets.QApplication.translate("Form", "Nuetral pose", None, -1))
-

@@ -190,8 +190,8 @@ class Ui_Form(object):
         self.gridLayout.addWidget(self.pinRefArray_groupBox, 3, 0, 1, 1)
 
         self.retranslateUi(Form)
-        QtCore.QObject.connect(self.ikfk_slider, QtCore.SIGNAL("sliderMoved(int)"), self.ikfk_spinBox.setValue)
-        QtCore.QObject.connect(self.ikfk_spinBox, QtCore.SIGNAL("valueChanged(int)"), self.ikfk_slider.setValue)
+        self.ikfk_slider.sliderMoved.connect(self.ikfk_spinBox.setValue)
+        self.ikfk_spinBox.valueChanged.connect(self.ikfk_slider.setValue)
         QtCore.QMetaObject.connectSlotsByName(Form)
 
     def retranslateUi(self, Form):
