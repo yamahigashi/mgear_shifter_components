@@ -223,15 +223,15 @@ class Component(component.Main):
         # ik
         if self.settings["useRollCtl"]:
             for shp in self.roll_ctl.getShapes():
-                pm.connectAttr(str(self.blend_att), shp.attr("visibility"))
+                pm.connectAttr(str(self.blend_att), str(shp) + ".visibility")
         for bk_ctl in self.bk_ctl:
             for shp in bk_ctl.getShapes():
-                pm.connectAttr(str(self.blend_att), shp.attr("visibility"))
+                pm.connectAttr(str(self.blend_att), str(shp) + ".visibility")
 
         for shp in self.heel_ctl.getShapes():
-            pm.connectAttr(str(self.blend_att), shp.attr("visibility"))
+            pm.connectAttr(str(self.blend_att), str(shp) + ".visibility")
         for shp in self.tip_ctl.getShapes():
-            pm.connectAttr(str(self.blend_att), shp.attr("visibility"))
+            pm.connectAttr(str(self.blend_att), str(shp) + ".visibility")
 
         # Roll / Bank --------------------------------------
         if self.settings["useRollCtl"]:  # Using the controler
@@ -247,9 +247,9 @@ class Component(component.Main):
             clamp_node + ".outputB",
             pm.getAttr(self.in_piv.attr("rx")) * self.n_factor)
 
-        pm.connectAttr(clamp_node + ".outputR", self.heel_loc.attr("rz"))
-        pm.connectAttr(clamp_node + ".outputG", self.out_piv.attr("rx"))
-        pm.connectAttr(inAdd_nod + ".output", self.in_piv.attr("rx"))
+        pm.connectAttr(clamp_node + ".outputR", str(self.heel_loc) + ".rz")
+        pm.connectAttr(clamp_node + ".outputG", str(self.out_piv) + ".rx")
+        pm.connectAttr(inAdd_nod + ".output", str(self.in_piv) + ".rx")
 
         # Reverse Controler offset -------------------------
         angle_outputs = node.createAddNodeMulti(self.angles_att)
@@ -276,7 +276,7 @@ class Component(component.Main):
             add_node = node.createAddNode(clamp_node + ".outputR",
                                           bk_loc.getAttr("rz"))
 
-            pm.connectAttr(add_node + ".output", bk_loc.attr("rz"))
+            pm.connectAttr(add_node + ".output", str(bk_loc) + ".rz")
 
         # Reverse compensation -----------------------------
         for i, fk_loc in enumerate(self.fk_loc):
@@ -286,8 +286,8 @@ class Component(component.Main):
 
             # Inverse Rotorder
             o_node = applyop.gear_inverseRotorder_op(bk_ctl, fk_ctl)
-            pm.connectAttr(o_node + ".output", bk_loc.attr("ro"))
-            pm.connectAttr(fk_ctl.attr("ro"), fk_loc.attr("ro"))
+            pm.connectAttr(o_node + ".output", str(bk_loc) + ".ro")
+            pm.connectAttr(str(fk_ctl) + ".ro", str(fk_loc) + ".ro")
             attribute.lockAttribute(bk_ctl, "ro")
 
             # Compensate the backward rotation
@@ -317,7 +317,7 @@ class Component(component.Main):
             blend_node = node.createBlendNode(ik_outputs,
                                               fk_outputs,
                                               self.blend_att)
-            pm.connectAttr(blend_node + ".output", fk_loc.attr("rotate"))
+            pm.connectAttr(blend_node + ".output", str(fk_loc) + ".rotate")
 
         return
 

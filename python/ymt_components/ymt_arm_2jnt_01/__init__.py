@@ -196,17 +196,17 @@ class Component(MainComponent):
 
         for fk_ctl in self.fk_ctl:
             for shp in fk_ctl.getShapes():
-                pm.connectAttr(fkvis_node + ".outputX", shp.attr("visibility"))
+                pm.connectAttr(fkvis_node + ".outputX", str(shp) + ".visibility")
 
         # ik
         for shp in self.upv_ctl.getShapes():
-            pm.connectAttr(str(self.blend_att), shp.attr("visibility"))
+            pm.connectAttr(str(self.blend_att), str(shp) + ".visibility")
 
         for shp in self.ik_ctl.getShapes():
-            pm.connectAttr(str(self.blend_att), shp.attr("visibility"))
+            pm.connectAttr(str(self.blend_att), str(shp) + ".visibility")
 
         for shp in self.ikRot_ctl.getShapes():
-            pm.connectAttr(rotspace_rev_node + ".outputX", shp.attr("visibility"))
+            pm.connectAttr(rotspace_rev_node + ".outputX", str(shp) + ".visibility")
 
         # IK Chain -----------------------------------------
         self.ikh = pri.addIkHandle(self.root, self.getName("ikh"), self.chain)
@@ -235,8 +235,8 @@ class Component(MainComponent):
 
             # scaling
             blend_node = pm.createNode("blendColors")
-            pm.connectAttr(self.chain[i].attr("scale"), blend_node + ".color1")
-            pm.connectAttr(self.fk_ctl[i].attr("scale"), blend_node + ".color2")
+            pm.connectAttr(str(self.chain[i]) + ".scale", blend_node + ".color1")
+            pm.connectAttr(str(self.fk_ctl[i]) + ".scale", blend_node + ".color2")
             pm.connectAttr(str(self.blend_att), blend_node + ".blender")
             pm.connectAttr(blend_node + ".output",  loc + ".scale")
 

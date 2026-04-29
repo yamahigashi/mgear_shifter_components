@@ -856,7 +856,7 @@ def update_curve_from_data(data, rplStr=["", ""]):
             for extra_shp in obj.listRelatives(shapes=True):
                 # Restore shapes connections
                 for c in cnx:
-                    pm.connectAttr(c[0], extra_shp.attr(c[1]))
+                    pm.connectAttr(c[0], str(extra_shp) + "." + c[1])
                 first_shape.addChild(extra_shp, add=True, shape=True)
                 pm.delete(obj)
 
@@ -1016,7 +1016,7 @@ def applyPathCnsLocal(target, curve, u, maintainOffset=True):
     cmds.connectAttr(curve.longName() + ".matrix", cns + ".worldUpMatrix")  # object rotation up
     cmds.setAttr(cns + ".frontAxis", 2)  # front axis x
     cmds.setAttr(cns + ".upAxis", 1)  # up axis y
-    pm.connectAttr(curve.attr("local"), cns.attr("geometryPath"), f=True)
+    pm.connectAttr(str(curve) + ".local", str(cns) + ".geometryPath", f=True)
 
     comp_node = pm.createNode("composeMatrix")
     cns.attr("allCoordinates") >> comp_node.attr("inputTranslate")  # pyright: ignore [reportUnusedExpression]

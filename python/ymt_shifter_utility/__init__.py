@@ -222,7 +222,7 @@ def _findPathAtoB(aPath, bPath):
 
 def applyPathCnsLocal(target, curve, u):
     cns = applyop.pathCns(target, curve, cnsType=False, u=u, tangent=False)
-    pm.connectAttr(curve.attr("local"), cns.attr("geometryPath"), f=True)  # tobe local space
+    pm.connectAttr(str(curve) + ".local", str(cns) + ".geometryPath", f=True)  # tobe local space
 
     comp_node = pm.createNode("composeMatrix")
     cns.attr("allCoordinates") >> comp_node.attr("inputTranslate")

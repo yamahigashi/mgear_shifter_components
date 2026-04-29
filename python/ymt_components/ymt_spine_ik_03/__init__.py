@@ -594,15 +594,15 @@ class Component(component.Main):
 
             dm_node = node.createDecomposeMatrixNode(s.attr("inverseMatrix"))
             comp_node = pm.PyNode(cmds.createNode("composeMatrix"))
-            pm.connectAttr(dm_node + ".outputScale", comp_node.attr("inputScale"))
-            pm.connectAttr(dm_node + ".outputShear", comp_node.attr("inputShear"))
+            pm.connectAttr(dm_node + ".outputScale", str(comp_node) + ".inputScale")
+            pm.connectAttr(dm_node + ".outputShear", str(comp_node) + ".inputShear")
             mulmat_node = applyop.gear_mulmatrix_op(comp_node.attr("outputMatrix"), s.attr("matrix"))
 
             mulmat_node = applyop.gear_mulmatrix_op(s2.attr("matrix"), mulmat_node.attr("output"))
             mulmat_node2 = applyop.gear_mulmatrix_op(mulmat_node.attr("output"), s2.attr("inverseMatrix"))
 
             dm_node = node.createDecomposeMatrixNode(mulmat_node2 + ".output")
-            pm.connectAttr(dm_node + ".outputTranslate", d.attr("t"))
+            pm.connectAttr(dm_node + ".outputTranslate", str(d) + ".t")
 
             check_list = (pm.Attribute, six.string_types)  # noqa
 
@@ -620,7 +620,7 @@ class Component(component.Main):
             pm.setAttr(cond + ".colorIfFalseG", 0.)
             pm.setAttr(cond + ".colorIfFalseB", 0.)
 
-            pm.connectAttr(cond + ".outColor", d.attr("r"))
+            pm.connectAttr(cond + ".outColor", str(d) + ".r")
             
         # References
         tmp_div_npo_transform = getTransform(self.div_cns_npo[i])  # to fix mismatch before/after later

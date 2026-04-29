@@ -251,11 +251,11 @@ class Component(component.Main):
 
             # ik
             for shp in self.upv_ctl.getShapes():
-                pm.connectAttr(str(self.blend_att), shp.attr("visibility"))
+                pm.connectAttr(str(self.blend_att), str(shp) + ".visibility")
             for shp in self.ikcns_ctl.getShapes():
-                pm.connectAttr(str(self.blend_att), shp.attr("visibility"))
+                pm.connectAttr(str(self.blend_att), str(shp) + ".visibility")
             for shp in self.ik_ctl.getShapes():
-                pm.connectAttr(str(self.blend_att), shp.attr("visibility"))
+                pm.connectAttr(str(self.blend_att), str(shp) + ".visibility")
 
         # FK Chain -----------------------------------------
         if self.isFk:
@@ -282,7 +282,7 @@ class Component(component.Main):
                 pm.connectAttr(add_nodeTwist + ".output",
                                self.ikh.attr("twist"))
             else:
-                pm.connectAttr(str(self.roll_att), self.ikh.attr("twist"))
+                pm.connectAttr(str(self.roll_att), str(self.ikh) + ".twist")
 
         # Chain of deformers -------------------------------
         for i, loc in enumerate(self.loc):
@@ -311,9 +311,9 @@ class Component(component.Main):
 
                 # scaling
                 blend_node = pm.createNode("blendColors")
-                pm.connectAttr(self.chain[i].attr("scale"),
+                pm.connectAttr(str(self.chain[i]) + ".scale",
                                blend_node + ".color1")
-                pm.connectAttr(self.fk_ctl[i].attr("scale"),
+                pm.connectAttr(str(self.fk_ctl[i]) + ".scale",
                                blend_node + ".color2")
                 pm.connectAttr(str(self.blend_att), blend_node + ".blender")
                 pm.connectAttr(blend_node + ".output", loc + ".scale")

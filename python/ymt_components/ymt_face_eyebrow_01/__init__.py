@@ -357,7 +357,7 @@ class Component(component.Main):
             v = self.root.getTranslation(space="world")
             mainCtlUpv.setTranslation(v, om.MSpace.kWorld)
             # connect upv curve to mainCrv_ctl driver node.
-            pm.connectAttr(deformer.attr("outputGeometry[0]"), mainCtlUpv.getShape().attr("create"))
+            pm.connectAttr(str(deformer) + ".outputGeometry[0]", str(mainCtlUpv.getShape()) + ".create")
 
             # offset upv curve
             cvs = mainCtlUpv.getCVs(space="world")
@@ -489,7 +489,7 @@ class Component(component.Main):
                 cns = applyPathCnsLocal(oTransUpV, tempMainUpvCurves[j], u)
                 cns = applyPathCnsLocal(oTrans, tempMainCtlCurves[j], u)
 
-                pm.connectAttr(oTransUpV.attr("worldMatrix[0]"),
+                pm.connectAttr(str(oTransUpV) + ".worldMatrix[0]",
                                cns.attr("worldUpMatrix"))
 
                 # connect secondary control to oTrans hook.
@@ -878,7 +878,7 @@ def draw_eye_guide_mesh_plane(points, t):
 
 def applyPathCnsLocal(target, curve, u):
     cns = applyop.pathCns(target, curve, cnsType=False, u=u, tangent=False)
-    pm.connectAttr(curve.attr("local"), cns.attr("geometryPath"), f=True)  # tobe local space
+    pm.connectAttr(str(curve) + ".local", str(cns) + ".geometryPath", f=True)  # tobe local space
 
     comp_node = pm.createNode("composeMatrix")
     cns.attr("allCoordinates") >> comp_node.attr("inputTranslate")

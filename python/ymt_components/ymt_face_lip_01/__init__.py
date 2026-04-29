@@ -376,7 +376,7 @@ class Component(component.Main):
             cns = applyPathCnsLocal(upv, rope_upv, u, negate=negate)
             cns = applyPathCnsLocal(npo, rope, u, negate=negate)
 
-            pm.connectAttr(upv.attr("worldMatrix[0]"), cns.attr("worldUpMatrix"))
+            pm.connectAttr(str(upv) + ".worldMatrix[0]", str(cns) + ".worldUpMatrix")
 
             ctl_name = self.getName("%s_crvdetail%s_%s" % (name, i, self.ctlName))
 
@@ -1051,7 +1051,7 @@ def createGhostWithParentConstraint(ctl, parent=None, connect=True):
 
 def applyPathCnsLocal(target, curve, u, negate=False):
     cns = applyop.pathCns(target, curve, cnsType=False, u=u, tangent=False)
-    pm.connectAttr(curve.attr("local"), cns.attr("geometryPath"), f=True)  # tobe local space
+    pm.connectAttr(str(curve) + ".local", str(cns) + ".geometryPath", f=True)  # tobe local space
 
     comp_node = pm.createNode("composeMatrix")
     cns.attr("allCoordinates") >> comp_node.attr("inputTranslate")
@@ -1062,10 +1062,10 @@ def applyPathCnsLocal(target, curve, u, negate=False):
     comp_node2 = pm.createNode("composeMatrix")
 
     if negate:
-        pm.setAttr(comp_node2.attr("inputScaleX"), -1.0)
+        pm.setAttr(str(comp_node2) + ".inputScaleX", -1.0)
 
-    pm.setAttr(comp_node2.attr("inputRotateX"), 90.0)
-    pm.setAttr(comp_node2.attr("inputRotateZ"), 90.0)
+    pm.setAttr(str(comp_node2) + ".inputRotateX", 90.0)
+    pm.setAttr(str(comp_node2) + ".inputRotateZ", 90.0)
 
     comp_node2.attr("outputMatrix") >> mul_node.attr("matrixIn[0]")
     comp_node.attr("outputMatrix") >> mul_node.attr("matrixIn[1]")

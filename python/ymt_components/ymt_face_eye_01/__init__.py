@@ -561,7 +561,7 @@ class Component(component.Main):
             trn = primitive.addTransformFromPos(self.eyeTargets_root, trn_name, pos=cv)
 
             # connecting positions with crv
-            pm.connectAttr(crv_info + ".controlPoints[%s]" % str(nearestCvId), trn.attr("translate"))
+            pm.connectAttr(crv_info + ".controlPoints[%s]" % str(nearestCvId), str(trn) + ".translate")
 
             # joints
             xform = setMatrixPosition(t, self.bboxCenter)
@@ -709,7 +709,7 @@ class Component(component.Main):
         height = (self.upPos - self.lowPos).length()
 
         cond_up_or_low = pm.createNode("condition")
-        pm.connectAttr(self.aimTrigger_ref.attr("ty"), cond_up_or_low + ".firstTerm")
+        pm.connectAttr(str(self.aimTrigger_ref) + ".ty", cond_up_or_low + ".firstTerm")
         pm.setAttr(cond_up_or_low + ".secondTerm", 0)
         pm.setAttr(cond_up_or_low + ".operation", 2)  # greater than
 
@@ -724,13 +724,13 @@ class Component(component.Main):
         pm.connectAttr(mult_node + ".outputX", cond_up_or_low + ".colorIfFalseR")
 
         mult_node = node.createMulNode(cond_up_or_low + ".outColorR", self.aimTrigger_ref.attr("ty"))
-        pm.connectAttr(mult_node + ".outputX", self.trackLvl[0].attr("ty"))
+        pm.connectAttr(mult_node + ".outputX", str(self.trackLvl[0]) + ".ty")
         mult_node = node.createMulNode(mult_upHTracking + ".outputX", self.aimTrigger_ref.attr("tx"))
 
-        pm.connectAttr(mult_node + ".outputX", self.trackLvl[0].attr("tx"))
+        pm.connectAttr(mult_node + ".outputX", str(self.trackLvl[0]) + ".tx")
 
         cond_up_or_low = pm.createNode("condition")
-        pm.connectAttr(self.aimTrigger_ref.attr("ty"), cond_up_or_low + ".firstTerm")
+        pm.connectAttr(str(self.aimTrigger_ref) + ".ty", cond_up_or_low + ".firstTerm")
         pm.setAttr(cond_up_or_low + ".secondTerm", 0)
         pm.setAttr(cond_up_or_low + ".operation", 2)  # greater than
 
@@ -745,10 +745,10 @@ class Component(component.Main):
         pm.connectAttr(mult_node + ".outputX", cond_up_or_low + ".colorIfFalseR")
 
         mult_node = node.createMulNode(cond_up_or_low + ".outColorR", self.aimTrigger_ref.attr("ty"))
-        pm.connectAttr(mult_node + ".outputX", self.trackLvl[1].attr("ty"))
+        pm.connectAttr(mult_node + ".outputX", str(self.trackLvl[1]) + ".ty")
         mult_node = node.createMulNode(mult_lowHTracking + ".outputX", self.aimTrigger_ref.attr("tx"))
 
-        pm.connectAttr(mult_node + ".outputX", self.trackLvl[1].attr("tx"))
+        pm.connectAttr(mult_node + ".outputX", str(self.trackLvl[1]) + ".tx")
 
     def addTensionOnBlinkAttributes(self):
 
