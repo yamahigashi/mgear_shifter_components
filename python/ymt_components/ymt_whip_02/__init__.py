@@ -231,7 +231,8 @@ class Component(component.Main):
         t = self._getTransformWithRollByBlade(t)
         cvs = crv.length()
         tm = datatypes.TransformationMatrix(t)
-        tm.addTranslation([0.0, cvs * 0.01, cvs * 1.4], om.MSpace.kObject)
+        offset = datatypes.Vector([0.0, cvs * 0.01, cvs * 1.4])
+        tm.setTranslation(tm.getTranslation(om.MSpace.kObject) + offset, om.MSpace.kObject)
 
         local_t = datatypes.Matrix(tm)
         self.length_npo = addTransform(self.aim_npo, self.getName("length_npo"), local_t)

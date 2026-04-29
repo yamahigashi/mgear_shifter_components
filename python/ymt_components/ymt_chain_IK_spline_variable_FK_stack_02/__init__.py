@@ -164,7 +164,8 @@ class Component(component.Main):
         global_t = self._getTransformWithRollByBlade(t)
         cvs = crv.length()
         tm = datatypes.TransformationMatrix(t)
-        tm.addTranslation([cvs * -0.4, cvs * 0.2, 0.], om.MSpace.kObject)
+        offset = datatypes.Vector([cvs * -0.4, cvs * 0.2, 0.])
+        tm.setTranslation(tm.getTranslation(om.MSpace.kObject) + offset, om.MSpace.kObject)
 
         local_t = datatypes.Matrix(tm)
         self.length_npo = addTransform(self.aim_npo, self.getName("length_npo"), local_t)
@@ -902,7 +903,8 @@ class Component(component.Main):
         t = getTransform(self.guide.root)
         cvs = self.slv_crv.length()
         tm = datatypes.TransformationMatrix(t)
-        tm.addTranslation([0., cvs * 0.1, 0.], om.MSpace.kObject)
+        offset = datatypes.Vector([0., cvs * 0.1, 0.])
+        tm.setTranslation(tm.getTranslation(om.MSpace.kObject) + offset, om.MSpace.kObject)
 
         local_t = datatypes.Matrix(tm)
         self.sine_npo = addTransform(self.aim_npo, self.getName("sine_npo"), t)

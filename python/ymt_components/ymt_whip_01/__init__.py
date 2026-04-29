@@ -1,4 +1,5 @@
 """mGear shifter components"""
+# ruff: noqa: UP032, UP031, ANN201, ANN001, D102, N802, E501, N816, I001
 # pylint: disable=import-error,W0201,C0111,C0112
 import re
 import inspect
@@ -109,7 +110,7 @@ class Component(component.Main):
             self.getName("dummy_crv"),
             self.guide.apos,
             close=False,
-            degree=min([len(self.guide.apos) - 1, 3])
+            degree=min([len(self.guide.apos) - 1, 3]),
         )
 
         for i in range(self.settings["ikNb"]):
@@ -167,7 +168,8 @@ class Component(component.Main):
         t = self._getTransformWithRollByBlade(t)
         cvs = crv.length()
         tm = datatypes.TransformationMatrix(t)
-        tm.addTranslation([0.0, cvs * 0.01, cvs * 1.4], om.MSpace.kObject)
+        offset = datatypes.Vector([0.0, cvs * 0.01, cvs * 1.4])
+        tm.setTranslation(tm.getTranslation(om.MSpace.kObject) + offset, om.MSpace.kObject)
 
         local_t = datatypes.Matrix(tm)
         self.length_npo = addTransform(self.aim_npo, self.getName("length_npo"), local_t)
