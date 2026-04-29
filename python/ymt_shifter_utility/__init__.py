@@ -850,8 +850,8 @@ def _getRotationsAtEachPoint(bfrs, norm):
             t1 = getTransformLookingAt(c, p, norm, axis="-xy")
             t2 = getTransformLookingAt(c, n, norm, axis="xy")
 
-            q1 = om.MQuaternion(t1.rotate.x, t1.rotate.y, t1.rotate.z, t1.rotate.w)
-            q2 = om.MQuaternion(t2.rotate.x, t2.rotate.y, t2.rotate.z, t2.rotate.w)
+            q1 = om.MTransformationMatrix(om.MMatrix(t1)).rotation(True)
+            q2 = om.MTransformationMatrix(om.MMatrix(t2)).rotation(True)
             q = om.MQuaternion.slerp(q1, q2, 0.5)
 
             rot = q.asEulerRotation().asVector()
@@ -1477,7 +1477,8 @@ def create_dummy_edges_from_objects(objects):
 def draw_plane_from_positions(positions, t=None):
     # type: (List[Tuple[float, float, float]], dt.Matrix|None) -> om.MFnMesh
     if t is not None:
-        positions = [x - t.translate for x in positions]
+        v = om.MTransformationMatrix(om.MMatrix(t)).translation(om.MSpace.kWorld)
+        positions = [(x[0] - v.x, x[1] - v.y, x[2] - v.z) for x in positions]
 
     mean_x = sum(p[0] for p in positions) / len(positions)
     mean_y = sum(p[1] for p in positions) / len(positions)
@@ -1515,8 +1516,8 @@ def draw_plane_from_positions(positions, t=None):
 
     if t is not None:
         n = pm.PyNode(mesh_trans.name())
-        v = t.translate
-        n.setTranslation(v, om.MSpace.kWorld)
+        v = om.MTransformationMatrix(om.MMatrix(t)).translation(om.MSpace.kWorld)
+        n.setTranslation([v.x, v.y, v.z], om.MSpace.kWorld)
 
     return mesh
 
@@ -1783,9 +1784,9 @@ _ROT_ORDER = {
 
 
 _SPACE = {
-    "transform": om.MSpace.kTransform,    # = オブジェクト／ローカル
+    "transform": om.MSpace.kTransform,
     "object":    om.MSpace.kTransform,
     "world":     om.MSpace.kWorld,
-    "pre":       om.MSpace.kPreTransform, # 親前
-    "post":      om.MSpace.kPostTransform,# 親後
+    "pre":       om.MSpace.kPreTransform,
+    "post":      om.MSpace.kPostTransform,
 }

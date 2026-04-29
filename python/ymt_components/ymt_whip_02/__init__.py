@@ -172,10 +172,6 @@ class Component(component.Main):
             degree=min([len(self.guide.apos) - 1, 3])
         )
         cmds.nurbsCurveToBezier()
-        print(type(self.dummy_crv))
-        print(self.dummy_crv)
-        for d in dir(self.dummy_crv):
-            print(d)
 
         dummy_crv_shape = self.dummy_crv.getShape()
         dummy_crv_fn = ymt_util.getAsMFnNode(dummy_crv_shape.name(), om.MFnNurbsCurve)
@@ -515,8 +511,8 @@ class Component(component.Main):
                 t1 = getTransformLookingAt(c, p, norm, axis="-xy")
                 t2 = getTransformLookingAt(c, n, norm, axis="xy")
 
-                q1 = om.MQuaternion(t1.rotate.x, t1.rotate.y, t1.rotate.z, t1.rotate.w)
-                q2 = om.MQuaternion(t2.rotate.x, t2.rotate.y, t2.rotate.z, t2.rotate.w)
+                q1 = om.MTransformationMatrix(om.MMatrix(t1)).rotation(True)
+                q2 = om.MTransformationMatrix(om.MMatrix(t2)).rotation(True)
                 q = om.MQuaternion.slerp(q1, q2, 0.5)
 
                 rot = q.asEulerRotation().asVector()
@@ -1075,7 +1071,7 @@ def transform_to_euler(t):
     # type: (om.MTransformationMatrix) -> Tuple[float, float, float]
 
     tm = om.MTransformationMatrix(t)
-    rot = tm.rotation().asEulerRotation().asVector()
+    rot = tm.rotation().asVector()
     rot = (math.degrees(rot[0]), math.degrees(rot[1]), math.degrees(rot[2]))
 
     return rot

@@ -107,7 +107,7 @@ class Component(component.Main):
             self.jnt_pos.append([self.aim_cns, "aim"])
 
         diff = self.guide.apos[2] - self.guide.apos[0]
-        offset = diff.normal() * self.initialDist + t.translate
+        offset = diff.normal() * self.initialDist + transform.getPositionFromMatrix(t)
         offset_mat = transform.setMatrixPosition(t, offset)
         self.proj_cns = primitive.addTransform(self.aim_cns, self.getName("proj_cns"), offset_mat)
 
