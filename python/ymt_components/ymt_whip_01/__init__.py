@@ -117,7 +117,8 @@ class Component(component.Main):
             degree=min([len(self.guide.apos) - 1, 3]),
         )
         dummy_crv_shape = self.dummy_crv.getShape()
-        dummy_crv_fn = ymt_util.getAsMFnNode(dummy_crv_shape.name(), om.MFnNurbsCurve)
+        dummy_crv_shape_name = dummy_crv_shape.name() if hasattr(dummy_crv_shape, "name") else str(dummy_crv_shape)
+        dummy_crv_fn = ymt_util.getAsMFnNode(dummy_crv_shape_name, om.MFnNurbsCurve)
 
         for i in range(self.settings["ikNb"]):
             self.addObjectsChainIk(i, dummy_crv_fn)
@@ -142,7 +143,8 @@ class Component(component.Main):
             False,
             3)
         slv_crv_shape = self.slv_crv.getShape()
-        self.slv_crv_fn = ymt_util.getAsMFnNode(slv_crv_shape.name(), om.MFnNurbsCurve)
+        slv_crv_shape_name = slv_crv_shape.name() if hasattr(slv_crv_shape, "name") else str(slv_crv_shape)
+        self.slv_crv_fn = ymt_util.getAsMFnNode(slv_crv_shape_name, om.MFnNurbsCurve)
 
         icon.connection_display_curve(self.getName("visualIKRef"), self.ik_ctl)
         if self.settings["isGlobalMaster"]:

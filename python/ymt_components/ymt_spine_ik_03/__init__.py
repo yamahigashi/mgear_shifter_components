@@ -132,9 +132,10 @@ class Component(component.Main):
         )
         cmds.nurbsCurveToBezier()  # type: ignore
         shape = dummy_crv.getShape()
+        shape_name = shape.name() if hasattr(shape, "name") else str(shape)
 
-        self.dummy_crv = ymtutil.getAsMFnNode(shape.name(), om.MFnNurbsCurve)
-        curveFn = ymtutil.getAsMFnNode(shape.name(), om.MFnNurbsCurve)
+        self.dummy_crv = ymtutil.getAsMFnNode(shape_name, om.MFnNurbsCurve)
+        curveFn = ymtutil.getAsMFnNode(shape_name, om.MFnNurbsCurve)
         # Get the curve data
         knots = curveFn.knots()
         params = list(knots)[1::3]

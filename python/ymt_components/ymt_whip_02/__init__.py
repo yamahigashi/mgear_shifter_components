@@ -174,7 +174,8 @@ class Component(component.Main):
         cmds.nurbsCurveToBezier()
 
         dummy_crv_shape = self.dummy_crv.getShape()
-        dummy_crv_fn = ymt_util.getAsMFnNode(dummy_crv_shape.name(), om.MFnNurbsCurve)
+        dummy_crv_shape_name = dummy_crv_shape.name() if hasattr(dummy_crv_shape, "name") else str(dummy_crv_shape)
+        dummy_crv_fn = ymt_util.getAsMFnNode(dummy_crv_shape_name, om.MFnNurbsCurve)
         self.length = dummy_crv_fn.length()
         self.division = len(self.guide.apos)
 
@@ -633,7 +634,8 @@ class Component(component.Main):
     def convertToTwistSpline(self, positions, crv, ikNb, isClosed=False):
 
         crvShape = crv.getShape()
-        curveFn = getAsMFnNode(crvShape.name(), om.MFnNurbsCurve)
+        crvShape_name = crvShape.name() if hasattr(crvShape, "name") else str(crvShape)
+        curveFn = getAsMFnNode(crvShape_name, om.MFnNurbsCurve)
 
         # Get the curve data
         knots = curveFn.knots()
@@ -734,9 +736,10 @@ class Component(component.Main):
         self.addOperatorSineCurveExprespy()
 
         driver_shape = self.mst_crv.getShape()
-        for attr in cmds.listAttr("{}.vertexData".format(driver_shape.getName()), multi=True) or []:
+        driver_shape_name = driver_shape.getName() if hasattr(driver_shape, "getName") else str(driver_shape)
+        for attr in cmds.listAttr("{}.vertexData".format(driver_shape_name), multi=True) or []:
                 if "useOrient" in attr:
-                    cmds.setAttr("{}.{}".format(driver_shape.getName(), attr), True)
+                    cmds.setAttr("{}.{}".format(driver_shape_name, attr), True)
 
     def addOperatorsNotGlobalMaster(self):
         # Curves -------------------------------------------
@@ -840,13 +843,15 @@ class Component(component.Main):
         fk0_npo.visibility = vis
 
     def addOperatorSineCurveExprespy(self):
+        mst_crv_shape = self.mst_crv.getShape()
+        mst_crv_shape_name = mst_crv_shape.name() if hasattr(mst_crv_shape, "name") else str(mst_crv_shape)
         rewrite_map = [
             ["__scale_ctl", self.length_ctl],
             ["__curve_length", self.length],
             ["__wave_offset_att", self.sinewave_offset_y_att],
             ["__wave_power_att", self.sinewave_power_y_att],
             ["__wave_length_att", self.sinewave_wavelength_y_att],
-            ["__mst_crv", "{}.outputSpline".format(self.mst_crv.getShape().name())],
+            ["__mst_crv", "{}.outputSpline".format(mst_crv_shape_name)],
             ["__divisions", self.divisions],
             ["__negate", self.negate],
             ["__dropoff", self.sinewave_dropoff_att],
@@ -868,7 +873,7 @@ class Component(component.Main):
             ["__wave_offset_att", self.sinewave_offset_x_att],
             ["__wave_power_att", self.sinewave_power_x_att],
             ["__wave_length_att", self.sinewave_wavelength_x_att],
-            ["__mst_crv", "{}.outputSpline".format(self.mst_crv.getShape().name())],
+            ["__mst_crv", "{}.outputSpline".format(mst_crv_shape_name)],
             ["__divisions", self.divisions],
             ["__negate", self.negate],
             ["__dropoff", self.sinewave_dropoff_att],
@@ -1070,7 +1075,7 @@ def getAsMFnNode(name, ctor):
 def transform_to_euler(t):
     # type: (om.MTransformationMatrix) -> Tuple[float, float, float]
 
-    tm = om.MTransformationMatrix(t)
+    tm = om.MTransformationMatrix(om.MMatrix(t))
     rot = tm.rotation().asVector()
     rot = (math.degrees(rot[0]), math.degrees(rot[1]), math.degrees(rot[2]))
 

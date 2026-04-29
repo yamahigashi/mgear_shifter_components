@@ -98,7 +98,8 @@ class Component(component.Main):
             degree=min([len(self.guide.apos) - 1, 3])
         )
         dummy_crv_shape = self.dummy_crv.getShape()
-        dummy_crv_fn = ymtutil.getAsMFnNode(dummy_crv_shape.name(), om.MFnNurbsCurve)
+        dummy_crv_shape_name = dummy_crv_shape.name() if hasattr(dummy_crv_shape, "name") else str(dummy_crv_shape)
+        dummy_crv_fn = ymtutil.getAsMFnNode(dummy_crv_shape_name, om.MFnNurbsCurve)
 
         for i in range(self.settings["ikNb"]):
             self.addObjectsChainIk(i, dummy_crv_fn)

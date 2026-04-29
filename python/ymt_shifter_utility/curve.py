@@ -574,16 +574,17 @@ def collect_curve_shapes(crv, rplStr=["", ""]):
     shapes_names = []
     shapesDict = {}
     for shape in crv.getShapes():
-        shapes_names.append(shape.name().replace(rplStr[0], rplStr[1]))
+        shape_name = shape.name() if hasattr(shape, "name") else str(shape)
+        shapes_names.append(shape_name.replace(rplStr[0], rplStr[1]))
         c_form = shape.form()
         degree = shape.degree()
         form = c_form.key
         form_id = c_form.index
         pnts = [[cv.x, cv.y, cv.z] for cv in shape.getCVs(space="object")]
-        shapesDict[shape.name()] = {"points": pnts,
-                                    "degree": degree,
-                                    "form": form,
-                                    "form_id": form_id}
+        shapesDict[shape_name] = {"points": pnts,
+                                  "degree": degree,
+                                  "form": form,
+                                  "form_id": form_id}
 
     return shapesDict, shapes_names
 

@@ -571,7 +571,8 @@ def convertToTwistSpline(
         if isinstance(crv, str):
             crv = pm.PyNode(crv)
         crvShape = crv.getShape()
-        curveFn = getAsMFnNode(crvShape.name(), om.MFnNurbsCurve)
+        crvShape_name = crvShape.name() if hasattr(crvShape, "name") else str(crvShape)
+        curveFn = getAsMFnNode(crvShape_name, om.MFnNurbsCurve)
 
     # Get the curve data
     knots = curveFn.knots()
