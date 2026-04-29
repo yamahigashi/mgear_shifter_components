@@ -26,6 +26,9 @@ from mgear.core.primitive import addTransform
 import ymt_shifter_utility as ymt_util
 from ymt_shifter_utility import pymel_to_pymaya as pym2m
 
+if om.MGlobal.apiVersion() >= 201600:
+    unicode = str
+
 ##########################################################
 # COMPONENT
 ##########################################################
