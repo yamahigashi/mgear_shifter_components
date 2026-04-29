@@ -25,6 +25,12 @@ SOFTWARE.
 
 from itertools import product
 from maya import cmds, OpenMaya
+if cmds.about(apiVersion=True) >= 20260000:
+	addDoubleLinear = "addDL"
+	pointMatrixMult = "pointMatrixMultDL"
+else:
+	addDoubleLinear = "addDoubleLinear"
+	pointMatrixMult = "pointMatrixMult"
 
 # Naming Convention
 DFM_ORG_FMT = "Org_X_X_{0}Jnts"  # Deformer Organizer
@@ -69,8 +75,8 @@ def makeLinkLine(sourceNode, destNode, selectNode=None):
 			rotPivot = cmds.xform(sourceNode, q=True, objectSpace=True, rotatePivot=True)
 			cmds.setAttr(lineShape + ".controlPoints[{0}]".format(idx), *rotPivot)
 		else:
-			worldMatrix = cmds.createNode('pointMatrixMult', name=node + "_linkCurveWorldMat")
-			inverseMatrix = cmds.createNode('pointMatrixMult', name=selectNode + "_linkCurveWorldMat")
+			worldMatrix = cmds.createNode(pointMatrixMult, name=node + "_linkCurveWorldMat")
+			inverseMatrix = cmds.createNode(pointMatrixMult, name=selectNode + "_linkCurveWorldMat")
 			rotPivot = cmds.xform(node, q=True, objectSpace=True, rotatePivot=True)
 
 			cmds.connectAttr(node + ".worldMatrix", worldMatrix + ".inMatrix", f=True)
@@ -433,7 +439,7 @@ def buildTwistSpline(pfx, cvs, aoTans, aiTans, tws, maxParam, closed=False):
 		cmds.connectAttr("{}.Pin".format(cvs[i]), "{}.vertexData[{}].paramWeight".format(spline, u))
 		if u != i:
 			# The paramValue needs an offset if we're at the last connection of a closed spline
-			adL = cmds.createNode("addDoubleLinear")
+			adL = cmds.createNode(addDoubleLinear)
 			cmds.setAttr("{0}.input2".format(adL), maxParam)
 			cmds.connectAttr("{0}.PinParam".format(cvs[i]), "{0}.input1".format(adL), f=True)
 			cmds.connectAttr("{0}.output".format(adL), "{}.vertexData[{}].paramValue".format(spline, u), f=True)
@@ -449,8 +455,8 @@ def buildTwistSpline(pfx, cvs, aoTans, aiTans, tws, maxParam, closed=False):
 			ratioB = 1. - ratioA
 			multA = cmds.createNode("multiplyDivide")
 			multB = cmds.createNode("multiplyDivide")
-			add1 = cmds.createNode("addDoubleLinear")
-			add2 = cmds.createNode("addDoubleLinear")
+			add1 = cmds.createNode(addDoubleLinear)
+			add2 = cmds.createNode(addDoubleLinear)
 
 			cmds.setAttr("{0}.operation".format(multA), 1)
 			cmds.connectAttr("{}.rotateX".format(tws[0]), "{}.input1X".format(multA))

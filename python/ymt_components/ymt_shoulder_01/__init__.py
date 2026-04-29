@@ -3,6 +3,12 @@ import math
 # Maya
 import maya.cmds as cmds
 import maya.api.OpenMaya as om
+if cmds.about(apiVersion=True) >= 20260000:
+    addDoubleLinear = "addDL"
+    pointMatrixMult = "pointMatrixMultDL"
+else:
+    addDoubleLinear = "addDoubleLinear"
+    pointMatrixMult = "pointMatrixMult"
 
 try:
     import mgear.pymaya as pm
@@ -188,7 +194,7 @@ class Component(MainComponent):
         cmds.setAttr('{}.postInfinity'.format(cv), 1)
 
         # cul softLength
-        culAllSoftLength = cmds.shadingNode('addDoubleLinear', au=True, n='culAllSoftLength')
+        culAllSoftLength = cmds.shadingNode(addDoubleLinear, au=True, n='culAllSoftLength')
         cmds.connectAttr('{}.output'.format(culSoftLength), '{}.input1'.format(culAllSoftLength))
         cmds.connectAttr('{}.startLengthSoftCorrection'.format(nt), '{}.input2'.format(culAllSoftLength))
         culSoftLengthPct = cmds.shadingNode('multiplyDivide', au=True, n='culSoftLengthPct')

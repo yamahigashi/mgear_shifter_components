@@ -8,6 +8,12 @@ import math
 import maya.cmds as cmds
 import maya.OpenMaya as om1
 import maya.api.OpenMaya as om
+if cmds.about(apiVersion=True) >= 20260000:
+    addDoubleLinear = "addDL"
+    pointMatrixMult = "pointMatrixMultDL"
+else:
+    addDoubleLinear = "addDoubleLinear"
+    pointMatrixMult = "pointMatrixMult"
 
 try:
     import mgear.pymaya as pm
@@ -892,7 +898,7 @@ class Component(component.Main):
         pm.connectAttr(roll_b.attr("outRoll"), mul2.attr("input1"))
         pm.setAttr(mul2.attr("input2"), (1. - ratio))
 
-        add = pm.createNode("addDoubleLinear")
+        add = pm.createNode(addDoubleLinear)
         pm.connectAttr(mul1.attr("output"), add.attr("input1"))
         pm.connectAttr(mul2.attr("output"), add.attr("input2"))
 
