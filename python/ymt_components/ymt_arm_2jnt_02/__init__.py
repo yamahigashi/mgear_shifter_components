@@ -19,9 +19,8 @@ import mgear.core.primitive as pri
 import mgear.core.attribute as att
 import mgear.core.transform as tra
 
+import ymt_shifter_utility as ymt_util
 
-if False:
-    from typing import List, Tuple, Any
 
 
 ##########################################################
@@ -194,8 +193,7 @@ class Component(arm_2jnt_04.Component):
                 pm.setAttr("{}.secondTerm".format(_head_ref_cond), i + 1)
                 pm.setAttr("{}.operation".format(_head_ref_cond), 0)
 
-                src = self.rig.findRelative(ref_name)
-
+                src = str(self.rig.findRelative(ref_name))
                 decomp = pm.createNode("decomposeMatrix")
                 comp = pm.createNode("composeMatrix")
                 pm.connectAttr("{}.worldInverseMatrix".format(src), "{}.inputMatrix".format(decomp))
@@ -203,7 +201,7 @@ class Component(arm_2jnt_04.Component):
                 pm.disconnectAttr("{}.outputRotate".format(decomp), "{}.inputRotate".format(comp))
                 cmds.evalDeferred("""cmds.delete("{}")""".format(decomp))
 
-                down, _, up = findPathAtoB(src, self.root)
+                down, _, up = ymt_util.findPathAtoB(src, self.root)
                 mult = pm.createNode("multMatrix")
                 pm.connectAttr("{}.outputMatrix".format(comp), "{}.matrixIn[0]".format(mult))
 
@@ -218,63 +216,3 @@ class Component(arm_2jnt_04.Component):
                 pm.connectAttr("{}.outputRotateX".format(decomp), "{}.colorIfTrueR".format(fk_ref_cond))
                 pm.connectAttr("{}.outputRotateY".format(decomp), "{}.colorIfTrueG".format(fk_ref_cond))
                 pm.connectAttr("{}.outputRotateZ".format(decomp), "{}.colorIfTrueB".format(fk_ref_cond))
-
-
-# TODO: extract to common logic
-def getFullPath(start, routes=None):
-    # type: (pm.nt.transform, List[pm.nt.transform]) -> List[pm.nt.transform]
-    if not routes:
-        routes = []
-
-    if not start.getParent():
-        return routes
-
-    else:
-        return getFullPath(start.getParent(), routes + [start, ])
-
-
-def findPathAtoB(a, b):
-    # type: (pm.nt.transform, pm.nt.transform) -> Tuple[List[pm.nt.transform], pm.nt.transform, List[pm.nt.transform]]
-    """Returns route of A to B in formed Tuple[down(to root), turning point, up(to leaf)]"""
-    # aPath = ["x", "a", "b", "c"]
-    # bPath = ["b", "c"]
-    # down [x, a]
-    # turn b
-    # up []
-
-    aPath = getFullPath(a)
-    bPath = getFullPath(b)
-
-    return _findPathAtoB(aPath, bPath)
-
-
-def _findPathAtoB(aPath, bPath):
-    # type: (List, List) -> Tuple[List, Any, List]
-    """Returns route of A to B in formed Tuple[down(to root), turning point, up(to leaf)]
-
-    >>> aPath = ["x", "a", "b", "c"]
-    >>> bPath = ["b", "c"]
-    >>> d, c, u = _findPathAtoB(aPath, bPath)
-    >>> d == ["x", "a"]
-    True
-    >>> c == "b"
-    True
-    >>> u == []
-    True
-
-    """
-    down = []
-    up = []
-    sharedNode = None
-
-    for u in aPath:
-        if u in bPath:
-            sharedNode = u
-            break
-
-        down.append(u)
-
-    idx = bPath.index(sharedNode)
-    up = list(reversed(bPath[:(idx)]))
-
-    return down, sharedNode, up
