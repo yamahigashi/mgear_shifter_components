@@ -745,7 +745,7 @@ class Component(component.Main):
         # self.ik_decompose_rot.append(self.decomp_tip_ik_rot)
         pm.setAttr(self.decomp_tip_ik_rot.attr("axisOrientX"), 90.0)
         pm.setAttr(self.decomp_tip_ik_rot.attr("axisOrientZ"), 90.0)
-        pm.connectAttr(self.ik_ctl[-1].rotate, self.decomp_tip_ik_rot.attr("rotate"))
+        pm.connectAttr(str(self.ik_ctl[-1].rotate), self.decomp_tip_ik_rot.attr("rotate"))
 
         # Division -----------------------------------------
         rootWorld_node = node.createDecomposeMatrixNode(self.root.attr("worldMatrix"))

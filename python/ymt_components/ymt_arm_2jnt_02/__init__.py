@@ -165,7 +165,7 @@ class Component(arm_2jnt_04.Component):
     def postConnect(self):
 
         fk_ref_cond = pm.createNode("condition")
-        pm.connectAttr(self.fkref_att, "{}.firstTerm".format(fk_ref_cond))
+        pm.connectAttr(str(self.fkref_att), "{}.firstTerm".format(fk_ref_cond))
         pm.setAttr("{}.secondTerm".format(fk_ref_cond), 0)
         pm.setAttr("{}.operation".format(fk_ref_cond), 0)
         pm.setAttr("{}.colorIfTrueR".format(fk_ref_cond), 0)
@@ -190,7 +190,7 @@ class Component(arm_2jnt_04.Component):
                 pm.connectAttr("{}.outColorB".format(_head_ref_cond), "{}.colorIfFalseB".format(fk_ref_cond))
                 fk_ref_cond = _head_ref_cond
 
-                pm.connectAttr(self.fkref_att, "{}.firstTerm".format(_head_ref_cond))
+                pm.connectAttr(str(self.fkref_att), "{}.firstTerm".format(_head_ref_cond))
                 pm.setAttr("{}.secondTerm".format(_head_ref_cond), i + 1)
                 pm.setAttr("{}.operation".format(_head_ref_cond), 0)
 

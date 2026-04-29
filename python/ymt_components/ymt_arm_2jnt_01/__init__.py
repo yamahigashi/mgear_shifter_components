@@ -200,10 +200,10 @@ class Component(MainComponent):
 
         # ik
         for shp in self.upv_ctl.getShapes():
-            pm.connectAttr(self.blend_att, shp.attr("visibility"))
+            pm.connectAttr(str(self.blend_att), shp.attr("visibility"))
 
         for shp in self.ik_ctl.getShapes():
-            pm.connectAttr(self.blend_att, shp.attr("visibility"))
+            pm.connectAttr(str(self.blend_att), shp.attr("visibility"))
 
         for shp in self.ikRot_ctl.getShapes():
             pm.connectAttr(rotspace_rev_node + ".outputX", shp.attr("visibility"))
@@ -231,13 +231,13 @@ class Component(MainComponent):
             weight_att_name1 = f"{cns}.{weight_att[0]}"
             weight_att_name2 = f"{cns}.{weight_att[1]}"
             pm.connectAttr(rev_node + ".outputX", weight_att_name1)
-            pm.connectAttr(self.blend_att, weight_att_name2)
+            pm.connectAttr(str(self.blend_att), weight_att_name2)
 
             # scaling
             blend_node = pm.createNode("blendColors")
             pm.connectAttr(self.chain[i].attr("scale"), blend_node + ".color1")
             pm.connectAttr(self.fk_ctl[i].attr("scale"), blend_node + ".color2")
-            pm.connectAttr(self.blend_att, blend_node + ".blender")
+            pm.connectAttr(str(self.blend_att), blend_node + ".blender")
             pm.connectAttr(blend_node + ".output",  loc + ".scale")
 
         # wrist rotation parent space switcher
@@ -247,7 +247,7 @@ class Component(MainComponent):
         weight_att_name1 = f"{cns}.{weight_att[0]}"
         weight_att_name2 = f"{cns}.{weight_att[1]}"
         pm.connectAttr(rotspace_rev_node + ".outputX", weight_att_name1)
-        pm.connectAttr(self.rot_space_att, weight_att_name2)
+        pm.connectAttr(str(self.rot_space_att), weight_att_name2)
 
         # wrist position switcher
         cns = pm.parentConstraint(self.fk_ctl[-1], self.end_ref, self.loc[-1], maintainOffset=True, skipTranslate=['x', 'y', 'z'])
@@ -255,7 +255,7 @@ class Component(MainComponent):
         weight_att_name1 = f"{cns}.{weight_att[0]}"
         weight_att_name2 = f"{cns}.{weight_att[1]}"
         pm.connectAttr(rev_node + ".outputX", weight_att_name1)
-        pm.connectAttr(self.blend_att, weight_att_name2)
+        pm.connectAttr(str(self.blend_att), weight_att_name2)
 
         pm.parentConstraint(self.ikRot_ctl, self.end_ref, maintainOffset=True, skipTranslate=['x', 'y', 'z'])
 

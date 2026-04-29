@@ -628,9 +628,9 @@ class Component(component.Main):
         op.rename(self.getName("slideCurveOp"))
 
         # pm.connectAttr(self.position_att, op + ".position")
-        pm.connectAttr(self.maxstretch_att, op + ".maxstretch")
-        pm.connectAttr(self.maxsquash_att, op + ".maxsquash")
-        pm.connectAttr(self.softness_att, op + ".softness")
+        pm.connectAttr(str(self.maxstretch_att), op + ".maxstretch")
+        pm.connectAttr(str(self.maxsquash_att), op + ".maxsquash")
+        pm.connectAttr(str(self.softness_att), op + ".softness")
         self.slv_crv_op = op
 
         # Volume driver ------------------------------------
@@ -703,9 +703,9 @@ class Component(component.Main):
             inv = pm.createNode("floatMath")
             pm.setAttr(inv + ".floatA", 1.0)
             pm.setAttr(inv + ".operation", 1)
-            pm.connectAttr(self.ik_att[i - 1], inv + ".floatB")
+            pm.connectAttr(str(self.ik_att[i - 1]), inv + ".floatB")
             pm.connectAttr(inv + ".outFloat", c + ".target[0].targetWeight")
-            pm.connectAttr(self.ik_att[i - 1], c + ".target[1].targetWeight")
+            pm.connectAttr(str(self.ik_att[i - 1]), c + ".target[1].targetWeight")
 
     def addFkOperator(self, i, rootWorld_node, crv_node):
 
@@ -790,7 +790,7 @@ class Component(component.Main):
                                             "y",
                                             div_node + ".output")
 
-        pm.connectAttr(self.volume_att, op + ".blend")
+        pm.connectAttr(str(self.volume_att), op + ".blend")
         pm.connectAttr(crv_node + ".arcLength", op + ".driver")
         # pm.connectAttr(self.st_att[i], op + ".stretch")
         # pm.connectAttr(self.sq_att[i], op + ".squash")
@@ -930,11 +930,11 @@ class Component(component.Main):
         self.sine_handle_x.setRotatePivot(self.sine_handle_x.getTranslation(om.MSpace.kObject) * -1., space=om.MSpace.kObject, balance=False)
         self.sine_handle_x.setScalePivot(pm.datatypes.Vector(0., -1., 0.), space=om.MSpace.kWorld, balance=True)
 
-        pm.connectAttr(self.sinewave_power_y_att, self.sine_deformer_y + ".amplitude")
-        pm.connectAttr(self.sinewave_wavelength_y_att, self.sine_deformer_y + ".wavelength")
+        pm.connectAttr(str(self.sinewave_power_y_att), self.sine_deformer_y + ".amplitude")
+        pm.connectAttr(str(self.sinewave_wavelength_y_att), self.sine_deformer_y + ".wavelength")
 
-        pm.connectAttr(self.sinewave_power_x_att, self.sine_deformer_x + ".amplitude")
-        pm.connectAttr(self.sinewave_wavelength_x_att, self.sine_deformer_x + ".wavelength")
+        pm.connectAttr(str(self.sinewave_power_x_att), self.sine_deformer_x + ".amplitude")
+        pm.connectAttr(str(self.sinewave_wavelength_x_att), self.sine_deformer_x + ".wavelength")
         t = getTransform(self.sine_handle_x)
 
         rot_offset = om.MEulerRotation(0., math.radians(90.), 0., 0).asQuaternion()
@@ -945,13 +945,13 @@ class Component(component.Main):
         if 0 == cmds.pluginInfo("maya-math-nodes", query=True, loaded=True):
             cmds.loadPlugin("maya-math-nodes")
         mult = pm.createNode("math_Multiply")
-        pm.connectAttr(self.sinewave_offset_y_att, "{}.input1".format(mult))
-        pm.connectAttr(self.sinewave_wavelength_y_att, "{}.input2".format(mult))
+        pm.connectAttr(str(self.sinewave_offset_y_att), "{}.input1".format(mult))
+        pm.connectAttr(str(self.sinewave_wavelength_y_att), "{}.input2".format(mult))
         pm.connectAttr("{}.output".format(mult), self.sine_deformer_y + ".offset")
 
         mult = pm.createNode("math_Multiply")
-        pm.connectAttr(self.sinewave_offset_x_att, "{}.input1".format(mult))
-        pm.connectAttr(self.sinewave_wavelength_x_att, "{}.input2".format(mult))
+        pm.connectAttr(str(self.sinewave_offset_x_att), "{}.input1".format(mult))
+        pm.connectAttr(str(self.sinewave_wavelength_x_att), "{}.input2".format(mult))
         pm.connectAttr("{}.output".format(mult), self.sine_deformer_x + ".offset")
 
     def connectRef(self, refArray, cns_obj, upVAttr=None, init_refNames=False):

@@ -714,7 +714,7 @@ class Component(component.Main):
         # self.ik_decompose_rot.append(self.decomp_tip_ik_rot)
         pm.setAttr(self.decomp_tip_ik_rot.attr("axisOrientX"), 90.0)
         pm.setAttr(self.decomp_tip_ik_rot.attr("axisOrientZ"), 90.0)
-        pm.connectAttr(self.ik_ctl[-1].rotate, self.decomp_tip_ik_rot.attr("rotate"))
+        pm.connectAttr(str(self.ik_ctl[-1].rotate), self.decomp_tip_ik_rot.attr("rotate"))
 
         self.addOperatorsIkRoll()
         # Division -----------------------------------------
@@ -781,9 +781,9 @@ class Component(component.Main):
             inv = pm.createNode("floatMath")
             pm.setAttr(inv + ".floatA", 1.0)
             pm.setAttr(inv + ".operation", 1)
-            pm.connectAttr(self.ik_att[i - 1], inv + ".floatB")
+            pm.connectAttr(str(self.ik_att[i - 1]), inv + ".floatB")
             pm.connectAttr(inv + ".outFloat", c + ".target[0].targetWeight")
-            pm.connectAttr(self.ik_att[i - 1], c + ".target[1].targetWeight")
+            pm.connectAttr(str(self.ik_att[i - 1]), c + ".target[1].targetWeight")
 
     def addOperatorsIkRoll(self):
 
@@ -922,7 +922,7 @@ class Component(component.Main):
                                             "y",
                                             div_node + ".output")
 
-        pm.connectAttr(self.volume_att, op + ".blend")
+        pm.connectAttr(str(self.volume_att), op + ".blend")
         pm.connectAttr(crv_node + ".arcLength", op + ".driver")
         # pm.connectAttr(self.st_att[i], op + ".stretch")
         # pm.connectAttr(self.sq_att[i], op + ".squash")

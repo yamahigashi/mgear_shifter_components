@@ -1,3 +1,5 @@
+# ruff: noqa: UP032, UP031, ANN201, ANN001, D102, N802, E501
+
 import sys
 import six
 import textwrap
@@ -288,7 +290,7 @@ class Component(MainComponent):
         # pm.connectAttr("{}.outputTranslate".format(decomp), "{}.translate".format(self.head_cns))
 
         cond = pm.createNode("condition")
-        pm.connectAttr(self.neckref_att, "{}.firstTerm".format(cond))
+        pm.connectAttr(str(self.neckref_att), "{}.firstTerm".format(cond))
         pm.setAttr("{}.secondTerm".format(cond), 0)
         pm.setAttr("{}.operation".format(cond), 0)
         pm.connectAttr("{}.outputTranslate".format(decomp), "{}.colorIfTrue".format(cond))
@@ -305,7 +307,7 @@ class Component(MainComponent):
 
         # Neck Rotation
         cond = pm.createNode("condition")
-        pm.connectAttr(self.neckref_att, "{}.firstTerm".format(cond))
+        pm.connectAttr(str(self.neckref_att), "{}.firstTerm".format(cond))
         pm.setAttr("{}.secondTerm".format(cond), 0)
         pm.setAttr("{}.operation".format(cond), 0)
         pm.setAttr("{}.colorIfTrueR".format(cond), 0)
@@ -327,7 +329,7 @@ class Component(MainComponent):
 
         mult = pm.createNode("multDoubleLinear")
         slerp = pm.createNode("quatSlerp")
-        pm.connectAttr(self.neckrate_att, "{}.input1".format(mult))
+        pm.connectAttr(str(self.neckrate_att), "{}.input1".format(mult))
         pm.setAttr("{}.input2".format(mult), (1. - (1. / (self.division) * (i + 1))))
         pm.connectAttr("{}.outputQuat".format(toQuat), "{}.input1Quat".format(slerp))
         pm.connectAttr("{}.output".format(mult), "{}.inputT".format(slerp))
@@ -400,7 +402,7 @@ class Component(MainComponent):
 
         # Head ref switch
         head_ref_cond = pm.createNode("condition")
-        pm.connectAttr(self.headref_att, "{}.firstTerm".format(head_ref_cond))
+        pm.connectAttr(str(self.headref_att), "{}.firstTerm".format(head_ref_cond))
         pm.setAttr("{}.secondTerm".format(head_ref_cond), 0)
         pm.setAttr("{}.operation".format(head_ref_cond), 0)
         pm.setAttr("{}.colorIfTrueR".format(head_ref_cond), 0)
@@ -441,7 +443,7 @@ class Component(MainComponent):
                 pm.connectAttr("{}.outColorB".format(_head_ref_cond), "{}.colorIfFalseB".format(head_ref_cond))
                 head_ref_cond = _head_ref_cond
 
-                pm.connectAttr(self.headref_att, "{}.firstTerm".format(_head_ref_cond))
+                pm.connectAttr(str(self.headref_att), "{}.firstTerm".format(_head_ref_cond))
                 pm.setAttr("{}.secondTerm".format(_head_ref_cond), i + 1)
                 pm.setAttr("{}.operation".format(_head_ref_cond), 0)
 

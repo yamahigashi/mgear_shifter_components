@@ -223,15 +223,15 @@ class Component(component.Main):
         # ik
         if self.settings["useRollCtl"]:
             for shp in self.roll_ctl.getShapes():
-                pm.connectAttr(self.blend_att, shp.attr("visibility"))
+                pm.connectAttr(str(self.blend_att), shp.attr("visibility"))
         for bk_ctl in self.bk_ctl:
             for shp in bk_ctl.getShapes():
-                pm.connectAttr(self.blend_att, shp.attr("visibility"))
+                pm.connectAttr(str(self.blend_att), shp.attr("visibility"))
 
         for shp in self.heel_ctl.getShapes():
-            pm.connectAttr(self.blend_att, shp.attr("visibility"))
+            pm.connectAttr(str(self.blend_att), shp.attr("visibility"))
         for shp in self.tip_ctl.getShapes():
-            pm.connectAttr(self.blend_att, shp.attr("visibility"))
+            pm.connectAttr(str(self.blend_att), shp.attr("visibility"))
 
         # Roll / Bank --------------------------------------
         if self.settings["useRollCtl"]:  # Using the controler
@@ -364,7 +364,7 @@ class Component(component.Main):
         if self.parent_comp is None:
             return
 
-        pm.connectAttr(self.parent_comp.blend_att, self.blend_att)
+        pm.connectAttr(str(self.parent_comp.blend_att), str(self.blend_att))
         pm.parent(self.root, self.parent_comp.ik_ctl)
         pm.parent(self.parent_comp.ik_ref, self.bk_ctl[-1])
         pm.parentConstraint(
@@ -379,7 +379,7 @@ class Component(component.Main):
         if self.parent_comp is None:
             return
 
-        pm.connectAttr(self.parent_comp.blend_att, self.blend_att)
+        pm.connectAttr(str(self.parent_comp.blend_att), str(self.blend_att))
         pm.parent(self.root, self.parent_comp.ik_ctl)
         pm.parent(self.parent_comp.ik_ref, self.bk_ctl[-1])
         pm.parentConstraint(self.parent_comp.tws3_rot,
@@ -393,7 +393,7 @@ class Component(component.Main):
                        cns + ".%sW0" % self.parent_comp.fk_ref)
         pm.connectAttr(bc_node + ".outputR",
                        cns + ".%sW1" % self.parent_comp.ik_ref)
-        pm.connectAttr(self.parent_comp.blend_att, bc_node + ".blender")
+        pm.connectAttr(str(self.parent_comp.blend_att), bc_node + ".blender")
 
         return
 
@@ -404,7 +404,7 @@ class Component(component.Main):
         if self.parent_comp is None:
             return
 
-        pm.connectAttr(self.parent_comp.blend_att, self.blend_att)
+        pm.connectAttr(str(self.parent_comp.blend_att), str(self.blend_att))
         pm.parent(self.root, self.parent_comp.ik_ctl)
         pm.parent(self.parent_comp.ik_ref, self.bk_ctl[-1])
         pm.parent(self.parent_comp.ik2b_ikCtl_ref, self.bk_ctl[-1])

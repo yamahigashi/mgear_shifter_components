@@ -800,13 +800,13 @@ class Component(component.Main):
         )
 
         # connect scale
-        pm.connectAttr(self.mouthSlide_ctl.scale, slide_c_ref.scale)
-        pm.connectAttr(self.cornerL_ctl.scale, corner_l_ref.scale)
-        pm.connectAttr(self.cornerR_ctl.scale, corner_r_ref.scale)
+        pm.connectAttr(str(self.mouthSlide_ctl.scale), slide_c_ref.scale)
+        pm.connectAttr(str(self.cornerL_ctl.scale), corner_l_ref.scale)
+        pm.connectAttr(str(self.cornerR_ctl.scale), corner_r_ref.scale)
 
         # connect pucker
         cmds.setAttr("{}.tz".format(slide_c_ref.name()), l=False)
-        pm.connectAttr(self.mouthSlide_ctl.tz, slide_c_ref.tz)
+        pm.connectAttr(str(self.mouthSlide_ctl.tz), slide_c_ref.tz)
 
         pm.parentConstraint(corner_l_ref, self.lips_L_Corner_npo, mo=True)
         pm.parentConstraint(corner_r_ref, self.lips_R_Corner_npo, mo=True)

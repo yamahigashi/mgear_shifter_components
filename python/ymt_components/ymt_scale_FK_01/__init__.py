@@ -251,11 +251,11 @@ class Component(component.Main):
 
             # ik
             for shp in self.upv_ctl.getShapes():
-                pm.connectAttr(self.blend_att, shp.attr("visibility"))
+                pm.connectAttr(str(self.blend_att), shp.attr("visibility"))
             for shp in self.ikcns_ctl.getShapes():
-                pm.connectAttr(self.blend_att, shp.attr("visibility"))
+                pm.connectAttr(str(self.blend_att), shp.attr("visibility"))
             for shp in self.ik_ctl.getShapes():
-                pm.connectAttr(self.blend_att, shp.attr("visibility"))
+                pm.connectAttr(str(self.blend_att), shp.attr("visibility"))
 
         # FK Chain -----------------------------------------
         if self.isFk:
@@ -282,7 +282,7 @@ class Component(component.Main):
                 pm.connectAttr(add_nodeTwist + ".output",
                                self.ikh.attr("twist"))
             else:
-                pm.connectAttr(self.roll_att, self.ikh.attr("twist"))
+                pm.connectAttr(str(self.roll_att), self.ikh.attr("twist"))
 
         # Chain of deformers -------------------------------
         for i, loc in enumerate(self.loc):
@@ -307,7 +307,7 @@ class Component(component.Main):
                 weight_att_name1 = f"{cns}.{weight_att[0]}"
                 weight_att_name2 = f"{cns}.{weight_att[1]}"
                 pm.connectAttr(rev_node + ".outputX", weight_att_name1)
-                pm.connectAttr(self.blend_att, weight_att_name2)
+                pm.connectAttr(str(self.blend_att), weight_att_name2)
 
                 # scaling
                 blend_node = pm.createNode("blendColors")
@@ -315,7 +315,7 @@ class Component(component.Main):
                                blend_node + ".color1")
                 pm.connectAttr(self.fk_ctl[i].attr("scale"),
                                blend_node + ".color2")
-                pm.connectAttr(self.blend_att, blend_node + ".blender")
+                pm.connectAttr(str(self.blend_att), blend_node + ".blender")
                 pm.connectAttr(blend_node + ".output", loc + ".scale")
 
     # =====================================================

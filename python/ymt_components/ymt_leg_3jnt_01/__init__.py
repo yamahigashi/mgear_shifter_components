@@ -807,7 +807,7 @@ class Component(component.Main):
                                      self.softblendLoc)
         node.createReverseNode(self.stretch_attr,
                                pc_node + ".target[0].targetWeight")
-        pm.connectAttr(self.stretch_attr,
+        pm.connectAttr(str(self.stretch_attr),
                        pc_node + ".target[1].targetWeight",
                        f=True)
 
@@ -855,7 +855,7 @@ class Component(component.Main):
         node.createReverseNode(self.fullIK_attr,
                                parentc_node + ".target[0].targetWeight")
 
-        pm.connectAttr(self.fullIK_attr,
+        pm.connectAttr(str(self.fullIK_attr),
                        parentc_node + ".target[1].targetWeight", f=True)
 
         # softIK 2 bones operators
@@ -919,7 +919,7 @@ class Component(component.Main):
                                      self.softblendLoc2)
         node.createReverseNode(self.stretch_attr,
                                pc_node + ".target[0].targetWeight")
-        pm.connectAttr(self.stretch_attr,
+        pm.connectAttr(str(self.stretch_attr),
                        pc_node + ".target[1].targetWeight",
                        f=True)
 
@@ -1039,8 +1039,8 @@ class Component(component.Main):
         self.volDriver_att = div_node2 + ".outputX"
 
         # Flip Offset ----------------------------------------
-        pm.connectAttr(self.ankleFlipOffset_att, self.tws2_loc.attr("rz"))
-        pm.connectAttr(self.kneeFlipOffset_att, self.tws1_loc.attr("rz"))
+        pm.connectAttr(str(self.ankleFlipOffset_att), self.tws2_loc.attr("rz"))
+        pm.connectAttr(str(self.kneeFlipOffset_att), self.tws1_loc.attr("rz"))
         # Divisions ----------------------------------------
         # at 0 or 1 the division will follow exactly the rotation of the
         # controler.. and we wont have this nice tangent + roll
@@ -1092,18 +1092,18 @@ class Component(component.Main):
             cts = [self.tws0_rot, self.tws1_rot, self.tws2_rot, self.tws3_drv]
             o_node = applyop.gear_rollsplinekine_op(div_cns, cts, perc, subdiv)
 
-            pm.connectAttr(self.resample_att, o_node + ".resample")
-            pm.connectAttr(self.absolute_att, o_node + ".absolute")
+            pm.connectAttr(str(self.resample_att), o_node + ".resample")
+            pm.connectAttr(str(self.absolute_att), o_node + ".absolute")
 
             # Squash n Stretch
             o_node = applyop.gear_squashstretch2_op(
                 div_cns, None,
                 pm.getAttr(self.volDriver_att),
                 "x")
-            pm.connectAttr(self.volume_att, o_node + ".blend")
-            pm.connectAttr(self.volDriver_att, o_node + ".driver")
-            pm.connectAttr(self.st_att[i], o_node + ".stretch")
-            pm.connectAttr(self.sq_att[i], o_node + ".squash")
+            pm.connectAttr(str(self.volume_att), o_node + ".blend")
+            pm.connectAttr(str(self.volDriver_att), o_node + ".driver")
+            pm.connectAttr(str(self.st_att[i]), o_node + ".stretch")
+            pm.connectAttr(str(self.sq_att[i]), o_node + ".squash")
 
         # connect roll rotation driver reference
         pm.orientConstraint(self.legBones[3],
@@ -1121,7 +1121,7 @@ class Component(component.Main):
         # ik
         for ctrl in [self.ik_ctl, self.roll1_ctl, self.roll2_ctl, self.upv_ctl, self.line_ref]:
             for shp in ctrl.getShapes():
-                pm.connectAttr(self.blend_att, shp.attr("visibility"))
+                pm.connectAttr(str(self.blend_att), shp.attr("visibility"))
 
         # setup leg o_node scale compensate
         pm.connectAttr(self.rig.global_ctl + ".scale", self.setup + ".scale")

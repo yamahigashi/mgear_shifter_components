@@ -456,7 +456,7 @@ def addJointCtl(self,
         oShape.isHistoricallyInteresting.set(False)
         # connecting the always draw shapes on top to global attribute
         if versions.current() >= 20220000:
-            pm.connectAttr(self.rig.ctlXRay_att,
+            pm.connectAttr(str(self.rig.ctlXRay_att),
                            oShape.attr("alwaysDrawOnTop"))
 
     # set controller tag

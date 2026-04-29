@@ -770,11 +770,11 @@ class Component(component.Main):
         )
 
         # connect scale
-        pm.connectAttr(self.mouthSlide_ctl.scale, slide_c_ref.scale)
+        pm.connectAttr(str(self.mouthSlide_ctl.scale), slide_c_ref.scale)
 
         # connect pucker
         cmds.setAttr("{}.tz".format(slide_c_ref.name()), l=False)
-        pm.connectAttr(self.mouthSlide_ctl.tz, slide_c_ref.tz)
+        pm.connectAttr(str(self.mouthSlide_ctl.tz), slide_c_ref.tz)
 
         ymt_util.setKeyableAttributesDontLockVisibility(slide_c_ref, [])
         ymt_util.setKeyableAttributesDontLockVisibility(outer_l_ref, [])

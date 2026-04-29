@@ -541,9 +541,9 @@ class Component(component.Main):
         op = applyop.gear_curveslide2_op(self.slv_crv, self.mst_crv, 0, 1.5, .5, .5)
 
         # pm.connectAttr(self.position_att, op + ".position")
-        pm.connectAttr(self.maxstretch_att, op + ".maxstretch")
-        pm.connectAttr(self.maxsquash_att, op + ".maxsquash")
-        pm.connectAttr(self.softness_att, op + ".softness")
+        pm.connectAttr(str(self.maxstretch_att), op + ".maxstretch")
+        pm.connectAttr(str(self.maxsquash_att), op + ".maxsquash")
+        pm.connectAttr(str(self.softness_att), op + ".softness")
 
         # Volume driver ------------------------------------
         crv_node = node.createCurveInfoNode(self.slv_crv)
@@ -613,9 +613,9 @@ class Component(component.Main):
             inv = pm.createNode("floatMath")
             pm.setAttr(inv + ".floatA", 1.0)
             pm.setAttr(inv + ".operation", 1)
-            pm.connectAttr(self.ik_att[i - 1], inv + ".floatB")
+            pm.connectAttr(str(self.ik_att[i - 1]), inv + ".floatB")
             pm.connectAttr(inv + ".outFloat", c + ".target[0].targetWeight")
-            pm.connectAttr(self.ik_att[i - 1], c + ".target[1].targetWeight")
+            pm.connectAttr(str(self.ik_att[i - 1]), c + ".target[1].targetWeight")
 
     def addFkOperator(self, i, rootWorld_node, crv_node):
 
@@ -711,10 +711,10 @@ class Component(component.Main):
                                             "y",
                                             div_node + ".output")
 
-        pm.connectAttr(self.volume_att, op + ".blend")
+        pm.connectAttr(str(self.volume_att), op + ".blend")
         pm.connectAttr(crv_node + ".arcLength", op + ".driver")
-        pm.connectAttr(self.st_att[i], op + ".stretch")
-        pm.connectAttr(self.sq_att[i], op + ".squash")
+        pm.connectAttr(str(self.st_att[i]), op + ".stretch")
+        pm.connectAttr(str(self.sq_att[i]), op + ".squash")
 
         # Controlers
         tmp_local_npo_transform = getTransform(self.fk_local_npo[i])  # to fix mismatch before/after later
