@@ -991,7 +991,8 @@ class Component(component.Main):
                 cns_node, query=True, weightAliasList=True)
 
             for i, attr in enumerate(cns_attr):
-                pm.setAttr(attr, 1.0)
+                attr_name = f"{cns_node}.{attr}"
+                pm.setAttr(attr_name, 1.0)
 
     def setRelation(self):
         """Set the relation beetween object from guide to rig"""

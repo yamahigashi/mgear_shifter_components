@@ -8,9 +8,12 @@ try:
     import mgear.pymaya as pm
 except ImportError:
     import pymel.core as pm
-import pymel.core.datatypes as dt
+try:
+    from mgear.pymaya import datatypes as dt
+except ImportError:
+    from pymel.core import datatypes as dt
 
-# import maya.OpenMaya as om
+import maya.OpenMaya as om
 
 # mgear
 from mgear.shifter.component import MainComponent
@@ -45,9 +48,9 @@ class Component(MainComponent):
             self.color_fk,
             "cube",
             w=dist,
-            h=self.size * .1,
-            d=self.size * .1,
-            po=dt.Vector(dist * .5 * self.n_factor, 0, 0)
+            h=self.size * 0.1,
+            d=self.size * 0.1,
+            po=dt.Vector(dist * 0.5 * self.n_factor, 0.0, 0.0)
         )
         self.fk_npo.append(fk_npo)
         self.fk_ctl.append(fk_ctl)
@@ -124,7 +127,7 @@ class Component(MainComponent):
 
         # match IK FK references
         self.match_ik = pri.addTransform(self.fk_ctl[2], self.getName("ik_mth"), tra.getTransform(self.ik_ctl))
-        mid = (len(self.fk_ctl) - 1) / 2
+        mid = int((len(self.fk_ctl) - 1) / 2)
         self.match_ikUpv = pri.addTransform(self.fk_ctl[mid], self.getName("upv_mth"), tra.getTransform(self.upv_ctl))
 
         if True or self.settings["ikTR"]:
@@ -222,11 +225,13 @@ class Component(MainComponent):
             if i == len(self.loc) - 1:
                 cns = pm.parentConstraint(self.fk_ctl[i], self.chain[i], loc, maintainOffset=True, skipRotate=['x', 'y', 'z'])
             else:
-                    cns = pm.parentConstraint(self.fk_ctl[i], self.chain[i], loc, maintainOffset=True)
+                cns = pm.parentConstraint(self.fk_ctl[i], self.chain[i], loc, maintainOffset=True)
 
             weight_att = pm.parentConstraint(cns, query=True, weightAliasList=True)
-            pm.connectAttr(rev_node + ".outputX", weight_att[0])
-            pm.connectAttr(self.blend_att, weight_att[1])
+            weight_att_name1 = f"{cns}.{weight_att[0]}"
+            weight_att_name2 = f"{cns}.{weight_att[1]}"
+            pm.connectAttr(rev_node + ".outputX", weight_att_name1)
+            pm.connectAttr(self.blend_att, weight_att_name2)
 
             # scaling
             blend_node = pm.createNode("blendColors")
@@ -239,14 +244,18 @@ class Component(MainComponent):
         cns = pm.parentConstraint(self.loc[-2], self.ikRot_cns, maintainOffset=True, skipRotate=['x', 'y', 'z'])
         cns = pm.parentConstraint(self.loc[-2], self.ik_ctl, self.ikRot_cns, maintainOffset=True, skipTranslate=['x', 'y', 'z'])
         weight_att = pm.parentConstraint(cns, query=True, weightAliasList=True)
-        pm.connectAttr(rotspace_rev_node + ".outputX", weight_att[0])
-        pm.connectAttr(self.rot_space_att, weight_att[1])
+        weight_att_name1 = f"{cns}.{weight_att[0]}"
+        weight_att_name2 = f"{cns}.{weight_att[1]}"
+        pm.connectAttr(rotspace_rev_node + ".outputX", weight_att_name1)
+        pm.connectAttr(self.rot_space_att, weight_att_name2)
 
         # wrist position switcher
         cns = pm.parentConstraint(self.fk_ctl[-1], self.end_ref, self.loc[-1], maintainOffset=True, skipTranslate=['x', 'y', 'z'])
         weight_att = pm.parentConstraint(cns, query=True, weightAliasList=True)
-        pm.connectAttr(rev_node + ".outputX", weight_att[0])
-        pm.connectAttr(self.blend_att, weight_att[1])
+        weight_att_name1 = f"{cns}.{weight_att[0]}"
+        weight_att_name2 = f"{cns}.{weight_att[1]}"
+        pm.connectAttr(rev_node + ".outputX", weight_att_name1)
+        pm.connectAttr(self.blend_att, weight_att_name2)
 
         pm.parentConstraint(self.ikRot_ctl, self.end_ref, maintainOffset=True, skipTranslate=['x', 'y', 'z'])
 
