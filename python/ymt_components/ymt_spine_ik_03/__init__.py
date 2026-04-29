@@ -105,17 +105,7 @@ class Component(component.Main):
         self.fk_ctl = []
         self.fk_npo = []
         self.fk_local_npo = []
-        self.scl_transforms = []
-        self.twister = []
-        self.ref_twist = []
-        self.fk_global_in = []
         self.fk_local_in = []
-        self.fk_global_out = []
-        self.fk_global_ref = []
-        self.fk_uv_param = []
-
-        self.ik_roll_npo = []
-        self.ik_decompose_rot = []
 
         self.length_ctl = None
         self.div_roll_npo = []
@@ -169,7 +159,7 @@ class Component(component.Main):
                 is_cv_ctl=False,
                 is_roll_ctl=True,
                 is_otans_ctl=True,
-                is_itans_ctl=True
+                is_itans_ctl=True,
         )
 
         cvs, oTans, iTans, joints, master_control, self.spline = tmpRes
@@ -363,7 +353,6 @@ class Component(component.Main):
         if i == 0:
             p = parentctl
         else:
-            # p = self.scl_transforms[i - 1]
             p = self.fk_local_in[i - 1]
 
         fk_npo = addTransform(p, self.getName("fk%s_npo" % (i)), global_t)
@@ -409,7 +398,6 @@ class Component(component.Main):
         self.fk_local_npo.append(fk_local_npo)
         parentctl = fk_ctl
         scl_ref = addTransform(parentctl, self.getName("%s_scl_ref" % i), getTransform(parentctl))
-        self.scl_transforms.append(scl_ref)
 
         # Twist references (This objects will replace the spinlookup
         # slerp solver behavior)
@@ -549,11 +537,13 @@ class Component(component.Main):
         if 0 == cmds.pluginInfo("rotationDriver", query=True, loaded=True):
             cmds.loadPlugin("rotationDriver")
 
-        self.decomp_tip_ik_rot = pm.createNode("decomposeRotate")
-        # self.ik_decompose_rot.append(self.decomp_tip_ik_rot)
-        pm.setAttr(self.decomp_tip_ik_rot.attr("axisOrientX"), 90.0)
-        pm.setAttr(self.decomp_tip_ik_rot.attr("axisOrientZ"), 90.0)
-        pm.connectAttr(self.ik_ctl[-1].rotate, self.decomp_tip_ik_rot.attr("rotate"))
+        decomp_tip_ik_rot = cmds.createNode("decomposeRotate")
+        cmds.setAttr(decomp_tip_ik_rot + ".axisOrientX", 90.0)
+        cmds.setAttr(decomp_tip_ik_rot + ".axisOrientZ", 90.0)
+        cmds.connectAttr(
+            self.ik_ctl[-1].getName() + ".rotate",
+            decomp_tip_ik_rot + ".rotate"
+        )
 
         # Division -----------------------------------------
         rootWorld_node = node.createDecomposeMatrixNode(self.root.attr("worldMatrix"))
@@ -573,9 +563,15 @@ class Component(component.Main):
             self.addFkOperator(i, rootWorld_node)
 
         driver_shape = self.spline.getShape()
-        for attr in cmds.listAttr("{}.vertexData".format(driver_shape.getName()), multi=True) or []:
+        try:
+            driver_shape_name = driver_shape.getName()
+        except AttributeError:
+            driver_shape_name = driver_shape
+
+        vertData_attr = "{}.vertexData".format(driver_shape_name)
+        for attr in cmds.listAttr(vertData_attr, multi=True) or []:
                 if "useOrient" in attr:
-                    cmds.setAttr("{}.{}".format(driver_shape.getName(), attr), True)
+                    cmds.setAttr("{}.{}".format(driver_shape_name, attr), True)
 
     def addFkOperator(self, i, rootWorld_node):
 

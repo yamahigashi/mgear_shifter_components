@@ -20,7 +20,7 @@ except ImportError:
 from mgear import shifter
 
 from . import settingsUI as sui
-from . import chain_guide_initializer
+from mgear.shifter.component import chain_guide_initializer
 
 # guide info
 AUTHOR = "yamahigashi"
