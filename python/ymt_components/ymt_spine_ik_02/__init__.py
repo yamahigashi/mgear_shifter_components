@@ -247,41 +247,33 @@ class Component(component.Main):
 
         x = vecProjection(a, x)[0]
         z = vecProjection(a, z)[2]
-        theta = math.atan2(x, z)
-        roll = theta + math.pi
+
+        if abs(x) < 0.001 or abs(z) < 0.001:
+            theta = 0.0
+        else:
+            theta = math.atan2(x, z)
+        roll = math.degrees(theta)
 
         tm = datatypes.TransformationMatrix(t)
-        pym2m.add_rotation(tm, (0., roll, 0), 'xyz', 'object', 'rad')
+        rot = (0.0, roll, 0.0)
+        tm = pym2m.add_rotation(tm, rot, "XYZ", om.MSpace.kObject, unit="rad")
+        mat = tm.asMatrix()
+        mat = [x for x in mat]  # Convert to list for compatibility with Maya API
 
-        return datatypes.Matrix(tm)
+        return datatypes.Matrix(mat)
 
     def _addObjectsFkControl(self, i, parentdiv, parentctl, t, parent_twistRef):
         # References
         tm = datatypes.TransformationMatrix(t)
-        tm = pym2m.add_rotation(tm, (0.0, 0.0, math.pi / -2.0), order="xyz", space=om.MSpace.kObject, unit="rad")
-        tm = pym2m.add_rotation(tm, (0.0, math.pi / -2.0, 0.0), order="xyz", space=om.MSpace.kObject, unit="rad")
-        
-        try:
-            global_t  = datatypes.Matrix(tm)
-        except TypeError:
-            global_t = datatypes.Matrix()
-            _m = tm.asMatrix()
-            global_t.a00 = _m.getElement(0, 0)
-            global_t.a01 = _m.getElement(0, 1)
-            global_t.a02 = _m.getElement(0, 2)
-            global_t.a03 = _m.getElement(0, 3)
-            global_t.a10 = _m.getElement(1, 0)
-            global_t.a11 = _m.getElement(1, 1)
-            global_t.a12 = _m.getElement(1, 2)
-            global_t.a13 = _m.getElement(1, 3)
-            global_t.a20 = _m.getElement(2, 0)
-            global_t.a21 = _m.getElement(2, 1)
-            global_t.a22 = _m.getElement(2, 2)
-            global_t.a23 = _m.getElement(2, 3)
-            global_t.a30 = _m.getElement(3, 0)
-            global_t.a31 = _m.getElement(3, 1)
-            global_t.a32 = _m.getElement(3, 2)
-            global_t.a33 = _m.getElement(3, 3)
+        tm = pym2m.add_rotation(tm, [0.0, 0.0, math.pi / -2.0], "XYZ", om.MSpace.kObject, unit="rad")
+        tm = pym2m.add_rotation(tm, [0.0, -math.pi / -2.0, 0], "XYZ", om.MSpace.kObject, unit="rad")
+        mat = tm.asMatrix()
+        global_t  = datatypes.Matrix([
+            mat[0], mat[1], mat[2], mat[3],
+            mat[4], mat[5], mat[6], mat[7],
+            mat[8], mat[9], mat[10], mat[11],
+            mat[12], mat[13], mat[14], mat[15],
+        ])
 
         # global input
         div_cns = addTransform(parentdiv, self.getName("%s_cns" % i))
