@@ -23,7 +23,7 @@ URL = "yamahigashi.dev"
 EMAIL = "yamahigashi@gmail.com"
 
 VERSION = [0, 0, 1]
-TYPE = "ymt_neck_ik_02"
+TYPE = "ymt_neck_ik_03"
 NAME = "neck"
 DESCRIPTION = ""
 
