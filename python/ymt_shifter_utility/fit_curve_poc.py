@@ -1,4 +1,4 @@
-"""Curve fitting without per-iteration scene updates.
+"""Proof-of-concept curve fitting without per-iteration scene updates.
 
 This module intentionally keeps the scope narrow:
 
@@ -6,6 +6,9 @@ This module intentionally keeps the scope narrow:
 * fixed sample parameters captured from the initial curves
 * analytic distance-loss gradients
 * one optional scene write-back at the end
+
+The goal is to validate the performance direction before replacing
+``fit_curve.py``.
 """
 # ruff: noqa: ANN202, UP045
 from __future__ import annotations
@@ -93,7 +96,7 @@ class FitResult:
 
 @dataclass
 class EvaluatorValidation:
-    """Difference between Maya curve evaluation and the local evaluator."""
+    """Difference between Maya curve evaluation and the POC evaluator."""
 
     max_error: float
     mean_error: float
@@ -176,12 +179,11 @@ def snapshot_curve(curve_like):
     mfn_curve = _as_mfn_curve(curve_like)
     mfn_curve.updateCurve()
     if _is_rational(mfn_curve):
-        raise NotImplementedError("fit_curve does not support rational curves yet.")
+        raise NotImplementedError("fit_curve_poc does not support rational curves yet.")
 
     degree = int(mfn_curve.degree)
     form = int(mfn_curve.form)
-    cv_positions = mfn_curve.cvPositions(om2.MSpace.kWorld)
-    cvs_world = [om2.MPoint(point) for point in cv_positions]
+    cvs_world = list(mfn_curve.cvPositions(om2.MSpace.kWorld))
     knots = _full_knot_vector(mfn_curve, degree, len(cvs_world), form)
     dag_path = mfn_curve.getPath()
 
@@ -532,7 +534,7 @@ def evaluate_points(cvs_world, basis_list):
 
 def validate_snapshot_evaluator(curve_like, num_samples=100):
     # type: (om2.MFnNurbsCurve | str | object, int) -> EvaluatorValidation
-    """Compare the local evaluator with Maya's curve evaluation at fixed params."""
+    """Compare the POC evaluator with Maya's curve evaluation at fixed params."""
     mfn_curve = _as_mfn_curve(curve_like)
     snapshot = snapshot_curve(mfn_curve)
     sample_params = _sample_params_by_length(mfn_curve, num_samples)
@@ -557,21 +559,17 @@ def build_fit_context(curve_a, curve_b, num_samples=100, source_sample_mode="par
     # type: (...) -> FitContext
     """Precompute fixed source bases and target points.
 
-    Open curves default to knot parameter samples so repeated runs measure the
-    same source locations. Closed and periodic curves use arc-length samples
-    from the source CV 0 region because their knot parameter start can be
-    offset from CV 0. Target samples are captured by arc length because the
-    target curve is not modified during optimization.
+    By default, source samples are taken from the knot parameter domain so
+    repeated runs measure the same source locations. ``source_sample_mode`` can
+    be set to ``"length"`` to use the source curve's initial arc-length spacing.
+    Target samples are still captured by arc length because the target curve is
+    not modified during optimization.
     """
     mfn_a = _as_mfn_curve(curve_a)
     mfn_b = _as_mfn_curve(curve_b)
     source = snapshot_curve(mfn_a)
 
-    effective_source_sample_mode = source_sample_mode
-    if source_sample_mode == "parameter" and source.is_closed:
-        sample_params = _sample_params_by_length(mfn_a, num_samples)
-        effective_source_sample_mode = "length"
-    elif source_sample_mode == "parameter":
+    if source_sample_mode == "parameter":
         sample_params = _sample_params_by_parameter(source, num_samples)
     elif source_sample_mode == "length":
         sample_params = _sample_params_by_length(mfn_a, num_samples)
@@ -587,7 +585,7 @@ def build_fit_context(curve_a, curve_b, num_samples=100, source_sample_mode="par
 
     return FitContext(
         source=source,
-        source_sample_mode=effective_source_sample_mode,
+        source_sample_mode=source_sample_mode,
         sample_params=sample_params,
         sample_basis=sample_basis,
         target_points=target_points,
@@ -911,7 +909,7 @@ def _set_scene_cv_positions_undoable(mfn_curve, positions_world, undo_name):
         mfn_curve.updateCurve()
 
 
-def set_scene_cv_positions(mfn_curve, positions_world, undoable=True, undo_name="fit_curve"):
+def set_scene_cv_positions(mfn_curve, positions_world, undoable=True, undo_name="fit_curve_poc"):
     # type: (om2.MFnNurbsCurve, Sequence[om2.MPoint], bool, str) -> None
     """Write final world-space CV positions back to the scene once."""
     if len(positions_world) != mfn_curve.numCVs:
@@ -924,9 +922,9 @@ def set_scene_cv_positions(mfn_curve, positions_world, undoable=True, undo_name=
     _set_scene_cv_positions_api(mfn_curve, positions_world)
 
 
-def symmetry_curve(curve_like, axis="X", undoable=True):
+def symmetry_curve_poc(curve_like, axis="X", undoable=True):
     # type: (om2.MFnNurbsCurve | str | object, str, bool) -> list[om2.MPoint]
-    """Apply the symmetry projection to a scene curve and write it back."""
+    """Apply the POC symmetry projection to a scene curve and write it back."""
     mfn_curve = _as_mfn_curve(curve_like)
     snapshot = snapshot_curve(mfn_curve)
     positions = apply_symmetry_projection(snapshot, snapshot.cvs_world, axis)
@@ -934,7 +932,7 @@ def symmetry_curve(curve_like, axis="X", undoable=True):
         mfn_curve,
         positions,
         undoable=undoable,
-        undo_name="fit_curve symmetry",
+        undo_name="fit_curve_poc symmetry",
     )
     # Periodic curves expose trailing degree CVs that are bound copies of the
     # first CVs. Return only the editable/independent CVs to make diagnostics
@@ -1051,7 +1049,7 @@ def optimize_context(
     )
 
 
-def fit_curve_on_curve(
+def fit_curve_on_curve_poc(
     curve_a,
     curve_b,
     cv_indices=None,
@@ -1109,7 +1107,7 @@ def fit_curve_on_curve(
             mfn_a,
             result.positions_world,
             undoable=undoable,
-            undo_name="fit_curve fit",
+            undo_name="fit_curve_poc fit",
         )
         scene_positions = _sync_periodic_bound_cvs(
             context.source,
@@ -1126,22 +1124,22 @@ def fit_curve_on_curve(
         result.max_write_error = _max_position_error(result.positions_world, scene_positions)
 
     om2.MGlobal.displayInfo(
-        "fit_curve distance loss: {} -> {}".format(result.initial_loss, result.final_loss),
+        "fit_curve_poc distance loss: {} -> {}".format(result.initial_loss, result.final_loss),
     )
     om2.MGlobal.displayInfo(
-        "fit_curve smoothness loss: {} -> {}".format(
+        "fit_curve_poc smoothness loss: {} -> {}".format(
             result.initial_smoothness_loss,
             result.final_smoothness_loss,
         ),
     )
     om2.MGlobal.displayInfo(
-        "fit_curve objective loss: {} -> {}".format(
+        "fit_curve_poc objective loss: {} -> {}".format(
             result.initial_objective_loss,
             result.final_objective_loss,
         ),
     )
     om2.MGlobal.displayInfo(
-        "fit_curve smoothness weight: base={}, effective={}, cv_scale={}, target_complexity={}, "
+        "fit_curve_poc smoothness weight: base={}, effective={}, cv_scale={}, target_complexity={}, "
         "complexity_scale={}".format(
             result.smoothness_weight,
             result.effective_smoothness_weight,
@@ -1151,14 +1149,14 @@ def fit_curve_on_curve(
         ),
     )
     om2.MGlobal.displayInfo(
-        "fit_curve symmetry post-process: enabled={}, axis={}".format(
+        "fit_curve_poc symmetry post-process: enabled={}, axis={}".format(
             result.symmetry,
             result.symmetry_axis,
         ),
     )
     if result.scene_loss_after_write is not None:
         om2.MGlobal.displayInfo(
-            "fit_curve scene write distance: {}, objective: {}, max write error: {}".format(
+            "fit_curve_poc scene write distance: {}, objective: {}, max write error: {}".format(
                 result.scene_loss_after_write,
                 result.scene_objective_loss_after_write,
                 result.max_write_error,

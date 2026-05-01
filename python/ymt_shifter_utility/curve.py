@@ -574,16 +574,21 @@ def collect_curve_shapes(crv, rplStr=["", ""]):
     shapes_names = []
     shapesDict = {}
     for shape in crv.getShapes():
-        shapes_names.append(shape.name().replace(rplStr[0], rplStr[1]))
-        c_form = shape.form()
-        degree = shape.degree()
-        form = c_form.key
-        form_id = c_form.index
-        pnts = [[cv.x, cv.y, cv.z] for cv in shape.getCVs(space="object")]
-        shapesDict[shape.name()] = {"points": pnts,
-                                    "degree": degree,
-                                    "form": form,
-                                    "form_id": form_id}
+        shape_name = shape.name() if hasattr(shape, "name") else str(shape)
+        shapes_names.append(shape_name.replace(rplStr[0], rplStr[1]))
+        form_id = cmds.getAttr("{}.form".format(shape_name))
+        form = {0: "open", 1: "closed", 2: "periodic"}.get(form_id, form_id)
+        degree = cmds.getAttr("{}.degree".format(shape_name))
+
+        objects = om2.MSelectionList()
+        objects.add(shape_name)
+        crv_fn = om2.MFnNurbsCurve(objects.getDagPath(0))
+        pnts = [[cv[0], cv[1], cv[2]]
+                for cv in crv_fn.cvPositions(om2.MSpace.kObject)]
+        shapesDict[shape_name] = {"points": pnts,
+                                  "degree": degree,
+                                  "form": form,
+                                  "form_id": form_id}
 
     return shapesDict, shapes_names
 
@@ -856,7 +861,7 @@ def update_curve_from_data(data, rplStr=["", ""]):
             for extra_shp in obj.listRelatives(shapes=True):
                 # Restore shapes connections
                 for c in cnx:
-                    pm.connectAttr(c[0], extra_shp.attr(c[1]))
+                    pm.connectAttr(c[0], str(extra_shp) + "." + c[1])
                 first_shape.addChild(extra_shp, add=True, shape=True)
                 pm.delete(obj)
 
@@ -1016,7 +1021,7 @@ def applyPathCnsLocal(target, curve, u, maintainOffset=True):
     cmds.connectAttr(curve.longName() + ".matrix", cns + ".worldUpMatrix")  # object rotation up
     cmds.setAttr(cns + ".frontAxis", 2)  # front axis x
     cmds.setAttr(cns + ".upAxis", 1)  # up axis y
-    pm.connectAttr(curve.attr("local"), cns.attr("geometryPath"), f=True)
+    pm.connectAttr(str(curve) + ".local", str(cns) + ".geometryPath", f=True)
 
     comp_node = pm.createNode("composeMatrix")
     cns.attr("allCoordinates") >> comp_node.attr("inputTranslate")  # pyright: ignore [reportUnusedExpression]
@@ -1241,18 +1246,42 @@ def gear_curvecns_op_local(crv, inputs=[]):
         pyNode: The curvecns node.
     """
     import ymt_shifter_utility
-
     pm.select(crv)
-    deformer_name = cmds.deformer(type="mgear_curveCns")[0]
+    deformer_name = pm.deformer(type="mgear_curveCns")[0]
 
-    con = cmds.listConnections(deformer_name + ".input", plugs=True, connections=True, source=True, destination=False)
+    con = cmds.listConnections(
+        deformer_name + ".input",
+        plugs=True,
+        connections=True,
+        source=True,
+        destination=False,
+        skipConversionNodes=True
+    )
     dst, src = con
 
-    cmds.disconnectAttr(src, dst)
-    cmds.connectAttr(
-        src.split(".")[0] + ".local",
-        deformer_name + ".input[0].inputGeometry"
-    )
+    # cmds.disconnectAttr(src, dst)
+    src_node = src.split(".")[0]
+    if cmds.nodeType(src_node) == "tweak":
+        tweak_con = cmds.listConnections(
+            src_node + ".input",
+            plugs=True,
+            connections=True,
+            source=True,
+            destination=False,
+            skipConversionNodes=True
+        )
+        tweak_dst, tweak_src = tweak_con
+        cmds.connectAttr(
+            tweak_src.split(".")[0] + ".local",
+            tweak_dst,
+            force=True
+        )
+    else:
+        cmds.connectAttr(
+            src_node + ".local",
+            deformer_name + ".input[0].inputGeometry",
+            force=True
+        )
 
     for i, item in enumerate(inputs):
         localMat = ymt_shifter_utility.getMultMatrixOfAtoB(item, crv, skip_last=False)

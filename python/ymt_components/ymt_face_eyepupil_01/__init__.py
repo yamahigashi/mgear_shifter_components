@@ -107,7 +107,9 @@ class Component(component.Main):
             self.jnt_pos.append([self.aim_cns, "aim"])
 
         diff = self.guide.apos[2] - self.guide.apos[0]
-        offset = diff.normal() * self.initialDist + t.translate
+        base_pos = transform.getPositionFromMatrix(t)
+        base_pos = dt.Vector(base_pos[0], base_pos[1], base_pos[2])
+        offset = diff.normal() * self.initialDist + base_pos
         offset_mat = transform.setMatrixPosition(t, offset)
         self.proj_cns = primitive.addTransform(self.aim_cns, self.getName("proj_cns"), offset_mat)
 
@@ -143,7 +145,8 @@ class Component(component.Main):
 
         self.surfRef = self.settings["surfaceReference"]
         if not self.surfRef:
-            self.sliding_surface = pm.duplicate(self.guide.getObjects(self.guide.root)["sliding_surface"])[0]
+            guide_surface = self.guide.getObjectByLocalName("sliding_surface")
+            self.sliding_surface = pm.duplicate(guide_surface)[0]
             pm.parent(self.sliding_surface, self.root)
             self.sliding_surface.visibility.set(False)
             pm.makeIdentity(self.sliding_surface, apply=True, t=1,  r=1, s=1, n=0, pn=1)

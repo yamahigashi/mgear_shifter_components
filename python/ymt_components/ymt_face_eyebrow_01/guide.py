@@ -27,7 +27,7 @@ except ImportError:
     from pymel.core import datatypes
 
 import ymt_shifter_utility as ymt_utility
-from . import chain_guide_initializer
+from mgear.shifter.component import chain_guide_initializer
 
 # guide info
 AUTHOR = "yamahigashi"
@@ -54,6 +54,10 @@ class Guide(guide.ComponentGuide):
     url = URL
     email = EMAIL
     version = VERSION
+
+    def getObjectByLocalName(self, local_name, includeShapes=False):
+        return ymt_utility.findGuideObjectByLocalName(
+            self, local_name, includeShapes=includeShapes)
 
     def setFromHierarchy(self, root):
         self.root = root

@@ -158,7 +158,8 @@ class Component(component.Main):
 
         self.surfRef = self.settings["surfaceReference"]
         if not self.surfRef:
-            self.sliding_surface = pm.duplicate(self.guide.getObjects(self.guide.root)["sliding_surface"])[0]
+            guide_surface = self.guide.getObjectByLocalName("sliding_surface")
+            self.sliding_surface = pm.duplicate(guide_surface)[0]
             pm.parent(self.sliding_surface.name(), self.root)
             self.sliding_surface.visibility.set(False)
             pm.makeIdentity(self.sliding_surface, apply=True, t=1,  r=1, s=1, n=0, pn=1)
@@ -357,13 +358,13 @@ class Component(component.Main):
             v = self.root.getTranslation(space="world")
             mainCtlUpv.setTranslation(v, om.MSpace.kWorld)
             # connect upv curve to mainCrv_ctl driver node.
-            pm.connectAttr(deformer.attr("outputGeometry[0]"), mainCtlUpv.getShape().attr("create"))
+            pm.connectAttr(str(deformer) + ".outputGeometry[0]", str(mainCtlUpv.getShape()) + ".create")
 
             # offset upv curve
-            cvs = mainCtlUpv.getCVs(space="world")
+            cvs = ymt_util.getCurveCVs(mainCtlUpv, space="world")
             for i, cv in enumerate(cvs):
                 offset = [cv[0], cv[1], cv[2] + self.FRONT_OFFSET]
-                mainCtlUpv.setCV(i, offset, space='world')
+                ymt_util.setCurveCV(mainCtlUpv, i, offset, space="world")
             # collect mainCrv upv
             self.mainCtlUpvs.append(mainCtlUpv)
 
@@ -386,12 +387,12 @@ class Component(component.Main):
         self.mainCurveUpvs.append(mainCrv_upv)
 
         for crv in [mainRope_upv, mainCrv_upv]:
-            cvs = crv.getCVs(space="world")
+            cvs = ymt_util.getCurveCVs(crv, space="world")
             for i, cv in enumerate(cvs):
                 # we populate the closest vertext list here to skipt the first
                 # and latest point
                 offset = [cv[0], cv[1], cv[2] + self.FRONT_OFFSET]
-                crv.setCV(i, offset, space='world')
+                ymt_util.setCurveCV(crv, i, offset, space="world")
 
     def addSecondaryCnsCurve(self, ctls):
         crv_degree = 2
@@ -474,7 +475,7 @@ class Component(component.Main):
         for j, crv in enumerate(self.secondaryCurves):
 
             lvlType = "transform"
-            cvs = crv.getCVs(space="object")
+            cvs = ymt_util.getCurveCVs(crv, space="object")
 
             for i, cv in enumerate(cvs):
 
@@ -489,7 +490,7 @@ class Component(component.Main):
                 cns = applyPathCnsLocal(oTransUpV, tempMainUpvCurves[j], u)
                 cns = applyPathCnsLocal(oTrans, tempMainCtlCurves[j], u)
 
-                pm.connectAttr(oTransUpV.attr("worldMatrix[0]"),
+                pm.connectAttr(str(oTransUpV) + ".worldMatrix[0]",
                                cns.attr("worldUpMatrix"))
 
                 # connect secondary control to oTrans hook.
@@ -878,7 +879,7 @@ def draw_eye_guide_mesh_plane(points, t):
 
 def applyPathCnsLocal(target, curve, u):
     cns = applyop.pathCns(target, curve, cnsType=False, u=u, tangent=False)
-    pm.connectAttr(curve.attr("local"), cns.attr("geometryPath"), f=True)  # tobe local space
+    pm.connectAttr(str(curve) + ".local", str(cns) + ".geometryPath", f=True)  # tobe local space
 
     comp_node = pm.createNode("composeMatrix")
     cns.attr("allCoordinates") >> comp_node.attr("inputTranslate")

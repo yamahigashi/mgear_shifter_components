@@ -251,11 +251,11 @@ class Component(component.Main):
 
             # ik
             for shp in self.upv_ctl.getShapes():
-                pm.connectAttr(self.blend_att, shp.attr("visibility"))
+                pm.connectAttr(str(self.blend_att), str(shp) + ".visibility")
             for shp in self.ikcns_ctl.getShapes():
-                pm.connectAttr(self.blend_att, shp.attr("visibility"))
+                pm.connectAttr(str(self.blend_att), str(shp) + ".visibility")
             for shp in self.ik_ctl.getShapes():
-                pm.connectAttr(self.blend_att, shp.attr("visibility"))
+                pm.connectAttr(str(self.blend_att), str(shp) + ".visibility")
 
         # FK Chain -----------------------------------------
         if self.isFk:
@@ -282,7 +282,7 @@ class Component(component.Main):
                 pm.connectAttr(add_nodeTwist + ".output",
                                self.ikh.attr("twist"))
             else:
-                pm.connectAttr(self.roll_att, self.ikh.attr("twist"))
+                pm.connectAttr(str(self.roll_att), str(self.ikh) + ".twist")
 
         # Chain of deformers -------------------------------
         for i, loc in enumerate(self.loc):
@@ -304,16 +304,18 @@ class Component(component.Main):
                 cns.interpType.set(0)
                 weight_att = pm.parentConstraint(
                     cns, query=True, weightAliasList=True)
-                pm.connectAttr(rev_node + ".outputX", weight_att[0])
-                pm.connectAttr(self.blend_att, weight_att[1])
+                weight_att_name1 = f"{cns}.{weight_att[0]}"
+                weight_att_name2 = f"{cns}.{weight_att[1]}"
+                pm.connectAttr(rev_node + ".outputX", weight_att_name1)
+                pm.connectAttr(str(self.blend_att), weight_att_name2)
 
                 # scaling
                 blend_node = pm.createNode("blendColors")
-                pm.connectAttr(self.chain[i].attr("scale"),
+                pm.connectAttr(str(self.chain[i]) + ".scale",
                                blend_node + ".color1")
-                pm.connectAttr(self.fk_ctl[i].attr("scale"),
+                pm.connectAttr(str(self.fk_ctl[i]) + ".scale",
                                blend_node + ".color2")
-                pm.connectAttr(self.blend_att, blend_node + ".blender")
+                pm.connectAttr(str(self.blend_att), blend_node + ".blender")
                 pm.connectAttr(blend_node + ".output", loc + ".scale")
 
     # =====================================================

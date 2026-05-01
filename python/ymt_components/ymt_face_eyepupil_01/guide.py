@@ -66,6 +66,10 @@ class Guide(guide.ComponentGuide):
 
     connectors = []
 
+    def getObjectByLocalName(self, local_name, includeShapes=False):
+        return ymt_utility.findGuideObjectByLocalName(
+            self, local_name, includeShapes=includeShapes)
+
     # =====================================================
     ##
     # @param self

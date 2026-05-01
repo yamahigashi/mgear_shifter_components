@@ -105,17 +105,7 @@ class Component(component.Main):
         self.fk_ctl = []
         self.fk_npo = []
         self.fk_local_npo = []
-        self.scl_transforms = []
-        self.twister = []
-        self.ref_twist = []
-        self.fk_global_in = []
         self.fk_local_in = []
-        self.fk_global_out = []
-        self.fk_global_ref = []
-        self.fk_uv_param = []
-
-        self.ik_roll_npo = []
-        self.ik_decompose_rot = []
 
         self.length_ctl = None
         self.div_roll_npo = []
@@ -142,9 +132,10 @@ class Component(component.Main):
         )
         cmds.nurbsCurveToBezier()  # type: ignore
         shape = dummy_crv.getShape()
+        shape_name = shape.name() if hasattr(shape, "name") else str(shape)
 
-        self.dummy_crv = ymtutil.getAsMFnNode(shape.name(), om.MFnNurbsCurve)
-        curveFn = ymtutil.getAsMFnNode(shape.name(), om.MFnNurbsCurve)
+        self.dummy_crv = ymtutil.getAsMFnNode(shape_name, om.MFnNurbsCurve)
+        curveFn = ymtutil.getAsMFnNode(shape_name, om.MFnNurbsCurve)
         # Get the curve data
         knots = curveFn.knots()
         params = list(knots)[1::3]
@@ -169,7 +160,7 @@ class Component(component.Main):
                 is_cv_ctl=False,
                 is_roll_ctl=True,
                 is_otans_ctl=True,
-                is_itans_ctl=True
+                is_itans_ctl=True,
         )
 
         cvs, oTans, iTans, joints, master_control, self.spline = tmpRes
@@ -363,7 +354,6 @@ class Component(component.Main):
         if i == 0:
             p = parentctl
         else:
-            # p = self.scl_transforms[i - 1]
             p = self.fk_local_in[i - 1]
 
         fk_npo = addTransform(p, self.getName("fk%s_npo" % (i)), global_t)
@@ -409,7 +399,6 @@ class Component(component.Main):
         self.fk_local_npo.append(fk_local_npo)
         parentctl = fk_ctl
         scl_ref = addTransform(parentctl, self.getName("%s_scl_ref" % i), getTransform(parentctl))
-        self.scl_transforms.append(scl_ref)
 
         # Twist references (This objects will replace the spinlookup
         # slerp solver behavior)
@@ -549,11 +538,13 @@ class Component(component.Main):
         if 0 == cmds.pluginInfo("rotationDriver", query=True, loaded=True):
             cmds.loadPlugin("rotationDriver")
 
-        self.decomp_tip_ik_rot = pm.createNode("decomposeRotate")
-        # self.ik_decompose_rot.append(self.decomp_tip_ik_rot)
-        pm.setAttr(self.decomp_tip_ik_rot.attr("axisOrientX"), 90.0)
-        pm.setAttr(self.decomp_tip_ik_rot.attr("axisOrientZ"), 90.0)
-        pm.connectAttr(self.ik_ctl[-1].rotate, self.decomp_tip_ik_rot.attr("rotate"))
+        decomp_tip_ik_rot = cmds.createNode("decomposeRotate")
+        cmds.setAttr(decomp_tip_ik_rot + ".axisOrientX", 90.0)
+        cmds.setAttr(decomp_tip_ik_rot + ".axisOrientZ", 90.0)
+        cmds.connectAttr(
+            self.ik_ctl[-1].getName() + ".rotate",
+            decomp_tip_ik_rot + ".rotate"
+        )
 
         # Division -----------------------------------------
         rootWorld_node = node.createDecomposeMatrixNode(self.root.attr("worldMatrix"))
@@ -573,9 +564,15 @@ class Component(component.Main):
             self.addFkOperator(i, rootWorld_node)
 
         driver_shape = self.spline.getShape()
-        for attr in cmds.listAttr("{}.vertexData".format(driver_shape.getName()), multi=True) or []:
+        try:
+            driver_shape_name = driver_shape.getName()
+        except AttributeError:
+            driver_shape_name = driver_shape
+
+        vertData_attr = "{}.vertexData".format(driver_shape_name)
+        for attr in cmds.listAttr(vertData_attr, multi=True) or []:
                 if "useOrient" in attr:
-                    cmds.setAttr("{}.{}".format(driver_shape.getName(), attr), True)
+                    cmds.setAttr("{}.{}".format(driver_shape_name, attr), True)
 
     def addFkOperator(self, i, rootWorld_node):
 
@@ -598,15 +595,15 @@ class Component(component.Main):
 
             dm_node = node.createDecomposeMatrixNode(s.attr("inverseMatrix"))
             comp_node = pm.PyNode(cmds.createNode("composeMatrix"))
-            pm.connectAttr(dm_node + ".outputScale", comp_node.attr("inputScale"))
-            pm.connectAttr(dm_node + ".outputShear", comp_node.attr("inputShear"))
+            pm.connectAttr(dm_node + ".outputScale", str(comp_node) + ".inputScale")
+            pm.connectAttr(dm_node + ".outputShear", str(comp_node) + ".inputShear")
             mulmat_node = applyop.gear_mulmatrix_op(comp_node.attr("outputMatrix"), s.attr("matrix"))
 
             mulmat_node = applyop.gear_mulmatrix_op(s2.attr("matrix"), mulmat_node.attr("output"))
             mulmat_node2 = applyop.gear_mulmatrix_op(mulmat_node.attr("output"), s2.attr("inverseMatrix"))
 
             dm_node = node.createDecomposeMatrixNode(mulmat_node2 + ".output")
-            pm.connectAttr(dm_node + ".outputTranslate", d.attr("t"))
+            pm.connectAttr(dm_node + ".outputTranslate", str(d) + ".t")
 
             check_list = (pm.Attribute, six.string_types)  # noqa
 
@@ -624,7 +621,7 @@ class Component(component.Main):
             pm.setAttr(cond + ".colorIfFalseG", 0.)
             pm.setAttr(cond + ".colorIfFalseB", 0.)
 
-            pm.connectAttr(cond + ".outColor", d.attr("r"))
+            pm.connectAttr(cond + ".outColor", str(d) + ".r")
             
         # References
         tmp_div_npo_transform = getTransform(self.div_cns_npo[i])  # to fix mismatch before/after later
@@ -703,7 +700,8 @@ class Component(component.Main):
                         pm.setAttr(node_name + ".operation", 0)
                         pm.setAttr(node_name + ".colorIfTrueR", 1)
                         pm.setAttr(node_name + ".colorIfFalseR", 0)
-                        pm.connectAttr(node_name + ".outColorR", attr)
+                        attr_name = f"{cns_node}.{attr}"
+                        pm.connectAttr(node_name + ".outColorR", attr_name)
 
     def connect_standard(self):
         self.parent.addChild(self.root)

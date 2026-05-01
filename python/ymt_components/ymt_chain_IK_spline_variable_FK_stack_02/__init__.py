@@ -108,15 +108,18 @@ class Component(component.Main):
             close=False,
             degree=min([len(self.guide.apos) - 1, 3])
         )
+        dummy_crv_shape = self.dummy_crv.getShape()
+        dummy_crv_shape_name = dummy_crv_shape.name() if hasattr(dummy_crv_shape, "name") else str(dummy_crv_shape)
+        dummy_crv_fn = ymt_util.getAsMFnNode(dummy_crv_shape_name, om.MFnNurbsCurve)
 
         for i in range(self.settings["ikNb"]):
-            self.addObjectsChainIk(i, self.dummy_crv)
+            self.addObjectsChainIk(i, dummy_crv_fn)
 
         # add npo
         t = getTransform(self.guide.root)
         self.aim_npo = addTransform(self.root, self.getName("aim_npo"), t)
 
-        self.addLengthCtrl(self.dummy_crv)
+        self.addLengthCtrl(dummy_crv_fn)
         pm.delete(self.dummy_crv)
 
         # Curves -------------------------------------------
@@ -131,6 +134,9 @@ class Component(component.Main):
             [datatypes.Vector()] * 10,
             False,
             3)
+        slv_crv_shape = self.slv_crv.getShape()
+        slv_crv_shape_name = slv_crv_shape.name() if hasattr(slv_crv_shape, "name") else str(slv_crv_shape)
+        self.slv_crv_fn = ymt_util.getAsMFnNode(slv_crv_shape_name, om.MFnNurbsCurve)
 
         icon.connection_display_curve(self.getName("visualIKRef"), self.ik_ctl)
         if self.settings["isGlobalMaster"]:
@@ -164,7 +170,8 @@ class Component(component.Main):
         global_t = self._getTransformWithRollByBlade(t)
         cvs = crv.length()
         tm = datatypes.TransformationMatrix(t)
-        tm.addTranslation([cvs * -0.4, cvs * 0.2, 0.], om.MSpace.kObject)
+        offset = datatypes.Vector([cvs * -0.4, cvs * 0.2, 0.])
+        tm.setTranslation(tm.getTranslation(om.MSpace.kObject) + offset, om.MSpace.kObject)
 
         local_t = datatypes.Matrix(tm)
         self.length_npo = addTransform(self.aim_npo, self.getName("length_npo"), local_t)
@@ -628,9 +635,9 @@ class Component(component.Main):
         op.rename(self.getName("slideCurveOp"))
 
         # pm.connectAttr(self.position_att, op + ".position")
-        pm.connectAttr(self.maxstretch_att, op + ".maxstretch")
-        pm.connectAttr(self.maxsquash_att, op + ".maxsquash")
-        pm.connectAttr(self.softness_att, op + ".softness")
+        pm.connectAttr(str(self.maxstretch_att), op + ".maxstretch")
+        pm.connectAttr(str(self.maxsquash_att), op + ".maxsquash")
+        pm.connectAttr(str(self.softness_att), op + ".softness")
         self.slv_crv_op = op
 
         # Volume driver ------------------------------------
@@ -688,8 +695,8 @@ class Component(component.Main):
                 self.ik_att[i])
             # self.ik_uv_param[i])
             dm_node = node.createDecomposeMatrixNode(intMatrix + ".output")
-            pm.connectAttr(dm_node + ".outputRotate", self.ik_npo[i].attr("rotate"))
-            pm.connectAttr(dm_node + ".outputTranslate", self.ik_npo[i].attr("translate"))
+            pm.connectAttr(dm_node + ".outputRotate", str(self.ik_npo[i]) + ".rotate")
+            pm.connectAttr(dm_node + ".outputTranslate", str(self.ik_npo[i]) + ".translate")
             '''
 
             # TODO: connect attribute on weight
@@ -703,9 +710,9 @@ class Component(component.Main):
             inv = pm.createNode("floatMath")
             pm.setAttr(inv + ".floatA", 1.0)
             pm.setAttr(inv + ".operation", 1)
-            pm.connectAttr(self.ik_att[i - 1], inv + ".floatB")
+            pm.connectAttr(str(self.ik_att[i - 1]), inv + ".floatB")
             pm.connectAttr(inv + ".outFloat", c + ".target[0].targetWeight")
-            pm.connectAttr(self.ik_att[i - 1], c + ".target[1].targetWeight")
+            pm.connectAttr(str(self.ik_att[i - 1]), c + ".target[1].targetWeight")
 
     def addFkOperator(self, i, rootWorld_node, crv_node):
 
@@ -724,7 +731,7 @@ class Component(component.Main):
             mulmat_node2 = applyop.gear_mulmatrix_op(mulmat_node.attr("output"), s2.attr("inverseMatrix"))
 
             dm_node = node.createDecomposeMatrixNode(mulmat_node2 + ".output")
-            pm.connectAttr(dm_node + ".outputTranslate", d.attr("t"))
+            pm.connectAttr(dm_node + ".outputTranslate", str(d) + ".t")
 
             check_list = (pm.Attribute, unicode, str)  # noqa
             cond = pm.createNode("condition")
@@ -734,7 +741,7 @@ class Component(component.Main):
             pm.setAttr(cond + ".colorIfFalseR", 0.)
             pm.setAttr(cond + ".colorIfFalseG", 0.)
             pm.setAttr(cond + ".colorIfFalseB", 0.)
-            pm.connectAttr(cond + ".outColor", d.attr("r"))
+            pm.connectAttr(cond + ".outColor", str(d) + ".r")
 
         # References
         if i == 0:  # we add extra 10% to the first position
@@ -770,7 +777,7 @@ class Component(component.Main):
             ratio)
 
         dm_node = node.createDecomposeMatrixNode(intMatrix + ".output")
-        pm.connectAttr(dm_node + ".outputRotate", self.twister[i].attr("rotate"))
+        pm.connectAttr(dm_node + ".outputRotate", str(self.twister[i]) + ".rotate")
         pm.parentConstraint(self.twister[i], self.ref_twist[i], maintainOffset=True)
 
         pm.connectAttr(self.ref_twist[i] + ".translate", cns + ".worldUpVector")
@@ -790,7 +797,7 @@ class Component(component.Main):
                                             "y",
                                             div_node + ".output")
 
-        pm.connectAttr(self.volume_att, op + ".blend")
+        pm.connectAttr(str(self.volume_att), op + ".blend")
         pm.connectAttr(crv_node + ".arcLength", op + ".driver")
         # pm.connectAttr(self.st_att[i], op + ".stretch")
         # pm.connectAttr(self.sq_att[i], op + ".squash")
@@ -803,7 +810,7 @@ class Component(component.Main):
                 self.root.attr("worldInverseMatrix"))
 
             dm_node = node.createDecomposeMatrixNode(mulmat_node + ".output")
-            pm.connectAttr(dm_node + ".outputTranslate", self.fk_npo[i].attr("t"))
+            pm.connectAttr(dm_node + ".outputTranslate", str(self.fk_npo[i]) + ".t")
 
         else:
             mulmat_node = applyop.gear_mulmatrix_op(
@@ -812,9 +819,9 @@ class Component(component.Main):
 
             dm_node = node.createDecomposeMatrixNode(mulmat_node + ".output")
             mul_node = node.createMulNode(div_node + ".output", dm_node + ".outputTranslate")
-            pm.connectAttr(mul_node + ".output", self.fk_npo[i].attr("t"))
+            pm.connectAttr(mul_node + ".output", str(self.fk_npo[i]) + ".t")
 
-        pm.connectAttr(dm_node + ".outputRotate", self.fk_npo[i].attr("r"))
+        pm.connectAttr(dm_node + ".outputRotate", str(self.fk_npo[i]) + ".r")
         self.addOperatorsOrientationLock(i, cns)
         self.fk_local_npo[i].setMatrix(tmp_local_npo_transform, worldSpace=True)
 
@@ -867,9 +874,9 @@ class Component(component.Main):
             ["fk0_npo", self.fk_npo[0]],
             ["curve_op", self.slv_crv_op],
             ["scale_cns", self.scale_npo],
-            ["curve_length", self.slv_crv.length()]
+            ["curve_length", self.slv_crv_fn.length()]
         ]
-        self.length_ctl.setTranslation(datatypes.Vector(0.0, self.slv_crv.length(), 0), space="preTransform")
+        self.length_ctl.setTranslation(datatypes.Vector(0.0, self.slv_crv_fn.length(), 0), space="preTransform")
         self.exprespy = create_exprespy_node(self.length_control_expression_archtype, self.getName("exprespy"), rewrite_map)
 
     def length_control_expression_archtype(curve_length, scale_ctl, fk0_npo, curve_op, scale_cns, sine_npo):
@@ -900,9 +907,10 @@ class Component(component.Main):
 
         # add npo
         t = getTransform(self.guide.root)
-        cvs = self.slv_crv.length()
+        cvs = self.slv_crv_fn.length()
         tm = datatypes.TransformationMatrix(t)
-        tm.addTranslation([0., cvs * 0.1, 0.], om.MSpace.kObject)
+        offset = datatypes.Vector([0., cvs * 0.1, 0.])
+        tm.setTranslation(tm.getTranslation(om.MSpace.kObject) + offset, om.MSpace.kObject)
 
         local_t = datatypes.Matrix(tm)
         self.sine_npo = addTransform(self.aim_npo, self.getName("sine_npo"), t)
@@ -930,11 +938,11 @@ class Component(component.Main):
         self.sine_handle_x.setRotatePivot(self.sine_handle_x.getTranslation(om.MSpace.kObject) * -1., space=om.MSpace.kObject, balance=False)
         self.sine_handle_x.setScalePivot(pm.datatypes.Vector(0., -1., 0.), space=om.MSpace.kWorld, balance=True)
 
-        pm.connectAttr(self.sinewave_power_y_att, self.sine_deformer_y + ".amplitude")
-        pm.connectAttr(self.sinewave_wavelength_y_att, self.sine_deformer_y + ".wavelength")
+        pm.connectAttr(str(self.sinewave_power_y_att), self.sine_deformer_y + ".amplitude")
+        pm.connectAttr(str(self.sinewave_wavelength_y_att), self.sine_deformer_y + ".wavelength")
 
-        pm.connectAttr(self.sinewave_power_x_att, self.sine_deformer_x + ".amplitude")
-        pm.connectAttr(self.sinewave_wavelength_x_att, self.sine_deformer_x + ".wavelength")
+        pm.connectAttr(str(self.sinewave_power_x_att), self.sine_deformer_x + ".amplitude")
+        pm.connectAttr(str(self.sinewave_wavelength_x_att), self.sine_deformer_x + ".wavelength")
         t = getTransform(self.sine_handle_x)
 
         rot_offset = om.MEulerRotation(0., math.radians(90.), 0., 0).asQuaternion()
@@ -945,13 +953,13 @@ class Component(component.Main):
         if 0 == cmds.pluginInfo("maya-math-nodes", query=True, loaded=True):
             cmds.loadPlugin("maya-math-nodes")
         mult = pm.createNode("math_Multiply")
-        pm.connectAttr(self.sinewave_offset_y_att, "{}.input1".format(mult))
-        pm.connectAttr(self.sinewave_wavelength_y_att, "{}.input2".format(mult))
+        pm.connectAttr(str(self.sinewave_offset_y_att), "{}.input1".format(mult))
+        pm.connectAttr(str(self.sinewave_wavelength_y_att), "{}.input2".format(mult))
         pm.connectAttr("{}.output".format(mult), self.sine_deformer_y + ".offset")
 
         mult = pm.createNode("math_Multiply")
-        pm.connectAttr(self.sinewave_offset_x_att, "{}.input1".format(mult))
-        pm.connectAttr(self.sinewave_wavelength_x_att, "{}.input2".format(mult))
+        pm.connectAttr(str(self.sinewave_offset_x_att), "{}.input1".format(mult))
+        pm.connectAttr(str(self.sinewave_wavelength_x_att), "{}.input2".format(mult))
         pm.connectAttr("{}.output".format(mult), self.sine_deformer_x + ".offset")
 
     def connectRef(self, refArray, cns_obj, upVAttr=None, init_refNames=False):
@@ -1004,7 +1012,8 @@ class Component(component.Main):
                         pm.setAttr(node_name + ".operation", 0)
                         pm.setAttr(node_name + ".colorIfTrueR", 1)
                         pm.setAttr(node_name + ".colorIfFalseR", 0)
-                        pm.connectAttr(node_name + ".outColorR", attr)
+                        attr_name = f"{cns_node}.{attr}"
+                        pm.connectAttr(node_name + ".outColorR", attr_name)
 
     def connect_standard(self):
         self.parent.addChild(self.root)
@@ -1037,7 +1046,7 @@ class Component(component.Main):
         m_out = mstr_out[mstr_e]
         s_in = slave_in[idx]
         for srt in ["scale", "rotate", "translate"]:
-            pm.connectAttr(m_out.attr(srt), s_in.attr(srt))
+            pm.connectAttr(str(m_out) + "." + srt, str(s_in) + "." + srt)
 
     # =====================================================
     # CONNECTOR
@@ -1125,7 +1134,7 @@ def getCurveUAtPoint(crv, position):
 
 def vecProjection(a, b):
 
-    dot = a.dot(b)
+    dot = a * b
     length = b.length()
     tmp = dot / (length * length)
     p = [tmp * b.x, tmp * b.y, tmp * b.z]

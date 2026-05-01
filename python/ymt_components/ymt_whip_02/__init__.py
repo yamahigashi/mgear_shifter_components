@@ -172,7 +172,11 @@ class Component(component.Main):
             degree=min([len(self.guide.apos) - 1, 3])
         )
         cmds.nurbsCurveToBezier()
-        self.length = self.dummy_crv.length()
+
+        dummy_crv_shape = self.dummy_crv.getShape()
+        dummy_crv_shape_name = dummy_crv_shape.name() if hasattr(dummy_crv_shape, "name") else str(dummy_crv_shape)
+        dummy_crv_fn = ymt_util.getAsMFnNode(dummy_crv_shape_name, om.MFnNurbsCurve)
+        self.length = dummy_crv_fn.length()
         self.division = len(self.guide.apos)
 
         tmpRes = self.convertToTwistSpline(self.guide.apos, self.dummy_crv, self.ikNb)
@@ -189,7 +193,7 @@ class Component(component.Main):
         t = getTransform(self.guide.root)
         self.aim_npo = addTransform(self.root, self.getName("aim_npo"), t)
 
-        self.addLengthCtrl(self.dummy_crv)
+        self.addLengthCtrl(dummy_crv_fn)
         pm.delete(self.dummy_crv)
 
         # icon.connection_display_curve(self.getName("visualIKRef"), self.ik_ctl)
@@ -231,7 +235,8 @@ class Component(component.Main):
         t = self._getTransformWithRollByBlade(t)
         cvs = crv.length()
         tm = datatypes.TransformationMatrix(t)
-        tm.addTranslation([0.0, cvs * 0.01, cvs * 1.4], om.MSpace.kObject)
+        offset = datatypes.Vector([0.0, cvs * 0.01, cvs * 1.4])
+        tm.setTranslation(tm.getTranslation(om.MSpace.kObject) + offset, om.MSpace.kObject)
 
         local_t = datatypes.Matrix(tm)
         self.length_npo = addTransform(self.aim_npo, self.getName("length_npo"), local_t)
@@ -507,8 +512,8 @@ class Component(component.Main):
                 t1 = getTransformLookingAt(c, p, norm, axis="-xy")
                 t2 = getTransformLookingAt(c, n, norm, axis="xy")
 
-                q1 = om.MQuaternion(t1.rotate.x, t1.rotate.y, t1.rotate.z, t1.rotate.w)
-                q2 = om.MQuaternion(t2.rotate.x, t2.rotate.y, t2.rotate.z, t2.rotate.w)
+                q1 = om.MTransformationMatrix(om.MMatrix(t1)).rotation(True)
+                q2 = om.MTransformationMatrix(om.MMatrix(t2)).rotation(True)
                 q = om.MQuaternion.slerp(q1, q2, 0.5)
 
                 rot = q.asEulerRotation().asVector()
@@ -629,7 +634,8 @@ class Component(component.Main):
     def convertToTwistSpline(self, positions, crv, ikNb, isClosed=False):
 
         crvShape = crv.getShape()
-        curveFn = getAsMFnNode(crvShape.name(), om.MFnNurbsCurve)
+        crvShape_name = crvShape.name() if hasattr(crvShape, "name") else str(crvShape)
+        curveFn = getAsMFnNode(crvShape_name, om.MFnNurbsCurve)
 
         # Get the curve data
         knots = curveFn.knots()
@@ -730,9 +736,10 @@ class Component(component.Main):
         self.addOperatorSineCurveExprespy()
 
         driver_shape = self.mst_crv.getShape()
-        for attr in cmds.listAttr("{}.vertexData".format(driver_shape.getName()), multi=True) or []:
+        driver_shape_name = driver_shape.getName() if hasattr(driver_shape, "getName") else str(driver_shape)
+        for attr in cmds.listAttr("{}.vertexData".format(driver_shape_name), multi=True) or []:
                 if "useOrient" in attr:
-                    cmds.setAttr("{}.{}".format(driver_shape.getName(), attr), True)
+                    cmds.setAttr("{}.{}".format(driver_shape_name, attr), True)
 
     def addOperatorsNotGlobalMaster(self):
         # Curves -------------------------------------------
@@ -743,9 +750,9 @@ class Component(component.Main):
 
         self.decomp_tip_ik_rot = pm.createNode("decomposeRotate")
         # self.ik_decompose_rot.append(self.decomp_tip_ik_rot)
-        pm.setAttr(self.decomp_tip_ik_rot.attr("axisOrientX"), 90.0)
-        pm.setAttr(self.decomp_tip_ik_rot.attr("axisOrientZ"), 90.0)
-        pm.connectAttr(self.ik_ctl[-1].rotate, self.decomp_tip_ik_rot.attr("rotate"))
+        pm.setAttr(str(self.decomp_tip_ik_rot) + ".axisOrientX", 90.0)
+        pm.setAttr(str(self.decomp_tip_ik_rot) + ".axisOrientZ", 90.0)
+        pm.connectAttr(str(self.ik_ctl[-1].rotate), str(self.decomp_tip_ik_rot) + ".rotate")
 
         # Division -----------------------------------------
         rootWorld_node = node.createDecomposeMatrixNode(self.root.attr("worldMatrix"))
@@ -767,15 +774,15 @@ class Component(component.Main):
 
             dm_node = node.createDecomposeMatrixNode(s.attr("inverseMatrix"))
             comp_node = pm.PyNode(cmds.createNode("composeMatrix"))
-            pm.connectAttr(dm_node + ".outputScale", comp_node.attr("inputScale"))
-            pm.connectAttr(dm_node + ".outputShear", comp_node.attr("inputShear"))
+            pm.connectAttr(dm_node + ".outputScale", str(comp_node) + ".inputScale")
+            pm.connectAttr(dm_node + ".outputShear", str(comp_node) + ".inputShear")
             mulmat_node = applyop.gear_mulmatrix_op(comp_node.attr("outputMatrix"), s.attr("matrix"))
 
             mulmat_node = applyop.gear_mulmatrix_op(s2.attr("matrix"), mulmat_node.attr("output"))
             mulmat_node2 = applyop.gear_mulmatrix_op(mulmat_node.attr("output"), s2.attr("inverseMatrix"))
 
             dm_node = node.createDecomposeMatrixNode(mulmat_node2 + ".output")
-            pm.connectAttr(dm_node + ".outputTranslate", d.attr("t"))
+            pm.connectAttr(dm_node + ".outputTranslate", str(d) + ".t")
 
             check_list = (pm.Attribute, six.string_types)  # noqa
             cond = pm.createNode("condition")
@@ -785,7 +792,7 @@ class Component(component.Main):
             pm.setAttr(cond + ".colorIfFalseR", 0.)
             pm.setAttr(cond + ".colorIfFalseG", 0.)
             pm.setAttr(cond + ".colorIfFalseB", 0.)
-            pm.connectAttr(cond + ".outColor", d.attr("r"))
+            pm.connectAttr(cond + ".outColor", str(d) + ".r")
 
         # References
         tmp_div_npo_transform = getTransform(self.div_cns_npo[i])  # to fix mismatch before/after later
@@ -836,13 +843,15 @@ class Component(component.Main):
         fk0_npo.visibility = vis
 
     def addOperatorSineCurveExprespy(self):
+        mst_crv_shape = self.mst_crv.getShape()
+        mst_crv_shape_name = mst_crv_shape.name() if hasattr(mst_crv_shape, "name") else str(mst_crv_shape)
         rewrite_map = [
             ["__scale_ctl", self.length_ctl],
             ["__curve_length", self.length],
             ["__wave_offset_att", self.sinewave_offset_y_att],
             ["__wave_power_att", self.sinewave_power_y_att],
             ["__wave_length_att", self.sinewave_wavelength_y_att],
-            ["__mst_crv", "{}.outputSpline".format(self.mst_crv.getShape().name())],
+            ["__mst_crv", "{}.outputSpline".format(mst_crv_shape_name)],
             ["__divisions", self.divisions],
             ["__negate", self.negate],
             ["__dropoff", self.sinewave_dropoff_att],
@@ -864,7 +873,7 @@ class Component(component.Main):
             ["__wave_offset_att", self.sinewave_offset_x_att],
             ["__wave_power_att", self.sinewave_power_x_att],
             ["__wave_length_att", self.sinewave_wavelength_x_att],
-            ["__mst_crv", "{}.outputSpline".format(self.mst_crv.getShape().name())],
+            ["__mst_crv", "{}.outputSpline".format(mst_crv_shape_name)],
             ["__divisions", self.divisions],
             ["__negate", self.negate],
             ["__dropoff", self.sinewave_dropoff_att],
@@ -983,7 +992,8 @@ class Component(component.Main):
             pm.setAttr(node_name + ".operation", 0)
             pm.setAttr(node_name + ".colorIfTrueR", 1)
             pm.setAttr(node_name + ".colorIfFalseR", 0)
-            pm.connectAttr(node_name + ".outColorR", attr)
+            attr_name = f"{cns_node}.{attr}"
+            pm.connectAttr(node_name + ".outColorR", attr_name)
 
     def connect_standard(self):
         self.parent.addChild(self.root)
@@ -1023,7 +1033,7 @@ class Component(component.Main):
 
 def vecProjection(a, b):
 
-    dot = a.dot(b)
+    dot = a * b
     length = b.length()
     tmp = dot / (length * length)
     p = [tmp * b.x, tmp * b.y, tmp * b.z]
@@ -1064,7 +1074,9 @@ def getAsMFnNode(name, ctor):
 
 def transform_to_euler(t):
     # type: (om.MTransformationMatrix) -> Tuple[float, float, float]
-    rot = t.rotate.asEulerRotation().asVector()
+
+    tm = om.MTransformationMatrix(om.MMatrix(t))
+    rot = tm.rotation().asVector()
     rot = (math.degrees(rot[0]), math.degrees(rot[1]), math.degrees(rot[2]))
 
     return rot

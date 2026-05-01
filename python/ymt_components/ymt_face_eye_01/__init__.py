@@ -143,8 +143,8 @@ class Component(component.Main):
         self.trackLvl = []
 
         self.previusTag = self.parentCtlTag
-        self.guide.eyeMesh = self.guide.getObjects(self.guide.root)["eyelidPivot"]
-        self.guide.eyeballMesh = self.guide.getObjects(self.guide.root)["eyeballPivot"]
+        self.guide.eyeMesh = self.guide.getObjectByLocalName("eyelidPivot")
+        self.guide.eyeballMesh = self.guide.getObjectByLocalName("eyeballPivot")
         # --------------------------------------------------------
 
         positions = [self.inPos]
@@ -166,7 +166,8 @@ class Component(component.Main):
 
         self.surfRef = self.settings["surfaceReference"]
         if not self.surfRef:
-            self.sliding_surface = pm.duplicate(self.guide.getObjects(self.guide.root)["sliding_surface"])[0]
+            guide_surface = self.guide.getObjectByLocalName("sliding_surface")
+            self.sliding_surface = pm.duplicate(guide_surface)[0]
             pm.parent(self.sliding_surface.name(), self.root)
             self.sliding_surface.visibility.set(False)
             pm.makeIdentity(self.sliding_surface, apply=True, t=1,  r=1, s=1, n=0, pn=1)  # type: ignore
@@ -444,7 +445,7 @@ class Component(component.Main):
 
     def _addCurveControllers(self, t, crv, ctlNames, inCtl=None, outCtl=None):
 
-        cvs = crv.getCVs(space="world")
+        cvs = ymt_util.getCurveCVs(crv, space="world")
         if self.negate:
             # cvs = [cv for cv in reversed(cvs)]
             pass
@@ -520,7 +521,7 @@ class Component(component.Main):
 
     def _selectNearestCvIndex(self, crv, pos):
 
-        cvs = crv.getCVs(space="world")
+        cvs = ymt_util.getCurveCVs(crv, space="world")
         min_dist = 9999999999
         nearest = None
         for i, cv in enumerate(cvs):
@@ -537,7 +538,7 @@ class Component(component.Main):
         npos = []
         aim_npos = []
 
-        cvs = crv.getCVs(space="world")
+        cvs = ymt_util.getCurveCVs(crv, space="world")
         crv_info = node.createCurveInfoNode(detailCrv)
 
         # aim constrain targets and joints
@@ -561,7 +562,7 @@ class Component(component.Main):
             trn = primitive.addTransformFromPos(self.eyeTargets_root, trn_name, pos=cv)
 
             # connecting positions with crv
-            pm.connectAttr(crv_info + ".controlPoints[%s]" % str(nearestCvId), trn.attr("translate"))
+            pm.connectAttr(crv_info + ".controlPoints[%s]" % str(nearestCvId), str(trn) + ".translate")
 
             # joints
             xform = setMatrixPosition(t, self.bboxCenter)
@@ -692,24 +693,24 @@ class Component(component.Main):
         mult_lowVTrackingLow = pm.createNode("multiplyDivide")
         mult_lowHTracking = pm.createNode("multiplyDivide")
 
-        pm.connectAttr(self.trackingMult_att, mult_upVTrackingUp + ".input1X")
-        pm.connectAttr(self.trackingMult_att, mult_upVTrackingLow + ".input1X")
-        pm.connectAttr(self.trackingMult_att, mult_upHTracking + ".input1X")
-        pm.connectAttr(self.trackingMult_att, mult_lowVTrackingUp + ".input1X")
-        pm.connectAttr(self.trackingMult_att, mult_lowVTrackingLow + ".input1X")
-        pm.connectAttr(self.trackingMult_att, mult_lowHTracking + ".input1X")
+        pm.connectAttr(str(self.trackingMult_att), mult_upVTrackingUp + ".input1X")
+        pm.connectAttr(str(self.trackingMult_att), mult_upVTrackingLow + ".input1X")
+        pm.connectAttr(str(self.trackingMult_att), mult_upHTracking + ".input1X")
+        pm.connectAttr(str(self.trackingMult_att), mult_lowVTrackingUp + ".input1X")
+        pm.connectAttr(str(self.trackingMult_att), mult_lowVTrackingLow + ".input1X")
+        pm.connectAttr(str(self.trackingMult_att), mult_lowHTracking + ".input1X")
 
-        pm.connectAttr(self.upVTrackingUp_att, mult_upVTrackingUp + ".input2X")
-        pm.connectAttr(self.upVTrackingLow_att, mult_upVTrackingLow + ".input2X")
-        pm.connectAttr(self.upHTracking_att, mult_upHTracking + ".input2X")
-        pm.connectAttr(self.lowVTrackingUp_att, mult_lowVTrackingUp + ".input2X")
-        pm.connectAttr(self.lowVTrackingLow_att, mult_lowVTrackingLow + ".input2X")
-        pm.connectAttr(self.lowHTracking_att, mult_lowHTracking + ".input2X")
+        pm.connectAttr(str(self.upVTrackingUp_att), mult_upVTrackingUp + ".input2X")
+        pm.connectAttr(str(self.upVTrackingLow_att), mult_upVTrackingLow + ".input2X")
+        pm.connectAttr(str(self.upHTracking_att), mult_upHTracking + ".input2X")
+        pm.connectAttr(str(self.lowVTrackingUp_att), mult_lowVTrackingUp + ".input2X")
+        pm.connectAttr(str(self.lowVTrackingLow_att), mult_lowVTrackingLow + ".input2X")
+        pm.connectAttr(str(self.lowHTracking_att), mult_lowHTracking + ".input2X")
 
         height = (self.upPos - self.lowPos).length()
 
         cond_up_or_low = pm.createNode("condition")
-        pm.connectAttr(self.aimTrigger_ref.attr("ty"), cond_up_or_low + ".firstTerm")
+        pm.connectAttr(str(self.aimTrigger_ref) + ".ty", cond_up_or_low + ".firstTerm")
         pm.setAttr(cond_up_or_low + ".secondTerm", 0)
         pm.setAttr(cond_up_or_low + ".operation", 2)  # greater than
 
@@ -724,13 +725,13 @@ class Component(component.Main):
         pm.connectAttr(mult_node + ".outputX", cond_up_or_low + ".colorIfFalseR")
 
         mult_node = node.createMulNode(cond_up_or_low + ".outColorR", self.aimTrigger_ref.attr("ty"))
-        pm.connectAttr(mult_node + ".outputX", self.trackLvl[0].attr("ty"))
+        pm.connectAttr(mult_node + ".outputX", str(self.trackLvl[0]) + ".ty")
         mult_node = node.createMulNode(mult_upHTracking + ".outputX", self.aimTrigger_ref.attr("tx"))
 
-        pm.connectAttr(mult_node + ".outputX", self.trackLvl[0].attr("tx"))
+        pm.connectAttr(mult_node + ".outputX", str(self.trackLvl[0]) + ".tx")
 
         cond_up_or_low = pm.createNode("condition")
-        pm.connectAttr(self.aimTrigger_ref.attr("ty"), cond_up_or_low + ".firstTerm")
+        pm.connectAttr(str(self.aimTrigger_ref) + ".ty", cond_up_or_low + ".firstTerm")
         pm.setAttr(cond_up_or_low + ".secondTerm", 0)
         pm.setAttr(cond_up_or_low + ".operation", 2)  # greater than
 
@@ -745,10 +746,10 @@ class Component(component.Main):
         pm.connectAttr(mult_node + ".outputX", cond_up_or_low + ".colorIfFalseR")
 
         mult_node = node.createMulNode(cond_up_or_low + ".outColorR", self.aimTrigger_ref.attr("ty"))
-        pm.connectAttr(mult_node + ".outputX", self.trackLvl[1].attr("ty"))
+        pm.connectAttr(mult_node + ".outputX", str(self.trackLvl[1]) + ".ty")
         mult_node = node.createMulNode(mult_lowHTracking + ".outputX", self.aimTrigger_ref.attr("tx"))
 
-        pm.connectAttr(mult_node + ".outputX", self.trackLvl[1].attr("tx"))
+        pm.connectAttr(mult_node + ".outputX", str(self.trackLvl[1]) + ".tx")
 
     def addTensionOnBlinkAttributes(self):
 

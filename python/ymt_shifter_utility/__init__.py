@@ -10,15 +10,16 @@ import maya.cmds as cmds
 import maya.api.OpenMaya as om
 import maya.api.OpenMayaAnim as oma
 
-from pymel.core import (
-    datatypes as dt,
-    nodetypes,
-)
+from pymel.core import nodetypes
 from pymel import versions
 try:
     import mgear.pymaya as pm
 except ImportError:
     import pymel.core as pm
+try:
+    from mgear.pymaya import datatypes as dt
+except ImportError:
+    from pymel.core import datatypes as dt
 
 from mgear.core import (
     attribute,
@@ -222,7 +223,7 @@ def _findPathAtoB(aPath, bPath):
 
 def applyPathCnsLocal(target, curve, u):
     cns = applyop.pathCns(target, curve, cnsType=False, u=u, tangent=False)
-    pm.connectAttr(curve.attr("local"), cns.attr("geometryPath"), f=True)  # tobe local space
+    pm.connectAttr(str(curve) + ".local", str(cns) + ".geometryPath", f=True)  # tobe local space
 
     comp_node = pm.createNode("composeMatrix")
     cns.attr("allCoordinates") >> comp_node.attr("inputTranslate")
@@ -456,7 +457,7 @@ def addJointCtl(self,
         oShape.isHistoricallyInteresting.set(False)
         # connecting the always draw shapes on top to global attribute
         if versions.current() >= 20220000:
-            pm.connectAttr(self.rig.ctlXRay_att,
+            pm.connectAttr(str(self.rig.ctlXRay_att),
                            oShape.attr("alwaysDrawOnTop"))
 
     # set controller tag
@@ -535,6 +536,91 @@ def getAsMFnNode(name, ctor):
     return ctor(dag)
 
 
+def getCurveShapeName(crv):
+    if isinstance(crv, str):
+        crv = pm.PyNode(crv)
+
+    if hasattr(crv, "getShape"):
+        crv = crv.getShape()
+
+    if hasattr(crv, "longName"):
+        return crv.longName()
+
+    if hasattr(crv, "fullPath"):
+        return crv.fullPath()
+
+    return crv.name() if hasattr(crv, "name") else str(crv)
+
+
+def getAsMFnNurbsCurve(crv):
+    if isinstance(crv, om.MFnNurbsCurve):
+        return crv
+
+    return getAsMFnNode(getCurveShapeName(crv), om.MFnNurbsCurve)
+
+
+def _getMSpace(space):
+    if space in (om.MSpace.kWorld, om.MSpace.kObject):
+        return space
+
+    if str(space).lower() == "world":
+        return om.MSpace.kWorld
+
+    return om.MSpace.kObject
+
+
+def getCurveDegree(crv):
+    return cmds.getAttr("{}.degree".format(getCurveShapeName(crv)))
+
+
+def getCurveCVs(crv, space="world"):
+    crv_fn = getAsMFnNurbsCurve(crv)
+    return [dt.Vector(p[0], p[1], p[2])
+            for p in crv_fn.cvPositions(_getMSpace(space))]
+
+
+def setCurveCV(crv, index, position, space="world"):
+    crv_fn = getAsMFnNurbsCurve(crv)
+    point = om.MPoint(position[0], position[1], position[2])
+    crv_fn.setCVPosition(index, point, _getMSpace(space))
+    crv_fn.updateCurve()
+
+
+def setCurveCVs(crv, positions, space="world"):
+    crv_fn = getAsMFnNurbsCurve(crv)
+    points = om.MPointArray()
+    for p in positions:
+        points.append(om.MPoint(p[0], p[1], p[2]))
+    crv_fn.setCVPositions(points, _getMSpace(space))
+    crv_fn.updateCurve()
+
+
+def findGuideObjectByLocalName(guide, local_name, includeShapes=False):
+    root = guide.root.longName() if hasattr(guide.root, "longName") else str(guide.root)
+    kwargs = {"ad": True, "fullPath": True}
+    if not includeShapes:
+        kwargs["type"] = "transform"
+
+    children = cmds.listRelatives(root, **kwargs) or []
+    target = "{}_{}".format(guide.fullName, local_name)
+
+    def _short_name(node):
+        return node.rsplit("|", 1)[-1].rsplit(":", 1)[-1]
+
+    for child in children:
+        if _short_name(child) == target:
+            return pm.PyNode(child)
+
+    suffix = "_{}".format(local_name)
+    for child in children:
+        short_name = _short_name(child)
+        if short_name == local_name or short_name.endswith(suffix):
+            return pm.PyNode(child)
+
+    raise Exception(
+        "Object {} not found in guide {}.".format(local_name, guide.fullName))
+
+
 def transform_to_euler(t):
     # type: (om.MTransformationMatrix|dt.Matrix) -> tuple[float, float, float]
 
@@ -571,7 +657,8 @@ def convertToTwistSpline(
         if isinstance(crv, str):
             crv = pm.PyNode(crv)
         crvShape = crv.getShape()
-        curveFn = getAsMFnNode(crvShape.name(), om.MFnNurbsCurve)
+        crvShape_name = crvShape.name() if hasattr(crvShape, "name") else str(crvShape)
+        curveFn = getAsMFnNode(crvShape_name, om.MFnNurbsCurve)
 
     # Get the curve data
     knots = curveFn.knots()
@@ -850,8 +937,8 @@ def _getRotationsAtEachPoint(bfrs, norm):
             t1 = getTransformLookingAt(c, p, norm, axis="-xy")
             t2 = getTransformLookingAt(c, n, norm, axis="xy")
 
-            q1 = om.MQuaternion(t1.rotate.x, t1.rotate.y, t1.rotate.z, t1.rotate.w)
-            q2 = om.MQuaternion(t2.rotate.x, t2.rotate.y, t2.rotate.z, t2.rotate.w)
+            q1 = om.MTransformationMatrix(om.MMatrix(t1)).rotation(True)
+            q2 = om.MTransformationMatrix(om.MMatrix(t2)).rotation(True)
             q = om.MQuaternion.slerp(q1, q2, 0.5)
 
             rot = q.asEulerRotation().asVector()
@@ -1477,7 +1564,8 @@ def create_dummy_edges_from_objects(objects):
 def draw_plane_from_positions(positions, t=None):
     # type: (List[Tuple[float, float, float]], dt.Matrix|None) -> om.MFnMesh
     if t is not None:
-        positions = [x - t.translate for x in positions]
+        v = om.MTransformationMatrix(om.MMatrix(t)).translation(om.MSpace.kWorld)
+        positions = [(x[0] - v.x, x[1] - v.y, x[2] - v.z) for x in positions]
 
     mean_x = sum(p[0] for p in positions) / len(positions)
     mean_y = sum(p[1] for p in positions) / len(positions)
@@ -1515,8 +1603,8 @@ def draw_plane_from_positions(positions, t=None):
 
     if t is not None:
         n = pm.PyNode(mesh_trans.name())
-        v = t.translate
-        n.setTranslation(v, om.MSpace.kWorld)
+        v = om.MTransformationMatrix(om.MMatrix(t)).translation(om.MSpace.kWorld)
+        n.setTranslation([v.x, v.y, v.z], om.MSpace.kWorld)
 
     return mesh
 
@@ -1783,9 +1871,9 @@ _ROT_ORDER = {
 
 
 _SPACE = {
-    "transform": om.MSpace.kTransform,    # = オブジェクト／ローカル
+    "transform": om.MSpace.kTransform,
     "object":    om.MSpace.kTransform,
     "world":     om.MSpace.kWorld,
-    "pre":       om.MSpace.kPreTransform, # 親前
-    "post":      om.MSpace.kPostTransform,# 親後
+    "pre":       om.MSpace.kPreTransform,
+    "post":      om.MSpace.kPostTransform,
 }

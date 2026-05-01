@@ -229,7 +229,8 @@ class Component(component.Main):
         self.addCurveBaseControllers(self.crv_root)
 
         if not self.surfRef:
-            self.sliding_surface = pm.duplicate(self.guide.getObjects(self.guide.root)["sliding_surface"])[0]
+            guide_surface = self.guide.getObjectByLocalName("sliding_surface")
+            self.sliding_surface = pm.duplicate(guide_surface)[0]
             pm.parent(self.sliding_surface.name(), self.root)
             self.sliding_surface.visibility.set(False)
             pm.makeIdentity(self.sliding_surface, apply=True, t=1,  r=1, s=1, n=0, pn=1)
@@ -237,8 +238,8 @@ class Component(component.Main):
     def getCurveCVs(self, crv, space="world"):
         # type: (...) -> List[om.MPoint]
 
-        cvs = crv.getCVs(space=space)
-        degree = cmds.getAttr("{}.degree".format(crv))
+        cvs = ymt_util.getCurveCVs(crv, space=space)
+        degree = ymt_util.getCurveDegree(crv)
 
         # TODO: extract to settings later
         # if self.settings["close"]:
@@ -770,11 +771,11 @@ class Component(component.Main):
         )
 
         # connect scale
-        pm.connectAttr(self.mouthSlide_ctl.scale, slide_c_ref.scale)
+        pm.connectAttr(str(self.mouthSlide_ctl.scale), slide_c_ref.scale)
 
         # connect pucker
         cmds.setAttr("{}.tz".format(slide_c_ref.name()), l=False)
-        pm.connectAttr(self.mouthSlide_ctl.tz, slide_c_ref.tz)
+        pm.connectAttr(str(self.mouthSlide_ctl.tz), slide_c_ref.tz)
 
         ymt_util.setKeyableAttributesDontLockVisibility(slide_c_ref, [])
         ymt_util.setKeyableAttributesDontLockVisibility(outer_l_ref, [])
@@ -809,7 +810,8 @@ class Component(component.Main):
                 cns_node, query=True, weightAliasList=True)
 
             for i, attr in enumerate(cns_attr):
-                pm.setAttr(attr, 1.0)
+                attr_name = f"{cns_node}.{attr}"
+                pm.setAttr(attr_name, 1.0)
 
     def setRelation(self):
         """Set the relation beetween object from guide to rig"""

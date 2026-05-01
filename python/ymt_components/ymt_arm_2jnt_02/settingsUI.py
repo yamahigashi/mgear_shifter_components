@@ -267,8 +267,8 @@ class Ui_Form(object):
         self.gridLayout.addWidget(self.fkRefArray_groupBox, 4, 0, 1, 1)
 
         self.retranslateUi(Form)
-        QtCore.QObject.connect(self.ikfk_slider, QtCore.SIGNAL("sliderMoved(int)"), self.ikfk_spinBox.setValue)
-        QtCore.QObject.connect(self.ikfk_spinBox, QtCore.SIGNAL("valueChanged(int)"), self.ikfk_slider.setValue)
+        self.ikfk_slider.sliderMoved.connect(self.ikfk_spinBox.setValue)
+        self.ikfk_spinBox.valueChanged.connect(self.ikfk_slider.setValue)
         QtCore.QMetaObject.connectSlotsByName(Form)
 
     def retranslateUi(self, Form):
@@ -319,4 +319,3 @@ class Ui_Form(object):
         self.fkRefArray_copyRef_pushButton.setText(QtWidgets.QApplication.translate("Form", "Copy from IK Ref", None, -1))
         self.fkRefArrayAdd_pushButton.setText(QtWidgets.QApplication.translate("Form", "<<", None, -1))
         self.fkRefArrayRemove_pushButton.setText(QtWidgets.QApplication.translate("Form", ">>", None, -1))
-

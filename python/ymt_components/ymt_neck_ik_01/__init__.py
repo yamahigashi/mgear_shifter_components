@@ -6,7 +6,10 @@ try:
     import mgear.pymaya as pm
 except ImportError:
     import pymel.core as pm
-import pymel.core.datatypes as dt
+try:
+    from mgear.pymaya import datatypes as dt
+except ImportError:
+    from pymel.core import datatypes as dt
 
 
 # mgear
@@ -248,7 +251,7 @@ class Component(MainComponent):
         # pm.connectAttr("{}.outputTranslate".format(decomp), "{}.translate".format(self.head_cns))
 
         neck_ref_cond_pos = pm.createNode("condition")
-        pm.connectAttr(self.neckref_att, "{}.firstTerm".format(neck_ref_cond_pos))
+        pm.connectAttr(str(self.neckref_att), "{}.firstTerm".format(neck_ref_cond_pos))
         pm.setAttr("{}.secondTerm".format(neck_ref_cond_pos), 0)
         pm.setAttr("{}.operation".format(neck_ref_cond_pos), 0)
         pm.connectAttr("{}.outputTranslate".format(decomp), "{}.colorIfTrue".format(neck_ref_cond_pos))
@@ -256,7 +259,7 @@ class Component(MainComponent):
 
         # Head ref switch
         head_ref_cond = pm.createNode("condition")
-        pm.connectAttr(self.headref_att, "{}.firstTerm".format(head_ref_cond))
+        pm.connectAttr(str(self.headref_att), "{}.firstTerm".format(head_ref_cond))
         pm.setAttr("{}.secondTerm".format(head_ref_cond), 0)
         pm.setAttr("{}.operation".format(head_ref_cond), 0)
         pm.setAttr("{}.colorIfTrueR".format(head_ref_cond), 0)
@@ -272,7 +275,7 @@ class Component(MainComponent):
 
         # Neck rotation
         neck_ref_cond = pm.createNode("condition")
-        pm.connectAttr(self.neckref_att, "{}.firstTerm".format(neck_ref_cond))
+        pm.connectAttr(str(self.neckref_att), "{}.firstTerm".format(neck_ref_cond))
         pm.setAttr("{}.secondTerm".format(neck_ref_cond), 0)
         pm.setAttr("{}.operation".format(neck_ref_cond), 0)
         pm.setAttr("{}.colorIfTrueR".format(neck_ref_cond), 0)
@@ -301,7 +304,7 @@ class Component(MainComponent):
 
         slerp = pm.createNode("quatSlerp")
         pm.connectAttr("{}.outputQuat".format(toQuat), "{}.input1Quat".format(slerp))
-        pm.connectAttr(self.neckrate_att, "{}.inputT".format(slerp))
+        pm.connectAttr(str(self.neckrate_att), "{}.inputT".format(slerp))
         pm.setAttr("{}.input2QuatX".format(slerp), 0.)
         pm.setAttr("{}.input2QuatY".format(slerp), 0.)
         pm.setAttr("{}.input2QuatZ".format(slerp), 0.)
@@ -347,7 +350,7 @@ class Component(MainComponent):
                 pm.connectAttr("{}.outColorB".format(_head_ref_cond), "{}.colorIfFalseB".format(head_ref_cond))
                 head_ref_cond = _head_ref_cond
 
-                pm.connectAttr(self.headref_att, "{}.firstTerm".format(_head_ref_cond))
+                pm.connectAttr(str(self.headref_att), "{}.firstTerm".format(_head_ref_cond))
                 pm.setAttr("{}.secondTerm".format(_head_ref_cond), i + 1)
                 pm.setAttr("{}.operation".format(_head_ref_cond), 0)
 

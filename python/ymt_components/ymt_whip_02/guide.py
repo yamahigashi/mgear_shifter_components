@@ -28,7 +28,7 @@ try:
 except ImportError:
     from pymel.core import datatypes
 
-from . import chain_guide_initializer
+from mgear.shifter.component import chain_guide_initializer
 
 # guide info
 AUTHOR = "yamahigashi"

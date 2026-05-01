@@ -22,7 +22,7 @@ AUTHOR = "Takayoshi Matsumoto"
 URL = "yamahigashi.dev"
 EMAIL = "yamahigashi@gmail.com"
 
-VERSION = [0, 0, 1]
+VERSION = [0, 1, 1]
 TYPE = "ymt_neck_ik_02"
 NAME = "neck"
 DESCRIPTION = ""

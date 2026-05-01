@@ -246,23 +246,23 @@ class Component(component.Main):
 
         # md_node_1
         pm.connectAttr(ty, md_node_1 + ".input1X")
-        pm.connectAttr(self.vertRotation_att, md_node_1 + ".input2X")
+        pm.connectAttr(str(self.vertRotation_att), md_node_1 + ".input2X")
 
         # md_node_2
         pm.connectAttr(tx, md_node_2 + ".input1X")
-        pm.connectAttr(self.sideRotation_att, md_node_2 + ".input2X")
+        pm.connectAttr(str(self.sideRotation_att), md_node_2 + ".input2X")
 
         # md_node_3
         pm.connectAttr(ty, md_node_3 + ".input1X")
-        pm.connectAttr(self.lipsAlignSpeed_att, md_node_3 + ".input2X")
+        pm.connectAttr(str(self.lipsAlignSpeed_att), md_node_3 + ".input2X")
 
         # md_node_4
         pm.connectAttr(ty, md_node_4 + ".input1X")
-        pm.connectAttr(self.verticalTranslation_att, md_node_4 + ".input2X")
+        pm.connectAttr(str(self.verticalTranslation_att), md_node_4 + ".input2X")
 
         # md_node_5
         pm.connectAttr(tz, md_node_5 + ".input1X")
-        pm.connectAttr(self.frontalTranslation_att, md_node_5 + ".input2X")
+        pm.connectAttr(str(self.frontalTranslation_att), md_node_5 + ".input2X")
 
         # md_node_6
         pm.connectAttr(md_node_1 + ".outputX", md_node_6 + ".input1X")
@@ -298,14 +298,14 @@ class Component(component.Main):
         pm.setAttr(cond_node_3 + ".colorIfFalseR", 0)
 
         # blend_node_1
-        pm.connectAttr(self.followLips_att, blend_node_1 + ".blender")
+        pm.connectAttr(str(self.followLips_att), blend_node_1 + ".blender")
         pm.connectAttr(md_node_6 + ".outputX", blend_node_1 + ".color1R")
         pm.connectAttr(md_node_2 + ".outputX", blend_node_1 + ".color1G")
         # pm.connectAttr(cond_node_1 + ".outColorR", blend_node_1 + ".color2R")
         # pm.connectAttr(md_node_8 + ".outputX", blend_node_1 + ".color2G")
 
         # blend_node_2
-        pm.connectAttr(self.followLips_att, blend_node_2 + ".blender")
+        pm.connectAttr(str(self.followLips_att), blend_node_2 + ".blender")
         pm.connectAttr(cond_node_3 + ".outColorR", blend_node_2 + ".color1R")
         pm.connectAttr(md_node_5 + ".outputX", blend_node_2 + ".color1G")
         pm.connectAttr(md_node_7 + ".outputX", blend_node_2 + ".color2G")

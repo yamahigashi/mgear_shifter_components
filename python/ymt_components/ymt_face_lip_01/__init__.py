@@ -240,7 +240,8 @@ class Component(component.Main):
         cmds.delete(cmds.listRelatives(plane.longName(), parent=True))
 
         if not self.surfRef:
-            self.sliding_surface = pm.duplicate(self.guide.getObjects(self.guide.root)["sliding_surface"])[0]
+            guide_surface = self.guide.getObjectByLocalName("sliding_surface")
+            self.sliding_surface = pm.duplicate(guide_surface)[0]
             pm.parent(self.sliding_surface.name(), self.root)
             self.sliding_surface.visibility.set(False)
             pm.makeIdentity(self.sliding_surface, apply=True, t=1,  r=1, s=1, n=0, pn=1)
@@ -258,7 +259,7 @@ class Component(component.Main):
             crv.attr("visibility").set(False)
             ctl.attr("visibility").set(False)
 
-            cvs = crv.getCVs(space="world")
+            cvs = ymt_util.getCurveCVs(crv, space="world")
             for i, cv in enumerate(cvs):
 
                 if i == 0:
@@ -271,7 +272,7 @@ class Component(component.Main):
                 else:
                     offset = [cv[0], cv[1] + self.thickness, cv[2]]
 
-                crv.setCV(i, offset, space='world')
+                ymt_util.setCurveCV(crv, i, offset, space="world")
 
             return crv, ctl
 
@@ -298,23 +299,23 @@ class Component(component.Main):
             new_crv.attr("visibility").set(False)
 
             # double translation denial
-            cvs = new_crv.getCVs(space="world")
+            cvs = ymt_util.getCurveCVs(new_crv, space="world")
             for i, cv in enumerate(cvs):
                 x, y, z = transform.getTranslation(new_crv)
                 offset = [cv[0] - x, cv[1] - y, cv[2] - z]
-                new_crv.setCV(i, offset, space='world')
+                ymt_util.setCurveCV(new_crv, i, offset, space="world")
 
             if not tobe_offset:
                 return new_crv
 
-            cvs = new_crv.getCVs(space="world")
+            cvs = ymt_util.getCurveCVs(new_crv, space="world")
             for i, cv in enumerate(cvs):
 
                 # we populate the closest vertext list here to skipt the first
                 # and latest point
                 offset = [cv[0], cv[1], cv[2] + self.FRONT_OFFSET]
 
-                new_crv.setCV(i, offset, space='world')
+                ymt_util.setCurveCV(new_crv, i, offset, space="world")
 
             return new_crv
 
@@ -340,8 +341,8 @@ class Component(component.Main):
     def _addControlJoints(self, crv, name, rope_root, rope, rope_upv, skipHeadAndTail=False):
 
         lvlType = "transform"
-        cvs = crv.getCVs(space="world")
-        local_cvs = crv.getCVs(space="object")
+        cvs = ymt_util.getCurveCVs(crv, space="world")
+        local_cvs = ymt_util.getCurveCVs(crv, space="object")
         controls = []
         t = getTransform(self.root)
 
@@ -376,7 +377,7 @@ class Component(component.Main):
             cns = applyPathCnsLocal(upv, rope_upv, u, negate=negate)
             cns = applyPathCnsLocal(npo, rope, u, negate=negate)
 
-            pm.connectAttr(upv.attr("worldMatrix[0]"), cns.attr("worldUpMatrix"))
+            pm.connectAttr(str(upv) + ".worldMatrix[0]", str(cns) + ".worldUpMatrix")
 
             ctl_name = self.getName("%s_crvdetail%s_%s" % (name, i, self.ctlName))
 
@@ -536,7 +537,7 @@ class Component(component.Main):
 
     def _addControls(self, crv_ctl, option, sidecut):
 
-        cvs = crv_ctl.getCVs(space="world")
+        cvs = ymt_util.getCurveCVs(crv_ctl, space="world")
 
         pm.progressWindow(title='controls', progress=0, max=len(cvs))
 
@@ -800,13 +801,13 @@ class Component(component.Main):
         )
 
         # connect scale
-        pm.connectAttr(self.mouthSlide_ctl.scale, slide_c_ref.scale)
-        pm.connectAttr(self.cornerL_ctl.scale, corner_l_ref.scale)
-        pm.connectAttr(self.cornerR_ctl.scale, corner_r_ref.scale)
+        pm.connectAttr(str(self.mouthSlide_ctl.scale), slide_c_ref.scale)
+        pm.connectAttr(str(self.cornerL_ctl.scale), corner_l_ref.scale)
+        pm.connectAttr(str(self.cornerR_ctl.scale), corner_r_ref.scale)
 
         # connect pucker
         cmds.setAttr("{}.tz".format(slide_c_ref.name()), l=False)
-        pm.connectAttr(self.mouthSlide_ctl.tz, slide_c_ref.tz)
+        pm.connectAttr(str(self.mouthSlide_ctl.tz), slide_c_ref.tz)
 
         pm.parentConstraint(corner_l_ref, self.lips_L_Corner_npo, mo=True)
         pm.parentConstraint(corner_r_ref, self.lips_R_Corner_npo, mo=True)
@@ -849,7 +850,8 @@ class Component(component.Main):
                 cns_node, query=True, weightAliasList=True)
 
             for i, attr in enumerate(cns_attr):
-                pm.setAttr(attr, 1.0)
+                attr_name = f"{cns_node}.{attr}"
+                pm.setAttr(attr_name, 1.0)
 
     def setRelation(self):
         """Set the relation beetween object from guide to rig"""
@@ -1050,7 +1052,7 @@ def createGhostWithParentConstraint(ctl, parent=None, connect=True):
 
 def applyPathCnsLocal(target, curve, u, negate=False):
     cns = applyop.pathCns(target, curve, cnsType=False, u=u, tangent=False)
-    pm.connectAttr(curve.attr("local"), cns.attr("geometryPath"), f=True)  # tobe local space
+    pm.connectAttr(str(curve) + ".local", str(cns) + ".geometryPath", f=True)  # tobe local space
 
     comp_node = pm.createNode("composeMatrix")
     cns.attr("allCoordinates") >> comp_node.attr("inputTranslate")
@@ -1061,10 +1063,10 @@ def applyPathCnsLocal(target, curve, u, negate=False):
     comp_node2 = pm.createNode("composeMatrix")
 
     if negate:
-        pm.setAttr(comp_node2.attr("inputScaleX"), -1.0)
+        pm.setAttr(str(comp_node2) + ".inputScaleX", -1.0)
 
-    pm.setAttr(comp_node2.attr("inputRotateX"), 90.0)
-    pm.setAttr(comp_node2.attr("inputRotateZ"), 90.0)
+    pm.setAttr(str(comp_node2) + ".inputRotateX", 90.0)
+    pm.setAttr(str(comp_node2) + ".inputRotateZ", 90.0)
 
     comp_node2.attr("outputMatrix") >> mul_node.attr("matrixIn[0]")
     comp_node.attr("outputMatrix") >> mul_node.attr("matrixIn[1]")

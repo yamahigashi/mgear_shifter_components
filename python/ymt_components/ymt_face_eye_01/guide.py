@@ -30,7 +30,9 @@ try:
 except ImportError:
     from pymel.core import datatypes
 
-from . import chain_guide_initializer
+from mgear.shifter.component import chain_guide_initializer
+
+import ymt_shifter_utility as ymt_utility
 
 # guide info
 AUTHOR = "yamahigashi"
@@ -59,6 +61,10 @@ class Guide(guide.ComponentGuide):
     version = VERSION
 
     connectors = ["pupil_01"]
+
+    def getObjectByLocalName(self, local_name, includeShapes=False):
+        return ymt_utility.findGuideObjectByLocalName(
+            self, local_name, includeShapes=includeShapes)
 
     def postInit(self):
         """Initialize the position for the guide"""

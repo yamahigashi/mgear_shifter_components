@@ -190,16 +190,16 @@ class Ui_Form(object):
         self.gridLayout.addWidget(self.ikRefArray_groupBox, 2, 0, 1, 1)
 
         self.retranslateUi(Form)
-        QtCore.QObject.connect(self.translate_pushButton, QtCore.SIGNAL("clicked()"), self.tx_checkBox.toggle)
-        QtCore.QObject.connect(self.translate_pushButton, QtCore.SIGNAL("clicked()"), self.ty_checkBox.toggle)
-        QtCore.QObject.connect(self.translate_pushButton, QtCore.SIGNAL("clicked()"), self.tz_checkBox.toggle)
-        QtCore.QObject.connect(self.rotate_pushButton, QtCore.SIGNAL("clicked()"), self.rx_checkBox.toggle)
-        QtCore.QObject.connect(self.rotate_pushButton, QtCore.SIGNAL("clicked()"), self.ry_checkBox.toggle)
-        QtCore.QObject.connect(self.rotate_pushButton, QtCore.SIGNAL("clicked()"), self.rz_checkBox.toggle)
-        QtCore.QObject.connect(self.rotate_pushButton, QtCore.SIGNAL("clicked()"), self.ro_checkBox.toggle)
-        QtCore.QObject.connect(self.scale_pushButton, QtCore.SIGNAL("clicked()"), self.sx_checkBox.toggle)
-        QtCore.QObject.connect(self.scale_pushButton, QtCore.SIGNAL("clicked()"), self.sy_checkBox.toggle)
-        QtCore.QObject.connect(self.scale_pushButton, QtCore.SIGNAL("clicked()"), self.sz_checkBox.toggle)
+        self.translate_pushButton.clicked.connect(self.tx_checkBox.toggle)
+        self.translate_pushButton.clicked.connect(self.ty_checkBox.toggle)
+        self.translate_pushButton.clicked.connect(self.tz_checkBox.toggle)
+        self.rotate_pushButton.clicked.connect(self.rx_checkBox.toggle)
+        self.rotate_pushButton.clicked.connect(self.ry_checkBox.toggle)
+        self.rotate_pushButton.clicked.connect(self.rz_checkBox.toggle)
+        self.rotate_pushButton.clicked.connect(self.ro_checkBox.toggle)
+        self.scale_pushButton.clicked.connect(self.sx_checkBox.toggle)
+        self.scale_pushButton.clicked.connect(self.sy_checkBox.toggle)
+        self.scale_pushButton.clicked.connect(self.sz_checkBox.toggle)
         QtCore.QMetaObject.connectSlotsByName(Form)
 
     def retranslateUi(self, Form):
@@ -248,4 +248,3 @@ class Ui_Form(object):
         self.ikRefArray_groupBox.setTitle(gqt.fakeTranslate("Form", "IK Reference Array", None, -1))
         self.ikRefArrayAdd_pushButton.setText(gqt.fakeTranslate("Form", "<<", None, -1))
         self.ikRefArrayRemove_pushButton.setText(gqt.fakeTranslate("Form", ">>", None, -1))
-

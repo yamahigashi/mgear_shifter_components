@@ -26,6 +26,9 @@ from mgear.core.primitive import addTransform
 import ymt_shifter_utility as ymt_util
 from ymt_shifter_utility import pymel_to_pymaya as pym2m
 
+if om.MGlobal.apiVersion() >= 201600:
+    unicode = str
+
 ##########################################################
 # COMPONENT
 ##########################################################
@@ -95,9 +98,12 @@ class Component(component.Main):
             close=False,
             degree=min([len(self.guide.apos) - 1, 3])
         )
+        dummy_crv_shape = self.dummy_crv.getShape()
+        dummy_crv_shape_name = dummy_crv_shape.name() if hasattr(dummy_crv_shape, "name") else str(dummy_crv_shape)
+        dummy_crv_fn = ymt_util.getAsMFnNode(dummy_crv_shape_name, om.MFnNurbsCurve)
 
         for i in range(self.settings["ikNb"]):
-            self.addObjectsChainIk(i, self.dummy_crv)
+            self.addObjectsChainIk(i, dummy_crv_fn)
 
         pm.delete(self.dummy_crv)
 
@@ -515,9 +521,9 @@ class Component(component.Main):
         op = applyop.gear_curveslide2_op(self.slv_crv, self.mst_crv, 0, 1.5, .5, .5)
 
         # pm.connectAttr(self.position_att, op + ".position")
-        pm.connectAttr(self.maxstretch_att, op + ".maxstretch")
-        pm.connectAttr(self.maxsquash_att, op + ".maxsquash")
-        pm.connectAttr(self.softness_att, op + ".softness")
+        pm.connectAttr(str(self.maxstretch_att), op + ".maxstretch")
+        pm.connectAttr(str(self.maxsquash_att), op + ".maxsquash")
+        pm.connectAttr(str(self.softness_att), op + ".softness")
 
         # Volume driver ------------------------------------
         crv_node = node.createCurveInfoNode(self.slv_crv)
@@ -572,8 +578,8 @@ class Component(component.Main):
                 self.ik_att[i])
             # self.ik_uv_param[i])
             dm_node = node.createDecomposeMatrixNode(intMatrix + ".output")
-            pm.connectAttr(dm_node + ".outputRotate", self.ik_npo[i].attr("rotate"))
-            pm.connectAttr(dm_node + ".outputTranslate", self.ik_npo[i].attr("translate"))
+            pm.connectAttr(dm_node + ".outputRotate", str(self.ik_npo[i]) + ".rotate")
+            pm.connectAttr(dm_node + ".outputTranslate", str(self.ik_npo[i]) + ".translate")
             '''
 
             # TODO: connect attribute on weight
@@ -587,9 +593,9 @@ class Component(component.Main):
             inv = pm.createNode("floatMath")
             pm.setAttr(inv + ".floatA", 1.0)
             pm.setAttr(inv + ".operation", 1)
-            pm.connectAttr(self.ik_att[i - 1], inv + ".floatB")
+            pm.connectAttr(str(self.ik_att[i - 1]), inv + ".floatB")
             pm.connectAttr(inv + ".outFloat", c + ".target[0].targetWeight")
-            pm.connectAttr(self.ik_att[i - 1], c + ".target[1].targetWeight")
+            pm.connectAttr(str(self.ik_att[i - 1]), c + ".target[1].targetWeight")
 
     def addFkOperator(self, i, rootWorld_node, crv_node):
 
@@ -614,7 +620,7 @@ class Component(component.Main):
             mulmat_node2 = applyop.gear_mulmatrix_op(mulmat_node.attr("output"), s2.attr("inverseMatrix"))
 
             dm_node = node.createDecomposeMatrixNode(mulmat_node2 + ".output")
-            pm.connectAttr(dm_node + ".outputTranslate", d.attr("t"))
+            pm.connectAttr(dm_node + ".outputTranslate", str(d) + ".t")
 
             check_list = (pm.Attribute, unicode, str)  # noqa
             cond = pm.createNode("condition")
@@ -624,7 +630,7 @@ class Component(component.Main):
             pm.setAttr(cond + ".colorIfFalseR", 0.)
             pm.setAttr(cond + ".colorIfFalseG", 0.)
             pm.setAttr(cond + ".colorIfFalseB", 0.)
-            pm.connectAttr(cond + ".outColor", d.attr("r"))
+            pm.connectAttr(cond + ".outColor", str(d) + ".r")
 
         # References
         if i == 0:  # we add extra 10% to the first position
@@ -665,7 +671,7 @@ class Component(component.Main):
             ratio)
 
         dm_node = node.createDecomposeMatrixNode(intMatrix + ".output")
-        pm.connectAttr(dm_node + ".outputRotate", self.twister[i].attr("rotate"))
+        pm.connectAttr(dm_node + ".outputRotate", str(self.twister[i]) + ".rotate")
         pm.parentConstraint(self.twister[i], self.ref_twist[i], maintainOffset=True)
 
         pm.connectAttr(self.ref_twist[i] + ".translate", cns + ".worldUpVector")
@@ -685,10 +691,10 @@ class Component(component.Main):
                                             "y",
                                             div_node + ".output")
 
-        pm.connectAttr(self.volume_att, op + ".blend")
+        pm.connectAttr(str(self.volume_att), op + ".blend")
         pm.connectAttr(crv_node + ".arcLength", op + ".driver")
-        pm.connectAttr(self.st_att[i], op + ".stretch")
-        pm.connectAttr(self.sq_att[i], op + ".squash")
+        pm.connectAttr(str(self.st_att[i]), op + ".stretch")
+        pm.connectAttr(str(self.sq_att[i]), op + ".squash")
 
         # Controlers
         tmp_local_npo_transform = getTransform(self.fk_local_npo[i])  # to fix mismatch before/after later
@@ -698,7 +704,7 @@ class Component(component.Main):
                 self.root.attr("worldInverseMatrix"))
 
             dm_node = node.createDecomposeMatrixNode(mulmat_node + ".output")
-            pm.connectAttr(dm_node + ".outputTranslate", self.fk_npo[i].attr("t"))
+            pm.connectAttr(dm_node + ".outputTranslate", str(self.fk_npo[i]) + ".t")
 
         else:
             mulmat_node = applyop.gear_mulmatrix_op(
@@ -707,9 +713,9 @@ class Component(component.Main):
 
             dm_node = node.createDecomposeMatrixNode(mulmat_node + ".output")
             mul_node = node.createMulNode(div_node + ".output", dm_node + ".outputTranslate")
-            pm.connectAttr(mul_node + ".output", self.fk_npo[i].attr("t"))
+            pm.connectAttr(mul_node + ".output", str(self.fk_npo[i]) + ".t")
 
-        pm.connectAttr(dm_node + ".outputRotate", self.fk_npo[i].attr("r"))
+        pm.connectAttr(dm_node + ".outputRotate", str(self.fk_npo[i]) + ".r")
         self.addOperatorsOrientationLock(i, cns)
         self.fk_local_npo[i].setMatrix(tmp_local_npo_transform, worldSpace=True)
 
@@ -802,7 +808,8 @@ class Component(component.Main):
                         pm.setAttr(node_name + ".operation", 0)
                         pm.setAttr(node_name + ".colorIfTrueR", 1)
                         pm.setAttr(node_name + ".colorIfFalseR", 0)
-                        pm.connectAttr(node_name + ".outColorR", attr)
+                        attr_name = f"{cns_node}.{attr}"
+                        pm.connectAttr(node_name + ".outColorR", attr_name)
 
     def connect_standard(self):
         self.parent.addChild(self.root)
@@ -828,7 +835,7 @@ class Component(component.Main):
         m_out = mstr_out[mstr_e]
         s_in = slave_in[idx]
         for srt in ["scale", "rotate", "translate"]:
-            pm.connectAttr(m_out.attr(srt), s_in.attr(srt))
+            pm.connectAttr(str(m_out) + "." + srt, str(s_in) + "." + srt)
 
     # =====================================================
     # CONNECTOR
@@ -936,7 +943,7 @@ def getCurveUAtPoint(crv, position):
 
 def vecProjection(a, b):
 
-    dot = a.dot(b)
+    dot = a * b
     length = b.length()
     tmp = dot / (length * length)
     p = [tmp * b.x, tmp * b.y, tmp * b.z]

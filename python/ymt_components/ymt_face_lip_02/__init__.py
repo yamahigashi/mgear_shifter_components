@@ -129,7 +129,7 @@ class Component(component.Main):
 
         self.thickness = self.offset.length()
         # self.thickness = self.size * 0.05
-        self.FRONT_OFFSET = self.size * 0.1
+        self.FRONT_OFFSET = self.size * 0.025
         self.NB_CVS = 2 * 4 + 4  # means 4 spans with 2 controllers each + 4 controllers for the corners
 
         # odd / event
@@ -200,7 +200,8 @@ class Component(component.Main):
         self.addCurveBaseControllers(self.crv_root)
 
         if not self.surfRef:
-            self.sliding_surface = pm.duplicate(self.guide.getObjects(self.guide.root)["sliding_surface"])[0]
+            guide_surface = self.guide.getObjectByLocalName("sliding_surface")
+            self.sliding_surface = pm.duplicate(guide_surface)[0]
             pm.parent(self.sliding_surface.name(), self.root)
             self.sliding_surface.visibility.set(False)
             pm.makeIdentity(self.sliding_surface, apply=True, t=1,  r=1, s=1, n=0, pn=1)
@@ -208,8 +209,8 @@ class Component(component.Main):
     def getCurveCVs(self, crv, space="world"):
         # type: (...) -> List[om.MPoint]
 
-        cvs = crv.getCVs(space=space)
-        degree = cmds.getAttr("{}.degree".format(crv))
+        cvs = ymt_util.getCurveCVs(crv, space=space)
+        degree = ymt_util.getCurveDegree(crv)
 
         # TODO: extract to settings later
         # if self.settings["close"]:
@@ -268,7 +269,16 @@ class Component(component.Main):
             ctlName,
             m=t,
             parent=crv_root)
-        fit_curve.fit_curve_on_curve(self.crv_ctl, self.rope, num_iterations=30, num_samples=30)
+        cmds.dgeval(self.rope.name())
+        cmds.dgeval(self.crv_ctl.name())
+        fit_curve.fit_curve_on_curve(
+            self.crv_ctl,
+            self.rope,
+            num_iterations=1000,
+            num_samples=30,
+            symmetry=True,
+            symmetry_axis="X",
+        )
 
     def addControlJoints(self):
 
@@ -436,11 +446,23 @@ class Component(component.Main):
 
         # # offset upv with FRONT_OFFSET
         cvs = self.getCurveCVs(self.upv_crv)
-        center_pos = self.rootPos
+        front_dir = (self.frontPos - self.rootPos).normal()
+        # Use one representative distance so the up-vector curve is translated
+        # along front, not reshaped by per-CV offset magnitude changes.
+        radial_dir = (cvs[0] - self.rootPos).normal()
+        front_amount = abs(
+            radial_dir[0] * front_dir[0]
+            + radial_dir[1] * front_dir[1]
+            + radial_dir[2] * front_dir[2]
+        ) * self.FRONT_OFFSET
+        front_offset = front_dir * front_amount
         for i, cv in enumerate(cvs):
-            offset = (cv - center_pos).normal() * self.FRONT_OFFSET
-            new_pos = [cv[0] + offset[0], cv[1] + offset[1], cv[2] + offset[2]]
-            self.upv_crv.setCV(i, new_pos, space="world")
+            new_pos = [
+                cv[0] + front_offset[0],
+                cv[1] + front_offset[1],
+                cv[2] + front_offset[2],
+            ]
+            ymt_util.setCurveCV(self.upv_crv, i, new_pos, space="world")
 
     def addConstraints(self):
 
@@ -918,13 +940,13 @@ class Component(component.Main):
         )
 
         # connect scale
-        pm.connectAttr(self.mouthSlide_ctl.scale, slide_c_ref.scale)
-        pm.connectAttr(self.cornerL_ctl.scale, corner_l_ref.scale)
-        pm.connectAttr(self.cornerR_ctl.scale, corner_r_ref.scale)
+        pm.connectAttr(str(self.mouthSlide_ctl.scale), slide_c_ref.scale)
+        pm.connectAttr(str(self.cornerL_ctl.scale), corner_l_ref.scale)
+        pm.connectAttr(str(self.cornerR_ctl.scale), corner_r_ref.scale)
 
         # connect pucker
         cmds.setAttr("{}.tz".format(slide_c_ref.name()), l=False)
-        pm.connectAttr(self.mouthSlide_ctl.tz, slide_c_ref.tz)
+        pm.connectAttr(str(self.mouthSlide_ctl.tz), slide_c_ref.tz)
 
         pm.parentConstraint(corner_l_ref, self.lips_L_Corner_npo, mo=True)
         pm.parentConstraint(corner_r_ref, self.lips_R_Corner_npo, mo=True)
@@ -991,7 +1013,8 @@ class Component(component.Main):
                 cns_node, query=True, weightAliasList=True)
 
             for i, attr in enumerate(cns_attr):
-                pm.setAttr(attr, 1.0)
+                attr_name = f"{cns_node}.{attr}"
+                pm.setAttr(attr_name, 1.0)
 
     def setRelation(self):
         """Set the relation beetween object from guide to rig"""
@@ -1031,16 +1054,26 @@ class Component(component.Main):
         ]
         initial_positions = [datatypes.Vector(p[0], p[1], p[2]) for p in initial_positions]
         crv_ctl = curve.addCurve(parent, name, initial_positions, close=True, degree=3, m=m)
-        fit_curve.fit_curve_on_curve(crv_ctl, crv, num_iterations=300, symmetry=symmetry)
+        # fit_curve.fit_curve_on_curve(crv_ctl, crv, num_iterations=300, symmetry=symmetry)
+        cmds.dgeval(str(crv_ctl))
+        cmds.dgeval(str(crv))
+        fit_curve.fit_curve_on_curve(
+            crv_ctl,
+            crv,
+            num_iterations=6000,
+            num_samples=100,
+            symmetry=symmetry,
+            symmetry_axis="X",
+        )
 
-        cvs = crv_ctl.getCVs(space="object")
+        cvs = ymt_util.getCurveCVs(crv_ctl, space="object")
         posTop[1] = cvs[0][1]
         posTop[2] = cvs[0][2]
-        crv_ctl.setCV(0, posTop, space="object")
+        ymt_util.setCurveCV(crv_ctl, 0, posTop, space="object")
 
         posBottom[1] = cvs[6][1]
         posBottom[2] = cvs[6][2]
-        crv_ctl.setCV(6, posBottom, space="object")
+        ymt_util.setCurveCV(crv_ctl, 6, posBottom, space="object")
 
         if symmetry:
             for l_index, r_index in [(1, 11), (2, 10), (3, 9), (4, 8), (5, 7)]:
@@ -1053,8 +1086,8 @@ class Component(component.Main):
                 new_pos_l = ( m_x, m[1], m[2])
                 new_pos_r = (-m_x, m[1], m[2])
 
-                crv_ctl.setCV(l_index, new_pos_l, space="object")
-                crv_ctl.setCV(r_index, new_pos_r, space="object")
+                ymt_util.setCurveCV(crv_ctl, l_index, new_pos_l, space="object")
+                ymt_util.setCurveCV(crv_ctl, r_index, new_pos_r, space="object")
 
         return crv_ctl
 
