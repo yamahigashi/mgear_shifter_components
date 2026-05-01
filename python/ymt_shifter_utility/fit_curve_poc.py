@@ -10,12 +10,13 @@ This module intentionally keeps the scope narrow:
 The goal is to validate the performance direction before replacing
 ``fit_curve.py``.
 """
+# ruff: noqa: ANN202, UP045
 from __future__ import annotations
 
 import math
 from dataclasses import dataclass
 from logging import DEBUG, INFO, StreamHandler, getLogger
-from typing import Iterable, Optional, Sequence
+from typing import Optional
 
 import maya.api.OpenMaya as om2
 
@@ -76,6 +77,11 @@ class FitResult:
     final_smoothness_loss: float = 0.0
     initial_objective_loss: float = 0.0
     final_objective_loss: float = 0.0
+    smoothness_weight: float = 0.0
+    effective_smoothness_weight: float = 0.0
+    smoothness_cv_scale: float = 1.0
+    target_complexity: float = 0.0
+    smoothness_complexity_scale: float = 1.0
     scene_loss_after_write: Optional[float] = None
     scene_smoothness_loss_after_write: Optional[float] = None
     scene_objective_loss_after_write: Optional[float] = None
@@ -129,9 +135,9 @@ def _external_knot_vector(maya_knots, form):
     if _is_periodic_form(form):
         first_interval = maya_knots[1] - maya_knots[0]
         last_interval = maya_knots[-1] - maya_knots[-2]
-        return [maya_knots[0] - first_interval] + list(maya_knots) + [maya_knots[-1] + last_interval]
+        return [maya_knots[0] - first_interval, *maya_knots, maya_knots[-1] + last_interval]
 
-    return [maya_knots[0]] + list(maya_knots) + [maya_knots[-1]]
+    return [maya_knots[0], *maya_knots, maya_knots[-1]]
 
 
 def _full_knot_vector(mfn_curve, degree, num_cvs, form):
@@ -334,6 +340,7 @@ def _normalized_cv_indices(snapshot, cv_indices):
 
 def evaluate_point(cvs_world, basis):
     # type: (Sequence[om2.MPoint], Iterable[tuple[int, float]]) -> om2.MPoint
+    """Evaluate one point from precomputed sparse basis weights."""
     x = 0.0
     y = 0.0
     z = 0.0
@@ -347,6 +354,7 @@ def evaluate_point(cvs_world, basis):
 
 def evaluate_points(cvs_world, basis_list):
     # type: (Sequence[om2.MPoint], Sequence[Sequence[tuple[int, float]]]) -> list[om2.MPoint]
+    """Evaluate multiple points from precomputed sparse basis weights."""
     return [evaluate_point(cvs_world, basis) for basis in basis_list]
 
 
@@ -445,6 +453,78 @@ def _independent_cv_count(snapshot):
     if snapshot.is_periodic:
         return snapshot.num_cvs - snapshot.degree
     return snapshot.num_cvs
+
+
+def _clamp(value, minimum, maximum):
+    # type: (float, float, float) -> float
+    return max(minimum, min(maximum, value))
+
+
+def _average_segment_length(points, closed):
+    # type: (Sequence[om2.MPoint], bool) -> float
+    if len(points) < 2:
+        return 0.0
+
+    count = len(points) if closed else len(points) - 1
+    if count <= 0:
+        return 0.0
+
+    total = 0.0
+    for i in range(count):
+        total += (points[(i + 1) % len(points)] - points[i]).length()
+    return total / float(count)
+
+
+def compute_target_complexity(target_points, closed):
+    # type: (Sequence[om2.MPoint], bool) -> float
+    """Return normalized target second-difference complexity."""
+    if len(target_points) < 3:
+        return 0.0
+
+    if closed:
+        triples = [
+            ((i - 1) % len(target_points), i, (i + 1) % len(target_points))
+            for i in range(len(target_points))
+        ]
+    else:
+        triples = [
+            (i - 1, i, i + 1)
+            for i in range(1, len(target_points) - 1)
+        ]
+
+    total = 0.0
+    for prev_index, index, next_index in triples:
+        total += _second_difference(target_points, prev_index, index, next_index).length()
+
+    average_segment_length = _average_segment_length(target_points, closed)
+    if average_segment_length <= 0.0:
+        return 0.0
+    return (total / float(len(triples))) / average_segment_length
+
+
+def compute_effective_smoothness_weight(
+    context,
+    cv_indices,
+    smoothness_weight,
+    smoothness_auto_scale=True,
+    smoothness_complexity_gain=1.0,
+):
+    # type: (FitContext, Sequence[int], float, bool, float) -> tuple[float, float, float, float]
+    """Scale smoothness weight by active CV count and target complexity."""
+    if smoothness_weight == 0.0 or not smoothness_auto_scale:
+        target_complexity = compute_target_complexity(context.target_points, context.source.is_closed)
+        return smoothness_weight, 1.0, target_complexity, 1.0
+
+    active_cv_count = float(len(cv_indices))
+    if active_cv_count <= 0.0:
+        cv_scale = 0.0
+    else:
+        cv_scale = _clamp((active_cv_count - 4.0) / active_cv_count, 0.0, 1.0)
+
+    target_complexity = compute_target_complexity(context.target_points, context.source.is_closed)
+    complexity_scale = 1.0 / (1.0 + target_complexity * smoothness_complexity_gain)
+    effective_weight = smoothness_weight * cv_scale * complexity_scale
+    return effective_weight, cv_scale, target_complexity, complexity_scale
 
 
 def _is_ring_smoothness(snapshot):
@@ -641,6 +721,8 @@ def optimize_context(
     beta=0.9,
     optimizer="adam",
     smoothness_weight=0.2,
+    smoothness_auto_scale=True,
+    smoothness_complexity_gain=1.0,
     adam_beta1=0.9,
     adam_beta2=0.999,
     adam_epsilon=1e-8,
@@ -648,13 +730,21 @@ def optimize_context(
     # type: (...) -> FitResult
     """Optimize the snapshot CV array without updating any scene curve."""
     cv_indices = _normalized_cv_indices(context.source, cv_indices)
+    smoothness_weight_data = compute_effective_smoothness_weight(
+        context,
+        cv_indices,
+        smoothness_weight,
+        smoothness_auto_scale,
+        smoothness_complexity_gain,
+    )
+    effective_smoothness_weight, cv_scale, target_complexity, complexity_scale = smoothness_weight_data
     positions = _sync_periodic_bound_cvs(context.source, context.source.cvs_world)
     first_moment = [om2.MVector(0.0, 0.0, 0.0) for _ in range(context.source.num_cvs)]
     second_moment = [om2.MVector(0.0, 0.0, 0.0) for _ in range(context.source.num_cvs)]
     initial_objective_loss, initial_loss, initial_smoothness_loss = compute_objective_loss(
         positions,
         context,
-        smoothness_weight,
+        effective_smoothness_weight,
     )
 
     if optimizer not in ("adam", "lion"):
@@ -665,7 +755,7 @@ def optimize_context(
             positions,
             context,
             cv_indices=cv_indices,
-            smoothness_weight=smoothness_weight,
+            smoothness_weight=effective_smoothness_weight,
         )
         if optimizer == "adam":
             positions = _adam_update_positions(
@@ -694,7 +784,7 @@ def optimize_context(
     final_objective_loss, final_loss, final_smoothness_loss = compute_objective_loss(
         positions,
         context,
-        smoothness_weight,
+        effective_smoothness_weight,
     )
     return FitResult(
         positions_world=positions,
@@ -705,6 +795,11 @@ def optimize_context(
         final_smoothness_loss=final_smoothness_loss,
         initial_objective_loss=initial_objective_loss,
         final_objective_loss=final_objective_loss,
+        smoothness_weight=smoothness_weight,
+        effective_smoothness_weight=effective_smoothness_weight,
+        smoothness_cv_scale=cv_scale,
+        target_complexity=target_complexity,
+        smoothness_complexity_scale=complexity_scale,
     )
 
 
@@ -719,6 +814,8 @@ def fit_curve_on_curve_poc(
     source_sample_mode="parameter",
     optimizer="adam",
     smoothness_weight=0.2,
+    smoothness_auto_scale=True,
+    smoothness_complexity_gain=1.0,
     adam_beta1=0.9,
     adam_beta2=0.999,
     adam_epsilon=1e-8,
@@ -746,6 +843,8 @@ def fit_curve_on_curve_poc(
         beta=beta,
         optimizer=optimizer,
         smoothness_weight=smoothness_weight,
+        smoothness_auto_scale=smoothness_auto_scale,
+        smoothness_complexity_gain=smoothness_complexity_gain,
         adam_beta1=adam_beta1,
         adam_beta2=adam_beta2,
         adam_epsilon=adam_epsilon,
@@ -760,7 +859,7 @@ def fit_curve_on_curve_poc(
         scene_objective, scene_distance, scene_smoothness = compute_objective_loss(
             scene_positions,
             context,
-            smoothness_weight,
+            result.effective_smoothness_weight,
         )
         result.scene_loss_after_write = scene_distance
         result.scene_smoothness_loss_after_write = scene_smoothness
@@ -780,6 +879,16 @@ def fit_curve_on_curve_poc(
         "fit_curve_poc objective loss: {} -> {}".format(
             result.initial_objective_loss,
             result.final_objective_loss,
+        ),
+    )
+    om2.MGlobal.displayInfo(
+        "fit_curve_poc smoothness weight: base={}, effective={}, cv_scale={}, target_complexity={}, "
+        "complexity_scale={}".format(
+            result.smoothness_weight,
+            result.effective_smoothness_weight,
+            result.smoothness_cv_scale,
+            result.target_complexity,
+            result.smoothness_complexity_scale,
         ),
     )
     if result.scene_loss_after_write is not None:
