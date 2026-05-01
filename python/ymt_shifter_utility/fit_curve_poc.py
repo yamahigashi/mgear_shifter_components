@@ -14,11 +14,13 @@ The goal is to validate the performance direction before replacing
 from __future__ import annotations
 
 import math
+from contextlib import contextmanager
 from dataclasses import dataclass
 from logging import DEBUG, INFO, StreamHandler, getLogger
 from typing import Optional
 
 import maya.api.OpenMaya as om2
+import maya.cmds as cmds
 
 from . import curve
 
@@ -855,20 +857,35 @@ def _adam_update_positions(
     return updated
 
 
-def set_scene_cv_positions(mfn_curve, positions_world):
-    # type: (om2.MFnNurbsCurve, Sequence[om2.MPoint]) -> None
-    """Write final world-space CV positions back to the scene once."""
-    if len(positions_world) != mfn_curve.numCVs:
-        raise ValueError("positions_world length does not match curve CV count.")
+@contextmanager
+def _undo_chunk(name):
+    if not cmds.undoInfo(query=True, state=True):
+        yield
+        return
 
+    cmds.undoInfo(openChunk=True, chunkName=name)
+    try:
+        yield
+    finally:
+        cmds.undoInfo(closeChunk=True)
+
+
+def _editable_cv_count(mfn_curve):
+    # type: (om2.MFnNurbsCurve) -> int
+    if _is_periodic_form(int(mfn_curve.form)):
+        return int(mfn_curve.numCVs) - int(mfn_curve.degree)
+    return int(mfn_curve.numCVs)
+
+
+def _set_scene_cv_positions_api(mfn_curve, positions_world):
+    # type: (om2.MFnNurbsCurve, Sequence[om2.MPoint]) -> None
     positions_world = [om2.MPoint(point) for point in positions_world]
     if _is_periodic_form(int(mfn_curve.form)):
         # Periodic curves bind the trailing degree CVs to the first degree CVs.
         # Writing every CV with setCVPositions can make Maya remap those bound
         # CVs in a way that differs from this evaluator's positions. Write only
         # the independent CVs and let Maya maintain the periodic overlap.
-        editable_count = int(mfn_curve.numCVs) - int(mfn_curve.degree)
-        for cv_index in range(editable_count):
+        for cv_index in range(_editable_cv_count(mfn_curve)):
             mfn_curve.setCVPosition(cv_index, positions_world[cv_index], om2.MSpace.kWorld)
         mfn_curve.updateCurve()
         return
@@ -877,13 +894,46 @@ def set_scene_cv_positions(mfn_curve, positions_world):
     mfn_curve.updateCurve()
 
 
-def symmetry_curve_poc(curve_like, axis="X"):
-    # type: (om2.MFnNurbsCurve | str | object, str) -> list[om2.MPoint]
+def _set_scene_cv_positions_undoable(mfn_curve, positions_world, undo_name):
+    # type: (om2.MFnNurbsCurve, Sequence[om2.MPoint], str) -> None
+    shape_name = mfn_curve.getPath().fullPathName()
+    with _undo_chunk(undo_name):
+        for cv_index in range(_editable_cv_count(mfn_curve)):
+            point = positions_world[cv_index]
+            cmds.xform(
+                "{}.cv[{}]".format(shape_name, cv_index),
+                worldSpace=True,
+                absolute=True,
+                translation=(point.x, point.y, point.z),
+            )
+        mfn_curve.updateCurve()
+
+
+def set_scene_cv_positions(mfn_curve, positions_world, undoable=True, undo_name="fit_curve_poc"):
+    # type: (om2.MFnNurbsCurve, Sequence[om2.MPoint], bool, str) -> None
+    """Write final world-space CV positions back to the scene once."""
+    if len(positions_world) != mfn_curve.numCVs:
+        raise ValueError("positions_world length does not match curve CV count.")
+
+    if undoable:
+        _set_scene_cv_positions_undoable(mfn_curve, positions_world, undo_name)
+        return
+
+    _set_scene_cv_positions_api(mfn_curve, positions_world)
+
+
+def symmetry_curve_poc(curve_like, axis="X", undoable=True):
+    # type: (om2.MFnNurbsCurve | str | object, str, bool) -> list[om2.MPoint]
     """Apply the POC symmetry projection to a scene curve and write it back."""
     mfn_curve = _as_mfn_curve(curve_like)
     snapshot = snapshot_curve(mfn_curve)
     positions = apply_symmetry_projection(snapshot, snapshot.cvs_world, axis)
-    set_scene_cv_positions(mfn_curve, positions)
+    set_scene_cv_positions(
+        mfn_curve,
+        positions,
+        undoable=undoable,
+        undo_name="fit_curve_poc symmetry",
+    )
     # Periodic curves expose trailing degree CVs that are bound copies of the
     # first CVs. Return only the editable/independent CVs to make diagnostics
     # match what this function actually writes.
@@ -1018,13 +1068,15 @@ def fit_curve_on_curve_poc(
     symmetry=False,
     symmetry_axis="X",
     write_back=True,
+    undoable=True,
 ):
     # type: (...) -> FitResult
     """Fit ``curve_a`` toward ``curve_b`` with no loop-time scene updates.
 
     If ``write_back`` is true, the optimized CVs are written to ``curve_a`` once
     after the optimization loop. Set it false to benchmark or inspect the result
-    without changing the scene.
+    without changing the scene. ``undoable`` controls whether that final write
+    uses Maya commands so Ctrl+Z/redo can restore it as a single undo item.
     """
     mfn_a = _as_mfn_curve(curve_a)
     context = build_fit_context(
@@ -1051,7 +1103,12 @@ def fit_curve_on_curve_poc(
     )
 
     if write_back:
-        set_scene_cv_positions(mfn_a, result.positions_world)
+        set_scene_cv_positions(
+            mfn_a,
+            result.positions_world,
+            undoable=undoable,
+            undo_name="fit_curve_poc fit",
+        )
         scene_positions = _sync_periodic_bound_cvs(
             context.source,
             mfn_a.cvPositions(om2.MSpace.kWorld),
