@@ -12,9 +12,10 @@ The goal is to validate the performance direction before replacing
 """
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from logging import DEBUG, INFO, StreamHandler, getLogger
-from typing import Iterable, Sequence
+from typing import Iterable, Optional, Sequence
 
 import maya.api.OpenMaya as om2
 
@@ -71,8 +72,14 @@ class FitResult:
     initial_loss: float
     final_loss: float
     iterations: int
-    scene_loss_after_write: float | None = None
-    max_write_error: float | None = None
+    initial_smoothness_loss: float = 0.0
+    final_smoothness_loss: float = 0.0
+    initial_objective_loss: float = 0.0
+    final_objective_loss: float = 0.0
+    scene_loss_after_write: Optional[float] = None
+    scene_smoothness_loss_after_write: Optional[float] = None
+    scene_objective_loss_after_write: Optional[float] = None
+    max_write_error: Optional[float] = None
 
 
 @dataclass
@@ -308,7 +315,7 @@ def _sync_periodic_bound_cvs(snapshot, cvs_world):
 
 
 def _normalized_cv_indices(snapshot, cv_indices):
-    # type: (NurbsCurveSnapshot, Sequence[int] | None) -> list[int]
+    # type: (NurbsCurveSnapshot, Optional[Sequence[int]]) -> list[int]
     if cv_indices is None:
         limit = snapshot.num_cvs - snapshot.degree if snapshot.is_periodic else snapshot.num_cvs
         return list(range(limit))
@@ -415,7 +422,7 @@ def compute_distance_loss(cvs_world, context):
 
 
 def compute_distance_gradients(cvs_world, context, cv_indices=None):
-    # type: (Sequence[om2.MPoint], FitContext, Sequence[int] | None) -> list[om2.MVector]
+    # type: (Sequence[om2.MPoint], FitContext, Optional[Sequence[int]]) -> list[om2.MVector]
     """Compute analytic gradients for the fixed-basis distance loss."""
     gradients = [om2.MVector(0.0, 0.0, 0.0) for _ in range(context.source.num_cvs)]
     active = None if cv_indices is None else set(_normalized_cv_indices(context.source, cv_indices))
@@ -430,6 +437,114 @@ def compute_distance_gradients(cvs_world, context, cv_indices=None):
                 continue
             gradients[master_index] += diff * (scale * weight)
 
+    return gradients
+
+
+def _independent_cv_count(snapshot):
+    # type: (NurbsCurveSnapshot) -> int
+    if snapshot.is_periodic:
+        return snapshot.num_cvs - snapshot.degree
+    return snapshot.num_cvs
+
+
+def _is_ring_smoothness(snapshot):
+    # type: (NurbsCurveSnapshot) -> bool
+    return snapshot.is_closed
+
+
+def _smoothness_indices(snapshot):
+    # type: (NurbsCurveSnapshot) -> list[tuple[int, int, int]]
+    count = _independent_cv_count(snapshot)
+    if count < 3:
+        return []
+
+    if _is_ring_smoothness(snapshot):
+        return [
+            ((i - 1) % count, i, (i + 1) % count)
+            for i in range(count)
+        ]
+
+    return [
+        (i - 1, i, i + 1)
+        for i in range(1, count - 1)
+    ]
+
+
+def _second_difference(cvs_world, prev_index, cv_index, next_index):
+    # type: (Sequence[om2.MPoint], int, int, int) -> om2.MVector
+    prev_point = cvs_world[prev_index]
+    point = cvs_world[cv_index]
+    next_point = cvs_world[next_index]
+    return om2.MVector(
+        prev_point.x - point.x * 2.0 + next_point.x,
+        prev_point.y - point.y * 2.0 + next_point.y,
+        prev_point.z - point.z * 2.0 + next_point.z,
+    )
+
+
+def compute_smoothness_loss(cvs_world, context):
+    # type: (Sequence[om2.MPoint], FitContext) -> float
+    """Compute mean squared second-difference loss for CV smoothness."""
+    triples = _smoothness_indices(context.source)
+    if not triples:
+        return 0.0
+
+    loss = 0.0
+    for prev_index, cv_index, next_index in triples:
+        diff = _second_difference(cvs_world, prev_index, cv_index, next_index)
+        loss += diff.x**2 + diff.y**2 + diff.z**2
+    return loss / float(len(triples))
+
+
+def compute_smoothness_gradients(cvs_world, context, cv_indices=None):
+    # type: (Sequence[om2.MPoint], FitContext, Optional[Sequence[int]]) -> list[om2.MVector]
+    """Compute gradients for the second-difference smoothness loss."""
+    gradients = [om2.MVector(0.0, 0.0, 0.0) for _ in range(context.source.num_cvs)]
+    triples = _smoothness_indices(context.source)
+    if not triples:
+        return gradients
+
+    active = None if cv_indices is None else set(_normalized_cv_indices(context.source, cv_indices))
+    scale = 2.0 / float(len(triples))
+
+    for prev_index, cv_index, next_index in triples:
+        diff = _second_difference(cvs_world, prev_index, cv_index, next_index)
+        contributions = (
+            (prev_index, diff * scale),
+            (cv_index, diff * (-2.0 * scale)),
+            (next_index, diff * scale),
+        )
+        for target_index, contribution in contributions:
+            master_index = _master_cv_index(context.source, target_index)
+            if active is not None and master_index not in active:
+                continue
+            gradients[master_index] += contribution
+
+    return gradients
+
+
+def compute_objective_loss(cvs_world, context, smoothness_weight):
+    # type: (Sequence[om2.MPoint], FitContext, float) -> tuple[float, float, float]
+    """Return ``(objective, distance, smoothness)`` for the current CV positions."""
+    distance_loss = compute_distance_loss(cvs_world, context)
+    smoothness_loss = compute_smoothness_loss(cvs_world, context)
+    return (
+        distance_loss + smoothness_weight * smoothness_loss,
+        distance_loss,
+        smoothness_loss,
+    )
+
+
+def compute_objective_gradients(cvs_world, context, cv_indices=None, smoothness_weight=0.2):
+    # type: (Sequence[om2.MPoint], FitContext, Optional[Sequence[int]], float) -> list[om2.MVector]
+    """Combine distance and smoothness gradients."""
+    gradients = compute_distance_gradients(cvs_world, context, cv_indices)
+    if smoothness_weight == 0.0:
+        return gradients
+
+    smoothness_gradients = compute_smoothness_gradients(cvs_world, context, cv_indices)
+    for cv_index, smoothness_gradient in enumerate(smoothness_gradients):
+        gradients[cv_index] += smoothness_gradient * smoothness_weight
     return gradients
 
 
@@ -448,6 +563,43 @@ def _lion_update_positions(cvs_world, momentum, gradients, cv_indices, beta, lea
     for cv_index in cv_indices:
         momentum[cv_index] = momentum[cv_index] * beta + gradients[cv_index] * (1.0 - beta)
         updated[cv_index] = om2.MPoint(cvs_world[cv_index]) - _sign_vector(momentum[cv_index]) * learning_rate
+    return updated
+
+
+def _adam_update_positions(
+    cvs_world,
+    first_moment,
+    second_moment,
+    gradients,
+    cv_indices,
+    learning_rate,
+    beta1,
+    beta2,
+    epsilon,
+    step,
+):
+    # type: (...) -> list[om2.MPoint]
+    updated = [om2.MPoint(point) for point in cvs_world]
+    bias_correction1 = 1.0 - beta1**step
+    bias_correction2 = 1.0 - beta2**step
+
+    for cv_index in cv_indices:
+        gradient = gradients[cv_index]
+        first_moment[cv_index] = first_moment[cv_index] * beta1 + gradient * (1.0 - beta1)
+        second_moment[cv_index] = om2.MVector(
+            second_moment[cv_index].x * beta2 + gradient.x * gradient.x * (1.0 - beta2),
+            second_moment[cv_index].y * beta2 + gradient.y * gradient.y * (1.0 - beta2),
+            second_moment[cv_index].z * beta2 + gradient.z * gradient.z * (1.0 - beta2),
+        )
+        m_hat = first_moment[cv_index] / bias_correction1
+        v_hat = second_moment[cv_index] / bias_correction2
+        update = om2.MVector(
+            m_hat.x / (math.sqrt(v_hat.x) + epsilon),
+            m_hat.y / (math.sqrt(v_hat.y) + epsilon),
+            m_hat.z / (math.sqrt(v_hat.z) + epsilon),
+        )
+        updated[cv_index] = om2.MPoint(cvs_world[cv_index]) - update * learning_rate
+
     return updated
 
 
@@ -487,25 +639,72 @@ def optimize_context(
     num_iterations=30,
     learning_rate=0.01,
     beta=0.9,
+    optimizer="adam",
+    smoothness_weight=0.2,
+    adam_beta1=0.9,
+    adam_beta2=0.999,
+    adam_epsilon=1e-8,
 ):
-    # type: (FitContext, Sequence[int] | None, int, float, float) -> FitResult
+    # type: (...) -> FitResult
     """Optimize the snapshot CV array without updating any scene curve."""
     cv_indices = _normalized_cv_indices(context.source, cv_indices)
     positions = _sync_periodic_bound_cvs(context.source, context.source.cvs_world)
-    momentum = [om2.MVector(0.0, 0.0, 0.0) for _ in range(context.source.num_cvs)]
-    initial_loss = compute_distance_loss(positions, context)
+    first_moment = [om2.MVector(0.0, 0.0, 0.0) for _ in range(context.source.num_cvs)]
+    second_moment = [om2.MVector(0.0, 0.0, 0.0) for _ in range(context.source.num_cvs)]
+    initial_objective_loss, initial_loss, initial_smoothness_loss = compute_objective_loss(
+        positions,
+        context,
+        smoothness_weight,
+    )
 
-    for _ in range(num_iterations):
-        gradients = compute_distance_gradients(positions, context, cv_indices)
-        positions = _lion_update_positions(positions, momentum, gradients, cv_indices, beta, learning_rate)
+    if optimizer not in ("adam", "lion"):
+        raise ValueError("Unsupported optimizer: {}".format(optimizer))
+
+    for step in range(1, num_iterations + 1):
+        gradients = compute_objective_gradients(
+            positions,
+            context,
+            cv_indices=cv_indices,
+            smoothness_weight=smoothness_weight,
+        )
+        if optimizer == "adam":
+            positions = _adam_update_positions(
+                positions,
+                first_moment,
+                second_moment,
+                gradients,
+                cv_indices,
+                learning_rate,
+                adam_beta1,
+                adam_beta2,
+                adam_epsilon,
+                step,
+            )
+        else:
+            positions = _lion_update_positions(
+                positions,
+                first_moment,
+                gradients,
+                cv_indices,
+                beta,
+                learning_rate,
+            )
         positions = _sync_periodic_bound_cvs(context.source, positions)
 
-    final_loss = compute_distance_loss(positions, context)
+    final_objective_loss, final_loss, final_smoothness_loss = compute_objective_loss(
+        positions,
+        context,
+        smoothness_weight,
+    )
     return FitResult(
         positions_world=positions,
         initial_loss=initial_loss,
         final_loss=final_loss,
         iterations=num_iterations,
+        initial_smoothness_loss=initial_smoothness_loss,
+        final_smoothness_loss=final_smoothness_loss,
+        initial_objective_loss=initial_objective_loss,
+        final_objective_loss=final_objective_loss,
     )
 
 
@@ -518,6 +717,11 @@ def fit_curve_on_curve_poc(
     learning_rate=0.01,
     beta=0.9,
     source_sample_mode="parameter",
+    optimizer="adam",
+    smoothness_weight=0.2,
+    adam_beta1=0.9,
+    adam_beta2=0.999,
+    adam_epsilon=1e-8,
     write_back=True,
 ):
     # type: (...) -> FitResult
@@ -540,6 +744,11 @@ def fit_curve_on_curve_poc(
         num_iterations=num_iterations,
         learning_rate=learning_rate,
         beta=beta,
+        optimizer=optimizer,
+        smoothness_weight=smoothness_weight,
+        adam_beta1=adam_beta1,
+        adam_beta2=adam_beta2,
+        adam_epsilon=adam_epsilon,
     )
 
     if write_back:
@@ -548,16 +757,36 @@ def fit_curve_on_curve_poc(
             context.source,
             mfn_a.cvPositions(om2.MSpace.kWorld),
         )
-        result.scene_loss_after_write = compute_distance_loss(scene_positions, context)
+        scene_objective, scene_distance, scene_smoothness = compute_objective_loss(
+            scene_positions,
+            context,
+            smoothness_weight,
+        )
+        result.scene_loss_after_write = scene_distance
+        result.scene_smoothness_loss_after_write = scene_smoothness
+        result.scene_objective_loss_after_write = scene_objective
         result.max_write_error = _max_position_error(result.positions_world, scene_positions)
 
     om2.MGlobal.displayInfo(
-        "fit_curve_poc loss: {} -> {}".format(result.initial_loss, result.final_loss),
+        "fit_curve_poc distance loss: {} -> {}".format(result.initial_loss, result.final_loss),
+    )
+    om2.MGlobal.displayInfo(
+        "fit_curve_poc smoothness loss: {} -> {}".format(
+            result.initial_smoothness_loss,
+            result.final_smoothness_loss,
+        ),
+    )
+    om2.MGlobal.displayInfo(
+        "fit_curve_poc objective loss: {} -> {}".format(
+            result.initial_objective_loss,
+            result.final_objective_loss,
+        ),
     )
     if result.scene_loss_after_write is not None:
         om2.MGlobal.displayInfo(
-            "fit_curve_poc scene write loss: {}, max write error: {}".format(
+            "fit_curve_poc scene write distance: {}, objective: {}, max write error: {}".format(
                 result.scene_loss_after_write,
+                result.scene_objective_loss_after_write,
                 result.max_write_error,
             ),
         )
