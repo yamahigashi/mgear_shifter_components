@@ -1246,18 +1246,42 @@ def gear_curvecns_op_local(crv, inputs=[]):
         pyNode: The curvecns node.
     """
     import ymt_shifter_utility
-
     pm.select(crv)
-    deformer_name = cmds.deformer(type="mgear_curveCns")[0]
+    deformer_name = pm.deformer(type="mgear_curveCns")[0]
 
-    con = cmds.listConnections(deformer_name + ".input", plugs=True, connections=True, source=True, destination=False)
+    con = cmds.listConnections(
+        deformer_name + ".input",
+        plugs=True,
+        connections=True,
+        source=True,
+        destination=False,
+        skipConversionNodes=True
+    )
     dst, src = con
 
-    cmds.disconnectAttr(src, dst)
-    cmds.connectAttr(
-        src.split(".")[0] + ".local",
-        deformer_name + ".input[0].inputGeometry"
-    )
+    # cmds.disconnectAttr(src, dst)
+    src_node = src.split(".")[0]
+    if cmds.nodeType(src_node) == "tweak":
+        tweak_con = cmds.listConnections(
+            src_node + ".input",
+            plugs=True,
+            connections=True,
+            source=True,
+            destination=False,
+            skipConversionNodes=True
+        )
+        tweak_dst, tweak_src = tweak_con
+        cmds.connectAttr(
+            tweak_src.split(".")[0] + ".local",
+            tweak_dst,
+            force=True
+        )
+    else:
+        cmds.connectAttr(
+            src_node + ".local",
+            deformer_name + ".input[0].inputGeometry",
+            force=True
+        )
 
     for i, item in enumerate(inputs):
         localMat = ymt_shifter_utility.getMultMatrixOfAtoB(item, crv, skip_last=False)
