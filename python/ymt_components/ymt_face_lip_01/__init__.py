@@ -258,7 +258,7 @@ class Component(component.Main):
             crv.attr("visibility").set(False)
             ctl.attr("visibility").set(False)
 
-            cvs = crv.getCVs(space="world")
+            cvs = ymt_util.getCurveCVs(crv, space="world")
             for i, cv in enumerate(cvs):
 
                 if i == 0:
@@ -271,7 +271,7 @@ class Component(component.Main):
                 else:
                     offset = [cv[0], cv[1] + self.thickness, cv[2]]
 
-                crv.setCV(i, offset, space='world')
+                ymt_util.setCurveCV(crv, i, offset, space="world")
 
             return crv, ctl
 
@@ -298,23 +298,23 @@ class Component(component.Main):
             new_crv.attr("visibility").set(False)
 
             # double translation denial
-            cvs = new_crv.getCVs(space="world")
+            cvs = ymt_util.getCurveCVs(new_crv, space="world")
             for i, cv in enumerate(cvs):
                 x, y, z = transform.getTranslation(new_crv)
                 offset = [cv[0] - x, cv[1] - y, cv[2] - z]
-                new_crv.setCV(i, offset, space='world')
+                ymt_util.setCurveCV(new_crv, i, offset, space="world")
 
             if not tobe_offset:
                 return new_crv
 
-            cvs = new_crv.getCVs(space="world")
+            cvs = ymt_util.getCurveCVs(new_crv, space="world")
             for i, cv in enumerate(cvs):
 
                 # we populate the closest vertext list here to skipt the first
                 # and latest point
                 offset = [cv[0], cv[1], cv[2] + self.FRONT_OFFSET]
 
-                new_crv.setCV(i, offset, space='world')
+                ymt_util.setCurveCV(new_crv, i, offset, space="world")
 
             return new_crv
 
@@ -340,8 +340,8 @@ class Component(component.Main):
     def _addControlJoints(self, crv, name, rope_root, rope, rope_upv, skipHeadAndTail=False):
 
         lvlType = "transform"
-        cvs = crv.getCVs(space="world")
-        local_cvs = crv.getCVs(space="object")
+        cvs = ymt_util.getCurveCVs(crv, space="world")
+        local_cvs = ymt_util.getCurveCVs(crv, space="object")
         controls = []
         t = getTransform(self.root)
 
@@ -536,7 +536,7 @@ class Component(component.Main):
 
     def _addControls(self, crv_ctl, option, sidecut):
 
-        cvs = crv_ctl.getCVs(space="world")
+        cvs = ymt_util.getCurveCVs(crv_ctl, space="world")
 
         pm.progressWindow(title='controls', progress=0, max=len(cvs))
 

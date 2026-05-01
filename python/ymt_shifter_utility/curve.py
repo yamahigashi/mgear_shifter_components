@@ -576,11 +576,15 @@ def collect_curve_shapes(crv, rplStr=["", ""]):
     for shape in crv.getShapes():
         shape_name = shape.name() if hasattr(shape, "name") else str(shape)
         shapes_names.append(shape_name.replace(rplStr[0], rplStr[1]))
-        c_form = shape.form()
-        degree = shape.degree()
-        form = c_form.key
-        form_id = c_form.index
-        pnts = [[cv.x, cv.y, cv.z] for cv in shape.getCVs(space="object")]
+        form_id = cmds.getAttr("{}.form".format(shape_name))
+        form = {0: "open", 1: "closed", 2: "periodic"}.get(form_id, form_id)
+        degree = cmds.getAttr("{}.degree".format(shape_name))
+
+        objects = om2.MSelectionList()
+        objects.add(shape_name)
+        crv_fn = om2.MFnNurbsCurve(objects.getDagPath(0))
+        pnts = [[cv[0], cv[1], cv[2]]
+                for cv in crv_fn.cvPositions(om2.MSpace.kObject)]
         shapesDict[shape_name] = {"points": pnts,
                                   "degree": degree,
                                   "form": form,

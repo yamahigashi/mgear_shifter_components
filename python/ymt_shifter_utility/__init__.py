@@ -535,6 +535,59 @@ def getAsMFnNode(name, ctor):
     return ctor(dag)
 
 
+def getCurveShapeName(crv):
+    if isinstance(crv, str):
+        crv = pm.PyNode(crv)
+
+    if hasattr(crv, "getShape"):
+        crv = crv.getShape()
+
+    return crv.name() if hasattr(crv, "name") else str(crv)
+
+
+def getAsMFnNurbsCurve(crv):
+    if isinstance(crv, om.MFnNurbsCurve):
+        return crv
+
+    return getAsMFnNode(getCurveShapeName(crv), om.MFnNurbsCurve)
+
+
+def _getMSpace(space):
+    if space in (om.MSpace.kWorld, om.MSpace.kObject):
+        return space
+
+    if str(space).lower() == "world":
+        return om.MSpace.kWorld
+
+    return om.MSpace.kObject
+
+
+def getCurveDegree(crv):
+    return cmds.getAttr("{}.degree".format(getCurveShapeName(crv)))
+
+
+def getCurveCVs(crv, space="world"):
+    crv_fn = getAsMFnNurbsCurve(crv)
+    return [dt.Vector(p[0], p[1], p[2])
+            for p in crv_fn.cvPositions(_getMSpace(space))]
+
+
+def setCurveCV(crv, index, position, space="world"):
+    crv_fn = getAsMFnNurbsCurve(crv)
+    point = om.MPoint(position[0], position[1], position[2])
+    crv_fn.setCVPosition(index, point, _getMSpace(space))
+    crv_fn.updateCurve()
+
+
+def setCurveCVs(crv, positions, space="world"):
+    crv_fn = getAsMFnNurbsCurve(crv)
+    points = om.MPointArray()
+    for p in positions:
+        points.append(om.MPoint(p[0], p[1], p[2]))
+    crv_fn.setCVPositions(points, _getMSpace(space))
+    crv_fn.updateCurve()
+
+
 def transform_to_euler(t):
     # type: (om.MTransformationMatrix|dt.Matrix) -> tuple[float, float, float]
 

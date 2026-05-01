@@ -360,10 +360,10 @@ class Component(component.Main):
             pm.connectAttr(str(deformer) + ".outputGeometry[0]", str(mainCtlUpv.getShape()) + ".create")
 
             # offset upv curve
-            cvs = mainCtlUpv.getCVs(space="world")
+            cvs = ymt_util.getCurveCVs(mainCtlUpv, space="world")
             for i, cv in enumerate(cvs):
                 offset = [cv[0], cv[1], cv[2] + self.FRONT_OFFSET]
-                mainCtlUpv.setCV(i, offset, space='world')
+                ymt_util.setCurveCV(mainCtlUpv, i, offset, space="world")
             # collect mainCrv upv
             self.mainCtlUpvs.append(mainCtlUpv)
 
@@ -386,12 +386,12 @@ class Component(component.Main):
         self.mainCurveUpvs.append(mainCrv_upv)
 
         for crv in [mainRope_upv, mainCrv_upv]:
-            cvs = crv.getCVs(space="world")
+            cvs = ymt_util.getCurveCVs(crv, space="world")
             for i, cv in enumerate(cvs):
                 # we populate the closest vertext list here to skipt the first
                 # and latest point
                 offset = [cv[0], cv[1], cv[2] + self.FRONT_OFFSET]
-                crv.setCV(i, offset, space='world')
+                ymt_util.setCurveCV(crv, i, offset, space="world")
 
     def addSecondaryCnsCurve(self, ctls):
         crv_degree = 2
@@ -474,7 +474,7 @@ class Component(component.Main):
         for j, crv in enumerate(self.secondaryCurves):
 
             lvlType = "transform"
-            cvs = crv.getCVs(space="object")
+            cvs = ymt_util.getCurveCVs(crv, space="object")
 
             for i, cv in enumerate(cvs):
 

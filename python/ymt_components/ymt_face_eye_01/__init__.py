@@ -444,7 +444,7 @@ class Component(component.Main):
 
     def _addCurveControllers(self, t, crv, ctlNames, inCtl=None, outCtl=None):
 
-        cvs = crv.getCVs(space="world")
+        cvs = ymt_util.getCurveCVs(crv, space="world")
         if self.negate:
             # cvs = [cv for cv in reversed(cvs)]
             pass
@@ -520,7 +520,7 @@ class Component(component.Main):
 
     def _selectNearestCvIndex(self, crv, pos):
 
-        cvs = crv.getCVs(space="world")
+        cvs = ymt_util.getCurveCVs(crv, space="world")
         min_dist = 9999999999
         nearest = None
         for i, cv in enumerate(cvs):
@@ -537,7 +537,7 @@ class Component(component.Main):
         npos = []
         aim_npos = []
 
-        cvs = crv.getCVs(space="world")
+        cvs = ymt_util.getCurveCVs(crv, space="world")
         crv_info = node.createCurveInfoNode(detailCrv)
 
         # aim constrain targets and joints

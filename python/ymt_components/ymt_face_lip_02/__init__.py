@@ -208,8 +208,8 @@ class Component(component.Main):
     def getCurveCVs(self, crv, space="world"):
         # type: (...) -> List[om.MPoint]
 
-        cvs = crv.getCVs(space=space)
-        degree = cmds.getAttr("{}.degree".format(crv))
+        cvs = ymt_util.getCurveCVs(crv, space=space)
+        degree = ymt_util.getCurveDegree(crv)
 
         # TODO: extract to settings later
         # if self.settings["close"]:
@@ -440,7 +440,7 @@ class Component(component.Main):
         for i, cv in enumerate(cvs):
             offset = (cv - center_pos).normal() * self.FRONT_OFFSET
             new_pos = [cv[0] + offset[0], cv[1] + offset[1], cv[2] + offset[2]]
-            self.upv_crv.setCV(i, new_pos, space="world")
+            ymt_util.setCurveCV(self.upv_crv, i, new_pos, space="world")
 
     def addConstraints(self):
 
@@ -1034,14 +1034,14 @@ class Component(component.Main):
         crv_ctl = curve.addCurve(parent, name, initial_positions, close=True, degree=3, m=m)
         fit_curve.fit_curve_on_curve(crv_ctl, crv, num_iterations=300, symmetry=symmetry)
 
-        cvs = crv_ctl.getCVs(space="object")
+        cvs = ymt_util.getCurveCVs(crv_ctl, space="object")
         posTop[1] = cvs[0][1]
         posTop[2] = cvs[0][2]
-        crv_ctl.setCV(0, posTop, space="object")
+        ymt_util.setCurveCV(crv_ctl, 0, posTop, space="object")
 
         posBottom[1] = cvs[6][1]
         posBottom[2] = cvs[6][2]
-        crv_ctl.setCV(6, posBottom, space="object")
+        ymt_util.setCurveCV(crv_ctl, 6, posBottom, space="object")
 
         if symmetry:
             for l_index, r_index in [(1, 11), (2, 10), (3, 9), (4, 8), (5, 7)]:
@@ -1054,8 +1054,8 @@ class Component(component.Main):
                 new_pos_l = ( m_x, m[1], m[2])
                 new_pos_r = (-m_x, m[1], m[2])
 
-                crv_ctl.setCV(l_index, new_pos_l, space="object")
-                crv_ctl.setCV(r_index, new_pos_r, space="object")
+                ymt_util.setCurveCV(crv_ctl, l_index, new_pos_l, space="object")
+                ymt_util.setCurveCV(crv_ctl, r_index, new_pos_r, space="object")
 
         return crv_ctl
 

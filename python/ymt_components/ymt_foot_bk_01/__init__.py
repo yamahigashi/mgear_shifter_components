@@ -391,14 +391,13 @@ class Component(component.Main):
         ik_shapes = self.parent_comp.ik_ctl.getShapes()
         for shape in ik_shapes:
             points = []
-            for cv in shape.getCVs():
+            for cv in ymt_util.getCurveCVs(shape):
                 x = cv[0] * 2.
                 y = cv[1] * 0.4 + offset_y
                 z = cv[2] * 3.
                 points.append(datatypes.Point((x, y, z)))
 
-            shape.setCVs(points)
-            shape.updateCurve()
+            ymt_util.setCurveCVs(shape, points)
 
     def connect_leg_ms_2jnt_01(self):
         """Connector for leg ms 2jnt"""

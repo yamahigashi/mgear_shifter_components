@@ -237,8 +237,8 @@ class Component(component.Main):
     def getCurveCVs(self, crv, space="world"):
         # type: (...) -> List[om.MPoint]
 
-        cvs = crv.getCVs(space=space)
-        degree = cmds.getAttr("{}.degree".format(crv))
+        cvs = ymt_util.getCurveCVs(crv, space=space)
+        degree = ymt_util.getCurveDegree(crv)
 
         # TODO: extract to settings later
         # if self.settings["close"]:
