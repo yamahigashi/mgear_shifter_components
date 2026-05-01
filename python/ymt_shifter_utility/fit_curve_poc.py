@@ -40,6 +40,8 @@ class NurbsCurveSnapshot:
     form: int
     knots: list[float]
     cvs_world: list[om2.MPoint]
+    world_matrix: om2.MMatrix
+    world_matrix_inv: om2.MMatrix
 
     @property
     def num_cvs(self):
@@ -82,6 +84,8 @@ class FitResult:
     smoothness_cv_scale: float = 1.0
     target_complexity: float = 0.0
     smoothness_complexity_scale: float = 1.0
+    symmetry: bool = False
+    symmetry_axis: str = "X"
     scene_loss_after_write: Optional[float] = None
     scene_smoothness_loss_after_write: Optional[float] = None
     scene_objective_loss_after_write: Optional[float] = None
@@ -179,12 +183,15 @@ def snapshot_curve(curve_like):
     form = int(mfn_curve.form)
     cvs_world = list(mfn_curve.cvPositions(om2.MSpace.kWorld))
     knots = _full_knot_vector(mfn_curve, degree, len(cvs_world), form)
+    dag_path = mfn_curve.getPath()
 
     return NurbsCurveSnapshot(
         degree=degree,
         form=form,
         knots=knots,
         cvs_world=cvs_world,
+        world_matrix=dag_path.inclusiveMatrix(),
+        world_matrix_inv=dag_path.inclusiveMatrixInverse(),
     )
 
 
@@ -336,6 +343,171 @@ def _normalized_cv_indices(snapshot, cv_indices):
             normalized.append(master_index)
             seen.add(master_index)
     return normalized
+
+
+def _axis_index(axis):
+    # type: (str) -> int
+    try:
+        return {"X": 0, "Y": 1, "Z": 2}[axis.upper()]
+    except KeyError:
+        raise ValueError("Unsupported symmetry_axis: {}".format(axis)) from None
+
+
+def _to_symmetry_space(snapshot, point):
+    # type: (NurbsCurveSnapshot, om2.MPoint) -> om2.MPoint
+    return om2.MPoint(point) * snapshot.world_matrix_inv
+
+
+def _from_symmetry_space(snapshot, point):
+    # type: (NurbsCurveSnapshot, om2.MPoint) -> om2.MPoint
+    return om2.MPoint(point) * snapshot.world_matrix
+
+
+def _project_point_to_symmetry_axis(point, axis_index):
+    # type: (om2.MPoint, int) -> om2.MPoint
+    projected = om2.MPoint(point)
+    projected[axis_index] = 0.0
+    return projected
+
+
+def _closed_symmetry_pairs_and_centers_for_center(count, center_index):
+    # type: (int, int) -> tuple[list[tuple[int, int]], list[int]]
+    if count <= 0:
+        return [], []
+
+    center_index %= count
+    centers = [center_index]
+    if count % 2 == 0:
+        centers.append((center_index + count // 2) % count)
+        pair_count = count // 2 - 1
+    else:
+        pair_count = count // 2
+
+    pairs = [
+        ((center_index + offset) % count, (center_index - offset) % count)
+        for offset in range(1, pair_count + 1)
+    ]
+    return pairs, centers
+
+
+def _symmetry_pairs_and_centers_for_count(count, closed):
+    # type: (int, bool) -> tuple[list[tuple[int, int]], list[int]]
+    if count <= 0:
+        return [], []
+
+    if closed:
+        return _closed_symmetry_pairs_and_centers_for_center(count, 0)
+
+    pairs = [
+        (i, count - 1 - i)
+        for i in range(count // 2)
+    ]
+    centers = [count // 2] if count % 2 else []
+    return pairs, centers
+
+
+def _symmetry_score(points, pairs, centers, axis_index):
+    # type: (Sequence[om2.MPoint], Sequence[tuple[int, int]], Sequence[int], int) -> float
+    score = 0.0
+    for center_index in centers:
+        score += abs(points[center_index][axis_index]) * 2.0
+
+    for left_index, right_index in pairs:
+        left_point = points[left_index]
+        right_point = points[right_index]
+        score += abs(left_point[axis_index] + right_point[axis_index])
+        for component_index in range(3):
+            if component_index == axis_index:
+                continue
+            score += abs(left_point[component_index] - right_point[component_index])
+    return score
+
+
+def _auto_symmetry_pairs_and_centers_for_points(points, closed, axis_index):
+    # type: (Sequence[om2.MPoint], bool, int) -> tuple[list[tuple[int, int]], list[int]]
+    count = len(points)
+    if count <= 0:
+        return [], []
+
+    if not closed:
+        return _symmetry_pairs_and_centers_for_count(count, closed)
+
+    # Closed/periodic CV index 0 is just a seam, not necessarily a mirror
+    # center. Score every possible seam so common Maya circles do not pair the
+    # wrong CVs when post-projecting symmetry.
+    best_pairs = []
+    best_centers = []
+    best_score = None
+    for center_index in range(count):
+        pairs, centers = _closed_symmetry_pairs_and_centers_for_center(count, center_index)
+        score = _symmetry_score(points, pairs, centers, axis_index)
+        if best_score is None or score < best_score:
+            best_pairs = pairs
+            best_centers = centers
+            best_score = score
+    return best_pairs, best_centers
+
+
+def _symmetry_pairs_and_centers(snapshot, points, axis_index):
+    # type: (NurbsCurveSnapshot, Sequence[om2.MPoint], int) -> tuple[list[tuple[int, int]], list[int]]
+    count = _independent_cv_count(snapshot)
+    return _auto_symmetry_pairs_and_centers_for_points(
+        points[:count],
+        snapshot.is_closed,
+        axis_index,
+    )
+
+
+def _axis_side_sign(left_point, right_point, axis_index):
+    # type: (om2.MPoint, om2.MPoint, int) -> float
+    if left_point[axis_index] > 0.0:
+        return 1.0
+    if left_point[axis_index] < 0.0:
+        return -1.0
+    if right_point[axis_index] > 0.0:
+        return -1.0
+    if right_point[axis_index] < 0.0:
+        return 1.0
+    return 1.0
+
+
+def _symmetrized_pair_points(left_point, right_point, axis_index):
+    # type: (om2.MPoint, om2.MPoint, int) -> tuple[om2.MPoint, om2.MPoint]
+    axis_magnitude = (abs(left_point[axis_index]) + abs(right_point[axis_index])) * 0.5
+    side_sign = _axis_side_sign(left_point, right_point, axis_index)
+    average = om2.MPoint(
+        (left_point.x + right_point.x) * 0.5,
+        (left_point.y + right_point.y) * 0.5,
+        (left_point.z + right_point.z) * 0.5,
+    )
+    average[axis_index] = axis_magnitude * side_sign
+
+    mirrored = om2.MPoint(average)
+    mirrored[axis_index] = -average[axis_index]
+    return average, mirrored
+
+
+def apply_symmetry_projection(snapshot, cvs_world, axis="X"):
+    # type: (NurbsCurveSnapshot, Sequence[om2.MPoint], str) -> list[om2.MPoint]
+    """Project CV positions onto the configured symmetry constraint."""
+    axis_index = _axis_index(axis)
+    projected_local = [_to_symmetry_space(snapshot, point) for point in cvs_world]
+    pairs, centers = _symmetry_pairs_and_centers(snapshot, projected_local, axis_index)
+
+    for left_index, right_index in pairs:
+        left_point = projected_local[left_index]
+        right_point = projected_local[right_index]
+        projected_local[left_index], projected_local[right_index] = _symmetrized_pair_points(
+            left_point,
+            right_point,
+            axis_index,
+        )
+
+    for center_index in centers:
+        projected_local[center_index] = _project_point_to_symmetry_axis(projected_local[center_index], axis_index)
+
+    projected = [_from_symmetry_space(snapshot, point) for point in projected_local]
+    return _sync_periodic_bound_cvs(snapshot, projected)
 
 
 def evaluate_point(cvs_world, basis):
@@ -705,6 +877,19 @@ def set_scene_cv_positions(mfn_curve, positions_world):
     mfn_curve.updateCurve()
 
 
+def symmetry_curve_poc(curve_like, axis="X"):
+    # type: (om2.MFnNurbsCurve | str | object, str) -> list[om2.MPoint]
+    """Apply the POC symmetry projection to a scene curve and write it back."""
+    mfn_curve = _as_mfn_curve(curve_like)
+    snapshot = snapshot_curve(mfn_curve)
+    positions = apply_symmetry_projection(snapshot, snapshot.cvs_world, axis)
+    set_scene_cv_positions(mfn_curve, positions)
+    # Periodic curves expose trailing degree CVs that are bound copies of the
+    # first CVs. Return only the editable/independent CVs to make diagnostics
+    # match what this function actually writes.
+    return positions[:_independent_cv_count(snapshot)]
+
+
 def _max_position_error(points_a, points_b):
     # type: (Sequence[om2.MPoint], Sequence[om2.MPoint]) -> float
     max_error = 0.0
@@ -726,10 +911,15 @@ def optimize_context(
     adam_beta1=0.9,
     adam_beta2=0.999,
     adam_epsilon=1e-8,
+    symmetry=False,
+    symmetry_axis="X",
 ):
     # type: (...) -> FitResult
     """Optimize the snapshot CV array without updating any scene curve."""
     cv_indices = _normalized_cv_indices(context.source, cv_indices)
+    if symmetry:
+        _axis_index(symmetry_axis)
+
     smoothness_weight_data = compute_effective_smoothness_weight(
         context,
         cv_indices,
@@ -739,6 +929,7 @@ def optimize_context(
     )
     effective_smoothness_weight, cv_scale, target_complexity, complexity_scale = smoothness_weight_data
     positions = _sync_periodic_bound_cvs(context.source, context.source.cvs_world)
+
     first_moment = [om2.MVector(0.0, 0.0, 0.0) for _ in range(context.source.num_cvs)]
     second_moment = [om2.MVector(0.0, 0.0, 0.0) for _ in range(context.source.num_cvs)]
     initial_objective_loss, initial_loss, initial_smoothness_loss = compute_objective_loss(
@@ -781,6 +972,9 @@ def optimize_context(
             )
         positions = _sync_periodic_bound_cvs(context.source, positions)
 
+    if symmetry:
+        positions = apply_symmetry_projection(context.source, positions, symmetry_axis)
+
     final_objective_loss, final_loss, final_smoothness_loss = compute_objective_loss(
         positions,
         context,
@@ -800,6 +994,8 @@ def optimize_context(
         smoothness_cv_scale=cv_scale,
         target_complexity=target_complexity,
         smoothness_complexity_scale=complexity_scale,
+        symmetry=bool(symmetry),
+        symmetry_axis=symmetry_axis.upper(),
     )
 
 
@@ -819,6 +1015,8 @@ def fit_curve_on_curve_poc(
     adam_beta1=0.9,
     adam_beta2=0.999,
     adam_epsilon=1e-8,
+    symmetry=False,
+    symmetry_axis="X",
     write_back=True,
 ):
     # type: (...) -> FitResult
@@ -848,6 +1046,8 @@ def fit_curve_on_curve_poc(
         adam_beta1=adam_beta1,
         adam_beta2=adam_beta2,
         adam_epsilon=adam_epsilon,
+        symmetry=symmetry,
+        symmetry_axis=symmetry_axis,
     )
 
     if write_back:
@@ -889,6 +1089,12 @@ def fit_curve_on_curve_poc(
             result.smoothness_cv_scale,
             result.target_complexity,
             result.smoothness_complexity_scale,
+        ),
+    )
+    om2.MGlobal.displayInfo(
+        "fit_curve_poc symmetry post-process: enabled={}, axis={}".format(
+            result.symmetry,
+            result.symmetry_axis,
         ),
     )
     if result.scene_loss_after_write is not None:
