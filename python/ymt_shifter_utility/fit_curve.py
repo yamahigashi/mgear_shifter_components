@@ -180,7 +180,8 @@ def snapshot_curve(curve_like):
 
     degree = int(mfn_curve.degree)
     form = int(mfn_curve.form)
-    cvs_world = list(mfn_curve.cvPositions(om2.MSpace.kWorld))
+    cv_positions = mfn_curve.cvPositions(om2.MSpace.kWorld)
+    cvs_world = [om2.MPoint(point) for point in cv_positions]
     knots = _full_knot_vector(mfn_curve, degree, len(cvs_world), form)
     dag_path = mfn_curve.getPath()
 
@@ -556,17 +557,21 @@ def build_fit_context(curve_a, curve_b, num_samples=100, source_sample_mode="par
     # type: (...) -> FitContext
     """Precompute fixed source bases and target points.
 
-    By default, source samples are taken from the knot parameter domain so
-    repeated runs measure the same source locations. ``source_sample_mode`` can
-    be set to ``"length"`` to use the source curve's initial arc-length spacing.
-    Target samples are still captured by arc length because the target curve is
-    not modified during optimization.
+    Open curves default to knot parameter samples so repeated runs measure the
+    same source locations. Closed and periodic curves use arc-length samples
+    from the source CV 0 region because their knot parameter start can be
+    offset from CV 0. Target samples are captured by arc length because the
+    target curve is not modified during optimization.
     """
     mfn_a = _as_mfn_curve(curve_a)
     mfn_b = _as_mfn_curve(curve_b)
     source = snapshot_curve(mfn_a)
 
-    if source_sample_mode == "parameter":
+    effective_source_sample_mode = source_sample_mode
+    if source_sample_mode == "parameter" and source.is_closed:
+        sample_params = _sample_params_by_length(mfn_a, num_samples)
+        effective_source_sample_mode = "length"
+    elif source_sample_mode == "parameter":
         sample_params = _sample_params_by_parameter(source, num_samples)
     elif source_sample_mode == "length":
         sample_params = _sample_params_by_length(mfn_a, num_samples)
@@ -582,7 +587,7 @@ def build_fit_context(curve_a, curve_b, num_samples=100, source_sample_mode="par
 
     return FitContext(
         source=source,
-        source_sample_mode=source_sample_mode,
+        source_sample_mode=effective_source_sample_mode,
         sample_params=sample_params,
         sample_basis=sample_basis,
         target_points=target_points,

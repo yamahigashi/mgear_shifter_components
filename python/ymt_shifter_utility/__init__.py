@@ -543,6 +543,12 @@ def getCurveShapeName(crv):
     if hasattr(crv, "getShape"):
         crv = crv.getShape()
 
+    if hasattr(crv, "longName"):
+        return crv.longName()
+
+    if hasattr(crv, "fullPath"):
+        return crv.fullPath()
+
     return crv.name() if hasattr(crv, "name") else str(crv)
 
 
