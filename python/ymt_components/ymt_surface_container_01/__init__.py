@@ -64,8 +64,7 @@ class Component(component.Main):
         self.WIP = self.options["mode"]
 
         # --------------------------------------------------------------------
-        guide_objects = self.guide.getObjects(self.guide.root)
-        guide_surface = guide_objects["sliding_surface"]
+        guide_surface = self.guide.getObjectByLocalName("sliding_surface")
         self.sliding_surface = pm.duplicate(guide_surface)[0]
         cmds.rename(self.sliding_surface.name(), self.getName("surface"))
         cmds.parent(self.sliding_surface.name(), self.root.name())

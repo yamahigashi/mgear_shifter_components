@@ -588,6 +588,32 @@ def setCurveCVs(crv, positions, space="world"):
     crv_fn.updateCurve()
 
 
+def findGuideObjectByLocalName(guide, local_name, includeShapes=False):
+    root = guide.root.longName() if hasattr(guide.root, "longName") else str(guide.root)
+    kwargs = {"ad": True, "fullPath": True}
+    if not includeShapes:
+        kwargs["type"] = "transform"
+
+    children = cmds.listRelatives(root, **kwargs) or []
+    target = "{}_{}".format(guide.fullName, local_name)
+
+    def _short_name(node):
+        return node.rsplit("|", 1)[-1].rsplit(":", 1)[-1]
+
+    for child in children:
+        if _short_name(child) == target:
+            return pm.PyNode(child)
+
+    suffix = "_{}".format(local_name)
+    for child in children:
+        short_name = _short_name(child)
+        if short_name == local_name or short_name.endswith(suffix):
+            return pm.PyNode(child)
+
+    raise Exception(
+        "Object {} not found in guide {}.".format(local_name, guide.fullName))
+
+
 def transform_to_euler(t):
     # type: (om.MTransformationMatrix|dt.Matrix) -> tuple[float, float, float]
 

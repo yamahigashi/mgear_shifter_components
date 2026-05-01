@@ -55,6 +55,10 @@ class Guide(guide.ComponentGuide):
     email = EMAIL
     version = VERSION
 
+    def getObjectByLocalName(self, local_name, includeShapes=False):
+        return ymt_utility.findGuideObjectByLocalName(
+            self, local_name, includeShapes=includeShapes)
+
     def setFromHierarchy(self, root):
         self.root = root
         self.model = self.root.getParent(generations=-1)

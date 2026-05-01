@@ -143,8 +143,8 @@ class Component(component.Main):
         self.trackLvl = []
 
         self.previusTag = self.parentCtlTag
-        self.guide.eyeMesh = self.guide.getObjects(self.guide.root)["eyelidPivot"]
-        self.guide.eyeballMesh = self.guide.getObjects(self.guide.root)["eyeballPivot"]
+        self.guide.eyeMesh = self.guide.getObjectByLocalName("eyelidPivot")
+        self.guide.eyeballMesh = self.guide.getObjectByLocalName("eyeballPivot")
         # --------------------------------------------------------
 
         positions = [self.inPos]
@@ -166,7 +166,8 @@ class Component(component.Main):
 
         self.surfRef = self.settings["surfaceReference"]
         if not self.surfRef:
-            self.sliding_surface = pm.duplicate(self.guide.getObjects(self.guide.root)["sliding_surface"])[0]
+            guide_surface = self.guide.getObjectByLocalName("sliding_surface")
+            self.sliding_surface = pm.duplicate(guide_surface)[0]
             pm.parent(self.sliding_surface.name(), self.root)
             self.sliding_surface.visibility.set(False)
             pm.makeIdentity(self.sliding_surface, apply=True, t=1,  r=1, s=1, n=0, pn=1)  # type: ignore
