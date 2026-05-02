@@ -694,7 +694,7 @@ class Component(component.Main):
         )
 
         self.ikHandle2 = primitive.addIkHandle(
-            self.softblendLoc2, self.getName("ik2BonesHandle"), self.chain2bones, self.ikSolver, self.upv_ctl
+            self.ik2b_ik_ref, self.getName("ik2BonesHandle"), self.chain2bones, self.ikSolver, self.upv_ctl
         )
 
         # TwistTest
@@ -855,8 +855,21 @@ class Component(component.Main):
         for i, x in enumerate(self.fk_ctl):
             pm.parentConstraint(x, self.legBonesFK[i], mo=True)
 
-        for i, x in enumerate(self.chain4bones[:-1]):
+        for i, x in enumerate([self.chain2bones[0], self.chain2bones[1]]):
             pm.parentConstraint(x, self.legBonesIK[i], mo=True)
+
+        pm.parentConstraint(
+            self.wik_ctl_02,
+            self.legBonesIK[2],
+            maintainOffset=True,
+            skipTranslate=["x", "y", "z"]
+        )
+        pm.parentConstraint(
+            self.wik_ctl_01,
+            self.legBonesIK[3],
+            maintainOffset=True,
+            skipTranslate=["x", "y", "z"]
+        )
 
         pm.connectAttr(str(self.chain4bones[-1]) + ".tx", str(self.legBonesIK[-1]) + ".tx")
 
