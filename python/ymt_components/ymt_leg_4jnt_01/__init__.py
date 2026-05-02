@@ -248,6 +248,17 @@ class Component(component.Main):
         attribute.lockAttribute(self.ankle_ctl, ["sx", "sy", "sz", "v"])
 
         # IK controls --------------------------------------------------------
+        try:
+            rot_x_p90 = datatypes.EulerRotation(math.radians(90), 0, 0, unit="radians").asMatrix()
+            rot_x_m90 = datatypes.EulerRotation(math.radians(-90), 0, 0, unit="radians").asMatrix()
+            rot_y_p90 = datatypes.EulerRotation(0, math.radians(90), 0, unit="radians").asMatrix()
+            rot_z_p90 = datatypes.EulerRotation(0, 0, math.radians(90), unit="radians").asMatrix()
+
+        except ValueError:
+            rot_x_p90 = datatypes.EulerRotation(math.radians(90), 0, 0).asMatrix()
+            rot_x_m90 = datatypes.EulerRotation(math.radians(-90), 0, 0).asMatrix()
+            rot_y_p90 = datatypes.EulerRotation(0, math.radians(90), 0).asMatrix()
+            rot_z_p90 = datatypes.EulerRotation(0, 0, math.radians(90)).asMatrix()
 
         # --------------------------------------------------------------------
         # foot IK
@@ -258,6 +269,8 @@ class Component(component.Main):
             t = transform.getTransformFromPos(self.guide.pos["toe"])
         else:
             t = t_align
+            t = rot_y_p90 * t
+            t = rot_x_m90 * t
 
         length = vector.getDistance(self.guide.apos[5], self.guide.apos[4])
         self.ik_cns = primitive.addTransform(self.root_ctl, self.getName("ik_cns"), t)
@@ -279,20 +292,24 @@ class Component(component.Main):
 
         # --------------------------------------------------------------------
         # foot WIK
-        rot_x_180 = datatypes.EulerRotation(
-            math.radians(-90),
-            0,
-            0,
-        ).asMatrix()
-        rot_z_90 = datatypes.EulerRotation(
-            0,
-            math.radians(90),
-            0,
-        ).asMatrix()
 
         t_align2 = transform.getTransformLookingAt(self.guide.apos[4], self.guide.apos[3], self.root_normal, "zx", False)
-        t_align2 = rot_z_90 * t_align2
-        t_align2 = rot_x_180 * t_align2
+        if self.settings["ikOri"]:
+            t_align2 = rot_y_p90 * t_align2
+            t_align2 = rot_z_p90 * t_align2
+            t_align2 = rot_x_p90 * t_align2
+            w = self.size * 0.36
+            h = self.size * 0.20
+            d = length * 0.1
+            po = datatypes.Vector(length * -0.5, 0.0, 0.0)
+        else:
+            t_align2 = rot_y_p90 * t_align2
+            t_align2 = rot_x_m90 * t_align2
+            h = self.size * 0.36
+            d = self.size * 0.20
+            w = length * 0.1
+            po = datatypes.Vector(length * -0.5, 0.0, 0.0)
+
         length = vector.getDistance(self.guide.apos[4], self.guide.apos[3])
         self.wik_cns_01 = primitive.addTransform(self.root_ctl, self.getName("wik_cns_01"), t_align2)
         self.wik_ctl_01 = self.addCtl(
@@ -301,10 +318,10 @@ class Component(component.Main):
             t_align2,
             self.color_fk,
             "cube",
-            h=self.size * 0.36,
-            d=self.size * 0.20,
-            w=length * 0.1,
-            po=datatypes.Vector(length * -0.5, 0.0, 0.0),
+            h=h,
+            d=d,
+            w=w,
+            po=po,
             tp=self.ik_cns,
         )
         attribute.setKeyableAttributes(self.wik_ctl_01)
@@ -313,8 +330,22 @@ class Component(component.Main):
         attribute.lockAttribute(self.wik_ctl_01, ["sx", "sy", "sz", "v"])
 
         t_align3 = transform.getTransformLookingAt(self.guide.apos[3], self.guide.apos[2], self.root_normal, "zx", False)
-        t_align3 = rot_z_90 * t_align3
-        t_align3 = rot_x_180 * t_align3
+        if self.settings["ikOri"]:
+            t_align3 = rot_y_p90 * t_align3
+            t_align3 = rot_z_p90 * t_align3
+            t_align3 = rot_x_p90 * t_align3
+            w = self.size * 0.36
+            h = self.size * 0.20
+            d = length * 0.1
+            po = datatypes.Vector(length * -0.5, 0.0, 0.0)
+        else:
+            t_align3 = rot_y_p90 * t_align3
+            t_align3 = rot_x_m90 * t_align3
+            h = self.size * 0.36
+            d = self.size * 0.20
+            w = length * 0.1
+            po = datatypes.Vector(length * -0.5, 0.0, 0.0)
+
         length = vector.getDistance(self.guide.apos[3], self.guide.apos[2])
         self.wik_cns_02 = primitive.addTransform(self.root_ctl, self.getName("wik_cns_02"), t_align3)
         self.wik_ctl_02 = self.addCtl(
@@ -323,10 +354,10 @@ class Component(component.Main):
             t_align3,
             self.color_fk,
             "cube",
-            h=self.size * 0.36,
-            d=self.size * 0.20,
-            w=length * 0.1,
-            po=datatypes.Vector(length * -0.5, 0.0, 0.0),
+            h=h,
+            d=d,
+            w=w,
+            po=po,
             tp=self.ik_cns,
         )
         attribute.setKeyableAttributes(self.wik_ctl_02)
@@ -486,11 +517,11 @@ class Component(component.Main):
             self.getName("toe_cns"),
             transform.getTransform(self.legBones[4])
         )
-        cmds.parentConstraint(self.legBones[0], self.thigh_cns, maintainOffset=True)
-        cmds.parentConstraint(self.legBones[1], self.knee_cns, maintainOffset=True)
-        cmds.parentConstraint(self.legBones[2], self.ankle_cns, maintainOffset=True)
-        cmds.parentConstraint(self.legBones[3], self.foot_cns, maintainOffset=True)
-        cmds.parentConstraint(self.legBones[4], self.toe_cns, maintainOffset=True)
+        cmds.parentConstraint(str(self.legBones[0]), str(self.thigh_cns), maintainOffset=True)
+        cmds.parentConstraint(str(self.legBones[1]), str(self.knee_cns), maintainOffset=True)
+        cmds.parentConstraint(str(self.legBones[2]), str(self.ankle_cns), maintainOffset=True)
+        cmds.parentConstraint(str(self.legBones[3]), str(self.foot_cns), maintainOffset=True)
+        cmds.parentConstraint(str(self.legBones[4]), str(self.toe_cns), maintainOffset=True)
 
         self.div_cns = []
         _tmp_div = 0
