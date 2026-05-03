@@ -320,7 +320,7 @@ class Component(component.Main):
             w = self.size * 0.36
             h = self.size * 0.20
             d = length * 0.1
-            po = datatypes.Vector(length * -0.5, 0.0, 0.0)
+            po = datatypes.Vector(0.0, 0.0, length * -0.5)
         else:
             t_align2 = rot_y_p90 * t_align2
             t_align2 = rot_x_m90 * t_align2
@@ -348,6 +348,7 @@ class Component(component.Main):
         attribute.setInvertMirror(self.wik_ctl_01, ["tx", "ry", "rz"])
         attribute.lockAttribute(self.wik_ctl_01, ["sx", "sy", "sz", "v"])
 
+        length = vector.getDistance(self.guide.apos[3], self.guide.apos[2])
         t_align3 = transform.getTransformLookingAt(self.guide.apos[3], self.guide.apos[2], self.root_normal, "zx", False)
         if self.settings["ikOri"]:
             t_align3 = rot_y_p90 * t_align3
@@ -356,7 +357,7 @@ class Component(component.Main):
             w = self.size * 0.36
             h = self.size * 0.20
             d = length * 0.1
-            po = datatypes.Vector(length * -0.5, 0.0, 0.0)
+            po = datatypes.Vector(0.0, 0.0, length * -0.5)
         else:
             t_align3 = rot_y_p90 * t_align3
             t_align3 = rot_x_m90 * t_align3
@@ -886,10 +887,21 @@ class Component(component.Main):
         pm.connectAttr(cond2_node + ".outColorR", self.footSoftIK + ".tz")
 
         # soft blend
-        pc_node = pm.pointConstraint(self.footSoftIK, self.ik_endpoint_refs["foot"], self.softblendLocFoot)
-        # pc_node = pm.parentConstraint(self.ik_ctl, self.ik_endpoint_refs["foot"], self.softblendLocFoot, skipTranslate=["x", "y", "z"])
-        node.createReverseNode(self.stretch_attr, pc_node + ".target[0].targetWeight")
-        pm.connectAttr(str(self.stretch_attr), pc_node + ".target[1].targetWeight", f=True)
+        # position soft blend
+        pos_cns = pm.pointConstraint(
+            self.footSoftIK,
+            self.ik_endpoint_refs["foot"],
+            self.softblendLocFoot,
+        )
+        node.createReverseNode(self.stretch_attr, pos_cns + ".target[0].targetWeight")
+        pm.connectAttr(str(self.stretch_attr), pos_cns + ".target[1].targetWeight", f=True)
+
+        # rotation follow
+        pm.orientConstraint(
+            self.ik_ctl,
+            self.softblendLocFoot,
+            maintainOffset=False,
+        )
 
         # Stretch
         distance2_node = node.createDistNode(self.softblendLocFoot, self.footSoftIK)
@@ -944,10 +956,19 @@ class Component(component.Main):
         pm.connectAttr(cond2_node + ".outColorR", self.ankleSoftIK + ".tz")
 
         # soft blend
-        pc_node = pm.pointConstraint(self.ankleSoftIK, self.ik_endpoint_refs["ankle"], self.softblendLoc2)
-        # pc_node = pm.parentConstraint(self.ik_ctl, self.ik_endpoint_refs["ankle"], self.softblendLoc2, skipTranslate=["x", "y", "z"])
-        node.createReverseNode(self.stretch_attr, pc_node + ".target[0].targetWeight")
-        pm.connectAttr(str(self.stretch_attr), pc_node + ".target[1].targetWeight", f=True)
+        pos_cns = pm.pointConstraint(
+            self.ankleSoftIK,
+            self.ik_endpoint_refs["ankle"],
+            self.softblendLoc2,
+        )
+        node.createReverseNode(self.stretch_attr, pos_cns + ".target[0].targetWeight")
+        pm.connectAttr(str(self.stretch_attr), pos_cns + ".target[1].targetWeight", f=True)
+
+        pm.orientConstraint(
+            self.ik_ctl,
+            self.softblendLoc2,
+            maintainOffset=False,
+        )
 
         # Stretch
         distance2_node = node.createDistNode(self.softblendLoc2, self.ankleSoftIK)
