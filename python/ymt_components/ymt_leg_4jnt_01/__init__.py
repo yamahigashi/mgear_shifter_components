@@ -33,6 +33,21 @@ if typing.TYPE_CHECKING:
 class Component(component.Main):
     """Shifter component Class"""
 
+    ik_endpoint_names = ["ankle", "foot", "toe"]
+    ik_endpoint_labels = ["Ankle", "Foot", "Toe"]
+
+    def _get_ik_endpoint_index(self):
+        return int(max(0, min(len(self.ik_endpoint_names) - 1, self.settings.get("ikEndpoint", 2))))
+
+    def _connect_endpoint_condition(self, endpoint_index, target_weight, true_value=1, false_value=0):
+        cond_node = pm.createNode("condition")
+        pm.setAttr(cond_node + ".operation", 0)
+        pm.connectAttr(self.ikEndpoint_att, cond_node + ".firstTerm")
+        pm.setAttr(cond_node + ".secondTerm", endpoint_index)
+        pm.setAttr(cond_node + ".colorIfTrueR", true_value)
+        pm.setAttr(cond_node + ".colorIfFalseR", false_value)
+        pm.connectAttr(cond_node + ".outColorR", target_weight, f=True)
+
     # =====================================================
     # OBJECTS
     # =====================================================
@@ -265,12 +280,16 @@ class Component(component.Main):
         # "z-x",
         t_align = transform.getTransformLookingAt(self.guide.apos[4], self.guide.apos[5], self.root_normal, "zx", False)
 
+        ik_endpoint_index = self._get_ik_endpoint_index()
+        ik_endpoint_name = self.ik_endpoint_names[ik_endpoint_index]
+
         if self.settings["ikOri"]:
             t = transform.getTransformFromPos(self.guide.pos["toe"])
         else:
             t = t_align
             t = rot_y_p90 * t
             t = rot_x_m90 * t
+        t = transform.setMatrixPosition(t, self.guide.pos[ik_endpoint_name])
 
         length = vector.getDistance(self.guide.apos[5], self.guide.apos[4])
         self.ik_cns = primitive.addTransform(self.root_ctl, self.getName("ik_cns"), t)
@@ -365,10 +384,13 @@ class Component(component.Main):
         attribute.setInvertMirror(self.wik_ctl_02, ["tx", "ry", "rz"])
         attribute.lockAttribute(self.wik_ctl_02, ["sx", "sy", "sz", "v"])
 
-        # 2 bones ik layer
-        self.ik2b_ikCtl_ref = primitive.addTransform(self.ik_ctl, self.getName("ik2B_A_ref"), t_align)
-        self.ik2b_bone_ref = primitive.addTransform(self.chain3bones[3], self.getName("ik2B_B_ref"), t_align)
-        self.ik2b_blend = primitive.addTransform(self.ik_ctl, self.getName("ik2B_blend"), t_align)
+        # IK endpoint position references
+        self.ik_endpoint_refs = {
+            name: primitive.addTransformFromPos(
+                self.ik_ctl, self.getName("ikEndpoint_%s_ref" % name), self.guide.pos[name]
+            )
+            for name in self.ik_endpoint_names
+        }
 
         roll_t = transform.getTransformLookingAt(
             self.guide.apos[0], self.guide.apos[1], self.guide.apos[5] - self.guide.apos[4], "yz", False
@@ -415,6 +437,16 @@ class Component(component.Main):
 
         self.softblendLoc = primitive.addTransform(self.root, self.getName("softblendLoc"), t)
 
+        # Soft IK objects 3 Bones chain ----------------------------
+        t = transform.getTransformLookingAt(self.guide.pos["root"], self.guide.pos["foot"], self.x_axis, "zx", False)
+
+        self.aim_tra_foot = primitive.addTransform(self.root_ctl, self.getName("aimSoftIKFoot"), t)
+
+        t = transform.getTransformFromPos(self.guide.pos["foot"])
+        self.footSoftIK = primitive.addTransform(self.aim_tra_foot, self.getName("footSoftIK"), t)
+
+        self.softblendLocFoot = primitive.addTransform(self.root, self.getName("softblendLocFoot"), t)
+
         # Soft IK objects 2 Bones chain ----------------------------
         t = transform.getTransformLookingAt(self.guide.pos["root"], self.guide.pos["ankle"], self.x_axis, "zx", False)
 
@@ -425,6 +457,9 @@ class Component(component.Main):
         self.ankleSoftIK = primitive.addTransform(self.aim_tra2, self.getName("ankleSoftIK"), t)
 
         self.softblendLoc2 = primitive.addTransform(self.root, self.getName("softblendLoc2"), t)
+        self.ankleSoftFoot_ref = primitive.addTransformFromPos(
+            self.softblendLoc2, self.getName("ankleSoftFoot_ref"), self.guide.pos["foot"]
+        )
 
         # References --------------------------------------
         self.ik_ref = primitive.addTransform(self.ik_ctl, self.getName("ik_ref"), transform.getTransform(self.ik_ctl))
@@ -572,7 +607,12 @@ class Component(component.Main):
 
     def addAttributes(self):
         self.blend_att = self.addAnimParam("blend", "Fk/Ik Blend", "double", self.settings["blend"], 0, 1)
-        self.fullIK_attr = self.addAnimParam("fullIK", "Full 3 bones IK", "double", self.settings["full3BonesIK"], 0, 1)
+        self.ikEndpoint_att = self.addAnimEnumParam(
+            "ikEndpoint",
+            "IK Endpoint",
+            self._get_ik_endpoint_index(),
+            self.ik_endpoint_labels,
+        )
         self.soft_attr = self.addAnimParam("softIKRange", "Soft IK Range", "double", 0.0001, 0.0001, 100)
         self.softSpeed_attr = self.addAnimParam("softIKSpeed", "Soft IK Speed", "double", 2.5, 1.001, 10)
         self.stretch_attr = self.addAnimParam("stretch", "Stretch", "double", 0, 0, 1)
@@ -726,21 +766,32 @@ class Component(component.Main):
 
         # Constraint and up vector
         pm.poleVectorConstraint(self.upv_ctl, self.ikHandle4)
-        pm.parentConstraint(self.chain4bones[3], self.wik_cns_01, maintainOffset=True)
-        pm.parentConstraint(self.chain3bones[2], self.wik_cns_02, maintainOffset=True)
+        wik1_cns = pm.parentConstraint(
+            self.ankleSoftFoot_ref,
+            self.softblendLocFoot,
+            self.chain4bones[3],
+            self.wik_cns_01,
+            maintainOffset=True,
+        )
+        self._connect_endpoint_condition(0, wik1_cns + ".target[0].targetWeight")
+        self._connect_endpoint_condition(1, wik1_cns + ".target[1].targetWeight")
+        self._connect_endpoint_condition(2, wik1_cns + ".target[2].targetWeight")
+
+        wik2_cns = pm.parentConstraint(
+            self.softblendLoc2,
+            self.chain3bones[2],
+            self.wik_cns_02,
+            maintainOffset=True
+        )
+        self._connect_endpoint_condition(0, wik2_cns + ".target[0].targetWeight")
+        self._connect_endpoint_condition(0, wik2_cns + ".target[1].targetWeight", false_value=1, true_value=0)
 
         pm.parentConstraint(self.wik_ctl_01, self.ikHandle3, maintainOffset=True)
-
-        parentc_node = pm.parentConstraint(self.ik2b_ikCtl_ref, self.ik2b_bone_ref, self.ik2b_blend, mo=True)
-
-        node.createReverseNode(self.fullIK_attr, parentc_node + ".target[0].targetWeight")
-
-        pm.connectAttr(str(self.fullIK_attr), parentc_node + ".target[1].targetWeight", f=True)
 
         # softIK 4 bones operators
         applyop.aimCns(
             self.aim_tra,
-            self.ik_ref,
+            self.ik_endpoint_refs["toe"],
             axis="zx",
             wupType=4,
             wupVector=[1, 0, 0],
@@ -757,7 +808,7 @@ class Component(component.Main):
             ]
         )
         subtract1_node = node.createPlusMinusAverage1D([plusTotalLength_node.attr("output1D"), self.soft_attr_cond], 2)
-        distance1_node = node.createDistNode(self.ik_ref, self.aim_tra)
+        distance1_node = node.createDistNode(self.ik_endpoint_refs["toe"], self.aim_tra)
         div1_node = node.createDivNode(1.0, self.rig.global_ctl + ".sx")
         mult1_node = node.createMulNode(distance1_node + ".distance", div1_node + ".outputX")
         subtract2_node = node.createPlusMinusAverage1D([mult1_node.attr("outputX"), subtract1_node.attr("output1D")], 2)
@@ -782,7 +833,9 @@ class Component(component.Main):
         pm.connectAttr(cond2_node + ".outColorR", self.wristSoftIK + ".tz")
 
         # soft blend
-        pm.pointConstraint(self.wristSoftIK, self.softblendLoc)
+        pc_node = pm.pointConstraint(self.wristSoftIK, self.ik_endpoint_refs["toe"], self.softblendLoc)
+        node.createReverseNode(self.stretch_attr, pc_node + ".target[0].targetWeight")
+        pm.connectAttr(str(self.stretch_attr), pc_node + ".target[1].targetWeight", f=True)
 
         # Stretch
         distance2_node = node.createDistNode(self.softblendLoc, self.wristSoftIK)
@@ -798,10 +851,68 @@ class Component(component.Main):
                 [mulNode.attr("outputX"), mult6_node.attr("outputX")], 1, self.chain4bones[i + 1] + ".tx"
             )
 
+        # softIK 3 bones operators
+        applyop.aimCns(
+            self.aim_tra_foot,
+            self.ik_endpoint_refs["foot"],
+            axis="zx",
+            wupType=4,
+            wupVector=[1, 0, 0],
+            wupObject=self.root_ctl,
+            maintainOffset=False,
+        )
+
+        plusTotalLength_node = node.createPlusMinusAverage1D(
+            [multJnt1_node.attr("outputX"), multJnt2_node.attr("outputX"), multJnt3_node.attr("outputX")]
+        )
+        subtract1_node = node.createPlusMinusAverage1D([plusTotalLength_node.attr("output1D"), self.soft_attr_cond], 2)
+        distance1_node = node.createDistNode(self.ik_endpoint_refs["foot"], self.aim_tra_foot)
+        div1_node = node.createDivNode(1.0, self.rig.global_ctl + ".sx")
+        mult1_node = node.createMulNode(distance1_node + ".distance", div1_node + ".outputX")
+        subtract2_node = node.createPlusMinusAverage1D([mult1_node.attr("outputX"), subtract1_node.attr("output1D")], 2)
+        div2_node = node.createDivNode(subtract2_node + ".output1D", self.soft_attr_cond)
+        mult2_node = node.createMulNode(-1, div2_node + ".outputX")
+        power_node = node.createPowNode(self.softSpeed_attr, mult2_node + ".outputX")
+        mult3_node = node.createMulNode(self.soft_attr_cond, power_node + ".outputX")
+        subtract3_node = node.createPlusMinusAverage1D(
+            [plusTotalLength_node.attr("output1D"), mult3_node.attr("outputX")], 2
+        )
+        cond1_node = node.createConditionNode(
+            self.soft_attr_cond, 0, 2, subtract3_node + ".output1D", plusTotalLength_node + ".output1D"
+        )
+        cond2_node = node.createConditionNode(
+            mult1_node + ".outputX", subtract1_node + ".output1D", 2, cond1_node + ".outColorR", mult1_node + ".outputX"
+        )
+        pm.connectAttr(cond2_node + ".outColorR", self.footSoftIK + ".tz")
+
+        # soft blend
+        pc_node = pm.pointConstraint(self.footSoftIK, self.ik_endpoint_refs["foot"], self.softblendLocFoot)
+        # pc_node = pm.parentConstraint(self.ik_ctl, self.ik_endpoint_refs["foot"], self.softblendLocFoot, skipTranslate=["x", "y", "z"])
+        node.createReverseNode(self.stretch_attr, pc_node + ".target[0].targetWeight")
+        pm.connectAttr(str(self.stretch_attr), pc_node + ".target[1].targetWeight", f=True)
+
+        # Stretch
+        distance2_node = node.createDistNode(self.softblendLocFoot, self.footSoftIK)
+        mult4_node = node.createMulNode(distance2_node + ".distance", div1_node + ".outputX")
+        for i, mulNode in enumerate([multJnt1_node, multJnt2_node, multJnt3_node]):
+            div3_node = node.createDivNode(mulNode + ".outputX", plusTotalLength_node + ".output1D")
+
+            mult5_node = node.createMulNode(mult4_node + ".outputX", div3_node + ".outputX")
+
+            mult6_node = node.createMulNode(self.stretch_attr, mult5_node + ".outputX")
+
+            chain3_len_node = node.createPlusMinusAverage1D(
+                [mulNode.attr("outputX"), mult6_node.attr("outputX")], 1
+            )
+            cond_node = node.createConditionNode(
+                self.ikEndpoint_att, 1, 0, chain3_len_node + ".output1D", mulNode + ".outputX"
+            )
+            pm.connectAttr(cond_node + ".outColorR", self.chain3bones[i + 1] + ".tx")
+
         # softIK 2 bones operators
         applyop.aimCns(
             self.aim_tra2,
-            self.ik2b_ik_ref,
+            self.ik_endpoint_refs["ankle"],
             axis="zx",
             wupType=4,
             wupVector=[1, 0, 0],
@@ -813,7 +924,7 @@ class Component(component.Main):
             [multJnt1_node.attr("outputX"), multJnt2_node.attr("outputX")]
         )
         subtract1_node = node.createPlusMinusAverage1D([plusTotalLength_node.attr("output1D"), self.soft_attr_cond], 2)
-        distance1_node = node.createDistNode(self.ik2b_ik_ref, self.aim_tra2)
+        distance1_node = node.createDistNode(self.ik_endpoint_refs["ankle"], self.aim_tra2)
         div1_node = node.createDivNode(1, self.rig.global_ctl + ".sx")
         mult1_node = node.createMulNode(distance1_node + ".distance", div1_node + ".outputX")
         subtract2_node = node.createPlusMinusAverage1D([mult1_node.attr("outputX"), subtract1_node.attr("output1D")], 2)
@@ -833,7 +944,8 @@ class Component(component.Main):
         pm.connectAttr(cond2_node + ".outColorR", self.ankleSoftIK + ".tz")
 
         # soft blend
-        pc_node = pm.pointConstraint(self.ankleSoftIK, self.ik2b_ik_ref, self.softblendLoc2)
+        pc_node = pm.pointConstraint(self.ankleSoftIK, self.ik_endpoint_refs["ankle"], self.softblendLoc2)
+        # pc_node = pm.parentConstraint(self.ik_ctl, self.ik_endpoint_refs["ankle"], self.softblendLoc2, skipTranslate=["x", "y", "z"])
         node.createReverseNode(self.stretch_attr, pc_node + ".target[0].targetWeight")
         pm.connectAttr(str(self.stretch_attr), pc_node + ".target[1].targetWeight", f=True)
 

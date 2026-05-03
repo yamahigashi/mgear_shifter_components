@@ -77,7 +77,7 @@ class Guide(guide.ComponentGuide):
 
         # Default Values
         self.pBlend = self.addParam("blend", "double", 1, 0, 1)
-        self.pFull3BoneIK = self.addParam("full3BonesIK", "double", 1, 0, 1)
+        self.pIkEndpoint = self.addEnumParam("ikEndpoint", ["Ankle", "Foot", "Toe"], 2)
         self.pIkRefArray = self.addParam("ikrefarray", "string", "")
         self.pUpvRefArray = self.addParam("upvrefarray", "string", "")
         self.pMaxStretch = self.addParam("maxstretch", "double", 1.5, 1, None)
@@ -149,6 +149,21 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
     def create_componentControls(self):
         return
 
+    def _root_has_attr(self, attr_name):
+        try:
+            return self.root.hasAttr(attr_name)
+        except AttributeError:
+            try:
+                return self.root.attr(attr_name).exists()
+            except Exception:
+                return False
+
+    def _get_ik_endpoint_index(self):
+        if self._root_has_attr("ikEndpoint"):
+            return self.root.attr("ikEndpoint").get()
+
+        return 2
+
     def populate_componentControls(self):
         """Populate the controls values.
 
@@ -162,8 +177,7 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
         # populate component settings
         self.settingsTab.ikfk_slider.setValue(int(self.root.attr("blend").get() * 100))
         self.settingsTab.ikfk_spinBox.setValue(int(self.root.attr("blend").get() * 100))
-        self.settingsTab.full3BonesIK_slider.setValue(int(self.root.attr("full3BonesIK").get() * 100))
-        self.settingsTab.full3BonesIK_spinBox.setValue(int(self.root.attr("full3BonesIK").get() * 100))
+        self.settingsTab.ikEndpoint_comboBox.setCurrentIndex(self._get_ik_endpoint_index())
         self.settingsTab.maxStretch_spinBox.setValue(self.root.attr("maxstretch").get())
         self.settingsTab.ikSolver_comboBox.setCurrentIndex(self.root.attr("ikSolver").get())
         self.populateCheck(self.settingsTab.neutralRotation_checkBox, "ikOri")
@@ -192,12 +206,8 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
             partial(self.updateSlider, self.settingsTab.ikfk_spinBox, "blend")
         )
 
-        self.settingsTab.full3BonesIK_slider.valueChanged.connect(
-            partial(self.updateSlider, self.settingsTab.full3BonesIK_slider, "full3BonesIK")
-        )
-
-        self.settingsTab.full3BonesIK_spinBox.valueChanged.connect(
-            partial(self.updateSlider, self.settingsTab.full3BonesIK_spinBox, "full3BonesIK")
+        self.settingsTab.ikEndpoint_comboBox.currentIndexChanged.connect(
+            partial(self.updateComboBox, self.settingsTab.ikEndpoint_comboBox, "ikEndpoint")
         )
 
         self.settingsTab.maxStretch_spinBox.valueChanged.connect(

@@ -63,6 +63,38 @@
               </item>
              </layout>
             </item>
+            <item row="1" column="0">
+             <widget class="QLabel" name="ikEndpoint_label">
+              <property name="text">
+               <string>IK Endpoint</string>
+              </property>
+             </widget>
+            </item>
+            <item row="1" column="1">
+             <widget class="QComboBox" name="ikEndpoint_comboBox">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <item>
+               <property name="text">
+                <string>Ankle</string>
+               </property>
+              </item>
+              <item>
+               <property name="text">
+                <string>Foot</string>
+               </property>
+              </item>
+              <item>
+               <property name="text">
+                <string>Toe</string>
+               </property>
+              </item>
+             </widget>
+            </item>
             <item row="2" column="0">
              <widget class="QLabel" name="maxStretch_label">
               <property name="sizePolicy">
@@ -119,6 +151,7 @@
               </item>
              </widget>
             </item>
+           </layout>
           </item>
           <item>
            <widget class="QCheckBox" name="neutralRotation_checkBox">
@@ -386,38 +419,6 @@
     <hint type="destinationlabel">
      <x>182</x>
      <y>37</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
-   <sender>full3BonesIK_slider</sender>
-   <signal>valueChanged(int)</signal>
-   <receiver>full3BonesIK_spinBox</receiver>
-   <slot>setValue(int)</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>142</x>
-     <y>60</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>212</x>
-     <y>62</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
-   <sender>full3BonesIK_spinBox</sender>
-   <signal>valueChanged(int)</signal>
-   <receiver>full3BonesIK_slider</receiver>
-   <slot>setValue(int)</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>214</x>
-     <y>52</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>180</x>
-     <y>54</y>
     </hint>
    </hints>
   </connection>
