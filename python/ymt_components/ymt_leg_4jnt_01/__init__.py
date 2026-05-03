@@ -31,7 +31,35 @@ if typing.TYPE_CHECKING:
 
 
 class Component(component.Main):
-    """Shifter component Class"""
+    """Four-bone leg component with endpoint-selectable IK.
+
+    The component keeps three IK solve layers for the same guide chain:
+    ``chain2bones`` solves root-to-ankle, ``chain3bones`` solves root-to-foot,
+    and ``chain4bones`` solves root-to-toe. ``ikEndpoint`` does not move or
+    replace the animator's IK control; it selects which endpoint is considered
+    active. Endpoint refs under ``ik_ctl`` provide the raw ankle, foot, and toe
+    target positions.
+
+    Stretch is endpoint-local. Toe distributes stretch over A/B/C/D, Foot over
+    A/B/C, and Ankle over A/B. Segments beyond the active endpoint keep their
+    base guide length and follow the active solve through guide offset and
+    ``ik_ctl`` rotation. The final IK chain selects active A/B/C/D lengths from
+    the three solve layers so downstream deformation sees one coherent length
+    state.
+
+    Intermediate offset controls, historically named WIK in this component's
+    internals, are layered between endpoints. Their local translate/rotate must
+    affect the actual IK target, so Foot and Ankle also build shadow effective
+    targets from the soft/raw blend locator plus the same local offset. Stretch
+    distance is measured to those shadow targets, not merely to
+    ``softblendLocFoot`` or ``softblendLoc2``.
+
+    Keep the stretch distance graph solver-independent. It may read the IK
+    control endpoint refs, soft IK locators, soft/raw blend locators, static
+    guide offsets, and offset-control local channels. It must not read IK
+    handles, solved chain joints, WIK auto-follow constraint results, or any
+    downstream final IK joints, otherwise Maya can form evaluation cycles.
+    """
 
     ik_endpoint_names = ["ankle", "foot", "toe"]
     ik_endpoint_labels = ["Ankle", "Foot", "Toe"]
@@ -310,7 +338,7 @@ class Component(component.Main):
         attribute.lockAttribute(self.ik_ctl, ["sx", "sy", "sz", "v"])
 
         # --------------------------------------------------------------------
-        # foot WIK
+        # foot intermediate offset control
 
         t_align2 = transform.getTransformLookingAt(self.guide.apos[4], self.guide.apos[3], self.root_normal, "zx", False)
         if self.settings["ikOri"]:
@@ -333,7 +361,7 @@ class Component(component.Main):
         self.wik_cns_01 = primitive.addTransform(self.root_ctl, self.getName("wik_cns_01"), t_align2)
         self.wik_ctl_01 = self.addCtl(
             self.wik_cns_01,
-            "wik1_ctl",
+            "footOffset_ctl",
             t_align2,
             self.color_fk,
             "cube",
@@ -370,7 +398,7 @@ class Component(component.Main):
         self.wik_cns_02 = primitive.addTransform(self.root_ctl, self.getName("wik_cns_02"), t_align3)
         self.wik_ctl_02 = self.addCtl(
             self.wik_cns_02,
-            "wik2_ctl",
+            "ankleOffset_ctl",
             t_align3,
             self.color_fk,
             "cube",
@@ -747,6 +775,9 @@ class Component(component.Main):
         multJnt3_node = node.createMulNode(self.boneCLenght_attr, self.boneCLenghtMult_attr)
         multJnt4_node = node.createMulNode(self.boneDLenght_attr, self.boneDLenghtMult_attr)
 
+        # Shadow targets copy only animator local offsets. They intentionally do
+        # not read actual WIK world matrices, IK handles, or solved chains, so
+        # stretch distance stays upstream of the solver graph.
         def connect_local_tr(src, dst):
             for attr_name in ("translate", "rotate"):
                 pm.connectAttr(src.attr(attr_name), dst.attr(attr_name), f=True)
@@ -944,7 +975,9 @@ class Component(component.Main):
             maintainOffset=False,
         )
 
-        # Stretch
+        # Foot stretch measures to the effective target: soft/raw foot target
+        # plus footOffset local channels. D remains base length outside Foot
+        # endpoint.
         distance2_node = node.createDistNode(self.ik3b_stretch_ref, self.footSoftIK)
         mult4_node = node.createMulNode(distance2_node + ".distance", div1_node + ".outputX")
         foot_len_outputs = []
@@ -1013,7 +1046,9 @@ class Component(component.Main):
             maintainOffset=False,
         )
 
-        # Stretch
+        # Ankle stretch measures to the effective target: soft/raw ankle target
+        # plus ankleOffset local channels. C and D remain base length outside
+        # longer endpoints.
         distance2_node = node.createDistNode(self.ik2b_stretch_ref, self.ankleSoftIK)
         mult4_node = node.createMulNode(distance2_node + ".distance", div1_node + ".outputX")
         ankle_len_outputs = []

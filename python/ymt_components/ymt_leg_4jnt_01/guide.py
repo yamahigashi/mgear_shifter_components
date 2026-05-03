@@ -22,7 +22,10 @@ ORIGINAL_EMAIL = "hello@miquel-campos.com"
 VERSION = [1, 0, 0]
 TYPE = "ymt_leg_4jnt_01"
 NAME = "leg"
-DESCRIPTION = "4 bones leg for quadrupeds and other animals"
+DESCRIPTION = (
+    "4 bones leg for quadrupeds and other animals. Supports endpoint-selectable "
+    "IK at Ankle, Foot, or Toe, with Soft IK and intermediate offset controls."
+)
 
 ##########################################################
 # CLASS
