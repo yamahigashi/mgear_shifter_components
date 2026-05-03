@@ -171,7 +171,13 @@ class Component(component.Main):
         else:
             u2 = crv.findParamFromLength(cvs / (self.settings["ikNb"] - 1) * i + 1)
             pos2 = crv.getPointAtParam(u2, space)
-            t = getTransformLookingAt(pos, pos2, self.guide.blades["blade"].y, axis="yx", negate=self.negate)
+            t = getTransformLookingAt(
+                datatypes.Vector(pos[0], pos[1], pos[2]),
+                datatypes.Vector(pos2[0], pos2[1], pos2[2]),
+                self.guide.blades["blade"].y,
+                axis="yx",
+                negate=self.negate
+            )
 
             # FIXME:
             t = getTransform(self.guide.root)
@@ -365,7 +371,7 @@ class Component(component.Main):
 
         # Twist references (This objects will replace the spinlookup
         # slerp solver behavior)
-        t = transform.getTransformLookingAt(
+        t = getTransformLookingAt(
             self.guide.apos[0],
             self.guide.apos[-1],
             self.guide.blades["blade"].z * -1,
@@ -478,7 +484,10 @@ class Component(component.Main):
         # Setup ------------------------------------------
         # Eval Fcurve
         ikname = "{}_ik_profile".format(self.guide.root.split("|")[-1])
-        self.ik_value = fcurve.getFCurveValues(ikname, self.settings["ikNb"])
+        self.ik_value = fcurve.getFCurveValues(
+            ikname,
+            self.settings["ikNb"]
+        )
         self.ik_att = [self.addAnimParam("gravity_rate_ik%s" % i,
                                          "Planetary Ik ratio %s" % i,
                                          "double",
@@ -803,8 +812,7 @@ class Component(component.Main):
 
                 ref.append(cns_obj)
                 cns_node = pm.parentConstraint(*ref, maintainOffset=True)
-                cns_attr = pm.parentConstraint(
-                    cns_node, query=True, weightAliasList=True)
+                cns_attr = pm.parentConstraint(cns_node, query=True, weightAliasList=True)
                 # check if the ref Array is for IK or Up vector
                 try:
                     if upVAttr:
@@ -823,8 +831,7 @@ class Component(component.Main):
                         pm.setAttr(node_name + ".operation", 0)
                         pm.setAttr(node_name + ".colorIfTrueR", 1)
                         pm.setAttr(node_name + ".colorIfFalseR", 0)
-                        attr_name = f"{cns_node}.{attr}"
-                        pm.connectAttr(node_name + ".outColorR", attr_name)
+                        pm.connectAttr(node_name + ".outColorR", attr)
 
     def connect_standard(self):
         self.parent.addChild(self.root)
