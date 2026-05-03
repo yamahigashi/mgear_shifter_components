@@ -393,6 +393,10 @@ class Component(component.Main):
             for name in self.ik_endpoint_names
         }
 
+        self.ik3b_ik_ref = primitive.addTransformFromPos(
+            self.wik_ctl_01, self.getName("ik3B_ik_ref"), self.guide.pos["foot"]
+        )
+
         roll_t = transform.getTransformLookingAt(
             self.guide.apos[0], self.guide.apos[1], self.guide.apos[5] - self.guide.apos[4], "yz", False
         )
@@ -447,6 +451,16 @@ class Component(component.Main):
         self.footSoftIK = primitive.addTransform(self.aim_tra_foot, self.getName("footSoftIK"), t)
 
         self.softblendLocFoot = primitive.addTransform(self.root, self.getName("softblendLocFoot"), t)
+        self.ik3b_stretch_npo = primitive.addTransform(
+            self.softblendLocFoot, self.getName("ik3B_stretch_npo"), transform.getTransform(self.wik_ctl_01)
+        )
+        self.ik3b_stretch_ctl = primitive.addTransform(
+            self.ik3b_stretch_npo, self.getName("ik3B_stretch_ctl"), transform.getTransform(self.wik_ctl_01)
+        )
+        attribute.setRotOrder(self.ik3b_stretch_ctl, "XZY")
+        self.ik3b_stretch_ref = primitive.addTransformFromPos(
+            self.ik3b_stretch_ctl, self.getName("ik3B_stretch_ref"), self.guide.pos["foot"]
+        )
 
         # Soft IK objects 2 Bones chain ----------------------------
         t = transform.getTransformLookingAt(self.guide.pos["root"], self.guide.pos["ankle"], self.x_axis, "zx", False)
@@ -460,6 +474,16 @@ class Component(component.Main):
         self.softblendLoc2 = primitive.addTransform(self.root, self.getName("softblendLoc2"), t)
         self.ankleSoftFoot_ref = primitive.addTransformFromPos(
             self.softblendLoc2, self.getName("ankleSoftFoot_ref"), self.guide.pos["foot"]
+        )
+        self.ik2b_stretch_npo = primitive.addTransform(
+            self.softblendLoc2, self.getName("ik2B_stretch_npo"), transform.getTransform(self.wik_ctl_02)
+        )
+        self.ik2b_stretch_ctl = primitive.addTransform(
+            self.ik2b_stretch_npo, self.getName("ik2B_stretch_ctl"), transform.getTransform(self.wik_ctl_02)
+        )
+        attribute.setRotOrder(self.ik2b_stretch_ctl, "XZY")
+        self.ik2b_stretch_ref = primitive.addTransformFromPos(
+            self.ik2b_stretch_ctl, self.getName("ik2B_stretch_ref"), self.guide.pos["ankle"]
         )
 
         # References --------------------------------------
@@ -723,6 +747,20 @@ class Component(component.Main):
         multJnt3_node = node.createMulNode(self.boneCLenght_attr, self.boneCLenghtMult_attr)
         multJnt4_node = node.createMulNode(self.boneDLenght_attr, self.boneDLenghtMult_attr)
 
+        def connect_local_tr(src, dst):
+            for attr_name in ("translate", "rotate"):
+                pm.connectAttr(src.attr(attr_name), dst.attr(attr_name), f=True)
+
+        def select_endpoint_value(ankle_value, foot_value, toe_value):
+            foot_or_toe = node.createConditionNode(self.ikEndpoint_att, 1, 0, foot_value, toe_value)
+            ankle_or_distal = node.createConditionNode(
+                self.ikEndpoint_att, 0, 0, ankle_value, foot_or_toe + ".outColorR"
+            )
+            return ankle_or_distal + ".outColorR"
+
+        connect_local_tr(self.wik_ctl_01, self.ik3b_stretch_ctl)
+        connect_local_tr(self.wik_ctl_02, self.ik2b_stretch_ctl)
+
         # # IK 4 bones ===============================================
 
         self.ikHandle4 = primitive.addIkHandle(
@@ -731,7 +769,7 @@ class Component(component.Main):
         # # IK 3 bones ===============================================
 
         self.ikHandle3 = primitive.addIkHandle(
-            self.softblendLoc, self.getName("ik3BonesHandle"), self.chain3bones, self.ikSolver, self.upv_ctl
+            self.ik3b_ik_ref, self.getName("ik3BonesHandle"), self.chain3bones, self.ikSolver, self.upv_ctl
         )
 
         self.ikHandle2 = primitive.addIkHandle(
@@ -781,13 +819,13 @@ class Component(component.Main):
         wik2_cns = pm.parentConstraint(
             self.softblendLoc2,
             self.chain3bones[2],
+            self.chain4bones[2],
             self.wik_cns_02,
             maintainOffset=True
         )
         self._connect_endpoint_condition(0, wik2_cns + ".target[0].targetWeight")
-        self._connect_endpoint_condition(0, wik2_cns + ".target[1].targetWeight", false_value=1, true_value=0)
-
-        pm.parentConstraint(self.wik_ctl_01, self.ikHandle3, maintainOffset=True)
+        self._connect_endpoint_condition(1, wik2_cns + ".target[1].targetWeight")
+        self._connect_endpoint_condition(2, wik2_cns + ".target[2].targetWeight")
 
         # softIK 4 bones operators
         applyop.aimCns(
@@ -841,6 +879,7 @@ class Component(component.Main):
         # Stretch
         distance2_node = node.createDistNode(self.softblendLoc, self.wristSoftIK)
         mult4_node = node.createMulNode(distance2_node + ".distance", div1_node + ".outputX")
+        toe_len_outputs = []
         for i, mulNode in enumerate([multJnt1_node, multJnt2_node, multJnt3_node, multJnt4_node]):
             div3_node = node.createDivNode(mulNode + ".outputX", plusTotalLength_node + ".output1D")
 
@@ -848,9 +887,11 @@ class Component(component.Main):
 
             mult6_node = node.createMulNode(self.stretch_attr, mult5_node + ".outputX")
 
-            node.createPlusMinusAverage1D(
-                [mulNode.attr("outputX"), mult6_node.attr("outputX")], 1, self.chain4bones[i + 1] + ".tx"
+            toe_len_node = node.createPlusMinusAverage1D(
+                [mulNode.attr("outputX"), mult6_node.attr("outputX")], 1
             )
+            toe_len_outputs.append(toe_len_node + ".output1D")
+            pm.connectAttr(toe_len_node + ".output1D", self.chain4bones[i + 1] + ".tx")
 
         # softIK 3 bones operators
         applyop.aimCns(
@@ -904,8 +945,9 @@ class Component(component.Main):
         )
 
         # Stretch
-        distance2_node = node.createDistNode(self.softblendLocFoot, self.footSoftIK)
+        distance2_node = node.createDistNode(self.ik3b_stretch_ref, self.footSoftIK)
         mult4_node = node.createMulNode(distance2_node + ".distance", div1_node + ".outputX")
+        foot_len_outputs = []
         for i, mulNode in enumerate([multJnt1_node, multJnt2_node, multJnt3_node]):
             div3_node = node.createDivNode(mulNode + ".outputX", plusTotalLength_node + ".output1D")
 
@@ -916,6 +958,7 @@ class Component(component.Main):
             chain3_len_node = node.createPlusMinusAverage1D(
                 [mulNode.attr("outputX"), mult6_node.attr("outputX")], 1
             )
+            foot_len_outputs.append(chain3_len_node + ".output1D")
             cond_node = node.createConditionNode(
                 self.ikEndpoint_att, 1, 0, chain3_len_node + ".output1D", mulNode + ".outputX"
             )
@@ -971,8 +1014,9 @@ class Component(component.Main):
         )
 
         # Stretch
-        distance2_node = node.createDistNode(self.softblendLoc2, self.ankleSoftIK)
+        distance2_node = node.createDistNode(self.ik2b_stretch_ref, self.ankleSoftIK)
         mult4_node = node.createMulNode(distance2_node + ".distance", div1_node + ".outputX")
+        ankle_len_outputs = []
         for i, mulNode in enumerate([multJnt1_node, multJnt2_node]):
             div3_node = node.createDivNode(mulNode + ".outputX", plusTotalLength_node + ".output1D")
 
@@ -980,9 +1024,18 @@ class Component(component.Main):
 
             mult6_node = node.createMulNode(self.stretch_attr, mult5_node + ".outputX")
 
-            node.createPlusMinusAverage1D(
-                [mulNode.attr("outputX"), mult6_node.attr("outputX")], 1, self.chain2bones[i + 1] + ".tx"
+            ankle_len_node = node.createPlusMinusAverage1D(
+                [mulNode.attr("outputX"), mult6_node.attr("outputX")], 1
             )
+            ankle_len_outputs.append(ankle_len_node + ".output1D")
+
+        active_a_len = select_endpoint_value(ankle_len_outputs[0], foot_len_outputs[0], toe_len_outputs[0])
+        active_b_len = select_endpoint_value(ankle_len_outputs[1], foot_len_outputs[1], toe_len_outputs[1])
+        active_c_len = select_endpoint_value(multJnt3_node + ".outputX", foot_len_outputs[2], toe_len_outputs[2])
+        active_d_len = select_endpoint_value(multJnt4_node + ".outputX", multJnt4_node + ".outputX", toe_len_outputs[3])
+
+        pm.connectAttr(active_a_len, self.chain2bones[1] + ".tx")
+        pm.connectAttr(active_b_len, self.chain2bones[2] + ".tx")
 
         # IK/FK connections
         for i, x in enumerate(self.fk_ctl):
@@ -1004,7 +1057,9 @@ class Component(component.Main):
             skipTranslate=["x", "y", "z"]
         )
 
-        pm.connectAttr(str(self.chain4bones[-1]) + ".tx", str(self.legBonesIK[-1]) + ".tx")
+        pm.connectAttr(active_b_len, self.legBonesIK[2] + ".tx")
+        pm.connectAttr(active_c_len, self.legBonesIK[3] + ".tx")
+        pm.connectAttr(active_d_len, self.legBonesIK[4] + ".tx")
 
         # foot twist roll
         pm.orientConstraint(self.ik_ref, self.legBonesIK[-1], mo=True)
