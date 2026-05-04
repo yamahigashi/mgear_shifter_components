@@ -118,6 +118,20 @@ class Component(component.Main):
         for name in self.ik_endpoint_names:
             self._connect_endpoint_translate(self.ik_endpoint_ref_offsets[name], self.ik_endpoint_refs[name])
 
+    def _add_match_ref_from(self, ctl, source, parent, name, cnx=True):
+        match = primitive.addTransform(parent, self.getName(name), transform.getTransform(source))
+        if cnx:
+            ctl.addAttr("match_ref", at="message", multi=False)
+            pm.connectAttr(match.message, ctl.match_ref)
+        return match
+
+    def _add_match_ref_from_matrix(self, ctl, matrix, parent, name, cnx=True):
+        match = primitive.addTransform(parent, self.getName(name), matrix)
+        if cnx:
+            ctl.addAttr("match_ref", at="message", multi=False)
+            pm.connectAttr(match.message, ctl.match_ref)
+        return match
+
     # =====================================================
     # OBJECTS
     # =====================================================
@@ -332,6 +346,23 @@ class Component(component.Main):
         attribute.setInvertMirror(self.ankle_ctl, ["tx", "ty", "tz"])
         attribute.lockAttribute(self.ankle_ctl, ["sx", "sy", "sz", "v"])
 
+        self.foot_lvl = primitive.addTransform(
+            self.root, self.getName("foot_lvl"), transform.getTransform(self.legBones[3])
+        )
+
+        self.foot_ctl = self.addCtl(
+            self.foot_lvl,
+            "foot_ctl",
+            transform.getTransform(self.legBones[3]),
+            self.color_ik,
+            "sphere",
+            w=self.size * 0.2,
+            tp=self.ankle_ctl,
+        )
+
+        attribute.setInvertMirror(self.foot_ctl, ["tx", "ty", "tz"])
+        attribute.lockAttribute(self.foot_ctl, ["sx", "sy", "sz", "v"])
+
         # IK controls --------------------------------------------------------
         try:
             rot_x_p90 = datatypes.EulerRotation(math.radians(90), 0, 0, unit="radians").asMatrix()
@@ -368,13 +399,19 @@ class Component(component.Main):
             self._point_in_matrix_space(self.guide.pos[name], t)
             for name in self.ik_endpoint_names
         ]
+        self.ik_endpoint_match_transforms = {}
+        for name in self.ik_endpoint_names:
+            self.ik_endpoint_match_transforms[name] = transform.setMatrixPosition(t, self.guide.pos[name])
+
         self.ik_endpoint_ref_offsets = {}
         for ref_name in self.ik_endpoint_names:
             self.ik_endpoint_ref_offsets[ref_name] = []
             for active_name in self.ik_endpoint_names:
-                active_t = transform.setMatrixPosition(t, self.guide.pos[active_name])
                 self.ik_endpoint_ref_offsets[ref_name].append(
-                    self._point_in_matrix_space(self.guide.pos[ref_name], active_t)
+                    self._point_in_matrix_space(
+                        self.guide.pos[ref_name],
+                        self.ik_endpoint_match_transforms[active_name],
+                    )
                 )
 
         self.ik_ctl = self.addCtl(
@@ -613,10 +650,6 @@ class Component(component.Main):
             self.tws3_loc, self.getName("tws3_rot"), transform.getTransform(self.legBones[3])
         )
         self.tws3_rot.setAttr("sx", 0.001)
-        self.tws3_drv = primitive.addTransform(
-            self.legBones[2], self.getName("tws3_drv"), transform.getTransform(self.legBones[3])
-        )
-        self.tws3_drv.setAttr("sx", 0.001)
 
         self.tws4_loc = primitive.addTransform(
             self.legBones[4], self.getName("tws4_loc"), transform.getTransform(self.legBones[4])
@@ -625,60 +658,69 @@ class Component(component.Main):
             self.tws4_loc, self.getName("tws4_rot"), transform.getTransform(self.legBones[4])
         )
         self.tws4_rot.setAttr("sx", 0.001)
-        self.tws4_drv = primitive.addTransform(
-            self.legBones[2], self.getName("tws4_drv"), transform.getTransform(self.legBones[4])
-        )
-        self.tws4_drv.setAttr("sx", 0.001)
 
-        # Divisions ----------------------------------------
-        # We have at least one division at the start, the end and one for
-        # the knee and one ankle
+        # Deform joint anchors and divisions ----------------
+        # Anchor refs keep exact joint orientation at anatomical points.
+        # div_cns are only the in-span roll/squash/stretch drivers.
         o_set = self.settings
-        self.divisions = o_set["div0"] + o_set["div1"] + o_set["div2"] + o_set["div3"] + 4
+        self.divisions = o_set["div0"] + o_set["div1"] + o_set["div2"] + o_set["div3"]
 
-        self.thigh_cns = primitive.addTransform(
-            self.root_ctl,
-            self.getName("thigh_cns"),
-            transform.getTransform(self.legBones[0])
-        )
-        self.knee_cns = primitive.addTransform(
-            self.root_ctl,
-            self.getName("knee_cns"),
-            transform.getTransform(self.legBones[1])
-        )
-        self.ankle_cns = primitive.addTransform(
-            self.root_ctl,
-            self.getName("ankle_cns"),
-            transform.getTransform(self.legBones[2])
-        )
-        self.foot_cns = primitive.addTransform(
-            self.root_ctl,
-            self.getName("foot_cns"),
-            transform.getTransform(self.legBones[3])
-        )
-        self.toe_cns = primitive.addTransform(
-            self.root_ctl,
-            self.getName("toe_cns"),
-            transform.getTransform(self.legBones[4])
-        )
-        cmds.parentConstraint(str(self.legBones[0]), str(self.thigh_cns), maintainOffset=True)
-        cmds.parentConstraint(str(self.legBones[1]), str(self.knee_cns), maintainOffset=True)
-        cmds.parentConstraint(str(self.legBones[2]), str(self.ankle_cns), maintainOffset=True)
-        cmds.parentConstraint(str(self.legBones[3]), str(self.foot_cns), maintainOffset=True)
-        cmds.parentConstraint(str(self.legBones[4]), str(self.toe_cns), maintainOffset=True)
+        self.joint_indices = {}
+        self.deform_anchor_refs = {}
+        self.deform_anchor_drivers = {}
+        anchor_specs = [
+            ("root", self.legBones[0], None),
+            ("knee", self.legBones[1], self.knee_ctl),
+            ("ankle", self.legBones[2], self.ankle_ctl),
+            ("foot", self.legBones[3], self.foot_ctl),
+            ("toe", self.legBones[4], None),
+        ]
+        for name, leg_bone, correction_ctl in anchor_specs:
+            ref = primitive.addTransform(
+                self.root_ctl,
+                self.getName("%s_jnt_ref" % name),
+                transform.getTransform(leg_bone),
+            )
+            self.deform_anchor_refs[name] = ref
+            pm.parentConstraint(leg_bone, ref, mo=False)
+            driver = ref
+            if correction_ctl:
+                driver = primitive.addTransform(
+                    self.root_ctl,
+                    self.getName("%s_jnt_corr" % name),
+                    transform.getTransform(ref),
+                )
+                node.createMultMatrixNode(
+                    correction_ctl.attr("worldMatrix"),
+                    self.root_ctl.attr("worldInverseMatrix"),
+                    driver,
+                    "rt",
+                )
+            self.deform_anchor_drivers[name] = driver
 
         self.div_cns = []
-        _tmp_div = 0
-        for cns, div in zip(
-                [self.thigh_cns, self.knee_cns, self.ankle_cns, self.foot_cns],
-                [o_set["div0"], o_set["div1"], o_set["div2"], o_set["div3"]]):
-            self.jnt_pos.append([cns, _tmp_div])
-            _tmp_div += 1
-            for _ in range(div + 1):
-                div_cns = primitive.addTransform(self.root_ctl, self.getName("div%s_loc" % _tmp_div))
+        div_index = 0
+        joint_index = 0
+        span_specs = [
+            ("root", o_set["div0"]),
+            ("knee", o_set["div1"]),
+            ("ankle", o_set["div2"]),
+            ("foot", o_set["div3"]),
+        ]
+        for anchor_name, div_count in span_specs:
+            self.joint_indices[anchor_name] = joint_index
+            self.jnt_pos.append([self.deform_anchor_drivers[anchor_name], anchor_name])
+            joint_index += 1
+            for _ in range(div_count):
+                div_cns = primitive.addTransform(self.root_ctl, self.getName("div%s_loc" % div_index))
                 self.div_cns.append(div_cns)
-                self.jnt_pos.append([div_cns, _tmp_div])
-                _tmp_div += 1
+                self.jnt_pos.append([div_cns, div_index])
+                div_index += 1
+                joint_index += 1
+
+        self.joint_indices["toe"] = joint_index
+        self.jnt_pos.append([self.deform_anchor_drivers["toe"], "toe"])
+        joint_index += 1
 
         # for i in range(self.divisions):
         #     div_cns = primitive.addTransform(self.root_ctl, self.getName("div%s_loc" % i))
@@ -691,23 +733,48 @@ class Component(component.Main):
             self.tws4_rot, self.getName("end_ref"), transform.getTransform(self.legBones[4])
         )
         self.jnt_pos.append([self.end_ref, "end"])
+        self.joint_indices["end"] = joint_index
 
         # match IK FK references
-        self.match_fk0_off = self.add_match_ref(self.fk_ctl[1], self.root, "matchFk0_npo", False)
-        self.match_fk0 = self.add_match_ref(self.fk_ctl[0], self.match_fk0_off, "fk0_mth")
+        self.match_fk = []
+        for i, fk_ctl in enumerate(self.fk_ctl):
+            match_off = self._add_match_ref_from(
+                fk_ctl, self.legBones[i], self.root, "matchFk%s_npo" % i, False
+            )
+            match_ref = self._add_match_ref_from(fk_ctl, self.legBones[i], match_off, "fk%s_mth" % i)
+            setattr(self, "match_fk%s_off" % i, match_off)
+            setattr(self, "match_fk%s" % i, match_ref)
+            self.match_fk.append(match_ref)
 
-        self.match_fk1_off = self.add_match_ref(self.fk_ctl[2], self.root, "matchFk1_npo", False)
-        self.match_fk1 = self.add_match_ref(self.fk_ctl[1], self.match_fk1_off, "fk1_mth")
+        self.match_ik_endpoint_refs = {}
+        for name in self.ik_endpoint_names:
+            self.match_ik_endpoint_refs[name] = self._add_match_ref_from_matrix(
+                self.ik_ctl,
+                self.ik_endpoint_match_transforms[name],
+                self.root,
+                "ikEndpoint_%s_mth" % name,
+                False,
+            )
 
-        self.match_fk2_off = self.add_match_ref(self.fk_ctl[3], self.root, "matchFk2_npo", False)
-        self.match_fk2 = self.add_match_ref(self.fk_ctl[2], self.match_fk2_off, "fk2_mth")
+        self.match_ik = self._add_match_ref_from_matrix(
+            self.ik_ctl,
+            self.ik_endpoint_match_transforms[ik_endpoint_name],
+            self.root,
+            "ik_mth",
+        )
 
-        self.match_fk3_off = self.add_match_ref(self.fk_ctl[4], self.root, "matchFk3_npo", False)
-        self.match_fk3 = self.add_match_ref(self.fk_ctl[3], self.ik_ctl, "fk3_mth")
-
-        self.match_fk4 = self.add_match_ref(self.fk_ctl[4], self.ik_ctl, "fk4_mth")
-
-        self.match_ik = self.add_match_ref(self.ik_ctl, self.fk4_ctl, "ik_mth")
+        self.match_foot_offset = self._add_match_ref_from_matrix(
+            self.wik_ctl_01,
+            transform.getTransform(self.wik_ctl_01),
+            self.root,
+            "footOffset_mth",
+        )
+        self.match_ankle_offset = self._add_match_ref_from_matrix(
+            self.wik_ctl_02,
+            transform.getTransform(self.wik_ctl_02),
+            self.root,
+            "ankleOffset_mth",
+        )
 
         self.match_ikUpv = self.add_match_ref(self.upv_ctl, self.fk0_ctl, "upv_mth")
 
@@ -730,6 +797,7 @@ class Component(component.Main):
 
         self.roundnessKnee_att = self.addAnimParam("roundnessKnee", "Roundness Knee", "double", 0, 0, self.size)
         self.roundnessAnkle_att = self.addAnimParam("roundnessAnkle", "Roundness Ankle", "double", 0, 0, self.size)
+        self.roundnessFoot_att = self.addAnimParam("roundnessFoot", "Roundness Foot", "double", 0, 0, self.size)
 
         self.boneALenghtMult_attr = self.addAnimParam("boneALenMult", "Bone A Mult", "double", 1)
         self.boneBLenghtMult_attr = self.addAnimParam("boneBLenMult", "Bone B Mult", "double", 1)
@@ -753,7 +821,7 @@ class Component(component.Main):
                 self.upvref_att = self.addAnimEnumParam("upvref", "UpV Ref", 0, ref_names)
         if self.validProxyChannels:
             attribute.addProxyAttribute(
-                [self.blend_att, self.roundnessAnkle_att, self.roundnessKnee_att],
+                [self.blend_att, self.roundnessAnkle_att, self.roundnessKnee_att, self.roundnessFoot_att],
                 [self.fk0_ctl, self.fk1_ctl, self.fk2_ctl, self.ik_ctl, self.upv_ctl],
             )
             attribute.addProxyAttribute(self.roll_att, [self.ik_ctl, self.upv_ctl])
@@ -787,6 +855,10 @@ class Component(component.Main):
         defValu = self.chain3bones[2].attr("jointOrientZ").get() / 2
         self.ankleFlipOffset_att = self.addSetupParam(
             "ankleFlipOffset", "Ankle Flip Offset", "double", defValu, -180, 180
+        )
+        defValu = self.chain4bones[3].attr("jointOrientZ").get() / 2
+        self.footFlipOffset_att = self.addSetupParam(
+            "footFlipOffset", "Foot Flip Offset", "double", defValu, -180, 180
         )
 
     # =====================================================
@@ -825,6 +897,7 @@ class Component(component.Main):
 
         pm.parentConstraint(self.mid1_jnt, self.knee_lvl)
         pm.parentConstraint(self.mid2_jnt, self.ankle_lvl)
+        pm.parentConstraint(self.legBones[3], self.foot_lvl)
 
         # joint length multiply
         multJnt1_node = node.createMulNode(self.boneALenght_attr, self.boneALenghtMult_attr)
@@ -1184,13 +1257,23 @@ class Component(component.Main):
         for x in "xy":
             pm.connectAttr(str(self.ankle_ctl) + "." + "r" + x, str(self.tws2_loc) + "." + "r" + x)
 
+        multTangent_node = node.createMulNode(self.roundnessFoot_att, multVal)
+        add_node = node.createAddNode(multTangent_node + ".outputX", initRound)
+        pm.connectAttr(add_node + ".output", str(self.tws3_rot) + ".sx")
+        for x in ["translate"]:
+            pm.connectAttr(str(self.foot_ctl) + "." + x, str(self.tws3_loc) + "." + x)
+        for x in "xy":
+            pm.connectAttr(str(self.foot_ctl) + "." + "r" + x, str(self.tws3_loc) + "." + "r" + x)
+
         # Volume -------------------------------------------
         distA_node = node.createDistNode(self.tws0_loc, self.tws1_loc)
         distB_node = node.createDistNode(self.tws1_loc, self.tws2_loc)
         distC_node = node.createDistNode(self.tws2_loc, self.tws3_loc)
+        distD_node = node.createDistNode(self.tws3_loc, self.tws4_loc)
         add_node = node.createAddNode(distA_node + ".distance", distB_node + ".distance")
         add_node2 = node.createAddNode(distC_node + ".distance", add_node + ".output")
-        div_node = node.createDivNode(add_node2 + ".output", self.root_ctl.attr("sx"))
+        add_node3 = node.createAddNode(distD_node + ".distance", add_node2 + ".output")
+        div_node = node.createDivNode(add_node3 + ".output", self.root_ctl.attr("sx"))
 
         # comp scaling
         dm_node = node.createDecomposeMatrixNode(self.root.attr("worldMatrix"))
@@ -1202,45 +1285,26 @@ class Component(component.Main):
         # Flip Offset ----------------------------------------
         pm.connectAttr(str(self.ankleFlipOffset_att), str(self.tws2_loc) + ".rz")
         pm.connectAttr(str(self.kneeFlipOffset_att), str(self.tws1_loc) + ".rz")
+        pm.connectAttr(str(self.footFlipOffset_att), str(self.tws3_loc) + ".rz")
 
         # Divisions ----------------------------------------
-        # at 0 or 1 the division will follow exactly the rotation of the
-        # controler.. and we wont have this nice tangent + roll
+        span_divisions = [
+            self.settings["div0"],
+            self.settings["div1"],
+            self.settings["div2"],
+            self.settings["div3"],
+        ]
+        percents = []
+        for span_index, div_count in enumerate(span_divisions):
+            span_start = span_index * 0.25
+            for div_index in range(div_count):
+                percents.append(
+                    span_start + ((div_index + 1.0) / (div_count + 1.0)) * 0.25
+                )
+
         for i, div_cns in enumerate(self.div_cns):
             subdiv = 45
-        
-            div0 = self.settings["div0"]
-            div1 = self.settings["div1"]
-            div2 = self.settings["div2"]
-            div3 = self.settings["div3"]
-        
-            # 4 spans:
-            # tws0 -> tws1 : 0.000 - 0.250
-            # tws1 -> tws2 : 0.250 - 0.500
-            # tws2 -> tws3 : 0.500 - 0.750
-            # tws3 -> tws4 : 0.750 - 1.000
-        
-            if i < div0 + 2:
-                perc = i * 0.25 / (div0 + 1.0)
-        
-            elif i < div0 + div1 + 3:
-                perc = 0.25 + (i - div0 - 1.0) * 0.25 / (div1 + 1.0)
-        
-            elif i < div0 + div1 + div2 + 4:
-                perc = 0.5 + (i - div0 - div1 - 2.0) * 0.25 / (div2 + 1.0)
-        
-            else:
-                perc = 0.75 + (i - div0 - div1 - div2 - 3.0) * 0.25 / (div3 + 1.0)
-        
-            # we need to offset the joint point to force the bone
-            # orientation to the next bone span
-            if abs(perc - 0.25) < 0.000001:
-                perc = 0.2508
-            elif abs(perc - 0.5) < 0.000001:
-                perc = 0.5008
-            elif abs(perc - 0.75) < 0.000001:
-                perc = 0.7508
-        
+            perc = percents[i]
             perc = max(0.001, min(0.999, perc))
         
             # Roll
@@ -1248,7 +1312,7 @@ class Component(component.Main):
                 self.tws0_rot,
                 self.tws1_rot,
                 self.tws2_rot,
-                self.tws3_drv,
+                self.tws3_rot,
                 self.tws4_rot,
             ]
         
@@ -1269,10 +1333,6 @@ class Component(component.Main):
             pm.connectAttr(str(self.volDriver_att), o_node + ".driver")
             pm.connectAttr(str(self.st_att[i]), o_node + ".stretch")
             pm.connectAttr(str(self.sq_att[i]), o_node + ".squash")
-
-        # connect roll rotation driver reference
-        pm.orientConstraint(self.legBones[3], self.tws3_drv, skip=["y", "z"], maintainOffset=True, weight=1)
-
         # Visibilities -------------------------------------
         # fk
         fkvis_node = node.createReverseNode(self.blend_att)
@@ -1288,9 +1348,34 @@ class Component(component.Main):
         pm.connectAttr(self.rig.global_ctl + ".scale", self.setup + ".scale")
 
         # match IK/FK ref
-        pm.parentConstraint(self.legBones[0], self.match_fk0_off, mo=True)
-        pm.parentConstraint(self.legBones[1], self.match_fk1_off, mo=True)
-        pm.parentConstraint(self.legBones[2], self.match_fk2_off, mo=True)
+        for leg_bone, match_off in zip(
+            self.legBones,
+            [
+                self.match_fk0_off,
+                self.match_fk1_off,
+                self.match_fk2_off,
+                self.match_fk3_off,
+                self.match_fk4_off,
+            ],
+        ):
+            pm.parentConstraint(leg_bone, match_off, mo=False)
+
+        for name, leg_bone in zip(self.ik_endpoint_names, self.legBones[2:5]):
+            pm.parentConstraint(leg_bone, self.match_ik_endpoint_refs[name], mo=True)
+
+        pm.parentConstraint(self.legBones[3], self.match_foot_offset, mo=True)
+        pm.parentConstraint(self.legBones[2], self.match_ankle_offset, mo=True)
+
+        ik_mth_cns = pm.parentConstraint(
+            self.match_ik_endpoint_refs["ankle"],
+            self.match_ik_endpoint_refs["foot"],
+            self.match_ik_endpoint_refs["toe"],
+            self.match_ik,
+            mo=False,
+        )
+        self._connect_endpoint_condition(0, ik_mth_cns + ".target[0].targetWeight")
+        self._connect_endpoint_condition(1, ik_mth_cns + ".target[1].targetWeight")
+        self._connect_endpoint_condition(2, ik_mth_cns + ".target[2].targetWeight")
 
 
     def verifyAlignmentAccuracy(self, jnts, guides, degree=10.0):
@@ -1351,12 +1436,12 @@ class Component(component.Main):
 
     def setRelation(self):
         """Set the relation beetween object from guide to rig"""
-        self.relatives["root"] = self.legBones[0]
-        self.relatives["knee"] = self.legBones[1]
-        self.relatives["ankle"] = self.div_cns[-3]
-        self.relatives["foot"] = self.div_cns[-2]
-        self.relatives["toe"] = self.toe_cns
-        self.relatives["eff"] = self.toe_cns
+        self.relatives["root"] = self.deform_anchor_drivers["root"]
+        self.relatives["knee"] = self.deform_anchor_drivers["knee"]
+        self.relatives["ankle"] = self.deform_anchor_drivers["ankle"]
+        self.relatives["foot"] = self.deform_anchor_drivers["foot"]
+        self.relatives["toe"] = self.deform_anchor_drivers["toe"]
+        self.relatives["eff"] = self.deform_anchor_drivers["toe"]
 
         self.controlRelatives["root"] = self.fk0_ctl
         self.controlRelatives["knee"] = self.fk1_ctl
@@ -1365,12 +1450,12 @@ class Component(component.Main):
         self.controlRelatives["toe"] = self.ik_ctl
         self.controlRelatives["eff"] = self.fk4_ctl
 
-        self.jointRelatives["root"] = 0
-        self.jointRelatives["knee"] = self.settings["div0"] + 2
-        self.jointRelatives["ankle"] = len(self.div_cns) - 2
-        self.jointRelatives["foot"] = len(self.div_cns) - 1
-        self.jointRelatives["toe"] = len(self.div_cns)
-        self.jointRelatives["eff"] = len(self.div_cns)
+        self.jointRelatives["root"] = self.joint_indices["root"]
+        self.jointRelatives["knee"] = self.joint_indices["knee"]
+        self.jointRelatives["ankle"] = self.joint_indices["ankle"]
+        self.jointRelatives["foot"] = self.joint_indices["foot"]
+        self.jointRelatives["toe"] = self.joint_indices["toe"]
+        self.jointRelatives["eff"] = self.joint_indices["end"]
 
         self.aliasRelatives["eff"] = "tip"
 
