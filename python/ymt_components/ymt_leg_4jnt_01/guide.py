@@ -107,7 +107,12 @@ class Guide(guide.ComponentGuide):
     def get_divisions(self):
         """Returns correct segments divisions"""
 
-        self.divisions = self.root.div0.get() + self.root.div1.get() + self.root.div2.get() + 4
+        self.divisions = (
+            self.root.div0.get()
+            + self.root.div1.get()
+            + self.root.div2.get()
+            + self.root.div3.get()
+        )
         return self.divisions
 
 
@@ -187,6 +192,7 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
         self.settingsTab.div0_spinBox.setValue(self.root.attr("div0").get())
         self.settingsTab.div1_spinBox.setValue(self.root.attr("div1").get())
         self.settingsTab.div2_spinBox.setValue(self.root.attr("div2").get())
+        self.settingsTab.div3_spinBox.setValue(self.root.attr("div3").get())
         ikRefArrayItems = self.root.attr("ikrefarray").get().split(",")
         for item in ikRefArrayItems:
             self.settingsTab.ikRefArray_listWidget.addItem(item)
@@ -234,6 +240,10 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
         )
         self.settingsTab.div2_spinBox.valueChanged.connect(
             partial(self.updateSpinBox, self.settingsTab.div2_spinBox, "div2")
+        )
+
+        self.settingsTab.div3_spinBox.valueChanged.connect(
+            partial(self.updateSpinBox, self.settingsTab.div3_spinBox, "div3")
         )
 
         self.settingsTab.squashStretchProfile_pushButton.clicked.connect(self.setProfile)
