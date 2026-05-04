@@ -35,10 +35,11 @@ class Component(component.Main):
 
     The component keeps three IK solve layers for the same guide chain:
     ``chain2bones`` solves root-to-ankle, ``chain3bones`` solves root-to-foot,
-    and ``chain4bones`` solves root-to-toe. ``ikEndpoint`` does not move or
-    replace the animator's IK control; it selects which endpoint is considered
-    active. Endpoint refs under ``ik_ctl`` provide the raw ankle, foot, and toe
-    target positions.
+    and ``chain4bones`` solves root-to-toe. ``ikEndpoint`` selects which
+    endpoint is considered active and moves a child endpoint offset under
+    ``ik_cns`` so the animator's IK control is displayed at that point.
+    Endpoint refs under ``ik_ctl`` are compensated to keep the raw ankle, foot,
+    and toe target positions coherent for the active endpoint.
 
     Stretch is endpoint-local. Toe distributes stretch over A/B/C/D, Foot over
     A/B/C, and Ankle over A/B. Segments beyond the active endpoint keep their
@@ -75,6 +76,47 @@ class Component(component.Main):
         pm.setAttr(cond_node + ".colorIfTrueR", true_value)
         pm.setAttr(cond_node + ".colorIfFalseR", false_value)
         pm.connectAttr(cond_node + ".outColorR", target_weight, f=True)
+
+    def _connect_or_set(self, value, target_attr):
+        attr_type = getattr(pm, "Attribute", None)
+        if isinstance(value, str) or (attr_type and isinstance(value, attr_type)):
+            pm.connectAttr(value, target_attr, f=True)
+        else:
+            pm.setAttr(target_attr, value)
+
+    def _select_endpoint_scalar(self, ankle_value, foot_value, toe_value):
+        foot_or_toe = pm.createNode("condition")
+        pm.setAttr(foot_or_toe + ".operation", 0)
+        pm.connectAttr(self.ikEndpoint_att, foot_or_toe + ".firstTerm")
+        pm.setAttr(foot_or_toe + ".secondTerm", 1)
+        self._connect_or_set(foot_value, foot_or_toe + ".colorIfTrueR")
+        self._connect_or_set(toe_value, foot_or_toe + ".colorIfFalseR")
+
+        ankle_or_distal = pm.createNode("condition")
+        pm.setAttr(ankle_or_distal + ".operation", 0)
+        pm.connectAttr(self.ikEndpoint_att, ankle_or_distal + ".firstTerm")
+        pm.setAttr(ankle_or_distal + ".secondTerm", 0)
+        self._connect_or_set(ankle_value, ankle_or_distal + ".colorIfTrueR")
+        pm.connectAttr(foot_or_toe + ".outColorR", ankle_or_distal + ".colorIfFalseR", f=True)
+        return ankle_or_distal + ".outColorR"
+
+    def _connect_endpoint_translate(self, endpoint_values, target):
+        for i, axis in enumerate("xyz"):
+            selected = self._select_endpoint_scalar(
+                endpoint_values[0][i],
+                endpoint_values[1][i],
+                endpoint_values[2][i],
+            )
+            pm.connectAttr(selected, target.attr("t%s" % axis), f=True)
+
+    def _point_in_matrix_space(self, point, space_matrix):
+        local_point = om2.MPoint(point[0], point[1], point[2]) * om2.MMatrix(space_matrix).inverse()
+        return datatypes.Vector(local_point.x, local_point.y, local_point.z)
+
+    def _connect_ik_endpoint_offsets(self):
+        self._connect_endpoint_translate(self.ik_endpoint_cns_offsets, self.ik_endpoint_cns)
+        for name in self.ik_endpoint_names:
+            self._connect_endpoint_translate(self.ik_endpoint_ref_offsets[name], self.ik_endpoint_refs[name])
 
     # =====================================================
     # OBJECTS
@@ -321,8 +363,22 @@ class Component(component.Main):
 
         length = vector.getDistance(self.guide.apos[5], self.guide.apos[4])
         self.ik_cns = primitive.addTransform(self.root_ctl, self.getName("ik_cns"), t)
+        self.ik_endpoint_cns = primitive.addTransform(self.ik_cns, self.getName("ikEndpoint_cns"), t)
+        self.ik_endpoint_cns_offsets = [
+            self._point_in_matrix_space(self.guide.pos[name], t)
+            for name in self.ik_endpoint_names
+        ]
+        self.ik_endpoint_ref_offsets = {}
+        for ref_name in self.ik_endpoint_names:
+            self.ik_endpoint_ref_offsets[ref_name] = []
+            for active_name in self.ik_endpoint_names:
+                active_t = transform.setMatrixPosition(t, self.guide.pos[active_name])
+                self.ik_endpoint_ref_offsets[ref_name].append(
+                    self._point_in_matrix_space(self.guide.pos[ref_name], active_t)
+                )
+
         self.ik_ctl = self.addCtl(
-            self.ik_cns,
+            self.ik_endpoint_cns,
             "ik_ctl",
             t,
             self.color_ik,
@@ -330,7 +386,7 @@ class Component(component.Main):
             w=self.size * 0.25,
             h=length * 0.08,
             d=length * 2.00,
-            tp=self.ik_cns,
+            tp=self.ik_endpoint_cns,
         )
         attribute.setKeyableAttributes(self.ik_ctl)
         attribute.setRotOrder(self.ik_ctl, "XZY")
@@ -747,6 +803,7 @@ class Component(component.Main):
         # Soft condition
         soft_cond_node = node.createConditionNode(self.soft_attr, 0.0001, 4, 0.0001, self.soft_attr)
         self.soft_attr_cond = soft_cond_node.outColorR
+        self._connect_ik_endpoint_offsets()
 
         if self.settings["ikSolver"]:
             self.ikSolver = "ikRPsolver"
