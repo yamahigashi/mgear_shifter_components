@@ -2,13 +2,15 @@
 
 from functools import partial
 
+from maya import cmds
+
 try:
     import mgear.pymaya as pm
 except ImportError:
     import pymel.core as pm
 
 from maya.app.general.mayaMixin import MayaQDockWidget, MayaQWidgetDockableMixin
-from mgear.core import pyqt, transform
+from mgear.core import attribute, pyqt, transform
 from mgear.shifter.component import guide
 from mgear.vendor.Qt import QtCore, QtWidgets
 
@@ -39,18 +41,23 @@ class Guide(guide.ComponentGuide):
     connectors = ["ymt_shoulder_01"]
 
     def postInit(self):
-        self.save_transform = ["root", "elbow", "wrist", "eff"]
+        self.save_transform = ["root", "elbow", "wrist", "eff", "upv"]
+        self.save_blade = ["blade"]
 
     def addObjects(self):
         self.root = self.addRoot()
-        v_temp = transform.getOffsetPosition(self.root, [3, 0, -0.2])
-        self.elbow = self.addLoc("elbow", self.root, v_temp)
-        v_temp = transform.getOffsetPosition(self.root, [6, 0, 0])
-        self.wrist = self.addLoc("wrist", self.elbow, v_temp)
-        v_temp = transform.getOffsetPosition(self.root, [7.5, 0, 0.6])
-        self.eff = self.addLoc("eff", self.wrist, v_temp)
+        elbow_pos = transform.getOffsetPosition(self.root, [3, 0, -0.2])
+        self.elbow = self.addLoc("elbow", self.root, elbow_pos)
+        wrist_pos = transform.getOffsetPosition(self.root, [6, 0, 0])
+        self.wrist = self.addLoc("wrist", self.elbow, wrist_pos)
+        eff_pos = transform.getOffsetPosition(self.root, [7.5, 0, 0.6])
+        self.eff = self.addLoc("eff", self.wrist, eff_pos)
+        self.blade = self.addBlade("blade", self.root, self.elbow)
+        cmds.setAttr(self.blade + ".bladeRollOffset", -90.0)
+        attribute.unlockAttribute(self.blade, ["rx"])
+        upv_pos = transform.getOffsetPosition(self.root, [3, 0, 3])
+        self.upv = self.addLoc("upv", self.root, upv_pos)
         self.dispcrv = self.addDispCurve("crv", [self.root, self.elbow, self.wrist, self.eff])
-        self.addUpvLocator(self.elbow, self.wrist, self.eff)
 
     def addParameters(self):
         self.pBlend = self.addParam("blend", "double", 1, 0, 1)

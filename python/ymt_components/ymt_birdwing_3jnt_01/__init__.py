@@ -91,7 +91,8 @@ class Component(component.Main):
         self.WIP = self.options["mode"]
         root_matrix = om2.MMatrix(self.guide.tra["root"])
         self.root_normal = datatypes.Vector(root_matrix[1], root_matrix[5], root_matrix[9]).normal()
-        self.normal = self.getNormalFromPos(self.guide.apos)
+        self.normal = self.guide.blades["blade"].z * -1
+        self.binormal = self.guide.blades["blade"].x
 
         self.length0 = vector.getDistance(self.guide.apos[0], self.guide.apos[1])
         self.length1 = vector.getDistance(self.guide.apos[1], self.guide.apos[2])
@@ -245,13 +246,17 @@ class Component(component.Main):
 
         self.ik_ref = primitive.addTransform(self.ik_ctl, self.getName("ik_ref"), transform.getTransform(self.ik_ctl))
 
-        v = self.guide.apos[2] - self.guide.apos[0]
-        v = self.normal ^ v
-        v.normalize()
-        v *= self.size * 0.5
-        v += self.guide.apos[1]
-        self.upv_lvl = primitive.addTransformFromPos(self.root, self.getName("upv_lvl"), v)
-        self.upv_cns = primitive.addTransformFromPos(self.upv_lvl, self.getName("upv_cns"), v)
+        v = self.guide.pos["upv"]
+        upv_source_normal = vector.getPlaneNormal(self.guide.apos[0], self.guide.apos[2], v)
+        upv_source_basis = transform.getTransformLookingAt(
+            self.guide.apos[0], self.guide.apos[2], upv_source_normal, "xz", False
+        )
+        blade_target_basis = transform.getTransformLookingAt(
+            self.guide.apos[0], self.guide.apos[2], self.normal, "xz", False
+        )
+        upv_t = transform.setMatrixPosition(upv_source_basis, v)
+        self.upv_lvl = primitive.addTransform(self.root, self.getName("upv_lvl"), upv_t)
+        self.upv_cns = primitive.addTransform(self.upv_lvl, self.getName("upv_cns"), upv_t)
         self.upv_ctl = self.addCtl(
             self.upv_cns,
             "upv_ctl",
@@ -263,6 +268,21 @@ class Component(component.Main):
         )
         attribute.setInvertMirror(self.upv_ctl, ["tx"])
         attribute.setKeyableAttributes(self.upv_ctl, ["tx", "ty", "tz"])
+
+        blade_pole_dir = self.guide.apos[2] - self.guide.apos[0]
+        blade_pole_dir = blade_pole_dir ^ self.normal
+        blade_pole_dir.normalize()
+        blade_pole_pos = self.guide.apos[1] + (blade_pole_dir * self.size)
+        blade_pole_t = transform.setMatrixPosition(blade_target_basis, blade_pole_pos)
+        self.effective_upv_npo = primitive.addTransform(
+            self.upv_cns, self.getName("effectiveUpv_npo"), blade_pole_t
+        )
+        self.effective_upv_ref = primitive.addTransform(
+            self.effective_upv_npo,
+            self.getName("effectiveUpv_ref"),
+            transform.getTransform(self.effective_upv_npo),
+        )
+        self.effective_upv_npo.attr("visibility").set(False)
 
         # Soft IK objects for IK A: root/elbow/wrist.
         t = transform.getTransformLookingAt(self.guide.pos["root"], self.guide.pos["wrist"], self.normal, "zx", False)
@@ -504,13 +524,13 @@ class Component(component.Main):
         multJnt3_node = node.createMulNode(self.boneCLenght_attr, self.boneCLenghtMult_attr)
 
         self.ikHandle2 = primitive.addIkHandle(
-            self.softblendLoc, self.getName("ik2BonesHandle"), self.chain2bones, self.ikSolver
+            self.softblendLoc, self.getName("ik2BonesHandle"), self.chain2bones, self.ikSolver, self.effective_upv_ref
         )
         if self.ikSolver == "ikSpringSolver":
             pm.mel.eval("ikSpringSolver;")
 
         pm.pointConstraint(self.root_ctl, self.chain2bones[0], maintainOffset=True)
-        pm.poleVectorConstraint(self.upv_ctl, self.ikHandle2)
+        pm.connectAttr(self.upv_ctl.attr("translate"), self.effective_upv_ref.attr("translate"), f=True)
         pm.pointConstraint(self.chain2bones[2], self.handChain[0], maintainOffset=False)
 
         self.ikHandleHand = primitive.addIkHandle(
