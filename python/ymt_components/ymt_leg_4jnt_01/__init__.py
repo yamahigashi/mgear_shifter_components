@@ -15,7 +15,7 @@ except ImportError:
 
 from mgear.shifter import component
 
-from mgear.core import node, fcurve, applyop, vector, icon
+from mgear.core import node, applyop, vector, icon
 from mgear.core import attribute, transform, primitive
 
 import ymt_shifter_utility as yu
@@ -99,6 +99,53 @@ class Component(component.Main):
         self._connect_or_set(ankle_value, ankle_or_distal + ".colorIfTrueR")
         pm.connectAttr(foot_or_toe + ".outColorR", ankle_or_distal + ".colorIfFalseR", f=True)
         return ankle_or_distal + ".outColorR"
+
+    def _get_division_percents(self):
+        percents = []
+        for span_index, div_count in enumerate(
+            [
+                self.settings["div0"],
+                self.settings["div1"],
+                self.settings["div2"],
+                self.settings["div3"],
+            ]
+        ):
+            span_start = span_index * 0.25
+            for div_index in range(div_count):
+                perc = span_start + ((div_index + 1.0) / (div_count + 1.0)) * 0.25
+                percents.append(max(0.001, min(0.999, perc)))
+        return percents
+
+    def _sample_profile_values(self, profile_name, percents):
+        profile_values = self.guide.paramDefs[profile_name].value
+        if profile_values:
+            return self._interpolate_profile_values(profile_values, percents)
+
+        fcv_node = self.settings[profile_name]
+        values = []
+        for perc in percents:
+            pm.setAttr(fcv_node + ".input", perc)
+            values.append(pm.getAttr(fcv_node + ".output"))
+        return values
+
+    def _interpolate_profile_values(self, profile_values, percents):
+        if not profile_values:
+            return [0] * len(percents)
+
+        values = [float(value) for value in profile_values]
+        if len(values) == 1:
+            return [values[0]] * len(percents)
+
+        max_index = len(values) - 1
+        interpolated = []
+        for perc in percents:
+            position = max(0.0, min(1.0, perc)) * max_index
+            low_index = int(math.floor(position))
+            high_index = min(low_index + 1, max_index)
+            blend = position - low_index
+            value = values[low_index] + ((values[high_index] - values[low_index]) * blend)
+            interpolated.append(value)
+        return interpolated
 
     def _connect_endpoint_translate(self, endpoint_values, target):
         for i, axis in enumerate("xyz"):
@@ -828,13 +875,9 @@ class Component(component.Main):
 
         # Setup ------------------------------------------
         # Eval Fcurve
-        if self.guide.paramDefs["st_profile"].value:
-            self.st_value = self.guide.paramDefs["st_profile"].value
-            self.sq_value = self.guide.paramDefs["sq_profile"].value
-        else:
-            self.st_value = fcurve.getFCurveValues(self.settings["st_profile"], self.divisions)
-            self.sq_value = fcurve.getFCurveValues(self.settings["sq_profile"], self.divisions)
-
+        self.division_percents = self._get_division_percents()
+        self.st_value = self._sample_profile_values("st_profile", self.division_percents)
+        self.sq_value = self._sample_profile_values("sq_profile", self.division_percents)
 
         self.st_att = []
         self.sq_att = []
@@ -1288,25 +1331,12 @@ class Component(component.Main):
         pm.connectAttr(str(self.footFlipOffset_att), str(self.tws3_loc) + ".rz")
 
         # Divisions ----------------------------------------
-        span_divisions = [
-            self.settings["div0"],
-            self.settings["div1"],
-            self.settings["div2"],
-            self.settings["div3"],
-        ]
-        percents = []
-        for span_index, div_count in enumerate(span_divisions):
-            span_start = span_index * 0.25
-            for div_index in range(div_count):
-                percents.append(
-                    span_start + ((div_index + 1.0) / (div_count + 1.0)) * 0.25
-                )
+        percents = self.division_percents
 
         for i, div_cns in enumerate(self.div_cns):
             subdiv = 45
             perc = percents[i]
-            perc = max(0.001, min(0.999, perc))
-        
+
             # Roll
             cts = [
                 self.tws0_rot,
@@ -1315,12 +1345,12 @@ class Component(component.Main):
                 self.tws3_rot,
                 self.tws4_rot,
             ]
-        
+
             o_node = applyop.gear_rollsplinekine_op(div_cns, cts, perc, subdiv)
-        
+
             pm.connectAttr(str(self.resample_att), o_node + ".resample")
             pm.connectAttr(str(self.absolute_att), o_node + ".absolute")
-        
+
             # Squash n Stretch
             o_node = applyop.gear_squashstretch2_op(
                 div_cns,
@@ -1328,7 +1358,7 @@ class Component(component.Main):
                 pm.getAttr(self.volDriver_att),
                 "x"
             )
-        
+
             pm.connectAttr(str(self.volume_att), o_node + ".blend")
             pm.connectAttr(str(self.volDriver_att), o_node + ".driver")
             pm.connectAttr(str(self.st_att[i]), o_node + ".stretch")
