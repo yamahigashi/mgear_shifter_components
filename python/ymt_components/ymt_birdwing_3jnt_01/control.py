@@ -116,10 +116,13 @@ class IkFkTransfer(syn_uti.IkFkTransfer):
 
         channels = ["tx", "ty", "tz", "rx", "ry", "rz", "sx", "sy", "sz"]
         roll_attrs = _get_roll_attrs_from_switch(switch_attr_name)
+        mode_attrs = _get_attrs_from_switch(switch_attr_name, ("wristControlMode",))
         pm.cutKey(key_dst_nodes, at=channels, time=(startFrame, endFrame))
         pm.cutKey(switch_attr_name, time=(startFrame, endFrame))
         if roll_attrs:
             pm.cutKey(roll_attrs, time=(startFrame, endFrame))
+        if mode_attrs:
+            pm.cutKey(mode_attrs, time=(startFrame, endFrame))
 
         for index, frame in enumerate(range(startFrame, endFrame + 1)):
             data = frame_data[index]
@@ -137,6 +140,8 @@ class IkFkTransfer(syn_uti.IkFkTransfer):
             pm.setKeyframe(switch_attr_name)
             if roll_attrs:
                 pm.setKeyframe(roll_attrs)
+            if mode_attrs:
+                pm.setKeyframe(mode_attrs)
 
     @staticmethod
     def showUI(model, ikfk_attr, uihost, fks, ik, upv, hand_ik):
@@ -223,9 +228,13 @@ def _set_attrs_zero(attrs):
 
 
 def _get_roll_attrs_from_switch(switch_attr_name):
+    return _get_attrs_from_switch(switch_attr_name, ("roll", "handRoll"))
+
+
+def _get_attrs_from_switch(switch_attr_name, attr_names):
     node_name, blend_name = switch_attr_name.rsplit(".", 1)
     attrs = []
-    for attr_name in ("roll", "handRoll"):
+    for attr_name in attr_names:
         candidate = node_name + "." + blend_name.replace("blend", attr_name)
         if cmds.objExists(candidate):
             attrs.append(candidate)

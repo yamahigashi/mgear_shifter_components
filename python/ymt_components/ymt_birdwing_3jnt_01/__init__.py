@@ -33,6 +33,18 @@ import ymt_shifter_utility as yu
 class Component(component.Main):
     """Shifter component class."""
 
+    wrist_control_mode_names = ["IK", "Chain"]
+
+    def _connect_enum_condition(self, enum_attr, enum_index, target_weight, true_value=1, false_value=0):
+        cond_node = pm.createNode("condition")
+        pm.setAttr(cond_node + ".operation", 0)
+        pm.connectAttr(enum_attr, cond_node + ".firstTerm")
+        pm.setAttr(cond_node + ".secondTerm", enum_index)
+        pm.setAttr(cond_node + ".colorIfTrueR", true_value)
+        pm.setAttr(cond_node + ".colorIfFalseR", false_value)
+        pm.connectAttr(cond_node + ".outColorR", target_weight, f=True)
+        return cond_node
+
     def _get_division_percents(self):
         percents = []
         for span_index, div_count in enumerate(
@@ -295,7 +307,19 @@ class Component(component.Main):
         # IK B: wrist/hand look-at target.
         t = transform.getTransformLookingAt(self.guide.apos[2], self.guide.apos[3], self.root_normal, "zx", False)
         t = transform.setMatrixPosition(t, self.guide.pos["eff"])
-        self.hand_ik_cns = primitive.addTransform(self.softblendLoc, self.getName("hand_ik_cns"), t)
+        self.hand_ik_cns = primitive.addTransform(self.root, self.getName("hand_ik_cns"), t)
+        self.hand_ik_parent_ik_ref = primitive.addTransform(
+            self.softblendLoc, self.getName("hand_ik_parent_ik_ref"), t
+        )
+        wrist_chain_t = transform.setMatrixPosition(
+            transform.getTransform(self.chain2bones[1]), self.guide.pos["wrist"]
+        )
+        self.hand_ik_parent_chain_pos = primitive.addTransform(
+            self.root, self.getName("hand_ik_parent_chain_pos"), wrist_chain_t
+        )
+        self.hand_ik_parent_chain_ref = primitive.addTransform(
+            self.hand_ik_parent_chain_pos, self.getName("hand_ik_parent_chain_ref"), t
+        )
         self.hand_ik_ctl = self.addCtl(
             self.hand_ik_cns,
             "hand_ik_ctl",
@@ -442,6 +466,12 @@ class Component(component.Main):
         self.volume_att = self.addAnimParam("volume", "Volume", "double", 1, 0, 1)
         self.roll_att = self.addAnimParam("roll", "Roll", "double", 0, -180, 180)
         self.handRoll_att = self.addAnimParam("handRoll", "Hand Roll", "double", 0, -180, 180)
+        self.wristControlMode_att = self.addAnimEnumParam(
+            "wristControlMode",
+            "Wrist Control Mode",
+            0,
+            self.wrist_control_mode_names,
+        )
         self.soft_attr = self.addAnimParam("softIKRange", "Soft IK Range", "double", 0.0001, 0.0001, 100)
         self.softSpeed_attr = self.addAnimParam("softIKSpeed", "Soft IK Speed", "double", 2.5, 1.001, 10)
         self.stretch_attr = self.addAnimParam("stretch", "Stretch", "double", 0, 0, 1)
@@ -477,7 +507,10 @@ class Component(component.Main):
                 ],
                 [self.fk0_ctl, self.fk1_ctl, self.fk2_ctl, self.ik_ctl, self.hand_ik_ctl, self.upv_ctl],
             )
-            attribute.addProxyAttribute([self.roll_att, self.handRoll_att], [self.ik_ctl, self.hand_ik_ctl, self.upv_ctl])
+            attribute.addProxyAttribute(
+                [self.roll_att, self.handRoll_att, self.wristControlMode_att],
+                [self.ik_ctl, self.hand_ik_ctl, self.upv_ctl],
+            )
 
         self.division_percents = self._get_division_percents()
         self.st_value = self._sample_profile_values("st_profile", self.division_percents)
@@ -537,7 +570,36 @@ class Component(component.Main):
             self.root, self.getName("ikHandHandle"), self.handChain, "ikSCsolver"
         )
         pm.pointConstraint(self.hand_ik_ctl, self.ikHandleHand, maintainOffset=False)
-        pm.orientConstraint(self.ik_ref, self.hand_ik_cns, maintainOffset=True)
+        pm.parentConstraint(
+            self.ik_ctl,
+            self.softblendLoc,
+            skipTranslate=["x", "y", "z"],
+            maintainOffset=False
+        )
+        pm.parentConstraint(
+            self.chain2bones[2],
+            self.hand_ik_parent_chain_pos,
+            skipRotate=["x", "y", "z"],
+            maintainOffset=False,
+        )
+        pm.parentConstraint(
+            self.chain2bones[1],
+            self.hand_ik_parent_chain_pos,
+            skipTranslate=["x", "y", "z"],
+            maintainOffset=True,
+        )
+        hand_parent_cns = pm.parentConstraint(
+            self.hand_ik_parent_ik_ref,
+            self.hand_ik_parent_chain_ref,
+            self.hand_ik_cns,
+            maintainOffset=False,
+        )
+        self._connect_enum_condition(
+            self.wristControlMode_att, 0, hand_parent_cns + ".target[0].targetWeight"
+        )
+        self._connect_enum_condition(
+            self.wristControlMode_att, 1, hand_parent_cns + ".target[1].targetWeight"
+        )
 
         chain_pos = [x.getTranslation(space="world") for x in self.chain2bones]
         same_dir = self.verifyAlignmentAccuracy(chain_pos, self.guide.apos[:3])
