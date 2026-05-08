@@ -3,6 +3,7 @@
 import traceback
 
 import maya.cmds as cmds
+from maya.api import OpenMaya as om2
 try:
     import mgear.pymaya as pm
 except ImportError:
@@ -77,20 +78,65 @@ class IkFkTransfer(syn_uti.IkFkTransfer):
             val_src_nodes = self.fkTargets
             key_src_nodes = [self.ikCtrl, self.upvCtrl, self.handIkCtrl]
             key_dst_nodes = self.fkCtrls
-        else:
-            val_src_nodes = [self.ikTarget, self.upvTarget, self.handIkTarget]
-            key_src_nodes = self.fkCtrls
-            key_dst_nodes = [self.ikCtrl, self.upvCtrl, self.handIkCtrl]
+            self.bakeAnimation(
+                self.getChangeAttrName(),
+                val_src_nodes,
+                key_src_nodes,
+                key_dst_nodes,
+                startFrame,
+                endFrame,
+                onlyKeyframes,
+            )
+            return
 
-        self.bakeAnimation(
-            self.getChangeAttrName(),
-            val_src_nodes,
-            key_src_nodes,
-            key_dst_nodes,
-            startFrame,
-            endFrame,
-            onlyKeyframes,
-        )
+        self._transfer_to_ik(startFrame, endFrame, onlyKeyframes)
+
+    def _transfer_to_ik(self, startFrame, endFrame, onlyKeyframes):
+        key_src_nodes = self.fkCtrls
+        key_dst_nodes = [self.ikCtrl, self.upvCtrl, self.handIkCtrl]
+        switch_attr_name = self.getChangeAttrName()
+
+        src_keys = pm.keyframe(key_src_nodes, at=["t", "r", "s"], q=True) or []
+        keyframe_list = sorted(set(int(x) for x in src_keys))
+
+        frame_data = []
+        for frame in range(startFrame, endFrame + 1):
+            if onlyKeyframes and frame not in keyframe_list:
+                frame_data.append(None)
+                continue
+
+            pm.currentTime(frame)
+            frame_data.append(
+                (
+                    getMatrix(self.ikTarget),
+                    _calculate_effective_upv_translate(self.upvCtrl, self.fkTargets),
+                    getMatrix(self.handIkTarget),
+                )
+            )
+
+        channels = ["tx", "ty", "tz", "rx", "ry", "rz", "sx", "sy", "sz"]
+        roll_attrs = _get_roll_attrs_from_switch(switch_attr_name)
+        pm.cutKey(key_dst_nodes, at=channels, time=(startFrame, endFrame))
+        pm.cutKey(switch_attr_name, time=(startFrame, endFrame))
+        if roll_attrs:
+            pm.cutKey(roll_attrs, time=(startFrame, endFrame))
+
+        for index, frame in enumerate(range(startFrame, endFrame + 1)):
+            data = frame_data[index]
+            if data is None:
+                continue
+
+            pm.currentTime(frame)
+            self.changeAttrToBoundValue()
+            ik_matrix, upv_translate, hand_ik_matrix = data
+            setMatrix(self.ikCtrl, ik_matrix)
+            _set_upv_translate(self.upvCtrl, upv_translate)
+            setMatrix(self.handIkCtrl, hand_ik_matrix)
+            _set_attrs_zero(roll_attrs)
+            pm.setKeyframe(key_dst_nodes, at=channels)
+            pm.setKeyframe(switch_attr_name)
+            if roll_attrs:
+                pm.setKeyframe(roll_attrs)
 
     @staticmethod
     def showUI(model, ikfk_attr, uihost, fks, ik, upv, hand_ik):
@@ -167,6 +213,25 @@ def setMatrix(obj, mat):
     cmds.xform(obj.name(), ws=True, matrix=mat)
 
 
+def _set_upv_translate(upv_ctrl, values):
+    cmds.setAttr(upv_ctrl.name() + ".translate", values[0], values[1], values[2])
+
+
+def _set_attrs_zero(attrs):
+    for attr in attrs:
+        pm.setAttr(attr, 0.0)
+
+
+def _get_roll_attrs_from_switch(switch_attr_name):
+    node_name, blend_name = switch_attr_name.rsplit(".", 1)
+    attrs = []
+    for attr_name in ("roll", "handRoll"):
+        candidate = node_name + "." + blend_name.replace("blend", attr_name)
+        if cmds.objExists(candidate):
+            attrs.append(candidate)
+    return attrs
+
+
 def _get_node(namespace, name):
     name = anim_utils.stripNamespace(name)
     if namespace:
@@ -212,6 +277,45 @@ def _calculate_upv_position(fk_goals):
     return arrow_vector + mid
 
 
+def _get_effective_upv_ref(upv_ctrl):
+    candidates = []
+    for attr_name in ("translate", "tx", "ty", "tz"):
+        candidates.extend(
+            cmds.listConnections(
+                upv_ctrl.name() + "." + attr_name,
+                source=False,
+                destination=True,
+                plugs=False,
+            ) or []
+        )
+
+    for candidate in candidates:
+        if cmds.nodeType(candidate) == "transform" and candidate.endswith("effectiveUpv_ref"):
+            return pm.PyNode(candidate)
+
+    for candidate in candidates:
+        if cmds.nodeType(candidate) == "transform":
+            return pm.PyNode(candidate)
+
+    mgear.log("Can't find effective upv object from : {0}".format(upv_ctrl), mgear.sev_error)
+    return None
+
+
+def _world_point_to_local(point, parent):
+    parent_matrix = om2.MMatrix(cmds.xform(parent.name(), q=True, ws=True, matrix=True))
+    local_point = om2.MPoint(point[0], point[1], point[2], 1.0) * parent_matrix.inverse()
+    return [local_point.x, local_point.y, local_point.z]
+
+
+def _calculate_effective_upv_translate(upv_ctrl, fk_goals):
+    upv_ref = _get_effective_upv_ref(upv_ctrl)
+    if not upv_ref:
+        position = _calculate_upv_position(fk_goals)
+        return [position[0], position[1], position[2]]
+
+    return _world_point_to_local(_calculate_upv_position(fk_goals), upv_ref.getParent())
+
+
 def ikFkMatch(namespace, ikfk_attr, ui_host, fks, ik, upv, hand_ik=None, key=None):
     """Switch IK/FK while matching the visible controls."""
 
@@ -244,13 +348,13 @@ def ikFkMatch(namespace, ikfk_attr, ui_host, fks, ik, upv, hand_ik=None, key=Non
     else:
         ik_mat = getMatrix(ik_goal)
         hand_mat = getMatrix(hand_ik_goal) if hand_ik_goal else None
-        upv_pos = _calculate_upv_position(fk_goals)
+        upv_translate = _calculate_effective_upv_translate(upv_ctrl, fk_goals)
         root_mat = getMatrix(fk_goals[0])
         blend_attr.set(1.0)
         setMatrix(ik_ctrl, ik_mat)
         if hand_ik_ctrl and hand_mat:
             setMatrix(hand_ik_ctrl, hand_mat)
-        upv_ctrl.setTranslation(upv_pos, space="world")
+        _set_upv_translate(upv_ctrl, upv_translate)
         for _ in range(10):
             cmds.xform(fk_ctrls[0].name(), ws=True, matrix=root_mat)
         for attr_name in ("roll", "handRoll"):

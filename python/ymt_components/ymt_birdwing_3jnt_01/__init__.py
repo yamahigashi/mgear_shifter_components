@@ -537,6 +537,7 @@ class Component(component.Main):
             self.root, self.getName("ikHandHandle"), self.handChain, "ikSCsolver"
         )
         pm.pointConstraint(self.hand_ik_ctl, self.ikHandleHand, maintainOffset=False)
+        pm.orientConstraint(self.ik_ref, self.hand_ik_cns, maintainOffset=True)
 
         chain_pos = [x.getTranslation(space="world") for x in self.chain2bones]
         same_dir = self.verifyAlignmentAccuracy(chain_pos, self.guide.apos[:3])
