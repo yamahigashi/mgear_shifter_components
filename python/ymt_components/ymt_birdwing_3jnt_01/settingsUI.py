@@ -50,6 +50,15 @@ class Ui_Form(object):
         self.ikSolver_comboBox.addItem("")
         self.ikSolver_comboBox.addItem("")
         self.formLayout.setWidget(1, QtWidgets.QFormLayout.FieldRole, self.ikSolver_comboBox)
+
+        self.wristControlMode_label = QtWidgets.QLabel(self.groupBox)
+        self.wristControlMode_label.setObjectName("wristControlMode_label")
+        self.formLayout.setWidget(2, QtWidgets.QFormLayout.LabelRole, self.wristControlMode_label)
+        self.wristControlMode_comboBox = QtWidgets.QComboBox(self.groupBox)
+        self.wristControlMode_comboBox.setObjectName("wristControlMode_comboBox")
+        self.wristControlMode_comboBox.addItem("")
+        self.wristControlMode_comboBox.addItem("")
+        self.formLayout.setWidget(2, QtWidgets.QFormLayout.FieldRole, self.wristControlMode_comboBox)
         self.verticalLayout.addLayout(self.formLayout)
 
         self.neutralRotation_checkBox = QtWidgets.QCheckBox(self.groupBox)
@@ -163,6 +172,9 @@ class Ui_Form(object):
         self.ikSolver_label.setText(gqt.fakeTranslate("Form", "IK Solver", None, -1))
         self.ikSolver_comboBox.setItemText(0, gqt.fakeTranslate("Form", "IK Spring", None, -1))
         self.ikSolver_comboBox.setItemText(1, gqt.fakeTranslate("Form", "Rotation Plane", None, -1))
+        self.wristControlMode_label.setText(gqt.fakeTranslate("Form", "Wrist Control Mode", None, -1))
+        self.wristControlMode_comboBox.setItemText(0, gqt.fakeTranslate("Form", "IK", None, -1))
+        self.wristControlMode_comboBox.setItemText(1, gqt.fakeTranslate("Form", "Chain", None, -1))
         self.neutralRotation_checkBox.setText(
             gqt.fakeTranslate("Form", "World Space Orientation Align IK ctl", None, -1)
         )

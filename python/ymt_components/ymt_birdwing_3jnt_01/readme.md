@@ -10,5 +10,6 @@ The component provides:
 - Palm control at the wrist rotates the hand IK target around the wrist in both wrist control modes.
 - Wrist Control Mode for the hand IK target: `IK` keeps the legacy main IK rotation parent,
   while `Chain` follows the solved upper/lower wing extension from the up-vector instead.
+  Its initial value can be set from the guide settings.
 - FK/IK blending with match references for FK, wrist IK, hand IK, and up-vector.
 - Separate deformation anchors and in-span division drivers, following the structure used in `ymt_leg_4jnt_01`.

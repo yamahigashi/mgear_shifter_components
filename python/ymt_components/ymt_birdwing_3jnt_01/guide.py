@@ -64,6 +64,7 @@ class Guide(guide.ComponentGuide):
         self.pIkRefArray = self.addParam("ikrefarray", "string", "")
         self.pUpvRefArray = self.addParam("upvrefarray", "string", "")
         self.pIKSolver = self.addEnumParam("ikSolver", ["IK Spring", "IK Rotation Plane"], 0)
+        self.pWristControlMode = self.addEnumParam("wristControlMode", ["IK", "Chain"], 0)
         self.pIKOrient = self.addParam("ikOri", "bool", True)
 
         self.pDiv0 = self.addParam("div0", "long", 2, 0, None)
@@ -123,6 +124,7 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
         self.settingsTab.ikfk_slider.setValue(int(self.root.attr("blend").get() * 100))
         self.settingsTab.ikfk_spinBox.setValue(int(self.root.attr("blend").get() * 100))
         self.settingsTab.ikSolver_comboBox.setCurrentIndex(self.root.attr("ikSolver").get())
+        self.settingsTab.wristControlMode_comboBox.setCurrentIndex(self.root.attr("wristControlMode").get())
         self.populateCheck(self.settingsTab.neutralRotation_checkBox, "ikOri")
         self.settingsTab.div0_spinBox.setValue(self.root.attr("div0").get())
         self.settingsTab.div1_spinBox.setValue(self.root.attr("div1").get())
@@ -163,6 +165,9 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
         )
         self.settingsTab.ikSolver_comboBox.currentIndexChanged.connect(
             partial(self.updateComboBox, self.settingsTab.ikSolver_comboBox, "ikSolver")
+        )
+        self.settingsTab.wristControlMode_comboBox.currentIndexChanged.connect(
+            partial(self.updateComboBox, self.settingsTab.wristControlMode_comboBox, "wristControlMode")
         )
         self.settingsTab.neutralRotation_checkBox.stateChanged.connect(
             partial(self.updateCheck, self.settingsTab.neutralRotation_checkBox, "ikOri")

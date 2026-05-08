@@ -33,7 +33,7 @@ import ymt_shifter_utility as yu
 class Component(component.Main):
     """Shifter component class."""
 
-    wrist_control_mode_names = ["IK", "Chain"]
+    wrist_control_mode_names = ("IK", "Chain")
 
     def _connect_enum_condition(self, enum_attr, enum_index, target_weight, true_value=1, false_value=0):
         cond_node = pm.createNode("condition")
@@ -329,9 +329,10 @@ class Component(component.Main):
             wrist_t,
             self.color_ik,
             "cube",
-            w=self.size * 0.16,
+            d=self.size * 0.16,
             h=self.size * 0.16,
-            d=length,
+            w=length  * 0.5,
+            po=datatypes.Vector(0.25 * length, 0, 0),
             tp=self.ik_ctl,
         )
         attribute.setRotOrder(self.palm_ctl, "XZY")
@@ -489,7 +490,7 @@ class Component(component.Main):
         self.wristControlMode_att = self.addAnimEnumParam(
             "wristControlMode",
             "Wrist Control Mode",
-            0,
+            int(max(0, min(len(self.wrist_control_mode_names) - 1, self.settings.get("wristControlMode", 0)))),
             self.wrist_control_mode_names,
         )
         self.soft_attr = self.addAnimParam("softIKRange", "Soft IK Range", "double", 0.0001, 0.0001, 100)
