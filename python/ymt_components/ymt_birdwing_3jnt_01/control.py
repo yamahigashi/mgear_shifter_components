@@ -32,6 +32,7 @@ class ikfkMatchAllButton(AbstractControllerButton):
         if not self.isControllerSetup():
             self.lookupControllers()
             self.hand_ik = self.ik.replace("_ik_", "_hand_ik_")
+            self.palm = self.ik.replace("_ik_", "_palm_")
 
         if event.button() == QtCore.Qt.RightButton:
             IkFkTransfer.showUI(
@@ -42,6 +43,7 @@ class ikfkMatchAllButton(AbstractControllerButton):
                 self.ik,
                 self.upv,
                 self.hand_ik,
+                self.palm,
             )
             return
 
@@ -53,6 +55,7 @@ class ikfkMatchAllButton(AbstractControllerButton):
             self.ik,
             self.upv,
             self.hand_ik,
+            self.palm,
         )
 
 
@@ -63,7 +66,7 @@ class ikfkMatchButton(ikfkMatchAllButton):
 class IkFkTransfer(syn_uti.IkFkTransfer):
     """Small transfer wrapper for the wing-specific control set."""
 
-    def setCtrls(self, fks, ik, upv, hand_ik):
+    def setCtrls(self, fks, ik, upv, hand_ik, palm=None):
         self.fkCtrls = [self._getNode(x) for x in fks]
         self.fkTargets = [self._getMth(x) for x in fks]
         self.ikCtrl = self._getNode(ik)
@@ -72,11 +75,14 @@ class IkFkTransfer(syn_uti.IkFkTransfer):
         self.upvTarget = self._getMth(upv)
         self.handIkCtrl = self._getNode(hand_ik)
         self.handIkTarget = self._getNode(hand_ik.replace("_hand_ik_ctl", "_handIk_mth"))
+        self.palmCtrl = self._getNode(palm) if palm else None
 
     def transfer(self, startFrame, endFrame, onlyKeyframes, switchTo=None, *args, **kwargs):
         if switchTo is not None and "fk" in switchTo.lower():
             val_src_nodes = self.fkTargets
             key_src_nodes = [self.ikCtrl, self.upvCtrl, self.handIkCtrl]
+            if self.palmCtrl:
+                key_src_nodes.append(self.palmCtrl)
             key_dst_nodes = self.fkCtrls
             self.bakeAnimation(
                 self.getChangeAttrName(),
@@ -94,6 +100,8 @@ class IkFkTransfer(syn_uti.IkFkTransfer):
     def _transfer_to_ik(self, startFrame, endFrame, onlyKeyframes):
         key_src_nodes = self.fkCtrls
         key_dst_nodes = [self.ikCtrl, self.upvCtrl, self.handIkCtrl]
+        if self.palmCtrl:
+            key_dst_nodes.append(self.palmCtrl)
         switch_attr_name = self.getChangeAttrName()
 
         src_keys = pm.keyframe(key_src_nodes, at=["t", "r", "s"], q=True) or []
@@ -134,6 +142,8 @@ class IkFkTransfer(syn_uti.IkFkTransfer):
             ik_matrix, upv_translate, hand_ik_matrix = data
             setMatrix(self.ikCtrl, ik_matrix)
             _set_upv_translate(self.upvCtrl, upv_translate)
+            if self.palmCtrl:
+                _reset_attrs(self.palmCtrl, ["rx", "ry", "rz"])
             setMatrix(self.handIkCtrl, hand_ik_matrix)
             _set_attrs_zero(roll_attrs)
             pm.setKeyframe(key_dst_nodes, at=channels)
@@ -144,7 +154,7 @@ class IkFkTransfer(syn_uti.IkFkTransfer):
                 pm.setKeyframe(mode_attrs)
 
     @staticmethod
-    def showUI(model, ikfk_attr, uihost, fks, ik, upv, hand_ik):
+    def showUI(model, ikfk_attr, uihost, fks, ik, upv, hand_ik, palm=None):
         try:
             for child in gqt.maya_main_window().children():
                 if isinstance(child, IkFkTransfer):
@@ -157,7 +167,7 @@ class IkFkTransfer(syn_uti.IkFkTransfer):
             ui.setModel(model)
             ui.setUiHost(uihost)
             ui.setSwitchedAttrShortName(ikfk_attr)
-            ui.setCtrls(fks, ik, upv, hand_ik)
+            ui.setCtrls(fks, ik, upv, hand_ik, palm)
             ui.setComboObj(None)
             ui.setComboBoxItemsFormList(["IK", "FK"])
             ui.createUI(gqt.maya_main_window())
@@ -179,6 +189,7 @@ class IkFkTransfer(syn_uti.IkFkTransfer):
         endFrame=None,
         onlyKeyframes=None,
         switchTo=None,
+        palm=None,
     ):
         if startFrame is None:
             startFrame = int(pm.playbackOptions(q=True, ast=True))
@@ -193,21 +204,21 @@ class IkFkTransfer(syn_uti.IkFkTransfer):
         ui.setModel(model)
         ui.setUiHost(uihost)
         ui.setSwitchedAttrShortName(ikfk_attr)
-        ui.setCtrls(fks, ik, upv, hand_ik)
+        ui.setCtrls(fks, ik, upv, hand_ik, palm)
         ui.setComboObj(None)
         ui.setComboBoxItemsFormList(["IK", "FK"])
         ui.getValue = lambda: 0.0 if "fk" in switchTo.lower() else 1.0
         ui.transfer(startFrame, endFrame, onlyKeyframes, switchTo=switchTo)
 
     @staticmethod
-    def toIK(model, ikfk_attr, uihost, fks, ik, upv, hand_ik, **kwargs):
+    def toIK(model, ikfk_attr, uihost, fks, ik, upv, hand_ik, palm=None, **kwargs):
         kwargs.update({"switchTo": "ik"})
-        IkFkTransfer.execute(model, ikfk_attr, uihost, fks, ik, upv, hand_ik, **kwargs)
+        IkFkTransfer.execute(model, ikfk_attr, uihost, fks, ik, upv, hand_ik, palm=palm, **kwargs)
 
     @staticmethod
-    def toFK(model, ikfk_attr, uihost, fks, ik, upv, hand_ik, **kwargs):
+    def toFK(model, ikfk_attr, uihost, fks, ik, upv, hand_ik, palm=None, **kwargs):
         kwargs.update({"switchTo": "fk"})
-        IkFkTransfer.execute(model, ikfk_attr, uihost, fks, ik, upv, hand_ik, **kwargs)
+        IkFkTransfer.execute(model, ikfk_attr, uihost, fks, ik, upv, hand_ik, palm=palm, **kwargs)
 
 
 def getMatrix(obj):
@@ -225,6 +236,12 @@ def _set_upv_translate(upv_ctrl, values):
 def _set_attrs_zero(attrs):
     for attr in attrs:
         pm.setAttr(attr, 0.0)
+
+
+def _reset_attrs(obj, attrs):
+    for attr in attrs:
+        if obj.hasAttr(attr):
+            obj.attr(attr).set(0.0)
 
 
 def _get_roll_attrs_from_switch(switch_attr_name):
@@ -325,7 +342,7 @@ def _calculate_effective_upv_translate(upv_ctrl, fk_goals):
     return _world_point_to_local(_calculate_upv_position(fk_goals), upv_ref.getParent())
 
 
-def ikFkMatch(namespace, ikfk_attr, ui_host, fks, ik, upv, hand_ik=None, key=None):
+def ikFkMatch(namespace, ikfk_attr, ui_host, fks, ik, upv, hand_ik=None, palm=None, key=None):
     """Switch IK/FK while matching the visible controls."""
 
     if not isinstance(namespace, str):
@@ -338,10 +355,13 @@ def ikFkMatch(namespace, ikfk_attr, ui_host, fks, ik, upv, hand_ik=None, key=Non
     upv_ctrl = _get_node(namespace, upv)
     hand_ik_ctrl = _get_node(namespace, hand_ik) if hand_ik else None
     hand_ik_goal = _get_mth(namespace, hand_ik) if hand_ik else None
+    palm_ctrl = _get_node(namespace, palm) if palm else None
     ui_node = _get_node(namespace, ui_host)
     blend_attr = ui_node.attr(ikfk_attr)
 
     all_controls = list(fk_ctrls) + [ik_ctrl, upv_ctrl, ui_node]
+    if palm_ctrl:
+        all_controls.append(palm_ctrl)
     if hand_ik_ctrl:
         all_controls.append(hand_ik_ctrl)
     if key:
@@ -361,6 +381,8 @@ def ikFkMatch(namespace, ikfk_attr, ui_host, fks, ik, upv, hand_ik=None, key=Non
         root_mat = getMatrix(fk_goals[0])
         blend_attr.set(1.0)
         setMatrix(ik_ctrl, ik_mat)
+        if palm_ctrl:
+            _reset_attrs(palm_ctrl, ["rx", "ry", "rz"])
         if hand_ik_ctrl and hand_mat:
             setMatrix(hand_ik_ctrl, hand_mat)
         _set_upv_translate(upv_ctrl, upv_translate)

@@ -305,11 +305,12 @@ class Component(component.Main):
         self.softblendLoc = primitive.addTransform(self.root, self.getName("softblendLoc"), t)
 
         # IK B: wrist/hand look-at target.
-        t = transform.getTransformLookingAt(self.guide.apos[2], self.guide.apos[3], self.root_normal, "zx", False)
-        t = transform.setMatrixPosition(t, self.guide.pos["eff"])
-        self.hand_ik_cns = primitive.addTransform(self.root, self.getName("hand_ik_cns"), t)
+        wrist_t = transform.getTransformFromPos(self.guide.pos["wrist"])
+        hand_t = transform.getTransformLookingAt(self.guide.apos[2], self.guide.apos[3], self.root_normal, "zx", False)
+        hand_t = transform.setMatrixPosition(hand_t, self.guide.pos["eff"])
+        self.hand_ik_parent_cns = primitive.addTransform(self.root, self.getName("hand_ik_parent_cns"), wrist_t)
         self.hand_ik_parent_ik_ref = primitive.addTransform(
-            self.softblendLoc, self.getName("hand_ik_parent_ik_ref"), t
+            self.softblendLoc, self.getName("hand_ik_parent_ik_ref"), wrist_t
         )
         wrist_chain_t = transform.setMatrixPosition(
             transform.getTransform(self.chain2bones[1]), self.guide.pos["wrist"]
@@ -318,18 +319,37 @@ class Component(component.Main):
             self.root, self.getName("hand_ik_parent_chain_pos"), wrist_chain_t
         )
         self.hand_ik_parent_chain_ref = primitive.addTransform(
-            self.hand_ik_parent_chain_pos, self.getName("hand_ik_parent_chain_ref"), t
+            self.hand_ik_parent_chain_pos, self.getName("hand_ik_parent_chain_ref"), wrist_t
         )
+        length = vector.getDistance(self.guide.apos[3], self.guide.apos[2])
+        self.palm_npo = primitive.addTransform(self.hand_ik_parent_cns, self.getName("palm_npo"), wrist_t)
+        self.palm_ctl = self.addCtl(
+            self.palm_npo,
+            "palm_ctl",
+            wrist_t,
+            self.color_ik,
+            "cube",
+            w=self.size * 0.16,
+            h=self.size * 0.16,
+            d=length,
+            tp=self.ik_ctl,
+        )
+        attribute.setRotOrder(self.palm_ctl, "XZY")
+        attribute.setKeyableAttributes(self.palm_ctl, ["rx", "ry", "rz"])
+        attribute.setInvertMirror(self.palm_ctl, ["ry", "rz"])
+        attribute.lockAttribute(self.palm_ctl, ["tx", "ty", "tz", "sx", "sy", "sz", "v"])
+
+        self.hand_ik_cns = primitive.addTransform(self.palm_ctl, self.getName("hand_ik_cns"), hand_t)
         self.hand_ik_ctl = self.addCtl(
             self.hand_ik_cns,
             "hand_ik_ctl",
-            t,
+            hand_t,
             self.color_ik,
             "cube",
             w=self.size * 0.20,
             h=self.size * 0.20,
             d=max(self.length2, self.size * 0.1) * 0.18,
-            tp=self.ik_ctl,
+            tp=self.palm_ctl,
         )
         attribute.setKeyableAttributes(self.hand_ik_ctl)
         attribute.setRotOrder(self.hand_ik_ctl, "XZY")
@@ -456,7 +476,7 @@ class Component(component.Main):
 
         self.line_ref = icon.connection_display_curve(self.getName("visalRef"), [self.upv_ctl, self.elbow_ctl])
         self.hand_line_ref = icon.connection_display_curve(
-            self.getName("handVisalRef"), [self.wrist_ctl, self.hand_ik_ctl]
+            self.getName("handVisalRef"), [self.palm_ctl, self.hand_ik_ctl]
         )
 
     def addAttributes(self):
@@ -509,7 +529,7 @@ class Component(component.Main):
             )
             attribute.addProxyAttribute(
                 [self.roll_att, self.handRoll_att, self.wristControlMode_att],
-                [self.ik_ctl, self.hand_ik_ctl, self.upv_ctl],
+                [self.ik_ctl, self.palm_ctl, self.hand_ik_ctl, self.upv_ctl],
             )
 
         self.division_percents = self._get_division_percents()
@@ -591,7 +611,7 @@ class Component(component.Main):
         hand_parent_cns = pm.parentConstraint(
             self.hand_ik_parent_ik_ref,
             self.hand_ik_parent_chain_ref,
-            self.hand_ik_cns,
+            self.hand_ik_parent_cns,
             maintainOffset=False,
         )
         self._connect_enum_condition(
@@ -600,6 +620,22 @@ class Component(component.Main):
         self._connect_enum_condition(
             self.wristControlMode_att, 1, hand_parent_cns + ".target[1].targetWeight"
         )
+
+        down, _, up = yu.findPathAtoB(self.ik_ctl, self.palm_ctl)
+        mult = pm.createNode("multMatrix")
+        compose = pm.createNode("composeMatrix")
+        pm.setAttr(compose + ".inputTranslate", self.hand_ik_cns.attr("translate").get())
+
+        for i, d in enumerate(down):
+            pm.connectAttr("{}.matrix".format(d), "{}.matrixIn[{}]".format(mult, i))
+
+        for j, u in enumerate(up):
+            pm.connectAttr("{}.inverseMatrix".format(u), "{}.matrixIn[{}]".format(mult, i + j + 1))
+
+        pm.connectAttr(compose + ".outputMatrix", mult + ".matrixIn[{}]".format(i + j + 2))
+        decomp = pm.createNode("decomposeMatrix")
+        pm.connectAttr(mult + ".matrixSum", decomp + ".inputMatrix")
+        pm.connectAttr(decomp + ".outputTranslate", self.hand_ik_cns.attr("translate"))
 
         chain_pos = [x.getTranslation(space="world") for x in self.chain2bones]
         same_dir = self.verifyAlignmentAccuracy(chain_pos, self.guide.apos[:3])
@@ -724,7 +760,7 @@ class Component(component.Main):
         for ctrl in self.fk_ctl:
             for shp in ctrl.getShapes():
                 pm.connectAttr(fkvis_node + ".outputX", shp.attr("visibility"))
-        for ctrl in [self.ik_ctl, self.hand_ik_ctl, self.upv_ctl, self.line_ref, self.hand_line_ref]:
+        for ctrl in [self.ik_ctl, self.palm_ctl, self.hand_ik_ctl, self.upv_ctl, self.line_ref, self.hand_line_ref]:
             for shp in ctrl.getShapes():
                 pm.connectAttr(self.blend_att, shp.attr("visibility"))
 

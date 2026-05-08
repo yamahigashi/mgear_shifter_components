@@ -110,6 +110,7 @@ class ShifterMarkingMenu(rmbmenu.ShifterMarkingMenu):
 
         ik = None
         upv = None
+        palm = None
         hand_ik = None
         fks = []
 
@@ -120,6 +121,9 @@ class ShifterMarkingMenu(rmbmenu.ShifterMarkingMenu):
             if "hand_ik_ctl" in c:
                 hand_ik = c
 
+            elif "palm_ctl" in c:
+                palm = c
+
             elif "ik_ctl" in c:
                 ik = c
 
@@ -129,6 +133,6 @@ class ShifterMarkingMenu(rmbmenu.ShifterMarkingMenu):
         fks.sort()
 
         if transfer:
-            control.IkFkTransfer.showUI(None, ikfk_attr, uiHost_name, fks, ik, upv, hand_ik)
+            control.IkFkTransfer.showUI(None, ikfk_attr, uiHost_name, fks, ik, upv, hand_ik, palm)
         else:
-            control.ikFkMatch(current_namespace, ikfk_attr, uiHost_name, fks, ik, upv, hand_ik)
+            control.ikFkMatch(current_namespace, ikfk_attr, uiHost_name, fks, ik, upv, hand_ik, palm)
