@@ -41,7 +41,7 @@ class Guide(guide.ComponentGuide):
     connectors = ["ymt_shoulder_01"]
 
     def postInit(self):
-        self.save_transform = ["root", "elbow", "wrist", "eff", "upv"]
+        self.save_transform = ["root", "elbow", "wrist", "eff"]
         self.save_blade = ["blade"]
 
     def addObjects(self):
@@ -53,10 +53,8 @@ class Guide(guide.ComponentGuide):
         eff_pos = transform.getOffsetPosition(self.root, [7.5, 0, 0.6])
         self.eff = self.addLoc("eff", self.wrist, eff_pos)
         self.blade = self.addBlade("blade", self.root, self.elbow)
-        cmds.setAttr(self.blade + ".bladeRollOffset", -90.0)
+        cmds.setAttr(self.blade + ".bladeRollOffset", 90.0)
         attribute.unlockAttribute(self.blade, ["rx"])
-        upv_pos = transform.getOffsetPosition(self.root, [3, 0, 3])
-        self.upv = self.addLoc("upv", self.root, upv_pos)
         self.dispcrv = self.addDispCurve("crv", [self.root, self.elbow, self.wrist, self.eff])
 
     def addParameters(self):
@@ -80,6 +78,7 @@ class Guide(guide.ComponentGuide):
 
         self.pUseIndex = self.addParam("useIndex", "bool", False)
         self.pParentJointIndex = self.addParam("parentJointIndex", "long", -1, None, None)
+        self.pSmoothStep = self.addParam("smoothStep", "bool", False)
 
     def get_divisions(self):
         self.divisions = self.root.div0.get() + self.root.div1.get() + self.root.div2.get()
@@ -126,6 +125,7 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
         self.settingsTab.ikSolver_comboBox.setCurrentIndex(self.root.attr("ikSolver").get())
         self.settingsTab.wristControlMode_comboBox.setCurrentIndex(self.root.attr("wristControlMode").get())
         self.populateCheck(self.settingsTab.neutralRotation_checkBox, "ikOri")
+        self.populateCheck(self.settingsTab.smoothStep_checkBox, "smoothStep")
         self.settingsTab.div0_spinBox.setValue(self.root.attr("div0").get())
         self.settingsTab.div1_spinBox.setValue(self.root.attr("div1").get())
         self.settingsTab.div2_spinBox.setValue(self.root.attr("div2").get())
@@ -218,6 +218,10 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
         self.mainSettingsTab.connector_comboBox.currentIndexChanged.connect(
             partial(self.updateConnector, self.mainSettingsTab.connector_comboBox, self.connector_items)
         )
+
+        self.settingsTab.smoothStep_checkBox.stateChanged.connect(
+            partial(self.updateCheck,
+                    self.settingsTab.smoothStep_checkBox, "smoothStep"))
 
     def eventFilter(self, sender, event):
         if event.type() == QtCore.QEvent.ChildRemoved:

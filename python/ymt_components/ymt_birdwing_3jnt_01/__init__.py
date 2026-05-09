@@ -258,15 +258,15 @@ class Component(component.Main):
 
         self.ik_ref = primitive.addTransform(self.ik_ctl, self.getName("ik_ref"), transform.getTransform(self.ik_ctl))
 
-        v = self.guide.pos["upv"]
-        upv_source_normal = vector.getPlaneNormal(self.guide.apos[0], self.guide.apos[2], v)
-        upv_source_basis = transform.getTransformLookingAt(
-            self.guide.apos[0], self.guide.apos[2], upv_source_normal, "xz", False
-        )
+        blade_pole_dir = self.guide.apos[2] - self.guide.apos[0]
+        blade_pole_dir = blade_pole_dir ^ self.normal
+        blade_pole_dir.normalize()
+        blade_pole_pos = self.guide.apos[1] + (blade_pole_dir * self.size)
+        blade_plane_normal = vector.getPlaneNormal(self.guide.apos[0], self.guide.apos[2], blade_pole_pos)
         blade_target_basis = transform.getTransformLookingAt(
-            self.guide.apos[0], self.guide.apos[2], self.normal, "xz", False
+            self.guide.apos[0], self.guide.apos[2], blade_plane_normal, "xz", False
         )
-        upv_t = transform.setMatrixPosition(upv_source_basis, v)
+        upv_t = transform.setMatrixPosition(blade_target_basis, blade_pole_pos)
         self.upv_lvl = primitive.addTransform(self.root, self.getName("upv_lvl"), upv_t)
         self.upv_cns = primitive.addTransform(self.upv_lvl, self.getName("upv_cns"), upv_t)
         self.upv_ctl = self.addCtl(
@@ -281,10 +281,6 @@ class Component(component.Main):
         attribute.setInvertMirror(self.upv_ctl, ["tx"])
         attribute.setKeyableAttributes(self.upv_ctl, ["tx", "ty", "tz"])
 
-        blade_pole_dir = self.guide.apos[2] - self.guide.apos[0]
-        blade_pole_dir = blade_pole_dir ^ self.normal
-        blade_pole_dir.normalize()
-        blade_pole_pos = self.guide.apos[1] + (blade_pole_dir * self.size)
         blade_pole_t = transform.setMatrixPosition(blade_target_basis, blade_pole_pos)
         self.effective_upv_npo = primitive.addTransform(
             self.upv_cns, self.getName("effectiveUpv_npo"), blade_pole_t

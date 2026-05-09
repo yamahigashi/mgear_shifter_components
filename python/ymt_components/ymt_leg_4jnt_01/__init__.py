@@ -741,7 +741,13 @@ class Component(component.Main):
                     correction_ctl.attr("worldMatrix"),
                     self.root_ctl.attr("worldInverseMatrix"),
                     driver,
-                    "rt",
+                    "t",
+                )
+                node.createMultMatrixNode(
+                    ref.attr("worldMatrix"),
+                    self.root_ctl.attr("worldInverseMatrix"),
+                    driver,
+                    "r",
                 )
             self.deform_anchor_drivers[name] = driver
 

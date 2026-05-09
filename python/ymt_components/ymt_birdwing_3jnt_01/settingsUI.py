@@ -65,6 +65,10 @@ class Ui_Form(object):
         self.neutralRotation_checkBox.setObjectName("neutralRotation_checkBox")
         self.verticalLayout.addWidget(self.neutralRotation_checkBox)
 
+        self.smoothStep_checkBox = QtWidgets.QCheckBox(self.groupBox)
+        self.smoothStep_checkBox.setObjectName("smoothStep_checkBox")
+        self.verticalLayout.addWidget(self.smoothStep_checkBox)
+
         self.horizontalLayout = QtWidgets.QHBoxLayout()
         self.horizontalLayout.setObjectName("horizontalLayout")
         self.divisions_label = QtWidgets.QLabel(self.groupBox)

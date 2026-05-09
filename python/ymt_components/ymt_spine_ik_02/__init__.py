@@ -782,57 +782,6 @@ class Component(component.Main):
             self.div_cns[i].attr("rotate").disconnect()
             pm.connectAttr(blend_node + ".output", self.div_cns[i] + ".rotate")
 
-    def connectRef(self, refArray, cns_obj, upVAttr=None, init_refNames=False):
-        """Connect the cns_obj to a multiple object using parentConstraint.
-
-        Args:
-            refArray (list of dagNode): List of driver objects
-            cns_obj (dagNode): The driven object.
-            upVAttr (bool): Set if the ref Array is for IK or Up vector
-        """
-        if refArray:
-            if upVAttr and not init_refNames:
-                # we only can perform name validation if the init_refnames are
-                # provided in a separated list. This check ensures backwards
-                # copatibility
-                ref_names = refArray.split(",")
-            else:
-                ref_names = self.get_valid_ref_list(refArray.split(","))
-
-            if not ref_names:
-                # return if the not ref_names list
-                return
-            elif len(ref_names) == 1:
-                ref = self.rig.findRelative(ref_names[0])
-                pm.parent(cns_obj, ref)
-            else:
-                ref = []
-                for ref_name in ref_names:
-                    ref.append(self.rig.findRelative(ref_name))
-
-                ref.append(cns_obj)
-                cns_node = pm.parentConstraint(*ref, maintainOffset=True)
-                cns_attr = pm.parentConstraint(cns_node, query=True, weightAliasList=True)
-                # check if the ref Array is for IK or Up vector
-                try:
-                    if upVAttr:
-                        oAttr = self.upvref_att
-                    else:
-                        oAttr = self.ikref_att
-
-                except AttributeError:
-                    oAttr = None
-
-                if oAttr:
-                    for i, attr in enumerate(cns_attr):
-                        node_name = pm.createNode("condition")
-                        pm.connectAttr(oAttr, node_name + ".firstTerm")
-                        pm.setAttr(node_name + ".secondTerm", i)
-                        pm.setAttr(node_name + ".operation", 0)
-                        pm.setAttr(node_name + ".colorIfTrueR", 1)
-                        pm.setAttr(node_name + ".colorIfFalseR", 0)
-                        pm.connectAttr(node_name + ".outColorR", attr)
-
     def connect_standard(self):
         self.parent.addChild(self.root)
         self.connectRef(self.settings["ik0refarray"], self.ik_npo[0])

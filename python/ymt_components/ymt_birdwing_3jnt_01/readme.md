@@ -6,6 +6,8 @@ The component provides:
 
 - FK controls for root, elbow, and wrist/hand sections.
 - IK A: a root to wrist 2-bone IK with up-vector, roll, soft IK, and stretch.
+- The initial up-vector control position is derived from the guide blade and root-to-wrist direction,
+  not from a free guide locator.
 - IK B: a wrist to hand IK target with hand roll.
 - Palm control at the wrist rotates the hand IK target around the wrist in both wrist control modes.
 - Wrist Control Mode for the hand IK target: `IK` keeps the legacy main IK rotation parent,
