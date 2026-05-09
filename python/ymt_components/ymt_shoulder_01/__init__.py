@@ -2,7 +2,6 @@ import math
 
 # Maya
 import maya.cmds as cmds
-import maya.api.OpenMaya as om
 if cmds.about(apiVersion=True) >= 20260000:
     addDoubleLinear = "addDL"
     pointMatrixMult = "pointMatrixMultDL"
@@ -128,15 +127,6 @@ class Component(MainComponent):
 
         t = tra.getTransform(arm_comp.dummy_chain[0])
         arm_comp.dummy_chain_npo = pri.addTransform(arm_comp.dummy_chain[0], self.getName("dummychain_npo"), t)
-        arm_comp.dummy_chain_offset = pm.createNode("math_MatrixFromRotation")
-        mult = pm.createNode("multMatrix")
-        pm.connectAttr("{}.matrix".format(arm_comp.dummy_chain[0]), "{}.matrixIn[0]".format(mult))
-        pm.connectAttr("{}.output".format(arm_comp.dummy_chain_offset), "{}.matrixIn[1]".format(mult))
-
-        rot = pm.createNode("math_RotationFromMatrix")
-        cmds.setAttr("{}.rotationOrder".format(rot), cmds.getAttr("{}.rotateOrder".format(arm_comp.dummy_chain[0])))
-        pm.connectAttr("{}.matrixSum".format(mult), "{}.input".format(rot))
-        pm.connectAttr("{}.output".format(rot), "{}.rotate".format(arm_comp.dummy_chain_npo))
 
     def set_softik_dummy(self, arm_comp):
         # --------------------------------------------------
@@ -232,24 +222,6 @@ class Component(MainComponent):
         cmds.connectAttr('{}.outColorR'.format(cond), '{}.translateX'.format(self.softdummy_npo))
         cmds.connectAttr('{}.outColorG'.format(cond), '{}.translateY'.format(self.softdummy_npo))
         cmds.connectAttr('{}.outColorB'.format(cond), '{}.translateZ'.format(self.softdummy_npo))
-
-        # apply offset to rest angle
-        rx = cmds.getAttr("{}.rx".format(arm_comp.dummy_chain[0]))
-        ry = cmds.getAttr("{}.ry".format(arm_comp.dummy_chain[0]))
-        rz = cmds.getAttr("{}.rz".format(arm_comp.dummy_chain[0]))
-        r1 = om.MEulerRotation(rx, ry, rz)
-
-        rx = cmds.getAttr("{}.jointOrientX".format(arm_comp.dummy_chain[0]))
-        ry = cmds.getAttr("{}.jointOrientY".format(arm_comp.dummy_chain[0]))
-        rz = cmds.getAttr("{}.jointOrientZ".format(arm_comp.dummy_chain[0]))
-        r2 = om.MEulerRotation(rx, ry, rz)
-
-        r3 = r1 * r2
-
-        cmds.setAttr("{}.inputX".format(arm_comp.dummy_chain_offset), -1. * r3.x)
-        cmds.setAttr("{}.inputY".format(arm_comp.dummy_chain_offset), -1. * r3.y)
-        cmds.setAttr("{}.inputZ".format(arm_comp.dummy_chain_offset), -1. * r3.z)
-        cmds.setAttr("{}.rotationOrder".format(arm_comp.dummy_chain_offset), cmds.getAttr("{}.rotateOrder".format(arm_comp.dummy_chain[0])))
 
     def add_arm_connection_attr(self, arm_comp):
         self.roll_att_pos = self.addAnimParam("roll_pos", "rollPositive", "double", 0.0, 0, 1.0)
@@ -349,6 +321,20 @@ class Component(MainComponent):
         self.arm_npo.addChild(arm_comp.dummy_chain[0])
         self.arm_npo.addChild(arm_comp.dummy_chain_npo)
         self.arm_npo.addChild(arm_comp.dummy_ikh)
+
+        dummy_root = arm_comp.dummy_chain[0]
+
+        # Capture rest after reparenting so non T-pose guide offsets are neutral.
+        rest_inverse = dummy_root.attr("matrix").get().inverse()
+        dummy_chain_delta = pm.createNode("multMatrix")
+        rest_inverse_values = [item for row in rest_inverse.get() for item in row]
+        cmds.setAttr(dummy_chain_delta.attr("matrixIn[0]").name(), rest_inverse_values, type="matrix")
+        pm.connectAttr("{}.matrix".format(dummy_root), "{}.matrixIn[1]".format(dummy_chain_delta))
+
+        dummy_chain_rot = pm.createNode("math_RotationFromMatrix")
+        cmds.setAttr("{}.rotationOrder".format(dummy_chain_rot), cmds.getAttr("{}.rotateOrder".format(dummy_root)))
+        pm.connectAttr("{}.matrixSum".format(dummy_chain_delta), "{}.input".format(dummy_chain_rot))
+        pm.connectAttr("{}.output".format(dummy_chain_rot), "{}.rotate".format(arm_comp.dummy_chain_npo))
 
         self.shoulder_npo = pri.addTransform(self.ctl_npo, self.getName("dummy_npo2"), t)
         self.shoulder_npo.addChild(self.ctl)

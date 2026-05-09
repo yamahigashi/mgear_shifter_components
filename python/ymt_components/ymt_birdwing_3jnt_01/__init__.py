@@ -822,5 +822,6 @@ class Component(component.Main):
 
     def connect_ymt_shoulder(self):
         if self.parent_comp is not None and "ymt_shoulder" in str(type(self.parent_comp)):
+            self.armChainUpvRef = self.upvRefChain
             self.parent_comp.connect_arm(self)
         self.connect_standard()
