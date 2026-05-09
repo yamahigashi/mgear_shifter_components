@@ -100,6 +100,25 @@ class Component(component.Main):
         pm.connectAttr(foot_or_toe + ".outColorR", ankle_or_distal + ".colorIfFalseR", f=True)
         return ankle_or_distal + ".outColorR"
 
+    def _parent_constraint_by_endpoint(self, endpoint_sources, target, maintainOffset=True):
+        sources = []
+        source_indices = []
+        for name in self.ik_endpoint_names:
+            source = endpoint_sources[name]
+            if source not in sources:
+                sources.append(source)
+            source_indices.append(sources.index(source))
+
+        cns = pm.parentConstraint(*sources, target, maintainOffset=maintainOffset)
+        for source_index in range(len(sources)):
+            weights = [
+                1 if endpoint_source_index == source_index else 0
+                for endpoint_source_index in source_indices
+            ]
+            selected = self._select_endpoint_scalar(weights[0], weights[1], weights[2])
+            pm.connectAttr(selected, cns + ".target[%s].targetWeight" % source_index, f=True)
+        return cns
+
     def _get_division_percents(self):
         percents = []
         for span_index, div_count in enumerate(
@@ -961,13 +980,6 @@ class Component(component.Main):
             for attr_name in ("translate", "rotate"):
                 pm.connectAttr(src.attr(attr_name), dst.attr(attr_name), f=True)
 
-        def select_endpoint_value(ankle_value, foot_value, toe_value):
-            foot_or_toe = node.createConditionNode(self.ikEndpoint_att, 1, 0, foot_value, toe_value)
-            ankle_or_distal = node.createConditionNode(
-                self.ikEndpoint_att, 0, 0, ankle_value, foot_or_toe + ".outColorR"
-            )
-            return ankle_or_distal + ".outColorR"
-
         connect_local_tr(self.wik_ctl_01, self.ik3b_stretch_ctl)
         connect_local_tr(self.wik_ctl_02, self.ik2b_stretch_ctl)
 
@@ -1015,27 +1027,28 @@ class Component(component.Main):
 
         # Constraint and up vector
         pm.poleVectorConstraint(self.upv_ctl, self.ikHandle4)
-        wik1_cns = pm.parentConstraint(
-            self.ankleSoftFoot_ref,
-            self.softblendLocFoot,
-            self.chain4bones[3],
+        self._parent_constraint_by_endpoint(
+            {
+                "ankle": self.ankleSoftFoot_ref,
+                "foot": self.softblendLocFoot,
+                "toe": self.chain4bones[3],
+            },
             self.wik_cns_01,
             maintainOffset=True,
         )
-        self._connect_endpoint_condition(0, wik1_cns + ".target[0].targetWeight")
-        self._connect_endpoint_condition(1, wik1_cns + ".target[1].targetWeight")
-        self._connect_endpoint_condition(2, wik1_cns + ".target[2].targetWeight")
 
-        wik2_cns = pm.parentConstraint(
-            self.softblendLoc2,
-            self.chain3bones[2],
-            self.chain4bones[2],
+        # Foot and Toe endpoint modes both consume the 3-bone foot solve here.
+        # This keeps footOffset_ctl rotation layered into ankleOffset/chain2
+        # while toe endpoint stretch and final target remain 4-bone based.
+        self._parent_constraint_by_endpoint(
+            {
+                "ankle": self.softblendLoc2,
+                "foot": self.chain3bones[2],
+                "toe": self.chain3bones[2],
+            },
             self.wik_cns_02,
-            maintainOffset=True
+            maintainOffset=True,
         )
-        self._connect_endpoint_condition(0, wik2_cns + ".target[0].targetWeight")
-        self._connect_endpoint_condition(1, wik2_cns + ".target[1].targetWeight")
-        self._connect_endpoint_condition(2, wik2_cns + ".target[2].targetWeight")
 
         # softIK 4 bones operators
         applyop.aimCns(
@@ -1243,10 +1256,10 @@ class Component(component.Main):
             )
             ankle_len_outputs.append(ankle_len_node + ".output1D")
 
-        active_a_len = select_endpoint_value(ankle_len_outputs[0], foot_len_outputs[0], toe_len_outputs[0])
-        active_b_len = select_endpoint_value(ankle_len_outputs[1], foot_len_outputs[1], toe_len_outputs[1])
-        active_c_len = select_endpoint_value(multJnt3_node + ".outputX", foot_len_outputs[2], toe_len_outputs[2])
-        active_d_len = select_endpoint_value(multJnt4_node + ".outputX", multJnt4_node + ".outputX", toe_len_outputs[3])
+        active_a_len = self._select_endpoint_scalar(ankle_len_outputs[0], foot_len_outputs[0], toe_len_outputs[0])
+        active_b_len = self._select_endpoint_scalar(ankle_len_outputs[1], foot_len_outputs[1], toe_len_outputs[1])
+        active_c_len = self._select_endpoint_scalar(multJnt3_node + ".outputX", foot_len_outputs[2], toe_len_outputs[2])
+        active_d_len = self._select_endpoint_scalar(multJnt4_node + ".outputX", multJnt4_node + ".outputX", toe_len_outputs[3])
 
         pm.connectAttr(active_a_len, self.chain2bones[1] + ".tx")
         pm.connectAttr(active_b_len, self.chain2bones[2] + ".tx")
