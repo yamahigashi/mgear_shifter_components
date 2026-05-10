@@ -94,6 +94,39 @@ class Component(component.Main):
             pm.connectAttr(match.message, ctl.match_ref)
         return match
 
+    def _get_hand_upv_position(self, wrist_pos, pole_dir) -> datatypes.Vector:
+        distance = max(self.size * 0.5, self.length2 * 0.25, 0.001)
+        return wrist_pos + (pole_dir * distance)
+
+    def _add_hand_upv_refs(self, wrist_t, pole_dir) -> None:
+        self.handUpvRefChain = yu.add3DChain(
+            self.root,
+            self.getName("handUpvRef%s_jnt"),
+            [self.guide.apos[2], self.guide.apos[3]],
+            self.normal,
+            False,
+            self.WIP,
+        )
+
+        hand_upv_t = transform.setMatrixPosition(
+            transform.getTransform(self.handUpvRefChain[0]),
+            self._get_hand_upv_position(self.guide.apos[2], pole_dir),
+        )
+        self.hand_effective_upv_npo = primitive.addTransform(
+            self.handUpvRefChain[0], self.getName("handEffectiveUpv_npo"), hand_upv_t
+        )
+        self.hand_effective_upv_ref = primitive.addTransform(
+            self.hand_effective_upv_npo,
+            self.getName("handEffectiveUpv_ref"),
+            transform.getTransform(self.hand_effective_upv_npo),
+        )
+        self.hand_effective_upv_npo.attr("visibility").set(False)
+
+        self.hand_upv_aim_ref = primitive.addTransform(
+            self.root, self.getName("handUpvAim_ref"), wrist_t
+        )
+        self.hand_upv_aim_ref.attr("visibility").set(False)
+
     def addObjects(self):
         """Add all objects needed to create the component."""
 
@@ -302,6 +335,7 @@ class Component(component.Main):
 
         # IK B: wrist/hand look-at target.
         wrist_t = transform.getTransformFromPos(self.guide.pos["wrist"])
+        self._add_hand_upv_refs(wrist_t, blade_pole_dir)
         hand_t = transform.getTransformLookingAt(self.guide.apos[2], self.guide.apos[3], self.root_normal, "zx", False)
         hand_t = transform.setMatrixPosition(hand_t, self.guide.pos["eff"])
         self.hand_ik_parent_cns = primitive.addTransform(self.root, self.getName("hand_ik_parent_cns"), wrist_t)
@@ -581,12 +615,29 @@ class Component(component.Main):
 
         pm.pointConstraint(self.root_ctl, self.chain2bones[0], maintainOffset=True)
         pm.connectAttr(self.upv_ctl.attr("translate"), self.effective_upv_ref.attr("translate"), f=True)
+        pm.connectAttr(self.upv_ctl.attr("translate"), self.hand_effective_upv_ref.attr("translate"), f=True)
         pm.pointConstraint(self.chain2bones[2], self.handChain[0], maintainOffset=False)
 
         self.ikHandleHand = primitive.addIkHandle(
             self.root, self.getName("ikHandHandle"), self.handChain, "ikSCsolver"
         )
         pm.pointConstraint(self.hand_ik_ctl, self.ikHandleHand, maintainOffset=False)
+        self.ikHandleHandUpvRef = primitive.addIkHandle(
+            self.root, self.getName("ikHandleHandUpvRef"), self.handUpvRefChain, "ikSCsolver"
+        )
+        pm.pointConstraint(self.handChain[0], self.handUpvRefChain[0], maintainOffset=False)
+        pm.pointConstraint(self.hand_ik_ctl, self.ikHandleHandUpvRef, maintainOffset=False)
+        pm.pointConstraint(self.handChain[0], self.hand_upv_aim_ref, maintainOffset=False)
+        applyop.aimCns(
+            self.hand_upv_aim_ref,
+            self.hand_ik_ctl,
+            axis="xz",
+            wupType="object",
+            wupVector=[0, 0, 1],
+            wupObject=self.hand_effective_upv_ref,
+            maintainOffset=False,
+        )
+        pm.orientConstraint(self.hand_upv_aim_ref, self.ikHandleHand, maintainOffset=False)
         pm.parentConstraint(
             self.ik_ctl,
             self.softblendLoc,
