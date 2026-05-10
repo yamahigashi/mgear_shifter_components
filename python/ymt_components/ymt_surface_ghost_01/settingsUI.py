@@ -10,6 +10,7 @@
 from Qt.QtCore import *
 from Qt.QtGui import *
 from Qt.QtWidgets import *
+from Qt import QtWidgets
 
 
 class Ui_Form(object):
