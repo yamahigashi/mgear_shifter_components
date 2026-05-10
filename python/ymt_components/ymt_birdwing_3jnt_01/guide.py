@@ -1,6 +1,7 @@
 """Guide for ymt_birdwing_3jnt_01."""
 
 from functools import partial
+from typing import ClassVar, Optional
 
 from maya import cmds
 
@@ -38,13 +39,13 @@ class Guide(guide.ComponentGuide):
     email = EMAIL
     version = VERSION
 
-    connectors = ["ymt_shoulder_01"]
+    connectors: ClassVar[list[str]] = ["ymt_shoulder_01"]
 
-    def postInit(self):
+    def postInit(self) -> None:
         self.save_transform = ["root", "elbow", "wrist", "eff"]
         self.save_blade = ["blade"]
 
-    def addObjects(self):
+    def addObjects(self) -> None:
         self.root = self.addRoot()
         elbow_pos = transform.getOffsetPosition(self.root, [3, 0, -0.2])
         self.elbow = self.addLoc("elbow", self.root, elbow_pos)
@@ -57,7 +58,7 @@ class Guide(guide.ComponentGuide):
         attribute.unlockAttribute(self.blade, ["rx"])
         self.dispcrv = self.addDispCurve("crv", [self.root, self.elbow, self.wrist, self.eff])
 
-    def addParameters(self):
+    def addParameters(self) -> None:
         self.pBlend = self.addParam("blend", "double", 1, 0, 1)
         self.pIkRefArray = self.addParam("ikrefarray", "string", "")
         self.pUpvRefArray = self.addParam("upvrefarray", "string", "")
@@ -69,18 +70,14 @@ class Guide(guide.ComponentGuide):
         self.pDiv1 = self.addParam("div1", "long", 2, 0, None)
         self.pDiv2 = self.addParam("div2", "long", 2, 0, None)
 
-        self.pSt_profile = self.addFCurveParam(
-            "st_profile", [[0, 0], [0.33, -1], [0.66, -1], [1, 0]]
-        )
-        self.pSq_profile = self.addFCurveParam(
-            "sq_profile", [[0, 0], [0.33, 1], [0.66, 1], [1, 0]]
-        )
+        self.pSt_profile = self.addFCurveParam("st_profile", [[0, 0], [0.33, -1], [0.66, -1], [1, 0]])
+        self.pSq_profile = self.addFCurveParam("sq_profile", [[0, 0], [0.33, 1], [0.66, 1], [1, 0]])
 
         self.pUseIndex = self.addParam("useIndex", "bool", False)
         self.pParentJointIndex = self.addParam("parentJointIndex", "long", -1, None, None)
         self.pSmoothStep = self.addParam("smoothStep", "bool", False)
 
-    def get_divisions(self):
+    def get_divisions(self) -> int:
         self.divisions = self.root.div0.get() + self.root.div1.get() + self.root.div2.get()
         return self.divisions
 
@@ -88,7 +85,7 @@ class Guide(guide.ComponentGuide):
 class settingsTab(QtWidgets.QDialog, sui.Ui_Form):
     """The component settings UI."""
 
-    def __init__(self, parent=None):
+    def __init__(self, parent: Optional[object] = None) -> None:
         super(settingsTab, self).__init__(parent)
         self.setupUi(self)
 
@@ -96,7 +93,7 @@ class settingsTab(QtWidgets.QDialog, sui.Ui_Form):
 class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
     """Create the component setting window."""
 
-    def __init__(self, parent=None):
+    def __init__(self, parent: Optional[object] = None) -> None:
         self.toolName = TYPE
         pyqt.deleteInstances(self, MayaQDockWidget)
         super(self.__class__, self).__init__(parent=parent)
@@ -108,17 +105,17 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
         self.create_componentLayout()
         self.create_componentConnections()
 
-    def setup_componentSettingWindow(self):
+    def setup_componentSettingWindow(self) -> None:
         self.mayaMainWindow = pyqt.maya_main_window()
         self.setObjectName(self.toolName)
         self.setWindowFlags(QtCore.Qt.Window)
         self.setWindowTitle(TYPE)
         self.resize(280, 620)
 
-    def create_componentControls(self):
+    def create_componentControls(self) -> None:
         return
 
-    def populate_componentControls(self):
+    def populate_componentControls(self) -> None:
         self.tabs.insertTab(1, self.settingsTab, "Component Settings")
         self.settingsTab.ikfk_slider.setValue(int(self.root.attr("blend").get() * 100))
         self.settingsTab.ikfk_spinBox.setValue(int(self.root.attr("blend").get() * 100))
@@ -150,13 +147,13 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
             )
         self.c_box.setCurrentIndex(self.connector_items.index(current_connector))
 
-    def create_componentLayout(self):
+    def create_componentLayout(self) -> None:
         self.settings_layout = QtWidgets.QVBoxLayout()
         self.settings_layout.addWidget(self.tabs)
         self.settings_layout.addWidget(self.close_button)
         self.setLayout(self.settings_layout)
 
-    def create_componentConnections(self):
+    def create_componentConnections(self) -> None:
         self.settingsTab.ikfk_slider.valueChanged.connect(
             partial(self.updateSlider, self.settingsTab.ikfk_slider, "blend")
         )
@@ -220,10 +217,10 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
         )
 
         self.settingsTab.smoothStep_checkBox.stateChanged.connect(
-            partial(self.updateCheck,
-                    self.settingsTab.smoothStep_checkBox, "smoothStep"))
+            partial(self.updateCheck, self.settingsTab.smoothStep_checkBox, "smoothStep")
+        )
 
-    def eventFilter(self, sender, event):
+    def eventFilter(self, sender: object, event: QtCore.QEvent) -> bool:
         if event.type() == QtCore.QEvent.ChildRemoved:
             if sender == self.settingsTab.ikRefArray_listWidget:
                 self.updateListAttr(sender, "ikrefarray")
@@ -232,5 +229,5 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
             return True
         return QtWidgets.QDialog.eventFilter(self, sender, event)
 
-    def dockCloseEventTriggered(self):
+    def dockCloseEventTriggered(self) -> None:
         pyqt.deleteInstances(self, MayaQDockWidget)

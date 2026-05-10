@@ -28,6 +28,7 @@ from mgear.shifter import component
 from mgear.core import applyop, attribute, icon, node, primitive, transform, vector
 
 import ymt_shifter_utility as yu
+from ymt_shifter_utility.type_protocols import PymelNode
 
 
 class Component(component.Main):
@@ -35,7 +36,9 @@ class Component(component.Main):
 
     wrist_control_mode_names = ("IK", "Chain")
 
-    def _connect_enum_condition(self, enum_attr, enum_index, target_weight, true_value=1, false_value=0):
+    def _connect_enum_condition(
+        self, enum_attr: object, enum_index: int, target_weight: object, true_value: int = 1, false_value: int = 0
+    ) -> PymelNode:
         cond_node = pm.createNode("condition")
         pm.setAttr(cond_node + ".operation", 0)
         pm.connectAttr(enum_attr, cond_node + ".firstTerm")
@@ -45,18 +48,16 @@ class Component(component.Main):
         pm.connectAttr(cond_node + ".outColorR", target_weight, f=True)
         return cond_node
 
-    def _get_division_percents(self):
+    def _get_division_percents(self) -> list[float]:
         percents = []
-        for span_index, div_count in enumerate(
-            [self.settings["div0"], self.settings["div1"], self.settings["div2"]]
-        ):
+        for span_index, div_count in enumerate([self.settings["div0"], self.settings["div1"], self.settings["div2"]]):
             span_start = span_index / 3.0
             for div_index in range(div_count):
                 perc = span_start + ((div_index + 1.0) / (div_count + 1.0)) / 3.0
                 percents.append(max(0.001, min(0.999, perc)))
         return percents
 
-    def _sample_profile_values(self, profile_name, percents):
+    def _sample_profile_values(self, profile_name: str, percents: list[float]) -> list[float]:
         profile_values = self.guide.paramDefs[profile_name].value
         if profile_values:
             return self._interpolate_profile_values(profile_values, percents)
@@ -68,7 +69,7 @@ class Component(component.Main):
             values.append(pm.getAttr(fcv_node + ".output"))
         return values
 
-    def _interpolate_profile_values(self, profile_values, percents):
+    def _interpolate_profile_values(self, profile_values: list[float], percents: list[float]) -> list[float]:
         if not profile_values:
             return [0] * len(percents)
 
@@ -80,25 +81,27 @@ class Component(component.Main):
         interpolated = []
         for perc in percents:
             position = max(0.0, min(1.0, perc)) * max_index
-            low_index = int(math.floor(position))
+            low_index = math.floor(position)
             high_index = min(low_index + 1, max_index)
             blend = position - low_index
             value = values[low_index] + ((values[high_index] - values[low_index]) * blend)
             interpolated.append(value)
         return interpolated
 
-    def _add_match_ref_from(self, ctl, source, parent, name, cnx=True):
+    def _add_match_ref_from(
+        self, ctl: PymelNode, source: PymelNode, parent: PymelNode, name: str, cnx: bool = True
+    ) -> PymelNode:
         match = primitive.addTransform(parent, self.getName(name), transform.getTransform(source))
         if cnx:
             ctl.addAttr("match_ref", at="message", multi=False)
             pm.connectAttr(match.message, ctl.match_ref)
         return match
 
-    def _get_hand_upv_position(self, wrist_pos, pole_dir) -> datatypes.Vector:
+    def _get_hand_upv_position(self, wrist_pos: datatypes.Vector, pole_dir: datatypes.Vector) -> datatypes.Vector:
         distance = max(self.size * 0.5, self.length2 * 0.25, 0.001)
         return wrist_pos + (pole_dir * distance)
 
-    def _add_hand_upv_refs(self, wrist_t, pole_dir) -> None:
+    def _add_hand_upv_refs(self, wrist_t: datatypes.Matrix, pole_dir: datatypes.Vector) -> None:
         self.handUpvRefChain = yu.add3DChain(
             self.root,
             self.getName("handUpvRef%s_jnt"),
@@ -122,12 +125,10 @@ class Component(component.Main):
         )
         self.hand_effective_upv_npo.attr("visibility").set(False)
 
-        self.hand_upv_aim_ref = primitive.addTransform(
-            self.root, self.getName("handUpvAim_ref"), wrist_t
-        )
+        self.hand_upv_aim_ref = primitive.addTransform(self.root, self.getName("handUpvAim_ref"), wrist_t)
         self.hand_upv_aim_ref.attr("visibility").set(False)
 
-    def addObjects(self):
+    def addObjects(self) -> None:
         """Add all objects needed to create the component."""
 
         self.setup = primitive.addTransformFromPos(self.setupWS, self.getName("WS"))
@@ -315,9 +316,7 @@ class Component(component.Main):
         attribute.setKeyableAttributes(self.upv_ctl, ["tx", "ty", "tz"])
 
         blade_pole_t = transform.setMatrixPosition(blade_target_basis, blade_pole_pos)
-        self.effective_upv_npo = primitive.addTransform(
-            self.upv_cns, self.getName("effectiveUpv_npo"), blade_pole_t
-        )
+        self.effective_upv_npo = primitive.addTransform(self.upv_cns, self.getName("effectiveUpv_npo"), blade_pole_t)
         self.effective_upv_ref = primitive.addTransform(
             self.effective_upv_npo,
             self.getName("effectiveUpv_ref"),
@@ -361,7 +360,7 @@ class Component(component.Main):
             "cube",
             d=self.size * 0.16,
             h=self.size * 0.16,
-            w=length  * 0.5,
+            w=length * 0.5,
             po=datatypes.Vector(0.25 * length, 0, 0),
             tp=self.ik_ctl,
         )
@@ -500,9 +499,7 @@ class Component(component.Main):
             self.match_fk.append(match_ref)
 
         self.match_ik = self._add_match_ref_from(self.ik_ctl, self.wingBones[2], self.root, "ik_mth")
-        self.match_hand_ik = self._add_match_ref_from(
-            self.hand_ik_ctl, self.wingBones[3], self.root, "handIk_mth"
-        )
+        self.match_hand_ik = self._add_match_ref_from(self.hand_ik_ctl, self.wingBones[3], self.root, "handIk_mth")
         self.match_ikUpv = self.add_match_ref(self.upv_ctl, self.fk0_ctl, "upv_mth")
 
         self.line_ref = icon.connection_display_curve(self.getName("visalRef"), [self.upv_ctl, self.elbow_ctl])
@@ -510,7 +507,7 @@ class Component(component.Main):
             self.getName("handVisalRef"), [self.palm_ctl, self.hand_ik_ctl]
         )
 
-    def addAttributes(self):
+    def addAttributes(self) -> None:
         """Create anim and setup attributes."""
 
         self.blend_att = self.addAnimParam("blend", "Fk/Ik Blend", "double", self.settings["blend"], 0, 1)
@@ -523,7 +520,7 @@ class Component(component.Main):
             int(max(0, min(len(self.wrist_control_mode_names) - 1, self.settings.get("wristControlMode", 0)))),
             self.wrist_control_mode_names,
         )
-        self.soft_attr = self.addAnimParam("softIKRange", "Soft IK Range", "double", 0.0001, 0.0001, 100)
+        self.soft_attr = self.addAnimParam("softIKRange", "Soft IK Range Ratio", "double", 0.0001, 0.0001, 1)
         self.softSpeed_attr = self.addAnimParam("softIKSpeed", "Soft IK Speed", "double", 2.5, 1.001, 10)
         self.stretch_attr = self.addAnimParam("stretch", "Stretch", "double", 0, 0, 1)
         self.roundnessElbow_att = self.addAnimParam("roundnessElbow", "Roundness Elbow", "double", 0, 0, self.size)
@@ -542,7 +539,7 @@ class Component(component.Main):
 
         if self.settings["upvrefarray"]:
             ref_names = self.get_valid_alias_list(self.settings["upvrefarray"].split(","))
-            ref_names = ["Auto"] + ref_names
+            ref_names = ["Auto", *ref_names]
             if len(ref_names) > 1:
                 self.upvref_att = self.addAnimEnumParam("upvref", "UpV Ref", 0, ref_names)
 
@@ -577,23 +574,20 @@ class Component(component.Main):
 
         self.resample_att = self.addSetupParam("resample", "Resample", "bool", True)
         self.absolute_att = self.addSetupParam("absolute", "Absolute", "bool", False)
+        elbow_flip_offset = self.chain2bones[1].attr("jointOrientZ").get() / 2
         self.elbowFlipOffset_att = self.addSetupParam(
-            "elbowFlipOffset", "Elbow Flip Offset", "double", self.chain2bones[1].attr("jointOrientZ").get() / 2, -180, 180
+            "elbowFlipOffset", "Elbow Flip Offset", "double", elbow_flip_offset, -180, 180
         )
         self.wristFlipOffset_att = self.addSetupParam("wristFlipOffset", "Wrist Flip Offset", "double", 0, -180, 180)
 
-    def addOperators(self):
-        """Apply operators, constraints, and expressions."""
-
-        soft_cond_node = node.createConditionNode(self.soft_attr, 0.0001, 4, 0.0001, self.soft_attr)
-        self.soft_attr_cond = soft_cond_node.outColorR
-
+    def _set_ik_solver(self) -> None:
         if self.settings["ikSolver"]:
             self.ikSolver = "ikRPsolver"
         else:
             pm.mel.eval("ikSpringSolver;")
             self.ikSolver = "ikSpringSolver"
 
+    def _connect_upv_ref_operator(self) -> None:
         self.ikHandleUpvRef = primitive.addIkHandle(
             self.root, self.getName("ikHandleWingUpvRef"), self.upvRefChain, "ikSCsolver"
         )
@@ -603,10 +597,7 @@ class Component(component.Main):
         pm.parentConstraint(self.wingBones[1], self.elbow_lvl)
         pm.parentConstraint(self.wingBones[2], self.wrist_lvl)
 
-        multJnt1_node = node.createMulNode(self.boneALenght_attr, self.boneALenghtMult_attr)
-        multJnt2_node = node.createMulNode(self.boneBLenght_attr, self.boneBLenghtMult_attr)
-        multJnt3_node = node.createMulNode(self.boneCLenght_attr, self.boneCLenghtMult_attr)
-
+    def _connect_ik_handles(self) -> None:
         self.ikHandle2 = primitive.addIkHandle(
             self.softblendLoc, self.getName("ik2BonesHandle"), self.chain2bones, self.ikSolver, self.effective_upv_ref
         )
@@ -618,9 +609,7 @@ class Component(component.Main):
         pm.connectAttr(self.upv_ctl.attr("translate"), self.hand_effective_upv_ref.attr("translate"), f=True)
         pm.pointConstraint(self.chain2bones[2], self.handChain[0], maintainOffset=False)
 
-        self.ikHandleHand = primitive.addIkHandle(
-            self.root, self.getName("ikHandHandle"), self.handChain, "ikSCsolver"
-        )
+        self.ikHandleHand = primitive.addIkHandle(self.root, self.getName("ikHandHandle"), self.handChain, "ikSCsolver")
         pm.pointConstraint(self.hand_ik_ctl, self.ikHandleHand, maintainOffset=False)
         self.ikHandleHandUpvRef = primitive.addIkHandle(
             self.root, self.getName("ikHandleHandUpvRef"), self.handUpvRefChain, "ikSCsolver"
@@ -638,12 +627,9 @@ class Component(component.Main):
             maintainOffset=False,
         )
         pm.orientConstraint(self.hand_upv_aim_ref, self.ikHandleHand, maintainOffset=False)
-        pm.parentConstraint(
-            self.ik_ctl,
-            self.softblendLoc,
-            skipTranslate=["x", "y", "z"],
-            maintainOffset=False
-        )
+
+    def _connect_hand_parent_mode(self) -> None:
+        pm.parentConstraint(self.ik_ctl, self.softblendLoc, skipTranslate=["x", "y", "z"], maintainOffset=False)
         pm.parentConstraint(
             self.chain2bones[2],
             self.hand_ik_parent_chain_pos,
@@ -662,13 +648,10 @@ class Component(component.Main):
             self.hand_ik_parent_cns,
             maintainOffset=False,
         )
-        self._connect_enum_condition(
-            self.wristControlMode_att, 0, hand_parent_cns + ".target[0].targetWeight"
-        )
-        self._connect_enum_condition(
-            self.wristControlMode_att, 1, hand_parent_cns + ".target[1].targetWeight"
-        )
+        self._connect_enum_condition(self.wristControlMode_att, 0, hand_parent_cns + ".target[0].targetWeight")
+        self._connect_enum_condition(self.wristControlMode_att, 1, hand_parent_cns + ".target[1].targetWeight")
 
+    def _connect_hand_ik_cns_offset(self) -> None:
         down, _, up = yu.findPathAtoB(self.ik_ctl, self.palm_ctl)
         mult = pm.createNode("multMatrix")
         compose = pm.createNode("composeMatrix")
@@ -685,6 +668,7 @@ class Component(component.Main):
         pm.connectAttr(mult + ".matrixSum", decomp + ".inputMatrix")
         pm.connectAttr(decomp + ".outputTranslate", self.hand_ik_cns.attr("translate"))
 
+    def _connect_twist_and_aim(self) -> None:
         chain_pos = [x.getTranslation(space="world") for x in self.chain2bones]
         same_dir = self.verifyAlignmentAccuracy(chain_pos, self.guide.apos[:3])
         angle = 0 if same_dir else 180
@@ -702,25 +686,26 @@ class Component(component.Main):
             maintainOffset=False,
         )
 
+    def _connect_soft_ik_and_stretch(self, multJnt1_node: PymelNode, multJnt2_node: PymelNode) -> None:
         plus_total_length_node = node.createPlusMinusAverage1D(
             [multJnt1_node.attr("outputX"), multJnt2_node.attr("outputX")]
         )
-        subtract1_node = node.createPlusMinusAverage1D(
-            [plus_total_length_node.attr("output1D"), self.soft_attr_cond], 2
-        )
+        soft_range_node = node.createMulNode(plus_total_length_node.attr("output1D"), self.soft_attr_cond)
+        soft_range_attr = soft_range_node.attr("outputX")
+        subtract1_node = node.createPlusMinusAverage1D([plus_total_length_node.attr("output1D"), soft_range_attr], 2)
         distance1_node = node.createDistNode(self.ik_ref, self.aim_tra)
         div1_node = node.createDivNode(1.0, self.rig.global_ctl + ".sx")
         mult1_node = node.createMulNode(distance1_node + ".distance", div1_node + ".outputX")
         subtract2_node = node.createPlusMinusAverage1D([mult1_node.attr("outputX"), subtract1_node.attr("output1D")], 2)
-        div2_node = node.createDivNode(subtract2_node + ".output1D", self.soft_attr_cond)
+        div2_node = node.createDivNode(subtract2_node + ".output1D", soft_range_attr)
         mult2_node = node.createMulNode(-1, div2_node + ".outputX")
         power_node = node.createPowNode(self.softSpeed_attr, mult2_node + ".outputX")
-        mult3_node = node.createMulNode(self.soft_attr_cond, power_node + ".outputX")
+        mult3_node = node.createMulNode(soft_range_attr, power_node + ".outputX")
         subtract3_node = node.createPlusMinusAverage1D(
             [plus_total_length_node.attr("output1D"), mult3_node.attr("outputX")], 2
         )
         cond1_node = node.createConditionNode(
-            self.soft_attr_cond, 0, 2, subtract3_node + ".output1D", plus_total_length_node + ".output1D"
+            soft_range_attr, 0, 2, subtract3_node + ".output1D", plus_total_length_node + ".output1D"
         )
         cond2_node = node.createConditionNode(
             mult1_node + ".outputX",
@@ -744,6 +729,7 @@ class Component(component.Main):
             length_node = node.createPlusMinusAverage1D([mul_node.attr("outputX"), mult6_node.attr("outputX")], 1)
             pm.connectAttr(length_node + ".output1D", self.chain2bones[index + 1] + ".tx")
 
+    def _connect_result_chains(self, multJnt3_node: PymelNode) -> None:
         pm.connectAttr(multJnt3_node + ".outputX", self.handChain[1] + ".tx")
 
         # FK result chain.
@@ -766,6 +752,7 @@ class Component(component.Main):
             self.getName("wingRollRef"), self.rollRef, parent=self.root, cParent=self.wingBones[0]
         )
 
+    def _connect_twist_driver_controls(self) -> None:
         init_round = 0.001
         add_node = node.createAddNode(self.roundnessElbow_att, init_round)
         pm.connectAttr(add_node + ".output", self.tws1_rot + ".sx")
@@ -779,6 +766,7 @@ class Component(component.Main):
         pm.connectAttr(self.wrist_ctl + ".rx", self.tws2_loc + ".rx")
         pm.connectAttr(self.wrist_ctl + ".ry", self.tws2_loc + ".ry")
 
+    def _connect_volume_driver(self) -> None:
         distA_node = node.createDistNode(self.tws0_loc, self.tws1_loc)
         distB_node = node.createDistNode(self.tws1_loc, self.tws2_loc)
         distC_node = node.createDistNode(self.tws2_loc, self.tws3_loc)
@@ -792,6 +780,7 @@ class Component(component.Main):
         pm.connectAttr(self.elbowFlipOffset_att, self.tws1_loc + ".rz")
         pm.connectAttr(self.wristFlipOffset_att, self.tws2_loc + ".rz")
 
+    def _connect_division_operators(self) -> None:
         cts = [self.tws0_rot, self.tws1_rot, self.tws2_rot, self.tws3_rot]
         for i, div_cns in enumerate(self.div_cns):
             o_node = applyop.gear_rollsplinekine_op(div_cns, cts, self.division_percents[i], 45)
@@ -804,6 +793,7 @@ class Component(component.Main):
             pm.connectAttr(self.st_att[i], o_node + ".stretch")
             pm.connectAttr(self.sq_att[i], o_node + ".squash")
 
+    def _connect_visibility(self) -> None:
         fkvis_node = node.createReverseNode(self.blend_att)
         for ctrl in self.fk_ctl:
             for shp in ctrl.getShapes():
@@ -812,6 +802,7 @@ class Component(component.Main):
             for shp in ctrl.getShapes():
                 pm.connectAttr(self.blend_att, shp.attr("visibility"))
 
+    def _connect_match_refs(self) -> None:
         pm.connectAttr(self.rig.global_ctl + ".scale", self.setup + ".scale")
 
         for wing_bone, match_off in zip(
@@ -822,7 +813,33 @@ class Component(component.Main):
         pm.parentConstraint(self.wingBones[2], self.match_ik, mo=True)
         pm.parentConstraint(self.wingBones[3], self.match_hand_ik, mo=True)
 
-    def verifyAlignmentAccuracy(self, jnts, guides, degree=10.0):
+    def addOperators(self) -> None:
+        """Apply operators, constraints, and expressions."""
+
+        soft_cond_node = node.createConditionNode(self.soft_attr, 0.0001, 4, 0.0001, self.soft_attr)
+        self.soft_attr_cond = soft_cond_node.outColorR
+        self._set_ik_solver()
+
+        multJnt1_node = node.createMulNode(self.boneALenght_attr, self.boneALenghtMult_attr)
+        multJnt2_node = node.createMulNode(self.boneBLenght_attr, self.boneBLenghtMult_attr)
+        multJnt3_node = node.createMulNode(self.boneCLenght_attr, self.boneCLenghtMult_attr)
+
+        self._connect_upv_ref_operator()
+        self._connect_ik_handles()
+        self._connect_hand_parent_mode()
+        self._connect_hand_ik_cns_offset()
+        self._connect_twist_and_aim()
+        self._connect_soft_ik_and_stretch(multJnt1_node, multJnt2_node)
+        self._connect_result_chains(multJnt3_node)
+        self._connect_twist_driver_controls()
+        self._connect_volume_driver()
+        self._connect_division_operators()
+        self._connect_visibility()
+        self._connect_match_refs()
+
+    def verifyAlignmentAccuracy(
+        self, jnts: list[datatypes.Vector], guides: list[datatypes.Vector], degree: float = 10.0
+    ) -> bool:
         if len(jnts) != len(guides):
             raise ValueError("jnts and guides must have the same number of positions.")
         if len(jnts) < 2:
@@ -841,7 +858,7 @@ class Component(component.Main):
                 return False
         return True
 
-    def setRelation(self):
+    def setRelation(self) -> None:
         """Set the relation between guide objects and rig objects."""
 
         self.relatives["root"] = self.deform_anchor_drivers["root"]
@@ -861,17 +878,17 @@ class Component(component.Main):
 
         self.aliasRelatives["eff"] = "hand"
 
-    def addConnection(self):
+    def addConnection(self) -> None:
         self.connections["standard"] = self.connect_standard
         self.connections["ymt_shoulder_01"] = self.connect_ymt_shoulder
 
-    def connect_standard(self):
+    def connect_standard(self) -> None:
         self.parent.addChild(self.root)
         self.connectRef(self.settings["ikrefarray"], self.ik_cns)
         if self.settings["upvrefarray"]:
             self.connectRef("Auto," + self.settings["upvrefarray"], self.upv_cns, True)
 
-    def connect_ymt_shoulder(self):
+    def connect_ymt_shoulder(self) -> None:
         if self.parent_comp is not None and "ymt_shoulder" in str(type(self.parent_comp)):
             self.armChainUpvRef = self.upvRefChain
             self.parent_comp.connect_arm(self)

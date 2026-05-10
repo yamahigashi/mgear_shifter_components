@@ -1,44 +1,18 @@
-# -*- coding: utf-8 -*-
 """Module for hook right mouse button using rmbmenuhook."""
-"""https://github.com/bohdon/maya-workflowtools/tree/main/src/workflowtools/scripts/rmbmenuhook"""
+
+# https://github.com/bohdon/maya-workflowtools/tree/main/src/workflowtools/scripts/rmbmenuhook
 import os
 import re
-import sys
-import six
 from functools import partial
+from logging import DEBUG, INFO, WARN, StreamHandler, getLogger
 
 import maya.cmds as cmds
-
-from mgear.core import (
-    transform,
-)
+from mgear.core import transform
 
 from ymt_components import rmbmenu
 from ymt_shifter_utility import control_util
 from . import control
 
-from logging import (  # noqa:F401 pylint: disable=unused-import, wrong-import-order
-    StreamHandler,
-    getLogger,
-    WARN,
-    DEBUG,
-    INFO
-)
-
-if sys.version_info >= (3, 0):  # pylint: disable=using-constant-test  # pylint: disable=using-constant-test, wrong-import-order
-    # For type annotation
-    from typing import (  # NOQA: F401 pylint: disable=unused-import
-        Optional,
-        Dict,
-        List,
-        Tuple,
-        Pattern,
-        Callable,
-        Any,
-        Text,
-        Generator,
-        Union
-    )
 ###############################################################################
 handler = StreamHandler()
 handler.setLevel(DEBUG)
@@ -56,50 +30,61 @@ logger.propagate = False
 
 
 class ShifterMarkingMenu(rmbmenu.ShifterMarkingMenu):
-
     comp_name = os.path.basename(os.path.dirname(__file__))
-  
-    def build_specialized(self, targets):
+
+    def build_specialized(self, targets: list[str]) -> None:
         # self.menu is the parent marking menu that menuItems should be attached to
         cmds.setParent(self.menu, m=True)
 
-        root = control_util.get_component_root(targets[0])
         # choices = control.get_head_ref_choices(root)
-        space_switch = cmds.menuItem(l='Space Switch', rp='W', subMenu=True)
+        space_switch = cmds.menuItem(l="Space Switch", rp="W", subMenu=True)
 
         # for i, choice in enumerate(choices):
-        #     cmds.menuItem(l="Switch Head Ref to {}".format(choice), parent=space_switch, command=partial(self.space_switch_head, targets, i, False))
+        #     cmds.menuItem(
+        #         l="Switch Head Ref to {}".format(choice),
+        #         parent=space_switch,
+        #         command=partial(self.space_switch_head, targets, i, False),
+        #     )
 
-        cmds.menuItem(l='Switch IKFK', rp='NW', parent=space_switch, command=partial(self.space_switch_ikfk, targets, False))
-        cmds.menuItem(l='Transfer IKFK', rp='SW', parent=space_switch, command=partial(self.space_switch_ikfk, targets, True))
+        cmds.menuItem(
+            l="Switch IKFK",
+            rp="NW",
+            parent=space_switch,
+            command=partial(self.space_switch_ikfk, targets, False),
+        )
+        cmds.menuItem(
+            l="Transfer IKFK",
+            rp="SW",
+            parent=space_switch,
+            command=partial(self.space_switch_ikfk, targets, True),
+        )
 
         cmds.setParent(self.menu, menu=True)
-        cmds.menuItem(l="Reset FK", rp='SE', command=partial(self.reset_fk, targets))
+        cmds.menuItem(l="Reset FK", rp="SE", command=partial(self.reset_fk, targets))
 
-    def reset_fk(self, targets, flag):
-        # type: (List[Text], bool) -> None
-
+    def reset_fk(self, targets: list[str], _flag: object) -> None:
         root = control_util.get_component_root(targets[0])
         controllers = control_util.get_component_controllers(root)
         fk_controllers = [x for x in controllers if "fk" in x]
 
         import pymel.core as pm
+
         for target in fk_controllers:
             node = pm.PyNode(target)
             transform.resetTransform(node)
 
-    def space_switch_head(self, targets, choice_index, transfer, flag):
+    def space_switch_head(self, targets: list[str], choice_index: int, transfer: bool, _flag: object) -> None:
         print(targets, choice_index, transfer)
         root = control_util.get_component_root(targets[0])
 
         try:
             control.switch_head_ref(root, choice_index)
-        except:
+        except Exception:
             import traceback
+
             traceback.print_exc()
 
-    def space_switch_ikfk(self, targets, transfer, flag):
-
+    def space_switch_ikfk(self, targets: list[str], transfer: bool, _flag: object) -> None:
         current_namespace = ":".join(targets[0].split(":")[:-1])
         root = control_util.get_component_root(targets[0])
         if not root:

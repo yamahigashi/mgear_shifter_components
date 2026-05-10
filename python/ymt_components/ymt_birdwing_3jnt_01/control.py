@@ -1,9 +1,11 @@
 """Controller helpers for ymt_birdwing_3jnt_01."""
 
 import traceback
+from typing import ClassVar, Optional
 
 import maya.cmds as cmds
 from maya.api import OpenMaya as om2
+
 try:
     import mgear.pymaya as pm
 except ImportError:
@@ -14,21 +16,25 @@ from mgear.core import anim_utils, pyqt as gqt
 import mgear.synoptic.utils as syn_uti
 
 from ymt_components.control import AbstractControllerButton
+from ymt_shifter_utility.type_protocols import PymelNode, SettablePlug, VectorLike, WorldPoint
 
 QtGui, QtCore, QtWidgets, wrapInstance = gqt.qt_import()
 
+Matrix = list[float]
+TransferFrameData = tuple[Matrix, list[float], Matrix]
+
 
 class ikfkMatchAllButton(AbstractControllerButton):
-    controllers = {
+    controllers: ClassVar[dict[str, str]] = {
         "ikfk_attr": "wing_blend",
         "fk0": "wing_",
     }
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: object, **kwargs: object) -> None:
         super(ikfkMatchAllButton, self).__init__(*args, **kwargs)
         self.model = syn_uti.getModel(self)
 
-    def mousePressEvent(self, event):
+    def mousePressEvent(self, event: QtGui.QMouseEvent) -> None:
         if not self.isControllerSetup():
             self.lookupControllers()
             self.hand_ik = self.ik.replace("_ik_", "_hand_ik_")
@@ -66,7 +72,7 @@ class ikfkMatchButton(ikfkMatchAllButton):
 class IkFkTransfer(syn_uti.IkFkTransfer):
     """Small transfer wrapper for the wing-specific control set."""
 
-    def setCtrls(self, fks, ik, upv, hand_ik, palm=None):
+    def setCtrls(self, fks: list[str], ik: str, upv: str, hand_ik: str, palm: Optional[str] = None) -> None:
         self.fkCtrls = [self._getNode(x) for x in fks]
         self.fkTargets = [self._getMth(x) for x in fks]
         self.ikCtrl = self._getNode(ik)
@@ -77,7 +83,15 @@ class IkFkTransfer(syn_uti.IkFkTransfer):
         self.handIkTarget = self._getNode(hand_ik.replace("_hand_ik_ctl", "_handIk_mth"))
         self.palmCtrl = self._getNode(palm) if palm else None
 
-    def transfer(self, startFrame, endFrame, onlyKeyframes, switchTo=None, *args, **kwargs):
+    def transfer(
+        self,
+        startFrame: int,
+        endFrame: int,
+        onlyKeyframes: bool,
+        switchTo: Optional[str] = None,
+        *_args: object,
+        **_kwargs: object,
+    ) -> None:
         if switchTo is not None and "fk" in switchTo.lower():
             val_src_nodes = self.fkTargets
             key_src_nodes = [self.ikCtrl, self.upvCtrl, self.handIkCtrl]
@@ -97,16 +111,17 @@ class IkFkTransfer(syn_uti.IkFkTransfer):
 
         self._transfer_to_ik(startFrame, endFrame, onlyKeyframes)
 
-    def _transfer_to_ik(self, startFrame, endFrame, onlyKeyframes):
-        key_src_nodes = self.fkCtrls
+    def _get_transfer_to_ik_dst_nodes(self) -> list[PymelNode]:
         key_dst_nodes = [self.ikCtrl, self.upvCtrl, self.handIkCtrl]
         if self.palmCtrl:
             key_dst_nodes.append(self.palmCtrl)
-        switch_attr_name = self.getChangeAttrName()
+        return key_dst_nodes
 
-        src_keys = pm.keyframe(key_src_nodes, at=["t", "r", "s"], q=True) or []
-        keyframe_list = sorted(set(int(x) for x in src_keys))
-
+    def _collect_transfer_to_ik_data(
+        self, startFrame: int, endFrame: int, onlyKeyframes: bool
+    ) -> list[Optional[TransferFrameData]]:
+        src_keys = pm.keyframe(self.fkCtrls, at=["t", "r", "s"], q=True) or []
+        keyframe_list = sorted({int(x) for x in src_keys})
         frame_data = []
         for frame in range(startFrame, endFrame + 1):
             if onlyKeyframes and frame not in keyframe_list:
@@ -121,7 +136,11 @@ class IkFkTransfer(syn_uti.IkFkTransfer):
                     getMatrix(self.handIkTarget),
                 )
             )
+        return frame_data
 
+    def _clear_transfer_to_ik_keys(
+        self, key_dst_nodes: list[PymelNode], switch_attr_name: str, startFrame: int, endFrame: int
+    ) -> tuple:
         channels = ["tx", "ty", "tz", "rx", "ry", "rz", "sx", "sy", "sz"]
         roll_attrs = _get_roll_attrs_from_switch(switch_attr_name)
         mode_attrs = _get_attrs_from_switch(switch_attr_name, ("wristControlMode",))
@@ -131,30 +150,58 @@ class IkFkTransfer(syn_uti.IkFkTransfer):
             pm.cutKey(roll_attrs, time=(startFrame, endFrame))
         if mode_attrs:
             pm.cutKey(mode_attrs, time=(startFrame, endFrame))
+        return channels, roll_attrs, mode_attrs
 
+    def _apply_transfer_to_ik_frame(
+        self,
+        key_dst_nodes: list[PymelNode],
+        switch_attr_name: str,
+        channels: list[str],
+        roll_attrs: list[str],
+        mode_attrs: list[str],
+        data: TransferFrameData,
+    ) -> None:
+        self.changeAttrToBoundValue()
+        ik_matrix, upv_translate, hand_ik_matrix = data
+        setMatrix(self.ikCtrl, ik_matrix)
+        _set_upv_translate(self.upvCtrl, upv_translate)
+        if self.palmCtrl:
+            _reset_attrs(self.palmCtrl, ["rx", "ry", "rz"])
+        setMatrix(self.handIkCtrl, hand_ik_matrix)
+        _set_attrs_zero(roll_attrs)
+        pm.setKeyframe(key_dst_nodes, at=channels)
+        pm.setKeyframe(switch_attr_name)
+        if roll_attrs:
+            pm.setKeyframe(roll_attrs)
+        if mode_attrs:
+            pm.setKeyframe(mode_attrs)
+
+    def _transfer_to_ik(self, startFrame: int, endFrame: int, onlyKeyframes: bool) -> None:
+        key_dst_nodes = self._get_transfer_to_ik_dst_nodes()
+        switch_attr_name = self.getChangeAttrName()
+        frame_data = self._collect_transfer_to_ik_data(startFrame, endFrame, onlyKeyframes)
+        channels, roll_attrs, mode_attrs = self._clear_transfer_to_ik_keys(
+            key_dst_nodes, switch_attr_name, startFrame, endFrame
+        )
         for index, frame in enumerate(range(startFrame, endFrame + 1)):
             data = frame_data[index]
             if data is None:
                 continue
 
             pm.currentTime(frame)
-            self.changeAttrToBoundValue()
-            ik_matrix, upv_translate, hand_ik_matrix = data
-            setMatrix(self.ikCtrl, ik_matrix)
-            _set_upv_translate(self.upvCtrl, upv_translate)
-            if self.palmCtrl:
-                _reset_attrs(self.palmCtrl, ["rx", "ry", "rz"])
-            setMatrix(self.handIkCtrl, hand_ik_matrix)
-            _set_attrs_zero(roll_attrs)
-            pm.setKeyframe(key_dst_nodes, at=channels)
-            pm.setKeyframe(switch_attr_name)
-            if roll_attrs:
-                pm.setKeyframe(roll_attrs)
-            if mode_attrs:
-                pm.setKeyframe(mode_attrs)
+            self._apply_transfer_to_ik_frame(key_dst_nodes, switch_attr_name, channels, roll_attrs, mode_attrs, data)
 
     @staticmethod
-    def showUI(model, ikfk_attr, uihost, fks, ik, upv, hand_ik, palm=None):
+    def showUI(
+        model: object,
+        ikfk_attr: str,
+        uihost: str,
+        fks: list[str],
+        ik: str,
+        upv: str,
+        hand_ik: str,
+        palm: Optional[str] = None,
+    ) -> None:
         try:
             for child in gqt.maya_main_window().children():
                 if isinstance(child, IkFkTransfer):
@@ -178,19 +225,19 @@ class IkFkTransfer(syn_uti.IkFkTransfer):
 
     @staticmethod
     def execute(
-        model,
-        ikfk_attr,
-        uihost,
-        fks,
-        ik,
-        upv,
-        hand_ik,
-        startFrame=None,
-        endFrame=None,
-        onlyKeyframes=None,
-        switchTo=None,
-        palm=None,
-    ):
+        model: object,
+        ikfk_attr: str,
+        uihost: str,
+        fks: list[str],
+        ik: str,
+        upv: str,
+        hand_ik: str,
+        startFrame: Optional[int] = None,
+        endFrame: Optional[int] = None,
+        onlyKeyframes: Optional[bool] = None,
+        switchTo: Optional[str] = None,
+        palm: Optional[str] = None,
+    ) -> None:
         if startFrame is None:
             startFrame = int(pm.playbackOptions(q=True, ast=True))
         if endFrame is None:
@@ -211,44 +258,64 @@ class IkFkTransfer(syn_uti.IkFkTransfer):
         ui.transfer(startFrame, endFrame, onlyKeyframes, switchTo=switchTo)
 
     @staticmethod
-    def toIK(model, ikfk_attr, uihost, fks, ik, upv, hand_ik, palm=None, **kwargs):
+    def toIK(
+        model: object,
+        ikfk_attr: str,
+        uihost: str,
+        fks: list[str],
+        ik: str,
+        upv: str,
+        hand_ik: str,
+        palm: Optional[str] = None,
+        **kwargs: object,
+    ) -> None:
         kwargs.update({"switchTo": "ik"})
         IkFkTransfer.execute(model, ikfk_attr, uihost, fks, ik, upv, hand_ik, palm=palm, **kwargs)
 
     @staticmethod
-    def toFK(model, ikfk_attr, uihost, fks, ik, upv, hand_ik, palm=None, **kwargs):
+    def toFK(
+        model: object,
+        ikfk_attr: str,
+        uihost: str,
+        fks: list[str],
+        ik: str,
+        upv: str,
+        hand_ik: str,
+        palm: Optional[str] = None,
+        **kwargs: object,
+    ) -> None:
         kwargs.update({"switchTo": "fk"})
         IkFkTransfer.execute(model, ikfk_attr, uihost, fks, ik, upv, hand_ik, palm=palm, **kwargs)
 
 
-def getMatrix(obj):
+def getMatrix(obj: PymelNode) -> Matrix:
     return cmds.xform(obj.name(), q=True, ws=True, matrix=True)
 
 
-def setMatrix(obj, mat):
+def setMatrix(obj: PymelNode, mat: Matrix) -> None:
     cmds.xform(obj.name(), ws=True, matrix=mat)
 
 
-def _set_upv_translate(upv_ctrl, values):
+def _set_upv_translate(upv_ctrl: PymelNode, values: list[float]) -> None:
     cmds.setAttr(upv_ctrl.name() + ".translate", values[0], values[1], values[2])
 
 
-def _set_attrs_zero(attrs):
+def _set_attrs_zero(attrs: list[str]) -> None:
     for attr in attrs:
         pm.setAttr(attr, 0.0)
 
 
-def _reset_attrs(obj, attrs):
+def _reset_attrs(obj: PymelNode, attrs: list[str]) -> None:
     for attr in attrs:
         if obj.hasAttr(attr):
             obj.attr(attr).set(0.0)
 
 
-def _get_roll_attrs_from_switch(switch_attr_name):
+def _get_roll_attrs_from_switch(switch_attr_name: str) -> list[str]:
     return _get_attrs_from_switch(switch_attr_name, ("roll", "handRoll"))
 
 
-def _get_attrs_from_switch(switch_attr_name, attr_names):
+def _get_attrs_from_switch(switch_attr_name: str, attr_names: tuple[str, ...]) -> list[str]:
     node_name, blend_name = switch_attr_name.rsplit(".", 1)
     attrs = []
     for attr_name in attr_names:
@@ -258,7 +325,7 @@ def _get_attrs_from_switch(switch_attr_name, attr_names):
     return attrs
 
 
-def _get_node(namespace, name):
+def _get_node(namespace: str, name: str) -> PymelNode:
     name = anim_utils.stripNamespace(name)
     if namespace:
         node = anim_utils.getNode(":".join([namespace, name]))
@@ -269,7 +336,7 @@ def _get_node(namespace, name):
     return node
 
 
-def _get_mth(namespace, name):
+def _get_mth(namespace: str, name: str) -> PymelNode:
     if "_hand_ik_ctl" in name:
         query = name.replace("_hand_ik_ctl", "_handIk_mth")
         node = _get_node(namespace, query)
@@ -287,7 +354,7 @@ def _get_mth(namespace, name):
     return node
 
 
-def _calculate_upv_position(fk_goals):
+def _calculate_upv_position(fk_goals: list[PymelNode]) -> VectorLike:
     start = fk_goals[0].getTranslation(space="world")
     mid = fk_goals[1].getTranslation(space="world")
     end = fk_goals[2].getTranslation(space="world")
@@ -303,7 +370,7 @@ def _calculate_upv_position(fk_goals):
     return arrow_vector + mid
 
 
-def _get_effective_upv_ref(upv_ctrl):
+def _get_effective_upv_ref(upv_ctrl: PymelNode) -> Optional[PymelNode]:
     candidates = []
     for attr_name in ("translate", "tx", "ty", "tz"):
         candidates.extend(
@@ -312,7 +379,8 @@ def _get_effective_upv_ref(upv_ctrl):
                 source=False,
                 destination=True,
                 plugs=False,
-            ) or []
+            )
+            or []
         )
 
     for candidate in candidates:
@@ -327,13 +395,13 @@ def _get_effective_upv_ref(upv_ctrl):
     return None
 
 
-def _world_point_to_local(point, parent):
+def _world_point_to_local(point: WorldPoint, parent: PymelNode) -> list[float]:
     parent_matrix = om2.MMatrix(cmds.xform(parent.name(), q=True, ws=True, matrix=True))
     local_point = om2.MPoint(point[0], point[1], point[2], 1.0) * parent_matrix.inverse()
     return [local_point.x, local_point.y, local_point.z]
 
 
-def _calculate_effective_upv_translate(upv_ctrl, fk_goals):
+def _calculate_effective_upv_translate(upv_ctrl: PymelNode, fk_goals: list[PymelNode]) -> list[float]:
     upv_ref = _get_effective_upv_ref(upv_ctrl)
     if not upv_ref:
         position = _calculate_upv_position(fk_goals)
@@ -342,7 +410,60 @@ def _calculate_effective_upv_translate(upv_ctrl, fk_goals):
     return _world_point_to_local(_calculate_upv_position(fk_goals), upv_ref.getParent())
 
 
-def ikFkMatch(namespace, ikfk_attr, ui_host, fks, ik, upv, hand_ik=None, palm=None, key=None):
+def _key_controls(controls: list[PymelNode], time: float) -> None:
+    for elem in controls:
+        cmds.setKeyframe(str(elem), time=time)
+
+
+def _match_to_fk(blend_attr: SettablePlug, fk_goals: list[PymelNode], fk_ctrls: list[PymelNode]) -> None:
+    fk_mats = [getMatrix(src) for src in fk_goals]
+    blend_attr.set(0.0)
+    for mat, dst in zip(fk_mats, fk_ctrls):
+        setMatrix(dst, mat)
+
+
+def _match_to_ik(
+    ikfk_attr: str,
+    ui_node: PymelNode,
+    ik_ctrl: PymelNode,
+    ik_goal: PymelNode,
+    upv_ctrl: PymelNode,
+    fk_ctrls: list[PymelNode],
+    fk_goals: list[PymelNode],
+    hand_ik_ctrl: Optional[PymelNode],
+    hand_ik_goal: Optional[PymelNode],
+    palm_ctrl: Optional[PymelNode],
+) -> None:
+    ik_mat = getMatrix(ik_goal)
+    hand_mat = getMatrix(hand_ik_goal) if hand_ik_goal else None
+    upv_translate = _calculate_effective_upv_translate(upv_ctrl, fk_goals)
+    root_mat = getMatrix(fk_goals[0])
+    ui_node.attr(ikfk_attr).set(1.0)
+    setMatrix(ik_ctrl, ik_mat)
+    if palm_ctrl:
+        _reset_attrs(palm_ctrl, ["rx", "ry", "rz"])
+    if hand_ik_ctrl and hand_mat:
+        setMatrix(hand_ik_ctrl, hand_mat)
+    _set_upv_translate(upv_ctrl, upv_translate)
+    for _ in range(10):
+        cmds.xform(fk_ctrls[0].name(), ws=True, matrix=root_mat)
+    for attr_name in ("roll", "handRoll"):
+        attr = ikfk_attr.replace("blend", attr_name)
+        if ui_node.hasAttr(attr):
+            ui_node.attr(attr).set(0.0)
+
+
+def ikFkMatch(
+    namespace: object,
+    ikfk_attr: str,
+    ui_host: str,
+    fks: list[str],
+    ik: str,
+    upv: str,
+    hand_ik: Optional[str] = None,
+    palm: Optional[str] = None,
+    key: Optional[bool] = None,
+) -> None:
     """Switch IK/FK while matching the visible controls."""
 
     if not isinstance(namespace, str):
@@ -359,40 +480,30 @@ def ikFkMatch(namespace, ikfk_attr, ui_host, fks, ik, upv, hand_ik=None, palm=No
     ui_node = _get_node(namespace, ui_host)
     blend_attr = ui_node.attr(ikfk_attr)
 
-    all_controls = list(fk_ctrls) + [ik_ctrl, upv_ctrl, ui_node]
+    all_controls = [*list(fk_ctrls), ik_ctrl, upv_ctrl, ui_node]
     if palm_ctrl:
         all_controls.append(palm_ctrl)
     if hand_ik_ctrl:
         all_controls.append(hand_ik_ctrl)
     if key:
-        for elem in all_controls:
-            cmds.setKeyframe(str(elem), time=(cmds.currentTime(query=True) - 1.0))
+        _key_controls(all_controls, cmds.currentTime(query=True) - 1.0)
 
     switch_to_fk = blend_attr.get() == 1.0
     if switch_to_fk:
-        fk_mats = [getMatrix(src) for src in fk_goals]
-        blend_attr.set(0.0)
-        for mat, dst in zip(fk_mats, fk_ctrls):
-            setMatrix(dst, mat)
+        _match_to_fk(blend_attr, fk_goals, fk_ctrls)
     else:
-        ik_mat = getMatrix(ik_goal)
-        hand_mat = getMatrix(hand_ik_goal) if hand_ik_goal else None
-        upv_translate = _calculate_effective_upv_translate(upv_ctrl, fk_goals)
-        root_mat = getMatrix(fk_goals[0])
-        blend_attr.set(1.0)
-        setMatrix(ik_ctrl, ik_mat)
-        if palm_ctrl:
-            _reset_attrs(palm_ctrl, ["rx", "ry", "rz"])
-        if hand_ik_ctrl and hand_mat:
-            setMatrix(hand_ik_ctrl, hand_mat)
-        _set_upv_translate(upv_ctrl, upv_translate)
-        for _ in range(10):
-            cmds.xform(fk_ctrls[0].name(), ws=True, matrix=root_mat)
-        for attr_name in ("roll", "handRoll"):
-            attr = ikfk_attr.replace("blend", attr_name)
-            if ui_node.hasAttr(attr):
-                ui_node.attr(attr).set(0.0)
+        _match_to_ik(
+            ikfk_attr,
+            ui_node,
+            ik_ctrl,
+            ik_goal,
+            upv_ctrl,
+            fk_ctrls,
+            fk_goals,
+            hand_ik_ctrl,
+            hand_ik_goal,
+            palm_ctrl,
+        )
 
     if key:
-        for elem in all_controls:
-            cmds.setKeyframe(str(elem), time=cmds.currentTime(query=True))
+        _key_controls(all_controls, cmds.currentTime(query=True))

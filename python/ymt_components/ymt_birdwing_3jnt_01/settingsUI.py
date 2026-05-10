@@ -6,7 +6,7 @@ QtGui, QtCore, QtWidgets, wrapInstance = gqt.qt_import()
 
 
 class Ui_Form(object):
-    def setupUi(self, Form):
+    def setupUi(self, Form: QtWidgets.QWidget) -> None:
         Form.setObjectName("Form")
         Form.resize(269, 596)
         self.gridLayout = QtWidgets.QGridLayout(Form)
@@ -170,7 +170,7 @@ class Ui_Form(object):
         self.ikfk_spinBox.valueChanged.connect(self.ikfk_slider.setValue)
         QtCore.QMetaObject.connectSlotsByName(Form)
 
-    def retranslateUi(self, Form):
+    def retranslateUi(self, Form: QtWidgets.QWidget) -> None:
         Form.setWindowTitle(gqt.fakeTranslate("Form", "Form", None, -1))
         self.ikfk_label.setText(gqt.fakeTranslate("Form", "FK/IK Blend", None, -1))
         self.ikSolver_label.setText(gqt.fakeTranslate("Form", "IK Solver", None, -1))
@@ -183,9 +183,7 @@ class Ui_Form(object):
             gqt.fakeTranslate("Form", "World Space Orientation Align IK ctl", None, -1)
         )
         self.divisions_label.setText(gqt.fakeTranslate("Form", "Divisions", None, -1))
-        self.squashStretchProfile_pushButton.setText(
-            gqt.fakeTranslate("Form", "Squash and Stretch Profile", None, -1)
-        )
+        self.squashStretchProfile_pushButton.setText(gqt.fakeTranslate("Form", "Squash and Stretch Profile", None, -1))
         self.ikRefArray_groupBox.setTitle(gqt.fakeTranslate("Form", "IK Reference Array", None, -1))
         self.ikRefArray_copyRef_pushButton.setText(gqt.fakeTranslate("Form", "Copy from UpV Ref", None, -1))
         self.ikRefArrayAdd_pushButton.setText(gqt.fakeTranslate("Form", "<<", None, -1))
