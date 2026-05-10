@@ -128,3 +128,15 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Codex local configuration
+.codex/
+
+# Claude Flow runtime data
+.claude-flow/data/
+.claude-flow/logs/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
