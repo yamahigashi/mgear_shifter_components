@@ -9,6 +9,7 @@ import os
 import re
 import sys
 import xml.etree.ElementTree as ET
+from collections.abc import Iterator, Sequence
 from logging import DEBUG, INFO, WARN, StreamHandler, getLogger  # NOQA
 
 import anyconfig
@@ -30,11 +31,11 @@ if sys.version_info >= (3, 0):
     )
 
 try:
-    import gml_maya.util as util  # type: ignore
+    import gml_maya.util as util
 except ImportError:
     class _DummyUtil:
         @staticmethod
-        def displayable_path(x):
+        def displayable_path(x: str) -> str:
             return x
     util = _DummyUtil()
 
@@ -63,8 +64,13 @@ class MGOption:
         alias_definition (dict or None): Loaded alias definitions
     """
 
-    def __init__(self, alias_definition=None, dst_alias=False, src_alias=False, dst_multiple=False):
-        # type: (Optional[str], bool, bool, bool) -> None
+    def __init__(
+        self,
+        alias_definition: Optional[str] = None,
+        dst_alias: bool = False,
+        src_alias: bool = False,
+        dst_multiple: bool = False,
+    ) -> None:
         """Initialize MGOption."""
         self.alias_definition_path = alias_definition
 
@@ -82,8 +88,7 @@ class MGOption:
         if self.alias_definition_path is not None and os.path.exists(self.alias_definition_path):
             self._load_alias_definition()
 
-    def _load_alias_definition(self):
-        # type: () -> None
+    def _load_alias_definition(self) -> None:
         """Load alias definitions from XML file."""
         self.alias_definition = {}
 
@@ -116,8 +121,7 @@ class MGOption:
 ##############################################################################
 
 
-def get_node(node_name):
-    # type: (Text) -> Optional[OpenMaya2.MDagPath]
+def get_node(node_name: str) -> Optional[OpenMaya2.MDagPath]:
     """Get Maya node(s) by name.
 
     Args:
@@ -152,8 +156,7 @@ def get_node(node_name):
     return dag_paths[0]
 
 
-def get_nodes(node_name):
-    # type: (Text) -> Optional[list[OpenMaya2.MDagPath]]
+def get_nodes(node_name: str) -> Optional[list[OpenMaya2.MDagPath]]:
     """Get Maya node(s) by name.
 
     Args:
@@ -188,8 +191,7 @@ def get_nodes(node_name):
     return dag_paths
 
 
-def apply_alias(name, definition):
-    # type: (Text, dict[Text, Text]) -> Text
+def apply_alias(name: str, definition: dict[str, str]) -> str:
     """Apply alias to name if defined in the definition.
 
     Args:
@@ -209,8 +211,10 @@ def apply_alias(name, definition):
 ##############################################################################
 
 
-def get_rotation(dag_path, space=OpenMaya2.MSpace.kWorld):
-    # type: (OpenMaya2.MDagPath, Union[int, OpenMaya2.MSpace]) -> OpenMaya2.MQuaternion
+def get_rotation(
+    dag_path: OpenMaya2.MDagPath,
+    space: Union[int, OpenMaya2.MSpace] = OpenMaya2.MSpace.kWorld,
+) -> OpenMaya2.MQuaternion:
     """Get rotation of a node as quaternion.
 
     Args:
@@ -241,8 +245,11 @@ def get_rotation(dag_path, space=OpenMaya2.MSpace.kWorld):
     return rotation
 
 
-def set_rotation(dag_path, quat, space=OpenMaya2.MSpace.kWorld):
-    # type: (OpenMaya2.MDagPath, OpenMaya2.MQuaternion, Union[int, OpenMaya2.MSpace]) -> None
+def set_rotation(
+    dag_path: OpenMaya2.MDagPath,
+    quat: OpenMaya2.MQuaternion,
+    space: Union[int, OpenMaya2.MSpace] = OpenMaya2.MSpace.kWorld,
+) -> None:
     """Set rotation of a node (Quaternion).
 
     Args:
@@ -266,8 +273,10 @@ def set_rotation(dag_path, quat, space=OpenMaya2.MSpace.kWorld):
         cmds.parent(path_name, parent[0])
 
 
-def get_translation(dag_path, space=OpenMaya2.MSpace.kWorld):
-    # type: (OpenMaya2.MDagPath, Union[int, OpenMaya2.MSpace]) -> OpenMaya2.MVector
+def get_translation(
+    dag_path: OpenMaya2.MDagPath,
+    space: Union[int, OpenMaya2.MSpace] = OpenMaya2.MSpace.kWorld,
+) -> OpenMaya2.MVector:
     """Get translation of a node.
 
     Args:
@@ -281,8 +290,11 @@ def get_translation(dag_path, space=OpenMaya2.MSpace.kWorld):
     return transform.translation(space)
 
 
-def set_translation(dag_path, value, space=OpenMaya2.MSpace.kWorld):
-    # type: (OpenMaya2.MDagPath, OpenMaya2.MVector, Union[int, OpenMaya2.MSpace]) -> None
+def set_translation(
+    dag_path: OpenMaya2.MDagPath,
+    value: OpenMaya2.MVector,
+    space: Union[int, OpenMaya2.MSpace] = OpenMaya2.MSpace.kWorld,
+) -> None:
     """Set translation of a node.
 
     Args:
@@ -299,8 +311,7 @@ def set_translation(dag_path, value, space=OpenMaya2.MSpace.kWorld):
 ##############################################################################
 
 
-def connect_attr(source, destination):
-    # type: (Text, Text) -> None
+def connect_attr(source: str, destination: str) -> None:
     """Connect one attribute to another.
 
     Args:
@@ -327,15 +338,14 @@ def connect_attr(source, destination):
 
 
 def parent_constrain(
-    source,
-    destination,
-    mode,
-    maintain_offset=True,
-    translate_axis=("x", "y", "z"),
-    rotate_axis=("x", "y", "z"),
-    weight=None,
-):
-    # type: (OpenMaya2.MDagPath, Union[OpenMaya2.MDagPath, list[OpenMaya2.MDagPath]], Text, bool, tuple[Text, ...], tuple[Text, ...], Optional[float]) -> None
+    source: OpenMaya2.MDagPath,
+    destination: Union[OpenMaya2.MDagPath, list[OpenMaya2.MDagPath]],
+    mode: str,
+    maintain_offset: bool = True,
+    translate_axis: Sequence[str] = ("x", "y", "z"),
+    rotate_axis: Sequence[str] = ("x", "y", "z"),
+    weight: Optional[float] = None,
+) -> None:
     """Create parent constraint between nodes.
 
     Args:
@@ -367,20 +377,20 @@ def parent_constrain(
         cns_list = cmds.parentConstraint(
             source.fullPathName(),
             destination.fullPathName(),
-            skipTranslate=skip_translate,  # type: ignore
-            skipRotate=skip_rotate,  # type: ignore
+            skipTranslate=skip_translate,
+            skipRotate=skip_rotate,
             maintainOffset=maintain_offset,
         )
         if not cns_list:
             return
 
-        cns_node = cns_list[0]  # type: ignore
+        cns_node = cns_list[0]
         # interpType を 0 (平均) にする
         cmds.setAttr(f"{cns_node}.interpType", 0)
 
         # ウェイトが指定されていれば設定
         if weight is not None:
-            attrs = cmds.listAttr(cns_node, keyable=True) or []  # type: ignore
+            attrs = cmds.listAttr(cns_node, keyable=True) or []
             src_name = source.fullPathName().replace(":", "|").split("|")[-1]
             weight_attr = f"{src_name}W"
             for a in attrs:
@@ -400,8 +410,7 @@ def parent_constrain(
 # Context Managers
 ##############################################################################
 @contextlib.contextmanager
-def maintain_children(target):
-    # type: (str) -> Generator
+def maintain_children(target: str) -> Iterator[None]:
     """Context manager that preserves child hierarchy during operations.
 
     Args:
@@ -427,8 +436,11 @@ def maintain_children(target):
 ##############################################################################
 
 
-def __tokenize_offset(node, offset, mode="t"):
-    # type: (str, Union[Text, list[Union[str, float]], tuple[Union[str, float], ...]], str) -> list[float]
+def __tokenize_offset(
+    node: str,
+    offset: Union[str, Sequence[Union[str, float]]],
+    mode: str = "t",
+) -> list[float]:
     """Tokenize offset values, resolving any relative offsets like "2.5x".
 
     Args:
@@ -453,7 +465,7 @@ def __tokenize_offset(node, offset, mode="t"):
     norm_pos = norm_xform.translation(OpenMaya2.MSpace.kTransform)
     norm_rot = norm_xform.rotation().asVector()
 
-    def _tokenize_value(val, idx):
+    def _tokenize_value(val: Union[str, float], idx: int) -> float:
         # e.g. "2.5x" means relative to local transform
         if isinstance(val, six.string_types) and val.endswith("x"):
             try:
@@ -475,8 +487,12 @@ def __tokenize_offset(node, offset, mode="t"):
     return [_tokenize_value(x, i) for i, x in enumerate(offset)]
 
 
-def do_match(entry, selection=None, option=None, preserve_children=False):
-    # type: (dict[Text, Any], Optional[list[Text]], Optional[MGOption], bool) -> None
+def do_match(
+    entry: dict[str, Any],
+    selection: Optional[list[str]] = None,
+    option: Optional[MGOption] = None,
+    preserve_children: bool = False,
+) -> None:
     """Match transform of source node to destination node.
 
     Args:
@@ -516,7 +532,7 @@ def do_match(entry, selection=None, option=None, preserve_children=False):
     if isinstance(mode, six.string_types):
         mode = [mode]
 
-    def _perform_match():
+    def _perform_match() -> None:
         logger.info(f"Matching mode({mode}) destination: {destination}, source: {source}")
 
         # Translation
@@ -552,16 +568,19 @@ def do_match(entry, selection=None, option=None, preserve_children=False):
         _perform_match()
 
 
-def do_connect(entry, option=None):
-    # type: (dict[Text, Any], Optional[MGOption]) -> None
+def do_connect(entry: dict[str, Any], option: Optional[MGOption] = None) -> None:
     """Connect or constrain one node to another.
 
     Args:
         entry: Dict defining the connection (contains "src", "dst", "mode", etc.)
         option: MGOption for alias handling, etc.
     """
-    def _connect_single(src_query, dst_query, _mode, _weight=None):
-        # type: (Text, Text, Text, Optional[float]) -> None
+    def _connect_single(
+        src_query: str,
+        dst_query: str,
+        _mode: str,
+        _weight: Optional[float] = None,
+    ) -> None:
         if option and option.alias_definition:
             if option.src_alias:
                 src_query = apply_alias(src_query, option.alias_definition)
@@ -590,8 +609,8 @@ def do_connect(entry, option=None):
             # Parent constraint
             parent_constrain(source, destination, _mode, maintain_offset=True, weight=_weight)
 
-    s_query = entry.get("src")  # type: Union[list[Any], Text]
-    d_query = entry.get("dst")  # type: Text
+    s_query = entry.get("src")
+    d_query = entry.get("dst")
     if not d_query:
         logger.error(f"No 'dst' found in entry: {entry}")
         return
@@ -614,8 +633,11 @@ def do_connect(entry, option=None):
 ##############################################################################
 
 
-def match(def_file_name="test.yaml", domain="guide_on_bone", option=None):
-    # type: (Text, Text, Optional[MGOption]) -> None
+def match(
+    def_file_name: str = "test.yaml",
+    domain: str = "guide_on_bone",
+    option: Optional[MGOption] = None,
+) -> None:
     """Match transforms based on configuration file.
 
     Args:
@@ -639,8 +661,11 @@ def match(def_file_name="test.yaml", domain="guide_on_bone", option=None):
         logger.exception("Traceback:")
 
 
-def connect_on_deformer(def_file_name="test.yaml", domain="bone_on_deformer", option=None):
-    # type: (Text, Text, Optional[MGOption]) -> None
+def connect_on_deformer(
+    def_file_name: str = "test.yaml",
+    domain: str = "bone_on_deformer",
+    option: Optional[MGOption] = None,
+) -> None:
     """Connect nodes based on configuration file.
 
     Args:
@@ -671,8 +696,7 @@ def connect_on_deformer(def_file_name="test.yaml", domain="bone_on_deformer", op
 plug_exp = re.compile(r"(?P<parent_name>\w+)\[(?P<parent_idx>\d+)\]\.(?P<target_name>\w+)")
 
 
-def _get_plug(node, name):
-    # type: (OpenMaya2.MFnDependencyNode, Text) -> Optional[OpenMaya2.MPlug]
+def _get_plug(node: OpenMaya2.MFnDependencyNode, name: str) -> Optional[OpenMaya2.MPlug]:
     """Get a plug (attribute) from a node.
 
     Args:

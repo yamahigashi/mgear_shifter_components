@@ -10,7 +10,7 @@
 from Qt import QtCore, QtWidgets
 
 class Ui_Form(object):
-    def setupUi(self, Form):
+    def setupUi(self, Form: QtWidgets.QWidget) -> None:
         Form.setObjectName("Form")
         Form.resize(268, 861)
         self.gridLayout = QtWidgets.QGridLayout(Form)
@@ -270,7 +270,7 @@ class Ui_Form(object):
         self.ikfk_spinBox.valueChanged.connect(self.ikfk_slider.setValue)
         QtCore.QMetaObject.connectSlotsByName(Form)
 
-    def retranslateUi(self, Form):
+    def retranslateUi(self, Form: QtWidgets.QWidget) -> None:
         Form.setWindowTitle(QtWidgets.QApplication.translate("Form", "Form", None, -1))
         self.ikfk_label.setText(QtWidgets.QApplication.translate("Form", "FK/IK Blend", None, -1))
         self.maxStretch_label.setText(QtWidgets.QApplication.translate("Form", "Max Stretch", None, -1))

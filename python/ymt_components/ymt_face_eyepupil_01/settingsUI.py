@@ -13,7 +13,7 @@ from Qt.QtWidgets import *
 
 
 class Ui_Form(object):
-    def setupUi(self, Form):
+    def setupUi(self, Form: QtWidgets.QWidget) -> None:
         if not Form.objectName():
             Form.setObjectName("Form")
         Form.resize(430, 850)
@@ -369,7 +369,7 @@ class Ui_Form(object):
         QMetaObject.connectSlotsByName(Form)
     # setupUi
 
-    def retranslateUi(self, Form):
+    def retranslateUi(self, Form: QtWidgets.QWidget) -> None:
         Form.setWindowTitle(QCoreApplication.translate("Form", "Form", None))
         self.keyable_groupBox.setTitle(QCoreApplication.translate("Form", "Keyable", None))
         self.translate_pushButton.setText(QCoreApplication.translate("Form", "Translate", None))

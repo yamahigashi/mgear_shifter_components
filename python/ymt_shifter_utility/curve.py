@@ -1,3 +1,4 @@
+from __future__ import annotations
 """modifyed mgear.core.curve for adding matrix keyword arguments"""
 
 #############################################
@@ -16,12 +17,14 @@ try:
 except ImportError:
     dt = importlib.import_module("pymel.core.datatypes")
 import json
+from collections.abc import Generator, Iterable, Sequence
 
 import maya.cmds as cmds
 import maya.OpenMaya as om
 import maya.api.OpenMaya as om2
 
 from mgear.core import applyop
+from ymt_shifter_utility.type_protocols import DagNodeLike, MatrixLike, PymelNode, VectorLike, WorldPoint
 from mgear.core.transform import (
     getTransform,
 )
@@ -65,7 +68,15 @@ if sys.version_info > (3, 0):
 #############################################
 
 
-def addCnsCurve(parent, name, drivers, degree=1, m=dt.Matrix(), close=False, local=False):
+def addCnsCurve(
+    parent: DagNodeLike | None,
+    name: str,
+    drivers: Sequence[DagNodeLike | str],
+    degree: int = 1,
+    m: MatrixLike = dt.Matrix(),
+    close: bool = False,
+    local: bool = False,
+) -> DagNodeLike:
     """Create a curve attached to given drivers. One point per center
 
     Arguments:
@@ -102,12 +113,14 @@ def addCnsCurve(parent, name, drivers, degree=1, m=dt.Matrix(), close=False, loc
     return node
 
 
-def addCurve(parent,
-             name,
-             points,
-             close=False,
-             degree=3,
-             m=dt.Matrix()):
+def addCurve(
+    parent: DagNodeLike | None,
+    name: str,
+    points: list[WorldPoint],
+    close: bool = False,
+    degree: int = 3,
+    m: MatrixLike | None = dt.Matrix(),
+) -> DagNodeLike:
     """Create a NurbsCurve with a single subcurve.
 
     Arguments:
@@ -140,13 +153,15 @@ def addCurve(parent,
     return node
 
 
-def createCurveFromOrderedEdges(edgeLoop,
-                                startVertex,
-                                name,
-                                parent=None,
-                                degree=3,
-                                m=dt.Matrix(),
-                                close=False):
+def createCurveFromOrderedEdges(
+    edgeLoop: Sequence[object],
+    startVertex: object,
+    name: str,
+    parent: DagNodeLike | None = None,
+    degree: int = 3,
+    m: MatrixLike | None = dt.Matrix(),
+    close: bool = False,
+) -> DagNodeLike:
     """Create a curve for a edgeloop ordering the list from starting vertex
 
     Arguments:
@@ -180,7 +195,7 @@ def createCurveFromOrderedEdges(edgeLoop,
 
     # return orderedEdges
     orderedVertex = [startVertex]
-    startPos = startVertex.getPosition(space="world") 
+    startPos = startVertex.getPosition(space="world")
     startPos = __applyInverseMatrixToPosition(startPos, m)
     orderedVertexPos = [startPos]
     for e in orderedEdges:
@@ -190,20 +205,22 @@ def createCurveFromOrderedEdges(edgeLoop,
                 orderedVertex.append(v)
                 pos = v.getPosition(space="world")
                 pos = __applyInverseMatrixToPosition(pos, m)
-         
+
                 orderedVertexPos.append(pos)
 
     crv = addCurve(parent, name, orderedVertexPos, degree=degree, m=m, close=close)
     return crv
 
 
-def createCurveFromEdges(edgeList,
-                        name,
-                        parent=None,
-                        degree=3,
-                        sortingAxis="x",
-                        close=False,
-                        m=dt.Matrix()):
+def createCurveFromEdges(
+    edgeList: Sequence[object],
+    name: str,
+    parent: DagNodeLike | None = None,
+    degree: int = 3,
+    sortingAxis: str = "x",
+    close: bool = False,
+    m: MatrixLike | None = dt.Matrix(),
+) -> DagNodeLike:
     """Create curve from a edge list.
 
     Arguments:
@@ -255,8 +272,7 @@ def createCurveFromEdges(edgeList,
     return crv
 
 
-def __applyInverseMatrixToPosition(pos, m):
-    # type: (list[float], dt.Matrix|om2.MMatrix|None) -> list[float]
+def __applyInverseMatrixToPosition(pos: list[float], m: dt.Matrix|om2.MMatrix|None) -> list[float]:
 
     if m is None:
         return pos
@@ -282,8 +298,7 @@ def __applyInverseMatrixToPosition(pos, m):
     return res
 
 
-def createCurveFromCurve(srcCrv, name, nbPoints, parent=None, m=dt.Matrix(), close=False, space=om2.MSpace.kWorld):
-    # type: (Union[str, pm.PyNode], str, int, Union[str, pm.PyNode, None], dt.Matrix, bool, str) -> pm.PyNode
+def createCurveFromCurve(srcCrv: Union[str, pm.PyNode], name: str, nbPoints: int, parent: Union[str, pm.PyNode, None] = None, m: dt.Matrix = dt.Matrix(), close: bool = False, space: str = om2.MSpace.kWorld) -> pm.PyNode:
     """Create a curve from a curve
 
     Arguments:
@@ -339,8 +354,7 @@ def createCurveFromCurve(srcCrv, name, nbPoints, parent=None, m=dt.Matrix(), clo
     return crv
 
 
-def createCurveFromCurveEvenLength(srcCrv, name, nbPoints, parent=None, m=dt.Matrix(), close=False, space=om2.MSpace.kWorld):
-    # type: (Union[str, pm.PyNode], str, int, Union[str, pm.PyNode, None], dt.Matrix, bool, str) -> pm.PyNode
+def createCurveFromCurveEvenLength(srcCrv: Union[str, pm.PyNode], name: str, nbPoints: int, parent: Union[str, pm.PyNode, None] = None, m: dt.Matrix = dt.Matrix(), close: bool = False, space: str = om2.MSpace.kWorld) -> pm.PyNode:
     """Create a curve from a curve
 
     Arguments:
@@ -396,7 +410,7 @@ def createCurveFromCurveEvenLength(srcCrv, name, nbPoints, parent=None, m=dt.Mat
     return crv
 
 
-def getCurveParamAtPosition(crv, position):
+def getCurveParamAtPosition(crv: PymelNode, position: Sequence[float]) -> tuple[float, float]:
     """Get curve parameter from a position
 
     Arguments:
@@ -430,7 +444,7 @@ def getCurveParamAtPosition(crv, position):
     return param, length
 
 
-def getCurveParamByRatio(crv, ratio):
+def getCurveParamByRatio(crv: PymelNode, ratio: float) -> tuple[float, float]:
     """Get curve parameter from a ratio
 
     Arguments:
@@ -450,8 +464,7 @@ def getCurveParamByRatio(crv, ratio):
     return param, length
 
 
-def getCurveLength(crv):
-    # type: (str|dt.Transform|om2.MObject|om2.MDagPath|om2.MFnNurbsCurve) -> float
+def getCurveLength(crv: str|dt.Transform|om2.MObject|om2.MDagPath|om2.MFnNurbsCurve) -> float:
     """Get the length of a curve."""
 
     if not isinstance(crv, om2.MFnNurbsCurve):
@@ -460,7 +473,7 @@ def getCurveLength(crv):
     return crv.length()
 
 
-def getPositionByRatio(crv, ratio):
+def getPositionByRatio(crv: PymelNode, ratio: float) -> object:
     """Get position on curve from a ratio
 
     Arguments:
@@ -475,7 +488,7 @@ def getPositionByRatio(crv, ratio):
     return point
 
 
-def findLenghtFromParam(crv, param, close=False):
+def findLenghtFromParam(crv: PymelNode, param: float, close: bool = False) -> float:
     """
     Find lengtht from a curve parameter
 
@@ -513,7 +526,7 @@ def findLenghtFromParam(crv, param, close=False):
 
 # ========================================
 
-def get_color(node):
+def get_color(node: PymelNode) -> int | tuple[float, float, float] | None:
     """Get the color from shape node
 
     Args:
@@ -532,7 +545,7 @@ def get_color(node):
         return color
 
 
-def set_color(node, color):
+def set_color(node: PymelNode, color: int | Sequence[float]) -> None:
     """Set the color in the Icons.
 
     Arguments:
@@ -560,7 +573,7 @@ def set_color(node, color):
 # Curves IO ==============================
 # ========================================
 
-def collect_curve_shapes(crv, rplStr=["", ""]):
+def collect_curve_shapes(crv: PymelNode, rplStr: Sequence[str] = ("", "")) -> tuple[dict[str, object], list[str]]:
     """Collect curve shapes data
 
     Args:
@@ -594,7 +607,7 @@ def collect_curve_shapes(crv, rplStr=["", ""]):
     return shapesDict, shapes_names
 
 
-def collect_selected_curve_data(objs=None):
+def collect_selected_curve_data(objs: Sequence[PymelNode] | None = None) -> dict[str, object] | None:
     """Generate a dictionary descriving the curve data from selected objs
 
     Args:
@@ -606,7 +619,7 @@ def collect_selected_curve_data(objs=None):
     return collect_curve_data(objs)
 
 
-def collect_curve_data(objs, rplStr=["", ""]):
+def collect_curve_data(objs: PymelNode | Sequence[PymelNode] | None, rplStr: Sequence[str] = ("", "")) -> dict[str, object] | None:
     """Generate a dictionary descriving the curve data
 
     Suport multiple objects
@@ -657,7 +670,7 @@ def collect_curve_data(objs, rplStr=["", ""]):
     return curves_dict
 
 
-def crv_parenting(data, crv, rplStr=["", ""], model=None):
+def crv_parenting(data: dict[str, object], crv: str, rplStr: Sequence[str] = ("", ""), model: PymelNode | None = None) -> None:
     """Parent the new created curves
 
     Args:
@@ -704,12 +717,14 @@ def crv_parenting(data, crv, rplStr=["", ""], model=None):
                   crv_p)
 
 
-def create_curve_from_data_by_name(crv,
-                                   data,
-                                   replaceShape=False,
-                                   rebuildHierarchy=False,
-                                   rplStr=["", ""],
-                                   model=None):
+def create_curve_from_data_by_name(
+    crv: str,
+    data: dict[str, object],
+    replaceShape: bool = False,
+    rebuildHierarchy: bool = False,
+    rplStr: Sequence[str] = ("", ""),
+    model: PymelNode | None = None,
+) -> None:
     """Build one curve from a given curve data dict
 
     Args:
@@ -774,11 +789,13 @@ def create_curve_from_data_by_name(crv,
         crv_parenting(data, crv, rplStr, model)
 
 
-def create_curve_from_data(data,
-                           replaceShape=False,
-                           rebuildHierarchy=False,
-                           rplStr=["", ""],
-                           model=None):
+def create_curve_from_data(
+    data: dict[str, object],
+    replaceShape: bool = False,
+    rebuildHierarchy: bool = False,
+    rplStr: Sequence[str] = ("", ""),
+    model: PymelNode | None = None,
+) -> None:
     """Build the curves from a given curve data dict
 
     Hierarchy rebuild after all curves are build to avoid lost parents
@@ -804,7 +821,7 @@ def create_curve_from_data(data,
             crv_parenting(data, crv, rplStr, model)
 
 
-def update_curve_from_data(data, rplStr=["", ""]):
+def update_curve_from_data(data: dict[str, object], rplStr: Sequence[str] = ("", "")) -> None:
     """update the curves from a given curve data dict
 
     Args:
@@ -871,7 +888,7 @@ def update_curve_from_data(data, rplStr=["", ""]):
             pm.rename(sh, sh.name().replace("ShapeShape", "Shape"))
 
 
-def export_curve(filePath=None, objs=None):
+def export_curve(filePath: str | Sequence[str] | None = None, objs: Sequence[PymelNode] | None = None) -> None:
     """Export the curve data to a json file
 
     Args:
@@ -902,7 +919,7 @@ def export_curve(filePath=None, objs=None):
     f.close()
 
 
-def _curve_from_file(filePath=None):
+def _curve_from_file(filePath: str | Sequence[str] | None = None) -> dict[str, object] | None:
     if not filePath:
         startDir = pm.workspace(q=True, rootDirectory=True)
         filePath = pm.fileDialog2(
@@ -921,22 +938,24 @@ def _curve_from_file(filePath=None):
     return configDict
 
 
-def import_curve(filePath=None,
-                 replaceShape=False,
-                 rebuildHierarchy=False,
-                 rplStr=["", ""]):
+def import_curve(
+    filePath: str | Sequence[str] | None = None,
+    replaceShape: bool = False,
+    rebuildHierarchy: bool = False,
+    rplStr: Sequence[str] = ("", ""),
+) -> None:
     create_curve_from_data(_curve_from_file(filePath),
                            replaceShape,
                            rebuildHierarchy,
                            rplStr)
 
 
-def update_curve_from_file(filePath=None, rplStr=["", ""]):
+def update_curve_from_file(filePath: str | Sequence[str] | None = None, rplStr: Sequence[str] = ("", "")) -> None:
     # update a curve data from json file
     update_curve_from_data(_curve_from_file(filePath), rplStr)
 
 
-def getMFnNurbsCurve(crv):
+def getMFnNurbsCurve(crv: str | PymelNode | om2.MObject | om2.MDagPath | om2.MFnNurbsCurve) -> om2.MFnNurbsCurve:
 
     if isinstance(crv, six.string_types) or isinstance(crv, six.text_type):
         dag = as_dagpath(crv)
@@ -947,8 +966,7 @@ def getMFnNurbsCurve(crv):
     return curveFn
 
 
-def as_selection_list(iterable):
-    # type: (Iterable) -> om2.MSelectionList
+def as_selection_list(iterable: Iterable) -> om2.MSelectionList:
 
     selectionList = om2.MSelectionList()
     for each in iterable:
@@ -956,15 +974,13 @@ def as_selection_list(iterable):
     return selectionList
 
 
-def as_dagpath_list(iterable):
-    # type: (Iterable) -> Generator[om2.MDagPath, None, None]
+def as_dagpath_list(iterable: Iterable) -> Generator[om2.MDagPath, None, None]:
     selectionList = as_selection_list(iterable)
     for i in range(selectionList.length()):
         yield selectionList.getDagPath(i)
 
 
-def as_dagpath(name):
-    # type: (Text) -> om2.MDagPath
+def as_dagpath(name: Text) -> om2.MDagPath:
     selectionList = as_selection_list([name])
 
     try:
@@ -973,39 +989,33 @@ def as_dagpath(name):
         return selectionList.getDependNode(0)
 
 
-def as_dependnode(name):
-    # type: (Text) -> om2.MFnDependencyNode
+def as_dependnode(name: Text) -> om2.MFnDependencyNode:
     selectionList = as_selection_list([name])
     return om2.MFnDependencyNode(selectionList.getDependNode(0))
 
 
-def as_dependencynodes(iterable):
-    # type: (Iterable) -> List[om2.MFnDependencyNode]
+def as_dependencynodes(iterable: Iterable) -> List[om2.MFnDependencyNode]:
     selectionList = as_selection_list(iterable)
     for i in range(selectionList.length()):
         yield om2.MFnDependencyNode(selectionList.getDagPath(i).node())
 
 
-def as_dependencynode(name):
-    # type: (Text) -> om2.MFnDependencyNode
+def as_dependencynode(name: Text) -> om2.MFnDependencyNode:
     dagpath = as_dagpath(name)
     return om2.MFnDependencyNode(dagpath.node())
 
 
-def as_mfn_mesh(name):
-    # type: (Text) -> om2.MFnMesh
+def as_mfn_mesh(name: Text) -> om2.MFnMesh:
     dagpath = as_dagpath(name)
     return om2.MFnMesh(dagpath.node())
 
 
-def as_mfnmesh(name):
-    # type: (Text) -> om2.MFnMesh
+def as_mfnmesh(name: Text) -> om2.MFnMesh:
     dagpath = as_dagpath(name)
     return om2.MFnMesh(dagpath)
 
 
-def applyPathCnsLocal(target, curve, u, maintainOffset=True):
-    # type: (dt.Transform, dt.Transform, float, bool) -> "motionPath"
+def applyPathCnsLocal(target: dt.Transform, curve: dt.Transform, u: float, maintainOffset: bool = True) -> "motionPath":
     import ymt_shifter_utility
 
     # prev_matrix = target.getMatrix(objectSpace=True)
@@ -1078,10 +1088,9 @@ def applyPathCnsLocal(target, curve, u, maintainOffset=True):
     decomp_node.attr("outputRotate") >> target.attr("rotate")  # pyright: ignore [reportUnusedExpression]
 
     return cns
-    
 
-def applyPathConstrainLocal(target, src_curve, maintainOffset=True):
-    # type: (str, str) -> None
+
+def applyPathConstrainLocal(target: PymelNode | str, src_curve: PymelNode | str, maintainOffset: bool = True) -> None:
 
     if isinstance(target, six.string_types) or isinstance(target, six.text_type):
         target = pm.PyNode(target)
@@ -1106,9 +1115,9 @@ def applyPathConstrainLocal(target, src_curve, maintainOffset=True):
     return cns
 
 
-def applyRopeCnsLocal(target, ctl_curve, rope, cv):
+def applyRopeCnsLocal(target: PymelNode, ctl_curve: PymelNode, rope: str, cv: Sequence[float]) -> None:
 
-    def _searchNearestEditPoint(curve, cv):
+    def _searchNearestEditPoint(curve: str, cv: Sequence[float]) -> int:
 
         candidate = math.inf
         index = 0
@@ -1145,8 +1154,7 @@ def applyRopeCnsLocal(target, ctl_curve, rope, cv):
     cmds.connectAttr(motionPath + ".rotate", target.longName() + ".rotate")
 
 
-def applyRopeCnsLocalWithUpv(target, upv, ctl_curve, rope, cv):
-    # type: (dt.Transform, dt.Transform, dt.Transform, dt.Transform, om2.MPoint) -> None
+def applyRopeCnsLocalWithUpv(target: dt.Transform, upv: dt.Transform, ctl_curve: dt.Transform, rope: dt.Transform, cv: om2.MPoint) -> None:
     """Apply a rope constraint to a target object.
 
     Arguments:
@@ -1160,7 +1168,7 @@ def applyRopeCnsLocalWithUpv(target, upv, ctl_curve, rope, cv):
         None
     """
 
-    def _searchNearestEditPoint(curve, cv):
+    def _searchNearestEditPoint(curve: str, cv: Sequence[float]) -> int:
 
         candidate = math.inf
         index = 0
@@ -1200,7 +1208,7 @@ def applyRopeCnsLocalWithUpv(target, upv, ctl_curve, rope, cv):
     )
 
 
-def curvecns_op(crv, inputs=[]):
+def curvecns_op(crv: str, inputs: Sequence[str] = ()) -> str:
 
     for i, item in enumerate(inputs):
         node = pm.createNode("decomposeMatrix")
@@ -1211,7 +1219,7 @@ def curvecns_op(crv, inputs=[]):
     return node
 
 
-def gear_curvecns_op(crv, inputs=[]):
+def gear_curvecns_op(crv: str | PymelNode, inputs: Sequence[str] = ()) -> PymelNode:
     """
     create mGear curvecns node.
 
@@ -1233,7 +1241,7 @@ def gear_curvecns_op(crv, inputs=[]):
     return node
 
 
-def gear_curvecns_op_local(crv, inputs=[]):
+def gear_curvecns_op_local(crv: str | PymelNode, inputs: Sequence[PymelNode] = ()) -> str:
     """
     create mGear curvecns node.
 
@@ -1291,7 +1299,7 @@ def gear_curvecns_op_local(crv, inputs=[]):
     return deformer_name
 
 
-def gear_curvecns_op_local_skip_rotate(crv, inputs=[]):
+def gear_curvecns_op_local_skip_rotate(crv: str | PymelNode, inputs: Sequence[PymelNode] = ()) -> str:
     """."""
 
     deformer_name = gear_curvecns_op_local(crv, inputs)
@@ -1325,7 +1333,7 @@ def gear_curvecns_op_local_skip_rotate(crv, inputs=[]):
     return deformer_name
 
 
-def createCurveOnSurfaceFromCurve(crv, surface, name):
+def createCurveOnSurfaceFromCurve(crv: PymelNode, surface: PymelNode, name: str) -> PymelNode:
 
     import ymt_shifter_utility
 
@@ -1419,8 +1427,7 @@ def createCurveOnSurfaceFromCurve(crv, surface, name):
     return targetCrv
 
 
-def applyCurveParamCns(src, target):
-    # type: (dt.Transform, dt.Transform) -> None
+def applyCurveParamCns(src: dt.Transform, target: dt.Transform) -> None:
 
     if isinstance(src, six.string_types) or isinstance(src, six.text_type):
         src = pm.PyNode(src)
@@ -1448,8 +1455,7 @@ def applyCurveParamCns(src, target):
         cmds.connectAttr(pointOnCurveInfo + ".position", target + ".controlPoints[%s]" % i, force=True)
 
 
-def getCvParamRatio(crv):
-    # type: (str) -> list[float]
+def getCvParamRatio(crv: str) -> list[float]:
     """Return the ratio of each control point in a curve"""
 
     sc = getMFnNurbsCurve(crv)
@@ -1474,8 +1480,7 @@ def getCvParamRatio(crv):
     return ratios
 
 
-def getCvLengthRatio(crv):
-    # type: (str) -> list[float]
+def getCvLengthRatio(crv: str) -> list[float]:
     """Return the ratio of each control point in a curve"""
 
     sc = getMFnNurbsCurve(crv)
@@ -1504,8 +1509,7 @@ def getCvLengthRatio(crv):
     return ratios
 
 
-def setCvParamRatio(crv, ratios):
-    # type: (str, list[float]) -> None
+def setCvParamRatio(crv: str, ratios: list[float]) -> None:
     """Set the ratio of each control point in a curve"""
 
     sc = getMFnNurbsCurve(crv)
@@ -1528,8 +1532,7 @@ def setCvParamRatio(crv, ratios):
     sc.updateCurve()
 
 
-def getCenterPosition(crv, sampleCount=100):
-    # type: (str) -> om2.MPoint
+def getCenterPosition(crv: str | PymelNode, sampleCount: int = 100) -> om2.MPoint:
 
     sc = getMFnNurbsCurve(crv)
     sc.updateCurve()

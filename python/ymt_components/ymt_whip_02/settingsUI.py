@@ -10,7 +10,7 @@
 from Qt import QtCore, QtWidgets
 
 class Ui_Form(object):
-    def setupUi(self, Form):
+    def setupUi(self, Form: QtWidgets.QWidget) -> None:
         Form.setObjectName("Form")
         Form.resize(419, 737)
         self.verticalLayout = QtWidgets.QVBoxLayout(Form)
@@ -253,7 +253,7 @@ class Ui_Form(object):
         self.retranslateUi(Form)
         QtCore.QMetaObject.connectSlotsByName(Form)
 
-    def retranslateUi(self, Form):
+    def retranslateUi(self, Form: QtWidgets.QWidget) -> None:
         Form.setWindowTitle(QtWidgets.QApplication.translate("Form", "Form", None, -1))
         self.groupBox_3.setTitle(QtWidgets.QApplication.translate("Form", "IK Controls", None, -1))
         self.ikNb_label.setText(QtWidgets.QApplication.translate("Form", "IK Ctl Number", None, -1))

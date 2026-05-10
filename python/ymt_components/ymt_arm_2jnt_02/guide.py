@@ -73,7 +73,7 @@ class Guide(arm_2jnt_04.Guide):
 
     connectors = ["ymt_shoulder_01"]
 
-    def addParameters(self):
+    def addParameters(self) -> None:
         super(Guide, self).addParameters()
 
         self.pFkRefArray = self.addParam("fkrefarray", "string", "")
@@ -83,7 +83,7 @@ class Guide(arm_2jnt_04.Guide):
 class settingsTab(QtWidgets.QDialog, sui.Ui_Form):
     """The Component settings UI"""
 
-    def __init__(self, parent=None):
+    def __init__(self, parent: object=None) -> None:
         super(settingsTab, self).__init__(parent)
         self.setupUi(self)
 
@@ -91,7 +91,7 @@ class settingsTab(QtWidgets.QDialog, sui.Ui_Form):
 class componentSettings(MayaQWidgetDockableMixin, componentMainSettings):
     """Create the component setting window"""
 
-    def __init__(self, parent=None):
+    def __init__(self, parent: object=None) -> None:
         self.toolName = TYPE
         # Delete old instances of the componet settings window.
         pyqt.deleteInstances(self, MayaQDockWidget)
@@ -105,7 +105,7 @@ class componentSettings(MayaQWidgetDockableMixin, componentMainSettings):
         self.create_componentLayout()
         self.create_componentConnections()
 
-    def setup_componentSettingWindow(self):
+    def setup_componentSettingWindow(self) -> None:
         self.mayaMainWindow = pyqt.maya_main_window()
 
         self.setObjectName(self.toolName)
@@ -113,10 +113,10 @@ class componentSettings(MayaQWidgetDockableMixin, componentMainSettings):
         self.setWindowTitle(TYPE)
         self.resize(280, 780)
 
-    def create_componentControls(self):
+    def create_componentControls(self) -> None:
         return
 
-    def populate_componentControls(self):
+    def populate_componentControls(self) -> None:
         """Populate Controls
 
         Populate the controls values from the custom attributes of the
@@ -181,7 +181,7 @@ class componentSettings(MayaQWidgetDockableMixin, componentMainSettings):
         comboIndex = self.connector_items.index(currentConnector)
         self.c_box.setCurrentIndex(comboIndex)
 
-    def create_componentLayout(self):
+    def create_componentLayout(self) -> None:
 
         self.settings_layout = QtWidgets.QVBoxLayout()
         self.settings_layout.addWidget(self.tabs)
@@ -189,7 +189,7 @@ class componentSettings(MayaQWidgetDockableMixin, componentMainSettings):
 
         self.setLayout(self.settings_layout)
 
-    def create_componentConnections(self):
+    def create_componentConnections(self) -> None:
 
         self.settingsTab.ikfk_slider.valueChanged.connect(
             partial(self.updateSlider, self.settingsTab.ikfk_slider, "blend"))
@@ -320,7 +320,7 @@ class componentSettings(MayaQWidgetDockableMixin, componentMainSettings):
                     self.mainSettingsTab.connector_comboBox,
                     self.connector_items))
 
-    def eventFilter(self, sender, event):
+    def eventFilter(self, sender: object, event: object) -> object:
         if event.type() == QtCore.QEvent.ChildRemoved:
             if sender == self.settingsTab.ikRefArray_listWidget:
                 self.updateListAttr(sender, "ikrefarray")
@@ -334,5 +334,5 @@ class componentSettings(MayaQWidgetDockableMixin, componentMainSettings):
         else:
             return QtWidgets.QDialog.eventFilter(self, sender, event)
 
-    def dockCloseEventTriggered(self):
+    def dockCloseEventTriggered(self) -> None:
         pyqt.deleteInstances(self, MayaQDockWidget)

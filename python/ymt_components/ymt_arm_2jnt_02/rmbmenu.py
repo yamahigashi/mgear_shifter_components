@@ -55,7 +55,7 @@ class ShifterMarkingMenu(rmbmenu.ShifterMarkingMenu):
 
     comp_name = os.path.basename(os.path.dirname(__file__))
 
-    def build_specialized(self, targets):
+    def build_specialized(self, targets: List[Text]) -> None:
         # self.menu is the parent marking menu that menuItems should be attached to
         cmds.setParent(self.menu, m=True)
 
@@ -72,8 +72,7 @@ class ShifterMarkingMenu(rmbmenu.ShifterMarkingMenu):
         cmds.setParent(self.menu, menu=True)
         cmds.menuItem(l="Reset FK", rp='SE', command=partial(self.reset_fk, targets))
 
-    def reset_fk(self, targets, flag):
-        # type: (List[Text], bool) -> None
+    def reset_fk(self, targets: List[Text], flag: bool) -> None:
 
         root = control_util.get_component_root(targets[0])
         controllers = control_util.get_component_controllers(root)
@@ -84,7 +83,7 @@ class ShifterMarkingMenu(rmbmenu.ShifterMarkingMenu):
             node = pm.PyNode(target)
             transform.resetTransform(node)
 
-    def space_switch_head(self, targets, choice_index, transfer, flag):
+    def space_switch_head(self, targets: List[Text], choice_index: Text, transfer: bool, flag: bool) -> None:
         print(targets, choice_index, transfer)
         root = control_util.get_component_root(targets[0])
 
@@ -94,7 +93,7 @@ class ShifterMarkingMenu(rmbmenu.ShifterMarkingMenu):
             import traceback
             traceback.print_exc()
 
-    def space_switch_ikfk(self, targets, transfer, flag):
+    def space_switch_ikfk(self, targets: List[Text], transfer: bool, flag: bool) -> None:
 
         current_namespace = ":".join(targets[0].split(":")[:-1])
         root = control_util.get_component_root(targets[0])

@@ -36,7 +36,7 @@ if sys.version_info >= (3, 0):  # pylint: disable=using-constant-test
 ##########################################################
 class Component(MainComponent):
 
-    def addNeckBones(self, positions, upv0, upv1):
+    def addNeckBones(self, positions: object, upv0: object, upv1: object) -> None:
 
         root_t = tra.getTransform(self.root)
         neck_t = tra.getTransformLookingAt(positions[0], upv0, self.normal, "yx", self.negate)
@@ -92,7 +92,7 @@ class Component(MainComponent):
 
     # Add all the objects needed to create the component.
     # @param self
-    def addObjects(self):
+    def addObjects(self) -> None:
 
         self.normal = self.guide.blades["blade"].z * -1.
 
@@ -145,7 +145,7 @@ class Component(MainComponent):
     # =====================================================
     # Add parameters to the anim and setup properties to control the component.
     # @param self
-    def addAttributes(self):
+    def addAttributes(self) -> None:
         # Anim -------------------------------------------
         ref_names = ["self", "head"]
         self.neckref_att = self.addAnimEnumParam("neck_ref", "Neck Ref", 1, ref_names)
@@ -165,7 +165,7 @@ class Component(MainComponent):
     # In order to keep the code clean and easier to debug,
     # we shouldn't create any new object in this method.
     # @param self
-    def addOperators(self):
+    def addOperators(self) -> None:
         pass
 
     # =====================================================
@@ -173,7 +173,7 @@ class Component(MainComponent):
     # =====================================================
     # Set the relation beetween object from guide to rig.\n
     # @param self
-    def setRelation(self):
+    def setRelation(self) -> None:
         self.relatives["root"] = self.root
         self.relatives["eff0"] = self.root
         self.relatives["tan2"] = self.head_ctl
@@ -196,12 +196,12 @@ class Component(MainComponent):
             self.jointRelatives["%s_loc" % (i)] = (i + 2)
             self.aliasRelatives["%s_ctl" % (i)] = (i + 2)
 
-    def connect_standard(self):
+    def connect_standard(self) -> None:
 
         self.parent.addChild(self.root)
         self.connect_with_nodespaghetti()
 
-    def connect_spaghetti_head_position(self, i, next_cns):
+    def connect_spaghetti_head_position(self, i: int, next_cns: object) -> None:
 
         npo = self.neck_npos[i]
         cns = self.neck_cnss[i]
@@ -228,7 +228,7 @@ class Component(MainComponent):
 
         return cond
 
-    def connect_spaghetti_head_rotation(self, i, head_ref_cond, head_space_mult):
+    def connect_spaghetti_head_rotation(self, i: int, head_ref_cond: object, head_space_mult: object) -> None:
 
         # npo = self.neck_npos[i]
         # ctl = self.neck_ctls[i]
@@ -272,7 +272,7 @@ class Component(MainComponent):
 
         return cond, slerp
 
-    def connect_spaghetti_head_position2(self, i, prev_mult, slerp, pos_cond):
+    def connect_spaghetti_head_position2(self, i: int, prev_mult: object, slerp: object, pos_cond: object) -> None:
 
         npo = self.neck_npos[i]
         cns = self.neck_cnss[i]
@@ -311,7 +311,7 @@ class Component(MainComponent):
 
         return mult
 
-    def connect_with_nodespaghetti(self):
+    def connect_with_nodespaghetti(self) -> None:
 
         neck_ref_cond_positions = []
         for i in range(self.division - 1):

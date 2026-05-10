@@ -63,7 +63,7 @@ class Component(component.Main):
     # =====================================================
     # OBJECTS
     # =====================================================
-    def addToSubGroup(self, obj, group_name):
+    def addToSubGroup(self, obj: object, group_name: str) -> None:
 
         if self.settings["ctlGrp"]:
             ctlGrp = self.settings["ctlGrp"]
@@ -72,7 +72,7 @@ class Component(component.Main):
 
         self.addToGroup(obj, group_name, parentGrp=ctlGrp)
 
-    def addObjects(self):
+    def addObjects(self) -> None:
         """Add all the objects needed to create the component."""
 
         if self.settings["neutralRotation"]:
@@ -152,7 +152,7 @@ class Component(component.Main):
             self.sliding_surface.visibility.set(False)
             pm.makeIdentity(self.sliding_surface, apply=True, t=1,  r=1, s=1, n=0, pn=1)
 
-    def addAttributes(self):
+    def addAttributes(self) -> None:
         # Ref
         if self.settings["ikrefarray"]:
             ref_names = self.get_valid_alias_list(
@@ -164,7 +164,7 @@ class Component(component.Main):
                     0,
                     ref_names)
 
-    def addOperators(self):
+    def addOperators(self) -> None:
         cmds.aimConstraint(
                 self.lookat.name(),
                 self.aim_cns.name(),
@@ -177,7 +177,7 @@ class Component(component.Main):
     # =====================================================
     # CONNECTOR
     # =====================================================
-    def setRelation(self):
+    def setRelation(self) -> None:
         """Set the relation beetween object from guide to rig"""
         self.relatives["root"] = self.ctl
         self.relatives["lookat"] = self.lookat
@@ -187,11 +187,11 @@ class Component(component.Main):
 
         self.aliasRelatives["root"] = "ctl"
 
-    def addConnection(self):
+    def addConnection(self) -> None:
         """Add more connection definition to the set"""
         self.connections["standard"] = self.connect_standard
 
-    def connect_standard(self):
+    def connect_standard(self) -> None:
         """standard connection definition for the component"""
 
         self.connect_standardWithSimpleIkRef()
@@ -224,7 +224,7 @@ class Component(component.Main):
         ymt_util.setKeyableAttributesDontLockVisibility(self.proj_cns, [])
         ymt_util.setKeyableAttributesDontLockVisibility(self.aim_cns, [])
 
-    def connect_ctl_to_aim(self):
+    def connect_ctl_to_aim(self) -> None:
         """Connect the control to the aim cns"""
 
         parentGuide = self.guide.parentComponent
@@ -245,7 +245,7 @@ class Component(component.Main):
             )
 
 
-    def connect_slide_ghost(self):
+    def connect_slide_ghost(self) -> None:
 
         # slide system
         try:
@@ -261,7 +261,7 @@ class Component(component.Main):
             raise
 
 
-def ghostSliderForPupil(ctl, ghostCtl, surface, sliderParent):
+def ghostSliderForPupil(ctl: object, ghostCtl: object, surface: object, sliderParent: object) -> None:
     """Modify the ghost control behaviour to slide on top of a surface
 
     Args:

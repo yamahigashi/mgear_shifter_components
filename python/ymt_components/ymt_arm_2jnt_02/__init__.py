@@ -29,7 +29,7 @@ import ymt_shifter_utility as ymt_util
 ##########################################################
 class Component(arm_2jnt_04.Component):
 
-    def addObjects(self):
+    def addObjects(self) -> None:
         super(Component, self).addObjects()
         t = tra.getTransform(self.root)
         self.fk0_cns = pri.addTransform(self.root,
@@ -37,7 +37,7 @@ class Component(arm_2jnt_04.Component):
                                         t)
         self.fk0_cns.addChild(self.fk0_npo)
 
-    def addAttributes(self):
+    def addAttributes(self) -> None:
         super(Component, self).addAttributes()
 
         ref_names = self.get_valid_alias_list(self.settings.get("fkrefarray", "").split(","))
@@ -52,7 +52,7 @@ class Component(arm_2jnt_04.Component):
 
         att.setInvertMirror(self.ik_ctl, ["tx", "ry", "rz"])
 
-    def addOperators(self):
+    def addOperators(self) -> None:
         super(Component, self).addOperators()
 
         for i, div_cns in enumerate(self.div_cns):
@@ -70,11 +70,11 @@ class Component(arm_2jnt_04.Component):
                 pass
         att.setKeyableAttributes(self.ikcns_ctl, [])
 
-    def addConnection(self):
+    def addConnection(self) -> None:
         self.connections["standard"] = self.connect_standard
         self.connections["ymt_shoulder_01"] = self.connect_ymt_shoulder
 
-    def connectRef(self, refArray, cns_obj, upVAttr=None, init_refNames=False):
+    def connectRef(self, refArray: str, cns_obj: object, upVAttr: bool=None, init_refNames: bool=False) -> None:
         """Connect the cns_obj to a multiple object using parentConstraint.
 
         Args:
@@ -126,7 +126,7 @@ class Component(arm_2jnt_04.Component):
                 pm.setAttr(node_name + ".colorIfFalseR", 0)
                 pm.connectAttr(node_name + ".outColorR", cns_node + "." + attr)
 
-    def connect_standard(self):
+    def connect_standard(self) -> None:
         """standard connection definition for the component"""
 
         if self.settings["ikTR"]:
@@ -152,7 +152,7 @@ class Component(arm_2jnt_04.Component):
                              False,
                              ["Auto"])
 
-    def connect_ymt_shoulder(self):
+    def connect_ymt_shoulder(self) -> None:
 
         # If the parent component hasn't been generated we skip the connection
         if self.parent_comp is not None and "ymt_shoulder" in str(type(self.parent_comp)):
@@ -162,7 +162,7 @@ class Component(arm_2jnt_04.Component):
 
         return
 
-    def postConnect(self):
+    def postConnect(self) -> None:
 
         fk_ref_cond = pm.createNode("condition")
         pm.connectAttr(str(self.fkref_att), "{}.firstTerm".format(fk_ref_cond))

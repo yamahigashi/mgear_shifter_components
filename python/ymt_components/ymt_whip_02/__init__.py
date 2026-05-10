@@ -106,7 +106,7 @@ class Component(component.Main):
     # =====================================================
     # OBJECTS
     # =====================================================
-    def addObjects(self):
+    def addObjects(self) -> None:
         """Add all the objects needed to create the component."""
 
         # FIXME: remove unneccessary guide.tan
@@ -199,7 +199,7 @@ class Component(component.Main):
 
         # icon.connection_display_curve(self.getName("visualIKRef"), self.ik_ctl)
 
-    def addToSubGroup(self, obj, group_name):
+    def addToSubGroup(self, obj: object, group_name: str) -> None:
 
         if self.settings["ctlGrp"]:
             ctlGrp = self.settings["ctlGrp"]
@@ -208,7 +208,7 @@ class Component(component.Main):
 
         self.addToGroup(obj, group_name, parentGrp=ctlGrp)
 
-    def addObjectsFkControl(self, joints):
+    def addObjectsFkControl(self, joints: object) -> None:
 
         parentdiv = self.root
         parentctl = self.root
@@ -231,7 +231,7 @@ class Component(component.Main):
         icon.connection_display_curve(self.getName("visualFKRef"), self.fk_ctl)
         return self.fk_ctl
 
-    def addLengthCtrl(self, crv):
+    def addLengthCtrl(self, crv: object) -> None:
         t = getTransform(self.guide.root)
         t = self._getTransformWithRollByBlade(t)
         cvs = crv.length()
@@ -277,7 +277,7 @@ class Component(component.Main):
         ymt_util.setKeyableAttributesDontLockVisibility(self.scale_ctl, self.s_params)
         ymt_util.setKeyableAttributesDontLockVisibility(self.length_ctl, ["tx", "ty", "tz"])
 
-    def _getTransformWithRollByBlade(self, t):
+    def _getTransformWithRollByBlade(self, t: object) -> None:
         # t = getTransform(self.guide.root)
         a = self.guide.blades["blade"].y
         x = vector.Blade(t).x
@@ -293,7 +293,7 @@ class Component(component.Main):
 
         return datatypes.Matrix(tm)
 
-    def _addObjectsFkControl(self, i, parentdiv, parentctl, t, pt, parent_twistRef):
+    def _addObjectsFkControl(self, i: int, parentdiv: object, parentctl: object, t: object, pt: object, parent_twistRef: object) -> None:
         # References
         tm = datatypes.TransformationMatrix(t)
         pym2m.add_rotation(tm, (0., 0., math.pi / -2.), 'xyz', 'object', 'rad')  # TODO: align with convention
@@ -381,7 +381,7 @@ class Component(component.Main):
     # =====================================================
     # ATTRIBUTES
     # =====================================================
-    def addAttributes(self):
+    def addAttributes(self) -> None:
         """Create the anim and setupr rig attributes for the component"""
 
         if not self.settings["ui_host"]:
@@ -486,7 +486,7 @@ class Component(component.Main):
             100.,
         )
 
-    def _getRotationsAtEachPoint(self, bfrs):
+    def _getRotationsAtEachPoint(self, bfrs: object) -> None:
         # type: (List[Text]) -> List[Tuple[float, float, float]]
         # pylint: disable=too-many-locals
 
@@ -524,7 +524,7 @@ class Component(component.Main):
 
         return rotations
 
-    def withCurvePos(self, curveFn, it, offset=0.):
+    def withCurvePos(self, curveFn: object, it: object, offset: float=0.) -> None:
         curveLen = curveFn.length()
 
         for i, element in enumerate(it):
@@ -533,10 +533,10 @@ class Component(component.Main):
             pos = point[0], point[1], point[2]
             yield pos, element
 
-    def alignControllers(self, bfrs, cvs, oTans, iTans, curveFn):
+    def alignControllers(self, bfrs: object, cvs: object, oTans: object, iTans: object, curveFn: object) -> None:
         curveLen = curveFn.length()
 
-        def insertNpo(obj):
+        def insertNpo(obj: object) -> None:
             # type: (Text) -> Text
             obj_node = pm.PyNode(obj)
             parent = obj_node.getParent()
@@ -596,7 +596,7 @@ class Component(component.Main):
             cmds.setAttr("{0}.Auto".format(cv), 0)
             insertNpo(cv)
 
-    def alignDeformers(self, ikNb, joints, positions, riderCnst, curveFn):
+    def alignDeformers(self, ikNb: object, joints: object, positions: object, riderCnst: object, curveFn: object) -> None:
         # align deformer joints
 
         curveLen = curveFn.length()
@@ -612,7 +612,7 @@ class Component(component.Main):
             p = joint.translation(om.MSpace.kWorld)
             _positions.append(p)
 
-        def _searchNearestParam(pos):
+        def _searchNearestParam(pos: float) -> None:
 
             res = _positions[0]
             cur = None
@@ -632,7 +632,7 @@ class Component(component.Main):
             param = _searchNearestParam(pos)
             cmds.setAttr("{0}.params[{1}].param".format(riderCnst, i), param)
 
-    def convertToTwistSpline(self, positions, crv, ikNb, isClosed=False):
+    def convertToTwistSpline(self, positions: object, crv: object, ikNb: object, isClosed: bool=False) -> None:
 
         crvShape = crv.getShape()
         crvShape_name = crvShape.name() if hasattr(crvShape, "name") else str(crvShape)
@@ -717,7 +717,7 @@ class Component(component.Main):
     # =====================================================
     # OPERATORS
     # =====================================================
-    def addOperators(self):
+    def addOperators(self) -> None:
         """Create operators and set the relations for the component rig
 
         Apply operators, constraints, expressions to the hierarchy.
@@ -742,7 +742,7 @@ class Component(component.Main):
                 if "useOrient" in attr:
                     cmds.setAttr("{}.{}".format(driver_shape_name, attr), True)
 
-    def addOperatorsNotGlobalMaster(self):
+    def addOperatorsNotGlobalMaster(self) -> None:
         # Curves -------------------------------------------
 
         # ensure plugin loaded
@@ -760,7 +760,7 @@ class Component(component.Main):
         for i in range(len(self.guide.apos)):
             self.addFkOperator(i, rootWorld_node)
 
-    def addFkOperator(self, i, rootWorld_node):
+    def addFkOperator(self, i: int, rootWorld_node: object) -> None:
 
         fk_local_npo_xfoms = []
         if i not in [len(self.guide.apos), 0]:
@@ -801,7 +801,7 @@ class Component(component.Main):
         self.div_cns[i].attr("r") >> self.fk_npo[i].attr("r")
         self.div_cns[i].attr("t") >> self.fk_npo[i].attr("t")
 
-    def addOperatorLengthExpression(self):
+    def addOperatorLengthExpression(self) -> None:
         rewrite_map = [
             ["scale_ctl", self.length_ctl],
             ["fk0_npo", self.fk_npo[0]],
@@ -817,9 +817,9 @@ class Component(component.Main):
         twistspline_ctrls = pm.PyNode(self.ik_ctl[0]).getParent().getParent().getParent()
         cmds.connectAttr("{0}.visibility".format(self.fk_npo[0]), "{0}.visibility".format(twistspline_ctrls))
 
-    def length_control_expression_archtype(curve_length, scale_ctl, fk0_npo, scale_master, scale_cns):
+    def length_control_expression_archtype(curve_length: float, scale_ctl: object, fk0_npo: object, scale_master: object, scale_cns: object) -> None:
         from maya.api.OpenMaya import MVector
-        def sigmoid(x, mi, mx):
+        def sigmoid(x: float, mi: float, mx: float) -> None:
             return mi + (mx-mi)*(lambda t: (1+((200. / curve_length)*100.)**(-t+0.5))**(-1) )( (x-mi)/(mx-mi))
 
         tz = scale_ctl.translateY
@@ -843,7 +843,7 @@ class Component(component.Main):
         scale_cns.scale = MVector(s, s, s)
         fk0_npo.visibility = vis
 
-    def addOperatorSineCurveExprespy(self):
+    def addOperatorSineCurveExprespy(self) -> None:
         mst_crv_shape = self.mst_crv.getShape()
         mst_crv_shape_name = mst_crv_shape.name() if hasattr(mst_crv_shape, "name") else str(mst_crv_shape)
         rewrite_map = [
@@ -892,25 +892,25 @@ class Component(component.Main):
                                               additional_code)
         # cmds.setAttr("{}.IN[4]".format(self.exprespy2), "{}.worldSpace".format(self.mst_crv.name()))
 
-    def sinewave_expression_archtype(COUNT, __scale_ctl, __curve_length, __wave_offset_att, __wave_power_att, __wave_length_att, __mst_crv, __divisions, __negate, __dropoff):
+    def sinewave_expression_archtype(COUNT: int, __scale_ctl: object, __curve_length: float, __wave_offset_att: float, __wave_power_att: float, __wave_length_att: float, __mst_crv: object, __divisions: int, __negate: bool, __dropoff: float) -> None:
 
         if not COUNT:
             import math
 
-            def near_zero(x):
+            def near_zero(x: float) -> None:
                 return abs(x) <= 0.0001
 
-            def sigmoid(x, mx):
+            def sigmoid(x: float, mx: float) -> None:
                 # return mi + (mx-mi)*(lambda t: (1+(100.)**(-t+0.5))**(-1) )( (x-mi)/(mx-mi))
                 x = (x * 10) / mx - 5.
                 return 1 / (1 + math.exp(-x))
 
-            def get_sin_at_pos(pos, s):
+            def get_sin_at_pos(pos: float, s: float) -> None:
 
                 x = math.sin(math.pi * (2. / (__wave_length_att / 100.0)) * ((__wave_offset_att / 100.0) * (__wave_length_att / 100.0) + pos * s)) * __curve_length * (__wave_power_att / 100.0) * 0.5
                 return sigmoid(pos, __dropoff / 100.0) * x
 
-            def get_tan_at_pos(pos, s):
+            def get_tan_at_pos(pos: float, s: float) -> object:
                 if near_zero(s):
                     return 0.
 
@@ -935,7 +935,7 @@ class Component(component.Main):
             s = __scale_ctl.ty / __curve_length
         # s = min(s, s2)
 
-    def connectRef(self, refArray, cns_obj, upVAttr=None, init_refNames=False):
+    def connectRef(self, refArray: str, cns_obj: object, upVAttr: bool=None, init_refNames: bool=False) -> None:
         """Connect the cns_obj to a multiple object using parentConstraint.
 
         Args:
@@ -996,7 +996,7 @@ class Component(component.Main):
             attr_name = f"{cns_node}.{attr}"
             pm.connectAttr(node_name + ".outColorR", attr_name)
 
-    def connect_standard(self):
+    def connect_standard(self) -> None:
         self.parent.addChild(self.root)
 
         if self.settings["ik0refarray"]:
@@ -1013,7 +1013,7 @@ class Component(component.Main):
     # CONNECTOR
     # =====================================================
 
-    def setRelation(self):
+    def setRelation(self) -> None:
         """Set the relation beetween object from guide to rig"""
         if self.settings["isGlobalMaster"]:
             return
@@ -1032,7 +1032,7 @@ class Component(component.Main):
             self.aliasRelatives["%s_ctl" % (i)] = (i + 1)
 
 
-def vecProjection(a, b):
+def vecProjection(a: object, b: object) -> None:
 
     dot = a * b
     length = b.length()
@@ -1042,7 +1042,7 @@ def vecProjection(a, b):
     return p
 
 
-def create_exprespy_node(func, name, rewrite_map, additional_code=None):
+def create_exprespy_node(func: object, name: str, rewrite_map: object, additional_code: object=None) -> None:
     code = inspect.getsource(func)
     code = textwrap.dedent("".join(code.splitlines(True)[1:]))
 
@@ -1059,21 +1059,21 @@ def create_exprespy_node(func, name, rewrite_map, additional_code=None):
     return exp_node
 
 
-def get_nearest_axis_orient(a, b):
+def get_nearest_axis_orient(a: object, b: object) -> None:
     # returns normalized axis of orientation of a to b
     ta = getTransform(a)
     tb = getTransform(b)
     tb - ta
 
 
-def getAsMFnNode(name, ctor):
+def getAsMFnNode(name: str, ctor: object) -> None:
     objects = om.MSelectionList()
     objects.add(name)
     dag = objects.getDagPath(0)
     return ctor(dag)
 
 
-def transform_to_euler(t):
+def transform_to_euler(t: object) -> None:
     # type: (om.MTransformationMatrix) -> Tuple[float, float, float]
 
     tm = om.MTransformationMatrix(om.MMatrix(t))

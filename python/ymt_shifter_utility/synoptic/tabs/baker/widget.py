@@ -29,7 +29,7 @@ QtGui, QtCore, QtWidgets, wrapInstance = gqt.qt_import()
 
 
 class Ui_baker(object):
-    def setupUi(self, baker):
+    def setupUi(self, baker: object) -> None:
         baker.setObjectName("baker")
         baker.resize(325, 840)
         baker.setMinimumSize(QtCore.QSize(325, 790))
@@ -332,7 +332,7 @@ class Ui_baker(object):
         self.retranslateUi(baker)
         QtCore.QMetaObject.connectSlotsByName(baker)
 
-    def retranslateUi(self, baker):
+    def retranslateUi(self, baker: object) -> None:
         baker.setWindowTitle(gqt.fakeTranslate("baker", "Form", None, -1))
         self.bake.setText(gqt.fakeTranslate("baker", "Bake Springs", None, -1))
         self.clearBake.setText(gqt.fakeTranslate("baker", "Clear Baked Springs", None, -1))

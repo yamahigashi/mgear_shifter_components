@@ -39,7 +39,7 @@ from mgear.synoptic.widgets import SelectBtn_LIkBox
 
 
 class Ui_ymt_face(object):
-    def setupUi(self, ymt_face):
+    def setupUi(self, ymt_face: object) -> None:
         if not ymt_face.objectName():
             ymt_face.setObjectName(u"ymt_face")
         ymt_face.resize(325, 660)
@@ -4592,7 +4592,7 @@ class Ui_ymt_face(object):
         QMetaObject.connectSlotsByName(ymt_face)
     # setupUi
 
-    def retranslateUi(self, ymt_face):
+    def retranslateUi(self, ymt_face: object) -> None:
         ymt_face.setWindowTitle(QCoreApplication.translate("ymt_face", u"Form", None))
         self.groupBox.setTitle(QCoreApplication.translate("ymt_face", u"GroupBox", None))
         self.b_selAll.setText(QCoreApplication.translate("ymt_face", u"Select All", None))

@@ -67,10 +67,10 @@ class Component(component.Main):
     ik_endpoint_names = ["ankle", "foot", "toe"]
     ik_endpoint_labels = ["Ankle", "Foot", "Toe"]
 
-    def _get_ik_endpoint_index(self):
+    def _get_ik_endpoint_index(self) -> None:
         return int(max(0, min(len(self.ik_endpoint_names) - 1, self.settings.get("ikEndpoint", 2))))
 
-    def _connect_endpoint_condition(self, endpoint_index, target_weight, true_value=1, false_value=0):
+    def _connect_endpoint_condition(self, endpoint_index: int, target_weight: object, true_value: object=1, false_value: object=0) -> None:
         cond_node = pm.createNode("condition")
         pm.setAttr(cond_node + ".operation", 0)
         pm.connectAttr(self.ikEndpoint_att, cond_node + ".firstTerm")
@@ -79,14 +79,14 @@ class Component(component.Main):
         pm.setAttr(cond_node + ".colorIfFalseR", false_value)
         pm.connectAttr(cond_node + ".outColorR", target_weight, f=True)
 
-    def _connect_or_set(self, value, target_attr):
+    def _connect_or_set(self, value: object, target_attr: str) -> None:
         attr_type = getattr(pm, "Attribute", None)
         if isinstance(value, str) or (attr_type and isinstance(value, attr_type)):
             pm.connectAttr(value, target_attr, f=True)
         else:
             pm.setAttr(target_attr, value)
 
-    def _select_endpoint_scalar(self, ankle_value, foot_value, toe_value):
+    def _select_endpoint_scalar(self, ankle_value: object, foot_value: object, toe_value: object) -> None:
         foot_or_toe = pm.createNode("condition")
         pm.setAttr(foot_or_toe + ".operation", 0)
         pm.connectAttr(self.ikEndpoint_att, foot_or_toe + ".firstTerm")
@@ -102,7 +102,7 @@ class Component(component.Main):
         pm.connectAttr(foot_or_toe + ".outColorR", ankle_or_distal + ".colorIfFalseR", f=True)
         return ankle_or_distal + ".outColorR"
 
-    def _parent_constraint_by_endpoint(self, endpoint_sources, target, maintainOffset=True):
+    def _parent_constraint_by_endpoint(self, endpoint_sources: object, target: str, maintainOffset: float=True) -> None:
         sources = []
         source_indices = []
         for name in self.ik_endpoint_names:
@@ -121,7 +121,7 @@ class Component(component.Main):
             pm.connectAttr(selected, cns + ".target[%s].targetWeight" % source_index, f=True)
         return cns
 
-    def _get_division_percents(self):
+    def _get_division_percents(self) -> None:
         percents = []
         for span_index, div_count in enumerate(
             [
@@ -137,7 +137,7 @@ class Component(component.Main):
                 percents.append(max(0.001, min(0.999, perc)))
         return percents
 
-    def _sample_profile_values(self, profile_name, percents):
+    def _sample_profile_values(self, profile_name: str, percents: object) -> object:
         profile_values = self.guide.paramDefs[profile_name].value
         if profile_values:
             return self._interpolate_profile_values(profile_values, percents)
@@ -149,7 +149,7 @@ class Component(component.Main):
             values.append(pm.getAttr(fcv_node + ".output"))
         return values
 
-    def _interpolate_profile_values(self, profile_values, percents):
+    def _interpolate_profile_values(self, profile_values: object, percents: object) -> object:
         if not profile_values:
             return [0] * len(percents)
 
@@ -168,7 +168,7 @@ class Component(component.Main):
             interpolated.append(value)
         return interpolated
 
-    def _connect_endpoint_translate(self, endpoint_values, target):
+    def _connect_endpoint_translate(self, endpoint_values: object, target: str) -> None:
         for i, axis in enumerate("xyz"):
             selected = self._select_endpoint_scalar(
                 endpoint_values[0][i],
@@ -177,23 +177,23 @@ class Component(component.Main):
             )
             pm.connectAttr(selected, target.attr("t%s" % axis), f=True)
 
-    def _point_in_matrix_space(self, point, space_matrix):
+    def _point_in_matrix_space(self, point: object, space_matrix: object) -> None:
         local_point = om2.MPoint(point[0], point[1], point[2]) * om2.MMatrix(space_matrix).inverse()
         return datatypes.Vector(local_point.x, local_point.y, local_point.z)
 
-    def _connect_ik_endpoint_offsets(self):
+    def _connect_ik_endpoint_offsets(self) -> None:
         self._connect_endpoint_translate(self.ik_endpoint_cns_offsets, self.ik_endpoint_cns)
         for name in self.ik_endpoint_names:
             self._connect_endpoint_translate(self.ik_endpoint_ref_offsets[name], self.ik_endpoint_refs[name])
 
-    def _add_match_ref_from(self, ctl, source, parent, name, cnx=True):
+    def _add_match_ref_from(self, ctl: object, source: object, parent: object, name: str, cnx: object=True) -> None:
         match = primitive.addTransform(parent, self.getName(name), transform.getTransform(source))
         if cnx:
             ctl.addAttr("match_ref", at="message", multi=False)
             pm.connectAttr(match.message, ctl.match_ref)
         return match
 
-    def _add_match_ref_from_matrix(self, ctl, matrix, parent, name, cnx=True):
+    def _add_match_ref_from_matrix(self, ctl: object, matrix: object, parent: object, name: str, cnx: object=True) -> None:
         match = primitive.addTransform(parent, self.getName(name), matrix)
         if cnx:
             ctl.addAttr("match_ref", at="message", multi=False)
@@ -203,7 +203,7 @@ class Component(component.Main):
     # =====================================================
     # OBJECTS
     # =====================================================
-    def addObjects(self):
+    def addObjects(self) -> None:
         """Add all the objects needed to create the component."""
 
         self.setup = primitive.addTransformFromPos(self.setupWS, self.getName("WS"))
@@ -855,7 +855,7 @@ class Component(component.Main):
         # add visual reference
         self.line_ref = icon.connection_display_curve(self.getName("visalRef"), [self.upv_ctl, self.knee_ctl])
 
-    def addAttributes(self):
+    def addAttributes(self) -> None:
         self.blend_att = self.addAnimParam("blend", "Fk/Ik Blend", "double", self.settings["blend"], 0, 1)
         self.ikEndpoint_att = self.addAnimEnumParam(
             "ikEndpoint",
@@ -934,7 +934,7 @@ class Component(component.Main):
     # =====================================================
     # OPERATORS
     # =====================================================
-    def addOperators(self):
+    def addOperators(self) -> None:
         """Create operators and set the relations for the component rig
 
         Apply operators, constraints, expressions to the hierarchy.
@@ -978,7 +978,7 @@ class Component(component.Main):
         # Shadow targets copy only animator local offsets. They intentionally do
         # not read actual WIK world matrices, IK handles, or solved chains, so
         # stretch distance stays upstream of the solver graph.
-        def connect_local_tr(src, dst):
+        def connect_local_tr(src: object, dst: object) -> None:
             for attr_name in ("translate", "rotate"):
                 pm.connectAttr(src.attr(attr_name), dst.attr(attr_name), f=True)
 
@@ -1429,7 +1429,7 @@ class Component(component.Main):
         self._connect_endpoint_condition(2, ik_mth_cns + ".target[2].targetWeight")
 
 
-    def verifyAlignmentAccuracy(self, jnts, guides, degree=10.0):
+    def verifyAlignmentAccuracy(self, jnts: object, guides: object, degree: int=10.0) -> bool:
         # type: (Sequence[Vector3], Sequence[Vector3], float) -> bool
         """
         Validate if the joint is in the same direction as the guides.
@@ -1485,7 +1485,7 @@ class Component(component.Main):
     # CONNECTOR
     # =====================================================
 
-    def setRelation(self):
+    def setRelation(self) -> None:
         """Set the relation beetween object from guide to rig"""
         self.relatives["root"] = self.deform_anchor_drivers["root"]
         self.relatives["knee"] = self.deform_anchor_drivers["knee"]
@@ -1511,7 +1511,7 @@ class Component(component.Main):
         self.aliasRelatives["eff"] = "tip"
 
     # standard connection definition.
-    def connect_standard(self):
+    def connect_standard(self) -> None:
         self.parent.addChild(self.root)
 
         # Set the Ik Reference

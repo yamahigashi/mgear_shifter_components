@@ -23,7 +23,7 @@ class Component(component.Main):
     # =====================================================
     # OBJECTS
     # =====================================================
-    def addObjects(self):
+    def addObjects(self) -> None:
         """Add all the objects needed to create the component."""
 
         self.div_count = len(self.guide.apos) - 5
@@ -121,7 +121,7 @@ class Component(component.Main):
         self.bk_loc = []
         self.previousTag = self.tip_ctl
 
-        def _add_loc_ctl(i, t, parent):
+        def _add_loc_ctl(i: int, t: object, parent: object) -> object:
 
             loc = primitive.addTransform(parent, self.getName("bk%s_loc" % i), t)
             self.bk_loc.append(loc)
@@ -198,7 +198,7 @@ class Component(component.Main):
             self.fk_ctl.append(fk_ctl)
             self.fk_loc.append(fk_loc)
 
-    def _calcBackCtlVerticalPos(self, x):
+    def _calcBackCtlVerticalPos(self, x: float) -> bool:
         _ = self.guide.pos["heel"]
         _ = self.guide.pos["inpivot"]
         _ = self.guide.pos["outpivot"]
@@ -207,7 +207,7 @@ class Component(component.Main):
     # =====================================================
     # ATTRIBUTES
     # =====================================================
-    def addAttributes(self):
+    def addAttributes(self) -> None:
         """Create the anim and setupr rig attributes for the component"""
 
         # Anim -------------------------------------------
@@ -230,7 +230,7 @@ class Component(component.Main):
     # =====================================================
     # OPERATORS
     # =====================================================
-    def addOperators(self):
+    def addOperators(self) -> None:
         """Create operators and set the relations for the component rig
 
         Apply operators, constraints, expressions to the hierarchy.
@@ -338,7 +338,7 @@ class Component(component.Main):
     # =====================================================
     # CONNECTOR
     # =====================================================
-    def setRelation(self):
+    def setRelation(self) -> None:
         """Set the relation beetween object from guide to rig"""
 
         self.relatives["root"] = self.fk_ctl[0]
@@ -364,14 +364,14 @@ class Component(component.Main):
             self.relatives["%s_loc" % self.div_count] = self.fk_ctl[-1]
             self.jointRelatives["%s_loc" % self.div_count] = self.div_count - 1
 
-    def addConnection(self):
+    def addConnection(self) -> None:
         """Add more connection definition to the set"""
 
         self.connections["leg_2jnt_01"] = self.connect_leg_2jnt_01
         self.connections["leg_ms_2jnt_01"] = self.connect_leg_ms_2jnt_01
         self.connections["leg_3jnt_01"] = self.connect_leg_3jnt_01
 
-    def connect_leg_2jnt_01(self):
+    def connect_leg_2jnt_01(self) -> None:
         """Connector for leg 2jnt"""
 
         # If the parent component hasn't been generated we skip the connection
@@ -400,7 +400,7 @@ class Component(component.Main):
 
             ymt_util.setCurveCVs(shape, points)
 
-    def connect_leg_ms_2jnt_01(self):
+    def connect_leg_ms_2jnt_01(self) -> None:
         """Connector for leg ms 2jnt"""
 
         # If the parent component hasn't been generated we skip the connection
@@ -425,7 +425,7 @@ class Component(component.Main):
 
         return
 
-    def connect_leg_3jnt_01(self):
+    def connect_leg_3jnt_01(self) -> None:
         """Connector for leg 3jnt"""
 
         # If the parent component hasn't been generated we skip the connection

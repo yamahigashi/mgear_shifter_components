@@ -2,6 +2,7 @@
 # GLOBAL
 ##################################################
 import re
+from typing import Optional, Text
 
 import importlib
 try:
@@ -18,7 +19,7 @@ QtGui, QtCore, QtWidgets, wrapInstance = gqt.qt_import()
 
 class AbstractControllerButton(QtWidgets.QPushButton):
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: object, **kwargs: object) -> None:
         super(AbstractControllerButton, self).__init__(*args, **kwargs)
         self.root = None
         self.side = "C"
@@ -26,7 +27,7 @@ class AbstractControllerButton(QtWidgets.QPushButton):
         self.index = 0
         self.lookupControllers()
 
-    def lookupControllers(self):
+    def lookupControllers(self) -> None:
 
         for prop in self.dynamicPropertyNames():
             print("setattr {}, {}".format(prop, self.property(prop)))
@@ -43,10 +44,10 @@ class AbstractControllerButton(QtWidgets.QPushButton):
                     self.index = int(_m.groups(2))
                     break
 
-    def isControllerSetup(self):
+    def isControllerSetup(self) -> bool:
         return False
 
-    def getName(self, name, side=None):
+    def getName(self, name: Text, side: Optional[Text] = None) -> str:
         """Return the name for component element
 
         Args:

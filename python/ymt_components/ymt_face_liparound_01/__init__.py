@@ -67,6 +67,7 @@ from logging import (
     DEBUG,
     INFO
 )
+from typing import NoReturn
 
 handler = StreamHandler()
 handler.setLevel(DEBUG)
@@ -86,7 +87,7 @@ class Component(component.Main):
     # =====================================================
     # OBJECTS
     # =====================================================
-    def addObjects(self):
+    def addObjects(self) -> None:
         """Add all the objects needed to create the component."""
 
         self.normal = self.guide.blades["blade"].z * -1.
@@ -198,7 +199,7 @@ class Component(component.Main):
         self.addControllers()
         self.addConstraints()
 
-    def addContainers(self):
+    def addContainers(self) -> None:
 
         t = getTransform(self.root)
 
@@ -213,7 +214,7 @@ class Component(component.Main):
         ymt_util.setKeyableAttributesDontLockVisibility(self.rope_root, [])
         ymt_util.setKeyableAttributesDontLockVisibility(self.upv_root, [])
 
-    def getNumberOfLocators(self, query):
+    def getNumberOfLocators(self, query: object) -> None:
         # type: (Text) -> int
         """ _uplocs."""
         num = 0
@@ -224,7 +225,7 @@ class Component(component.Main):
 
         return num
 
-    def addCurve(self):
+    def addCurve(self) -> None:
 
         self.addCurves(self.crv_root)
         self.addCurveBaseControllers(self.crv_root)
@@ -236,7 +237,7 @@ class Component(component.Main):
             self.sliding_surface.visibility.set(False)
             pm.makeIdentity(self.sliding_surface, apply=True, t=1,  r=1, s=1, n=0, pn=1)
 
-    def getCurveCVs(self, crv, space="world"):
+    def getCurveCVs(self, crv: object, space: object="world") -> None:
         # type: (...) -> List[om.MPoint]
 
         cvs = ymt_util.getCurveCVs(crv, space=space)
@@ -248,7 +249,7 @@ class Component(component.Main):
 
         return cvs
 
-    def addCurves(self, crv_root):
+    def addCurves(self, crv_root: object) -> None:
 
         t = getTransform(self.root)
         positions = [self._worldToObj(x) for x in self.locsPos]
@@ -262,11 +263,11 @@ class Component(component.Main):
             degree=3,
         )
 
-    def addCurveBaseControllers(self, crv_root):
+    def addCurveBaseControllers(self, crv_root: object) -> None:
 
         t = getTransform(self.root)
 
-        def curveFromCurve(crv, name, nbPoints, tobe_offset):
+        def curveFromCurve(crv: object, name: str, nbPoints: object, tobe_offset: float) -> None:
             new_crv = curve.createCurveFromCurve(
                 crv,
                 self.getName(name),
@@ -294,10 +295,10 @@ class Component(component.Main):
         self.upv_crv = curveFromCurve(self.crv, "upv_crv", self.NB_ROPE, True)
         self.crv_ctl = curveFromCurve(self.crv, "ctl_crv",  self.NB_CVS,  False)
 
-    def addControlJoints(self):
+    def addControlJoints(self) -> None:
         self.joints = self._addControlJoints(self.crv, self.rope_root, self.rope)
 
-    def _addControlJoints(self, crv, rope_root, rope):
+    def _addControlJoints(self, crv: object, rope_root: object, rope: object) -> None:
 
         local_cvs = self.getCurveCVs(crv, "object")
         controls = []
@@ -408,7 +409,7 @@ class Component(component.Main):
 
         return controls
 
-    def addToSubGroup(self, obj, group_name):
+    def addToSubGroup(self, obj: object, group_name: str) -> None:
 
         if self.settings["ctlGrp"]:
             ctlGrp = self.settings["ctlGrp"]
@@ -417,7 +418,7 @@ class Component(component.Main):
 
         self.addToGroup(obj, group_name, parentGrp=ctlGrp)
 
-    def addControllers(self):
+    def addControllers(self) -> None:
         axis_list = ["sx", "sy", "sz", "ro"]
         ctlOptions = [
             # for referenece
@@ -475,8 +476,8 @@ class Component(component.Main):
         cmds.setAttr(w2.name() + ".rotation", 0.0)
         cmds.setAttr(w3.name() + ".rotation", 0.0)
 
-    def addConstraints(self):
-        def applyMultiCns(ctls, src1Index, src2Index, dstIndex, p1, p2):
+    def addConstraints(self) -> None:
+        def applyMultiCns(ctls: object, src1Index: int, src2Index: int, dstIndex: int, p1: object, p2: object) -> None:
 
             src1 = ctls[src1Index]
             src2 = ctls[src2Index]
@@ -495,7 +496,7 @@ class Component(component.Main):
             cmds.setAttr(attr1, (r1 * 0.5) + (p1 * 0.5))
             cmds.setAttr(attr2, (r2 * 0.5) + (p2 * 0.5))
 
-        def calcDistRatio(a, b, c):
+        def calcDistRatio(a: object, b: object, c: object) -> None:
             pa = a.getTranslation(space="world")
             pb = b.getTranslation(space="world")
             pc = c.getTranslation(space="world")
@@ -520,7 +521,7 @@ class Component(component.Main):
             applyMultiCns(self.upCtls, b, r, nic * 2 + i + 3,  0.80, 0.20)
             applyMultiCns(self.upCtls, r, t, nic * 3 + i + 4,  0.25, 0.50)
 
-    def _addControls(self, crv_ctl, option):
+    def _addControls(self, crv_ctl: object, option: object) -> None:
 
         cvs = self.getCurveCVs(crv_ctl)
         sum_cvs = datatypes.Vector()
@@ -586,7 +587,7 @@ class Component(component.Main):
     # =====================================================
     # ATTRIBUTES
     # =====================================================
-    def addAttributes(self):
+    def addAttributes(self) -> None:
         """Create the anim and setupr rig attributes for the component"""
 
         pass
@@ -596,7 +597,7 @@ class Component(component.Main):
     # =====================================================
     # OPERATORS
     # =====================================================
-    def addOperators(self):
+    def addOperators(self) -> None:
         """Create operators and set the relations for the component rig
 
         Apply operators, constraints, expressions to the hierarchy.
@@ -609,12 +610,12 @@ class Component(component.Main):
     # =====================================================
     # CONNECTOR
     # =====================================================
-    def addConnection(self):
+    def addConnection(self) -> None:
         self.connections["mouth_01"] = self.connect_mouth
         self.connections["lip_01"] = self.connect_mouth
         self.connections["standard"] = self.connect_mouth
 
-    def connect_mouth(self):
+    def connect_mouth(self) -> None:
 
         if self.parent is None:
             return
@@ -631,14 +632,14 @@ class Component(component.Main):
             traceback.print_exc()
             raise
 
-    def connect_standard(self):
+    def connect_standard(self) -> NoReturn:
         raise
         self.parent.addChild(self.root)
         if self.surfRef:
             ref = self.rig.findComponent(self.surfRef)
             self.sliding_surface = ref.sliding_surface
 
-    def connect_ghosts(self):
+    def connect_ghosts(self) -> None:
 
         corner_l_ref = self.rig.findRelative("mouthCorner_L0_root")
         corner_r_ref = self.rig.findRelative("mouthCorner_R0_root")
@@ -704,7 +705,7 @@ class Component(component.Main):
 
                 comp.groups[k] = []
 
-    def _createGhostCtl(self, ghost_ctl, parent):
+    def _createGhostCtl(self, ghost_ctl: object, parent: object) -> None:
 
         ctl = ghost.createGhostCtl(ghost_ctl, parent=parent, connect=True)
         # rigbits.connectLocalTransform([ctl, ghost_ctl])
@@ -736,7 +737,7 @@ class Component(component.Main):
 
         return ctl
 
-    def _removeFromCtrlGroup(self, obj):
+    def _removeFromCtrlGroup(self, obj: object) -> None:
 
         if self.settings["ctlGrp"]:
             ctlGrp = self.settings["ctlGrp"]
@@ -753,7 +754,7 @@ class Component(component.Main):
             except ValueError:
                 pass
 
-    def connect_slide_ghost(self, intTra, slide_c_ref, outer_l_ref, outer_r_ref):
+    def connect_slide_ghost(self, intTra: object, slide_c_ref: object, outer_l_ref: object, outer_r_ref: object) -> None:
 
         # create ghost controls
         self.mouthSlide_ctl = self._createGhostCtl(slide_c_ref, intTra)
@@ -784,7 +785,7 @@ class Component(component.Main):
 
         return drivers
 
-    def connect_mouth_ghost(self, liplow_ref):
+    def connect_mouth_ghost(self, liplow_ref: object) -> None:
 
         # center main controls
         self.lips_C_lower_ctl, lo_ghost_ctl = createGhostWithParentConstraint(self.lips_C_lower_ctl, liplow_ref)
@@ -796,7 +797,7 @@ class Component(component.Main):
         for c in npos:
             rigbits.connectLocalTransform([self.mouthSlide_ctl, c])
 
-    def connect_averageParentCns(self, parents, target):
+    def connect_averageParentCns(self, parents: object, target: str) -> None:
         """
         Connection definition using average parent constraint.
         """
@@ -814,12 +815,12 @@ class Component(component.Main):
                 attr_name = f"{cns_node}.{attr}"
                 pm.setAttr(attr_name, 1.0)
 
-    def setRelation(self):
+    def setRelation(self) -> None:
         """Set the relation beetween object from guide to rig"""
 
         self.relatives["root"] = self.root
 
-    def _worldToObj(self, pos):
+    def _worldToObj(self, pos: float) -> None:
         # type: (list[float]) -> dt.Vector
 
         m = getTransform(self.root)
@@ -838,7 +839,7 @@ class Component(component.Main):
 
         return positions
 
-    def _objToWorld(self, pos):
+    def _objToWorld(self, pos: float) -> None:
         # type: (list[float]) -> dt.Vector
 
         m = getTransform(self.root)
@@ -859,7 +860,7 @@ class Component(component.Main):
         return positions
 
 
-def ghostSliderForMouth(ctlGhost, surface, sliderParent):
+def ghostSliderForMouth(ctlGhost: object, surface: object, sliderParent: object) -> None:
     """Modify the ghost control behaviour to slide on top of a surface
 
     Args:
@@ -868,7 +869,7 @@ def ghostSliderForMouth(ctlGhost, surface, sliderParent):
         sliderParent (dagNode): The parent for the slider.
     """
 
-    def conn(ctl, driver, ghost):
+    def conn(ctl: object, driver: object, ghost: object) -> None:
         for attr in ("translate", "scale", "rotate"):
             try:
                 pm.connectAttr("{}.{}".format(ctl, attr), "{}.{}".format(driver, attr))
@@ -876,7 +877,7 @@ def ghostSliderForMouth(ctlGhost, surface, sliderParent):
             except RuntimeError:
                 pass
 
-    def connCenter(ctl, driver, ghost):
+    def connCenter(ctl: object, driver: object, ghost: object) -> None:
 
         dm_node = ymt_util.getDecomposeMatrixOfAtoB(ctl, driver, skip_last=True)
 
@@ -931,7 +932,7 @@ def ghostSliderForMouth(ctlGhost, surface, sliderParent):
     return drivers
 
 
-def ghostSliderForMouth2(ghostControls, npos, surface, sliderParent):
+def ghostSliderForMouth2(ghostControls: object, npos: object, surface: object, sliderParent: object) -> None:
 
     surfaceShape = surface.getShape()
     drivens = []
@@ -958,7 +959,7 @@ def ghostSliderForMouth2(ghostControls, npos, surface, sliderParent):
         _visi_off_lock(driven)
 
 
-def createGhostWithParentConstraint(ctl, parent=None, connect=True):
+def createGhostWithParentConstraint(ctl: object, parent: object=None, connect: object=True) -> None:
     """Create a duplicated Ghost control
 
     Create a duplicate of the control and rename the original with _ghost.
@@ -1017,7 +1018,7 @@ def createGhostWithParentConstraint(ctl, parent=None, connect=True):
     return newCtl, ctl
 
 
-def _visi_off_lock(node):
+def _visi_off_lock(node: object) -> None:
     """Short cuts."""
     if not node:
         raise Exception("node is null")

@@ -58,14 +58,14 @@ class Guide(guide.ComponentGuide):
 
     connectors = ["surface"]
 
-    def postInit(self):
+    def postInit(self) -> None:
         """Initialize the position for the guide"""
 
         self.save_transform = ["root", "#_loc", "tan"]
         self.save_blade = ["blade"]
         self.addMinMax("#_loc", 1, -1)
 
-    def addObjects(self):
+    def addObjects(self) -> None:
         """Add the Guide Root, blade and locators"""
 
         self.root = self.addRoot()
@@ -80,7 +80,7 @@ class Guide(guide.ComponentGuide):
         self.dispcrv = self.addDispCurve("crv", centers)
         self.addDispCurve("crvRef", centers, 3)
 
-    def addParameters(self):
+    def addParameters(self) -> None:
         """Add the configurations settings"""
 
         self.pUseIndex = self.addParam("useIndex", "bool", False)
@@ -96,7 +96,7 @@ class Guide(guide.ComponentGuide):
         self.pCtlSize = self.addParam("ctlSize", "double", 1, None, None)
         self.pIcon = self.addParam("icon", "string", "cube")
 
-    def modalPositions(self):
+    def modalPositions(self) -> bool:
         """Launch a modal dialog to set position of the guide."""
         self.sections_number = None
         self.dir_axis = None
@@ -146,14 +146,14 @@ class Guide(guide.ComponentGuide):
 ##########################################################
 class settingsTab(QtWidgets.QDialog, sui.Ui_Form):
 
-    def __init__(self, parent=None):
+    def __init__(self, parent: object=None) -> None:
         super(settingsTab, self).__init__(parent)
         self.setupUi(self)
 
 
 class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
 
-    def __init__(self, parent=None):
+    def __init__(self, parent: object=None) -> None:
         self.toolName = TYPE
         # Delete old instances of the componet settings window.
         pyqt.deleteInstances(self, MayaQDockWidget)
@@ -183,7 +183,7 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
         self.create_componentLayout()
         self.create_componentConnections()
 
-    def setup_componentSettingWindow(self):
+    def setup_componentSettingWindow(self) -> None:
         self.mayaMainWindow = pyqt.maya_main_window()
 
         self.setObjectName(self.toolName)
@@ -191,10 +191,10 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
         self.setWindowTitle(TYPE)
         self.resize(280, 350)
 
-    def create_componentControls(self):
+    def create_componentControls(self) -> None:
         pass
 
-    def populate_componentControls(self):
+    def populate_componentControls(self) -> None:
         """Populate Controls
 
         Populate the controls values from the custom attributes of the
@@ -245,7 +245,7 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
         comboIndex = self.connector_items.index(currentConnector)
         self.c_box.setCurrentIndex(comboIndex)
 
-    def create_componentLayout(self):
+    def create_componentLayout(self) -> None:
 
         self.settings_layout = QtWidgets.QVBoxLayout()
         self.settings_layout.addWidget(self.tabs)
@@ -253,7 +253,7 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
 
         self.setLayout(self.settings_layout)
 
-    def create_componentConnections(self):
+    def create_componentConnections(self) -> None:
 
         # populate component settings
         self.mainSettingsTab.connector_comboBox.currentIndexChanged.connect(
@@ -316,7 +316,7 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
                     self.settingsTab.controlShape_comboBox,
                     self.iconsList, "icon"))
 
-    def updateMasterChain(self, lEdit, targetAttr):
+    def updateMasterChain(self, lEdit: object, targetAttr: str) -> None:
         oType = pm.nodetypes.Transform
 
         oSel = pm.selected()
@@ -355,12 +355,12 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
                 pm.displayWarning("The previous Master Chain have been "
                                   "cleared")
 
-    def _get_chain_segments_length(self, chain_root):
+    def _get_chain_segments_length(self, chain_root: object) -> None:
         module = shifter.importComponentGuide(chain_root.comp_type.get())
         componentGuide = module.Guide
         comp_guide = componentGuide()
         comp_guide.setFromHierarchy(chain_root)
         return len(comp_guide.pos)
 
-    def dockCloseEventTriggered(self):
+    def dockCloseEventTriggered(self) -> None:
         pyqt.deleteInstances(self, MayaQDockWidget)

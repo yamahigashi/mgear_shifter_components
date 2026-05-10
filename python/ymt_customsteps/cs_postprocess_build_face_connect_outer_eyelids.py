@@ -13,6 +13,7 @@ from mgear.core.transform import (
 import mgear.shifter.custom_step as cstp
 import ymt_shifter_utility as ymt_utility
 import ymt_shifter_utility.curve as curve
+from ymt_shifter_utility.type_protocols import DagNodeLike
 
 
 class CustomShifterStep(cstp.customShifterMainStep):
@@ -44,12 +45,10 @@ class CustomShifterStep(cstp.customShifterMainStep):
         }
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.name = "Outer Eyelids Connect"
 
-    def run(self, stepDict):
-        # type: (dict) -> None
-
+    def run(self, stepDict: dict[str, object]) -> None:
         self.rig = stepDict["mgearRun"]
         self.stepDict = stepDict
         self.config = stepDict["cs_outer_eyelids_config"]
@@ -76,7 +75,9 @@ class CustomShifterStep(cstp.customShifterMainStep):
         cmds.delete(dummy_start)
         cmds.delete(dummy_end)
 
-    def blendShape(self, name, brow_crv, blink_crv, eyelids, left=True):
+    def blendShape(
+        self, name: str, brow_crv: str, blink_crv: str, eyelids: list[str], left: bool = True
+    ) -> DagNodeLike:
 
         if left:
             sortingAxis = "x"
@@ -106,8 +107,7 @@ class CustomShifterStep(cstp.customShifterMainStep):
 
         return dest
 
-    def get_npos(self, left=True):
-        # type: (bool) -> Tuple[list[str], str, str]
+    def get_npos(self, left: bool = True) -> tuple[list[str], str, str]:
         if left:
             npos = self.config.get("npos_left", None)
         else:
@@ -121,14 +121,14 @@ class CustomShifterStep(cstp.customShifterMainStep):
         left = cmds.xform(npos[0], q=True, ws=True, t=True)
         right = cmds.xform(npos[-1], q=True, ws=True, t=True)
         start_position = [
-            left[0] - (centroid[0] - left[0]) * 0.6,  # type: ignore
-            left[1] - (centroid[1] - left[1]) * 0.8,  # type: ignore 
-            left[2] - (centroid[2] - left[2]) * 0.6  # type: ignore
+            left[0] - (centroid[0] - left[0]) * 0.6,
+            left[1] - (centroid[1] - left[1]) * 0.8,
+            left[2] - (centroid[2] - left[2]) * 0.6
         ]
         end_position = [
-            right[0] + (right[0] - centroid[0]) * 0.6,  # type: ignore
-            right[1] + (right[1] - centroid[1]) * 0.8,  # type: ignore
-            right[2] + (right[2] - centroid[2]) * 0.6  # type: ignore
+            right[0] + (right[0] - centroid[0]) * 0.6,
+            right[1] + (right[1] - centroid[1]) * 0.8,
+            right[2] + (right[2] - centroid[2]) * 0.6
         ]
 
         dummy_start = cmds.spaceLocator(n="dummy_start")[0]
@@ -141,9 +141,7 @@ class CustomShifterStep(cstp.customShifterMainStep):
 
         return npos, dummy_start, dummy_end
 
-    def get_brow_crv(self, left=True):
-        # type: (bool) -> str
-
+    def get_brow_crv(self, left: bool = True) -> str:
         if left:
             crv = self.config.get("brow_crv_left", None)
         else:
@@ -154,9 +152,7 @@ class CustomShifterStep(cstp.customShifterMainStep):
 
         return crv
 
-    def get_blink_crv(self, left=True):
-        # type: (bool) -> str
-
+    def get_blink_crv(self, left: bool = True) -> str:
         if left:
             crv = self.config.get("blink_crv_left", None)
         else:

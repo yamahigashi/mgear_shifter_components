@@ -10,7 +10,7 @@
 from Qt import QtCore, QtGui, QtWidgets
 
 class Ui_baker(object):
-    def setupUi(self, baker):
+    def setupUi(self, baker: object) -> None:
         baker.setObjectName("baker")
         baker.resize(325, 790)
         baker.setMinimumSize(QtCore.QSize(325, 790))
@@ -1904,7 +1904,7 @@ class Ui_baker(object):
         self.retranslateUi(baker)
         QtCore.QMetaObject.connectSlotsByName(baker)
 
-    def retranslateUi(self, baker):
+    def retranslateUi(self, baker: object) -> None:
         baker.setWindowTitle(QtWidgets.QApplication.translate("baker", "Form", None, -1))
         self.b_flipPose.setText(QtWidgets.QApplication.translate("baker", "Flip Pose", None, -1))
         self.b_keySel.setText(QtWidgets.QApplication.translate("baker", "Key Sel", None, -1))

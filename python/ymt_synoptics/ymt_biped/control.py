@@ -1,6 +1,5 @@
 # import re
 import importlib
-import sys
 import maya.cmds as cmds
 try:
     pm = importlib.import_module("mgear.pymaya")
@@ -14,6 +13,8 @@ from mgear.core import pyqt
 import mgear.core.anim_utils as anim_utils
 import mgear.synoptic.utils as syn_utils
 import mgear.core.utils as utils
+from typing import Optional
+from ymt_shifter_utility.type_protocols import AttrValue, DagNodeLike, MatrixValue, MouseEventLike
 
 import gml_maya.decorator as deco
 try:
@@ -21,7 +22,7 @@ try:
 except ImportError:
     node_utils = importlib.import_module("gml_maya.util.node_util")
 
-from logging import (  # noqa:F401 pylint: disable=unused-import, wrong-import-order
+from logging import (  # pylint: disable=unused-import, wrong-import-order
     StreamHandler,
     getLogger,
     WARN,
@@ -29,20 +30,6 @@ from logging import (  # noqa:F401 pylint: disable=unused-import, wrong-import-o
     INFO
 )
 
-if sys.version_info >= (3, 0):  # pylint: disable=using-constant-test  # pylint: disable=using-constant-test, wrong-import-order
-    # For type annotation
-    from typing import (  # NOQA: F401 pylint: disable=unused-import
-        Optional,
-        Dict,
-        List,
-        Tuple,
-        Pattern,
-        Callable,
-        Any,
-        Text,
-        Generator,
-        Union
-    )
 ###############################################################################
 handler = StreamHandler()
 handler.setLevel(DEBUG)
@@ -58,7 +45,7 @@ logger.propagate = False
 
 class MirrorEntry(object):
 
-    def __init__(self, target, attr, val):
+    def __init__(self, target: DagNodeLike, attr: str, val: AttrValue) -> None:
         self.target = target
         self.attr = attr
         self.val = val
@@ -66,14 +53,14 @@ class MirrorEntry(object):
 
 class MirrorPoseButton(QtWidgets.QPushButton):
 
-    def mousePressEvent(self, event):
+    def mousePressEvent(self, event: MouseEventLike) -> None:
 
         mirrorPose()
 
 
 class FlipPoseButton(QtWidgets.QPushButton):
 
-    def mousePressEvent(self, event):
+    def mousePressEvent(self, event: MouseEventLike) -> None:
 
         mirrorPose(True)
 
@@ -82,13 +69,11 @@ class ikfkMatchButton(QtWidgets.QPushButton):
 
     MAXIMUM_TRY_FOR_SEARCHING_FK = 1000
 
-    def __init__(self, *args, **kwargs):
-        # type: (*str, **str) -> None
+    def __init__(self, *args: object, **kwargs: object) -> None:
         super(ikfkMatchButton, self).__init__(*args, **kwargs)
-        self.numFkControllers = None  # type: Optional[int]
+        self.numFkControllers: Optional[int] = None
 
-    def searchNumberOfFkControllers(self):
-        # type: () -> int
+    def searchNumberOfFkControllers(self) -> int:
 
         for i in range(self.MAXIMUM_TRY_FOR_SEARCHING_FK):
             prop = self.property("fk{0}".format(str(i)))
@@ -97,8 +82,7 @@ class ikfkMatchButton(QtWidgets.QPushButton):
 
         return 0
 
-    def mousePressEvent(self, event):
-        # type: (QtCore.QEvent) -> None
+    def mousePressEvent(self, event: MouseEventLike) -> None:
 
         mouse_button = event.button()
 
@@ -139,7 +123,7 @@ class ikfkMatchButton(QtWidgets.QPushButton):
 
 @deco.autokey_off
 @utils.one_undo
-def mirrorPose(flip=False, nodes=None):
+def mirrorPose(flip: bool=False, nodes: object=None) -> None:
     """Summary
 
     Args:
@@ -165,7 +149,7 @@ def mirrorPose(flip=False, nodes=None):
         applyMirror(nameSpace, dat)
 
 
-def applyMirror(nameSpace, mirrorEntry):
+def applyMirror(nameSpace: str, mirrorEntry: MirrorEntry) -> None:
     """Apply mirro pose
 
     Args:
@@ -190,7 +174,7 @@ def applyMirror(nameSpace, mirrorEntry):
         mgear.log("applyMirror failed: {0} {1}: {2}".format(node.name(), attr, val), mgear.sev_error)
 
 
-def gatherMirrorData(nameSpace, node, flip):
+def gatherMirrorData(nameSpace: str, node: DagNodeLike, flip: bool) -> list[MirrorEntry]:
     """Get the data to mirror
 
     Args:
@@ -215,8 +199,7 @@ def gatherMirrorData(nameSpace, node, flip):
         return calculateMirrorData(node, node, flip=False)
 
 
-def calculateMirrorData(srcNode, targetNode, flip=False):
-    # type: (Transform, Transform, bool) -> List[MirrorEntry]
+def calculateMirrorData(srcNode: DagNodeLike, targetNode: DagNodeLike, flip: bool=False) -> list[MirrorEntry]:
     """Calculate the mirror data
 
     Args:
@@ -297,8 +280,7 @@ def calculateMirrorData(srcNode, targetNode, flip=False):
     return results
 
 
-def getPivotCheckButtonAttrName(str):
-    # type: (Text) -> Text
+def getPivotCheckButtonAttrName(str: str) -> str:
     """Get the invert check butto attribute name
 
     Args:
@@ -310,26 +292,17 @@ def getPivotCheckButtonAttrName(str):
     return "invPivot{0}".format(str.lower().capitalize())
 
 
-def getMatrix(obj):
-    # type: (pm.datatypes.Transform) -> List[float]
+def getMatrix(obj: DagNodeLike) -> list[float]:
     xform = cmds.xform("{}".format(obj.name()), q=True, ws=True, matrix=True)
     return xform
 
 
-def setMatrix(obj, mat):
-    # type: (pm.datatypes.Transform) -> None
+def setMatrix(obj: DagNodeLike, mat: MatrixValue) -> None:
     cmds.xform("{}".format(obj.name()), ws=True, matrix=mat)
 
 
 @deco.autokey_off
-def ikFkMatch(namespace,
-              ikfk_attr,
-              ui_host,
-              fks,
-              ik,
-              upv,
-              ik_rot=None,
-              key=None):
+def ikFkMatch(namespace: object, ikfk_attr: object, ui_host: object, fks: object, ik: object, upv: object, ik_rot: object=None, key: object=None) -> object:
     """Switch IK/FK with matching functionality
 
     This function is meant to work with 2 joint limbs.
@@ -347,8 +320,7 @@ def ikFkMatch(namespace,
     """
 
     # returns a pymel node on the given name
-    def _get_node(name):
-        # type: (str) -> pm.nodetypes.Transform
+    def _get_node(name: str) -> DagNodeLike:
         name = anim_utils.stripNamespace(name)
         if namespace:
             node = anim_utils.getNode(":".join([namespace, name]))
@@ -361,8 +333,7 @@ def ikFkMatch(namespace,
         return node
 
     # returns matching node
-    def _get_mth(name):
-        # type: (str) -> pm.nodetypes.Transform
+    def _get_mth(name: str) -> DagNodeLike:
         tmp = name.split("_")
         tmp[-1] = "mth"
         query = "_".join(tmp)
@@ -511,29 +482,24 @@ def ikFkMatch(namespace,
 
 class IkFkTransfer(anim_utils.AbstractAnimationTransfer):
 
-    def __init__(self):
-        # type: () -> None
+    def __init__(self) -> None:
         super(IkFkTransfer, self).__init__()
         self.getValue = self.getValueFromUI
 
     # ----------------------------------------------------------------
 
-    def getChangeAttrName(self):
-        # type: () -> str
+    def getChangeAttrName(self) -> str:
         return "{}.{}".format(self.getHostName(), self.switchedAttrShortName)
 
-    def getChangeRollAttrName(self):
-        # type: () -> str
+    def getChangeRollAttrName(self) -> str:
         return "{}.{}".format(
             self.getHostName(),
             self.switchedAttrShortName.replace("blend", "roll"))
 
-    def changeAttrToBoundValue(self):
-        # type: () -> None
+    def changeAttrToBoundValue(self) -> None:
         pm.setAttr(self.getChangeAttrName(), self.getValue())
 
-    def getValueFromUI(self):
-        # type: () -> float
+    def getValueFromUI(self) -> float:
         if self.comboBoxSpaces.currentIndex() == 0:
             # IK
             return 1.0
@@ -541,8 +507,7 @@ class IkFkTransfer(anim_utils.AbstractAnimationTransfer):
             # FK
             return 0.0
 
-    def _getNode(self, name):
-        # type: (str) -> pm.nodetypes.Transform
+    def _getNode(self, name: str) -> DagNodeLike:
         node = anim_utils.getNode(":".join([self.nameSpace, name]))
 
         if not node:
@@ -550,14 +515,13 @@ class IkFkTransfer(anim_utils.AbstractAnimationTransfer):
 
         return node
 
-    def _getMth(self, name):
-        # type: (Text) -> pm.nodetypes.Transform
+    def _getMth(self, name: str) -> DagNodeLike:
 
         tmp = name.split("_")
         tmp[-1] = "mth"
         return self._getNode("_".join(tmp))
 
-    def _get_node_mth(self, name):
+    def _get_node_mth(self, name: str) -> tuple[DagNodeLike, DagNodeLike]:
         n = self._getNode(name)
         m = self._getMth(name)
 
@@ -569,8 +533,7 @@ class IkFkTransfer(anim_utils.AbstractAnimationTransfer):
 
         return n, m
 
-    def setCtrls(self, fks, ik, upv, ikRot):
-        # type: (list[str], str, str) -> None
+    def setCtrls(self, fks: list[str], ik: str, upv: str, ikRot: object) -> None:
         """gather core PyNode represented each controllers"""
 
         nm = [self._get_node_mth(x) for x in fks]
@@ -590,22 +553,14 @@ class IkFkTransfer(anim_utils.AbstractAnimationTransfer):
         else:
             self.hasIkRot = False
 
-    def setGroupBoxTitle(self):
+    def setGroupBoxTitle(self) -> None:
         if hasattr(self, "groupBox"):
             # TODO: extract logic with naming convention
             part = "_".join(self.ikCtrl.name().split(":")[-1].split("_")[:-2])
             self.groupBox.setTitle(part)
 
     @deco.autokey_off
-    def transfer(self,
-                 startFrame,
-                 endFrame,
-                 onlyKeyframes,
-                 ikRot,
-                 switchTo=None,
-                 *args,
-                 **kargs):
-        # type: (int, int, bool, str, *str, **str) -> None
+    def transfer(self, startFrame: object, endFrame: object, onlyKeyframes: object, ikRot: object, switchTo: object=None, *args: object, **kargs: object) -> None:
 
         if switchTo is not None:
             if "fk" in switchTo.lower():
@@ -652,14 +607,7 @@ class IkFkTransfer(anim_utils.AbstractAnimationTransfer):
 
     @utils.one_undo
     @utils.viewport_off
-    def bakeAnimation(self,
-                      switch_attr_name,
-                      val_src_nodes,
-                      key_src_nodes,
-                      key_dst_nodes,
-                      startFrame,
-                      endFrame,
-                      onlyKeyframes=True):
+    def bakeAnimation(self, switch_attr_name: object, val_src_nodes: object, key_src_nodes: object, key_dst_nodes: object, startFrame: object, endFrame: object, onlyKeyframes: object=True) -> None:
 
         # Temporaly turn off cycle check to avoid misleading cycle message
         # on Maya 2016.  With Maya 2016.5 and 2017 the cycle warning doesn't
@@ -687,7 +635,7 @@ class IkFkTransfer(anim_utils.AbstractAnimationTransfer):
         pm.cutKey(key_dst_nodes, at=channels, time=(startFrame, endFrame))
         pm.cutKey(switch_attr_name, time=(startFrame, endFrame))
 
-        def keyframe(x, i):
+        def keyframe(x: object, i: object) -> None:
             pm.currentTime(x)
 
             # set the new space in the channel
@@ -723,8 +671,7 @@ class IkFkTransfer(anim_utils.AbstractAnimationTransfer):
 
     # ----------------------------------------------------------------
     # re implement doItbyUI to have access to self.hasIKrot option
-    def doItByUI(self):
-        # type: () -> None
+    def doItByUI(self) -> None:
 
         # gather settings from UI
         startFrame = self.startFrame_value.value()
@@ -744,8 +691,7 @@ class IkFkTransfer(anim_utils.AbstractAnimationTransfer):
     # ----------------------------------------------------------------
 
     @staticmethod
-    def showUI(model, ikfk_attr, uihost, fks, ik, upv, ikRot, *args):
-        # type: (pm.nodetypes.Transform, str, str, List[str], str, str, *str) -> None
+    def showUI(model: DagNodeLike, ikfk_attr: str, uihost: str, fks: list[str], ik: str, upv: str, ikRot: object, *args: object) -> None:
 
         try:
             for c in pyqt.maya_main_window().children():
@@ -783,18 +729,7 @@ class IkFkTransfer(anim_utils.AbstractAnimationTransfer):
             mgear.log(e, mgear.sev_error)
 
     @staticmethod
-    def execute(model,
-                ikfk_attr,
-                uihost,
-                fks,
-                ik,
-                upv,
-                ikRot=None,
-                startFrame=None,
-                endFrame=None,
-                onlyKeyframes=None,
-                switchTo=None):
-        # type: (pm.nodetypes.Transform, str, str, List[str], str, str, int, int, bool, str) -> None
+    def execute(model: DagNodeLike, ikfk_attr: str, uihost: str, fks: list[str], ik: str, upv: str, ikRot: object=None, startFrame: object=None, endFrame: object=None, onlyKeyframes: object=None, switchTo: object=None) -> None:
         """transfer without displaying UI"""
         logger.debug("model: %s" % model)
         logger.debug("ikfk_attr: %s" % ikfk_attr)
@@ -832,8 +767,7 @@ class IkFkTransfer(anim_utils.AbstractAnimationTransfer):
         ui.transfer(startFrame, endFrame, onlyKeyframes, ikRot, switchTo=switchTo)
 
     @staticmethod
-    def toIK(model, ikfk_attr, uihost, fks, ik, upv, ikRot, **kwargs):
-        # type: (pm.nodetypes.Transform, str, str, List[str], str, str, **str) -> None
+    def toIK(model: DagNodeLike, ikfk_attr: str, uihost: str, fks: list[str], ik: str, upv: str, ikRot: object, **kwargs: object) -> None:
 
         kwargs.update({"switchTo": "ik"})
         IkFkTransfer.execute(model,
@@ -846,14 +780,12 @@ class IkFkTransfer(anim_utils.AbstractAnimationTransfer):
                              **kwargs)
 
     @staticmethod
-    def toFK(model, ikfk_attr, uihost, fks, ik, upv, ikRot, **kwargs):
-        # type: (pm.nodetypes.Transform, str, str, List[str], str, str, **str) -> None
+    def toFK(model: DagNodeLike, ikfk_attr: str, uihost: str, fks: list[str], ik: str, upv: str, ikRot: object, **kwargs: object) -> None:
 
         kwargs.update({"switchTo": "fk"})
         IkFkTransfer.execute(model, ikfk_attr, uihost, fks, ik, upv, ikRot, **kwargs)
 
-    def getWorldMatrices(self, start, end, val_src_nodes, keyframes):
-        # type: (int, int, List[pm.nodetypes.Transform]) -> List[List[float]]
+    def getWorldMatrices(self, start: object, end: object, val_src_nodes: object, keyframes: object) -> object:
         """ returns matrice List[frame][controller number]."""
 
         res = []
@@ -871,12 +803,10 @@ class IkFkTransfer(anim_utils.AbstractAnimationTransfer):
 class toggleControllerVisibilityButton(QtWidgets.QPushButton):
     """Toggle Controllers visibility."""
 
-    def __init__(self, *args, **kwargs):
-        # type: (*str, **str) -> None
+    def __init__(self, *args: object, **kwargs: object) -> None:
         super(toggleControllerVisibilityButton, self).__init__(*args, **kwargs)
 
-    def mousePressEvent(self, event):
-        # type: (QtCore.QEvent) -> None
+    def mousePressEvent(self, event: MouseEventLike) -> None:
 
         import ymt_synoptics.ymt_biped.logic as l
 
@@ -894,5 +824,5 @@ class toggleControllerVisibilityButton(QtWidgets.QPushButton):
 
 if __name__ == "__main__":
     import ymt_synoptics.ymt_biped.control as c
-    reload(c)  # NOQA
+    reload(c)
     print(c)

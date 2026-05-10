@@ -78,7 +78,7 @@ class Component(component.Main):
     # =====================================================
     # OBJECTS
     # =====================================================
-    def addObjects(self):
+    def addObjects(self) -> None:
         """Add all the objects needed to create the component."""
 
         self.WIP = self.options["mode"]
@@ -126,7 +126,7 @@ class Component(component.Main):
         self.addContainers()
         self.addControllers()
 
-    def addContainers(self):
+    def addContainers(self) -> None:
         t = getTransform(self.root)
         self.slider_root = addTransform(self.root, self.getName("sliders"), t)
         self.ctl_root = addTransform(self.root, self.getName("ctls"), t)
@@ -137,7 +137,7 @@ class Component(component.Main):
         ymt_util.setKeyableAttributesDontLockVisibility(self.slider_root, [])
         ymt_util.setKeyableAttributesDontLockVisibility(self.ctl_root, [])
 
-    def addControllers(self):
+    def addControllers(self) -> None:
 
         if self.negate:
             scl = [1, 1, -1]
@@ -173,7 +173,7 @@ class Component(component.Main):
 
         # cmds.delete(self.dummyCurve.longName())
 
-    def addController(self, index, t):
+    def addController(self, index: int, t: object) -> None:
 
         if self.settings["neutralpose"]:
             if self.negate:
@@ -198,7 +198,7 @@ class Component(component.Main):
 
         return npo, ctl
 
-    def addWire(self, ctls):
+    def addWire(self, ctls: object) -> None:
 
         t = getTransform(self.root)
         copyCtls = ctls.copy()
@@ -282,7 +282,7 @@ class Component(component.Main):
     # =====================================================
     # ATTRIBUTES
     # =====================================================
-    def addAttributes(self):
+    def addAttributes(self) -> None:
         """Create the anim and setupr rig attributes for the component"""
 
         if not self.settings["ui_host"]:
@@ -291,7 +291,7 @@ class Component(component.Main):
     # =====================================================
     # OPERATORS
     # =====================================================
-    def addOperators(self):
+    def addOperators(self) -> None:
         """Create operators and set the relations for the component rig
 
         Apply operators, constraints, expressions to the hierarchy.
@@ -301,7 +301,7 @@ class Component(component.Main):
         """
         pass
 
-    def connect_standard(self):
+    def connect_standard(self) -> None:
         self.parent.addChild(self.root)
         if self.surfRef:
             ref = self.rig.findComponent(self.surfRef)
@@ -325,14 +325,14 @@ class Component(component.Main):
                 import traceback
                 traceback.print_exc()
 
-    def connect_slide_ghosts(self):
+    def connect_slide_ghosts(self) -> None:
 
         for i, (_, ctl) in enumerate(zip(self.float_npos, self.float_ctls)):
             self.connect_slide_ghost(ctl, i)
 
         pm.delete(self.slider_root)
 
-    def connect_slide_ghost(self, surfaceCtl, index):
+    def connect_slide_ghost(self, surfaceCtl: object, index: int) -> None:
 
         # create ghost controls
         ghostCtl = ghost.createGhostCtl(surfaceCtl, self.slider_root)
@@ -415,11 +415,11 @@ class Component(component.Main):
         self.ghost_npos.append(npo)
         self.ghost_ctls.append(ghostCtl)
 
-    def connect_rivets(self):
+    def connect_rivets(self) -> None:
         for i, (npo, ctl) in enumerate(zip(self.float_npos, self.float_ctls)):
             self.connect_rivet(npo, i)
 
-    def connect_rivet(self, npo, index):
+    def connect_rivet(self, npo: object, index: int) -> None:
         rivets = ymt_util.apply_rivet_constrain_to_selected(self.sliding_surface, npo)
         cmds.parent(rivets[0], self.sliding_surface.getParent().longName(), relative=True)
         cmds.parentConstraint(rivets[0], npo.longName(), mo=True)
@@ -428,10 +428,10 @@ class Component(component.Main):
     # =====================================================
     # CONNECTOR
     # =====================================================
-    def addConnection(self):
+    def addConnection(self) -> None:
         self.connections["standard"] = self.connect_standard
 
-    def setRelation(self):
+    def setRelation(self) -> None:
         """Set the relation beetween object from guide to rig"""
         self.relatives["root"] = self.root
         # self.relatives["ctl"] = self.surfaceCtl
@@ -439,13 +439,13 @@ class Component(component.Main):
     # =====================================================
     # UTILITY
     # =====================================================
-    def _visi_off_lock(self, node):
+    def _visi_off_lock(self, node: object) -> None:
         """Short cuts."""
         node.visibility.set(False)
         ymt_util.setKeyableAttributesDontLockVisibility(node, [])
         cmds.setAttr("{}.visibility".format(node.name()), l=False)
 
-    def removeFromControllerGroup(self, obj):
+    def removeFromControllerGroup(self, obj: object) -> None:
         if self.settings["ctlGrp"]:
             ctlGrp = self.settings["ctlGrp"]
 

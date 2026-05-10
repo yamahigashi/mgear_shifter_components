@@ -63,7 +63,7 @@ logger.propagate = False
 
 class ShifterMarkingMenu(rmbmenu.ShifterMarkingMenu):
 
-    def check_name(obj):
+    def check_name(obj: str) -> Optional[bool]:
         if "finger" in obj:
             return True
 
@@ -74,8 +74,8 @@ class ShifterMarkingMenu(rmbmenu.ShifterMarkingMenu):
     EVENT_FILTER_FUNCTIONS = [
         check_name
     ]
-  
-    def build_specialized(self, targets):
+
+    def build_specialized(self, targets: List[str]) -> None:
         # self.menu is the parent marking menu that menuItems should be attached to
         cmds.setParent(self.menu, menu=True)
         cmds.menuItem(l="Select Row", rp='NW', command=partial(self.select_row, targets))
@@ -85,7 +85,7 @@ class ShifterMarkingMenu(rmbmenu.ShifterMarkingMenu):
         cmds.setParent(self.menu, menu=True)
         # cmds.menuItem(l="Reset Foot AUX", rp='SE', command=partial(self.reset_foot_aux, targets))
 
-    def __sel(self, targets):
+    def __sel(self, targets: List[str]) -> None:
 
         if len(targets) < 1:
             return
@@ -98,29 +98,21 @@ class ShifterMarkingMenu(rmbmenu.ShifterMarkingMenu):
                 # cmds.select(t, toggle=True)
                 mel.eval("""select -tgl {};""".format(t))
 
-    def select_row(self, targets, flag):
-        # type: (List[Text], bool) -> None
-
+    def select_row(self, targets: List[str], flag: bool) -> None:
         controllers = self.get_same_row_controllers(targets)
         self.__sel(controllers)
 
-    def select_col(self, targets, flag):
-        # type: (List[Text], bool) -> None
-
+    def select_col(self, targets: List[str], flag: bool) -> None:
         controllers = self.get_same_col_controllers(targets)
         self.__sel(controllers)
 
-    def select_all(self, targets, flag):
-        # type: (List[Text], bool) -> None
-
+    def select_all(self, targets: List[str], flag: bool) -> None:
         controllers = self.get_same_col_controllers(targets)
         controllers = self.get_same_row_controllers(controllers)
         self.__sel(controllers)
 
-    def get_same_row_controllers(self, targets):
-        # type: (List[Text]) -> List[Text]
-
-        def __inner__(obj):
+    def get_same_row_controllers(self, targets: List[str]) -> List[str]:
+        def __inner__(obj: str) -> List[str]:
             namespace = ":".join(obj.split(":")[:-1])
             base_name = obj.split(":")[-1]
             match = re.search("finger_(?P<side>[a-zA-Z])[0-9]+?_fk(?P<row_num>[0-9]+?)_", base_name)
@@ -139,10 +131,8 @@ class ShifterMarkingMenu(rmbmenu.ShifterMarkingMenu):
 
         return res
 
-    def get_same_col_controllers(self, targets):
-        # type: (List[Text]) -> List[Text]
-
-        def __inner__(obj):
+    def get_same_col_controllers(self, targets: List[str]) -> List[str]:
+        def __inner__(obj: str) -> List[str]:
             namespace = ":".join(obj.split(":")[:-1])
             base_name = obj.split(":")[-1]
             match = re.search("finger_(?P<side>[a-zA-Z])(?P<col_num>[0-9]+?)_fk(?P<row_num>[0-9]+?)_", base_name)

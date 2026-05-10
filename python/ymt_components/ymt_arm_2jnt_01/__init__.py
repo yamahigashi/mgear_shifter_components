@@ -33,7 +33,7 @@ import mgear.core.vector as vec
 ##########################################################
 class Component(MainComponent):
 
-    def _add_fk(self, i, parent, t, tOld):
+    def _add_fk(self, i: int, parent: object, t: object, tOld: object) -> None:
 
         dist = vec.getDistance(self.guide.apos[i], self.guide.apos[i + 1])
         if self.settings["neutralpose"] or not tOld:
@@ -58,7 +58,7 @@ class Component(MainComponent):
 
         return fk_ctl
 
-    def addObjects(self):
+    def addObjects(self) -> None:
 
         self.WIP = self.options["mode"]
         self.normal = self.guide.blades["blade"].z * -1
@@ -166,7 +166,7 @@ class Component(MainComponent):
     # =====================================================
     # PROPERTY
     # =====================================================
-    def addAttributes(self):
+    def addAttributes(self) -> None:
         self.settings["upvrefarray"] = self.settings["ikrefarray"]
 
         # Anim -------------------------------------------
@@ -188,7 +188,7 @@ class Component(MainComponent):
     # =====================================================
     # OPERATORS
     # =====================================================
-    def addOperators(self):
+    def addOperators(self) -> None:
 
         # Visibilities -------------------------------------
         # fk
@@ -289,7 +289,7 @@ class Component(MainComponent):
     # =====================================================
     # CONNECTOR
     # =====================================================
-    def setRelation(self):
+    def setRelation(self) -> None:
 
         self.relatives["root"] = self.loc[0]
         self.jointRelatives["root"] = 0
@@ -304,19 +304,19 @@ class Component(MainComponent):
         self.jointRelatives["eff"] = 2
 
     # @param self
-    def addConnection(self):
+    def addConnection(self) -> None:
         self.connections["standard"] = self.connect_standard
         self.connections["orientation"] = self.connect_orientation
         self.connections["parent"] = self.connect_parent
         self.connections["ymt_shoulder_01"] = self.connect_ymt_shoulder
 
-    def connect_orientation(self):
+    def connect_orientation(self) -> None:
         self.connect_orientCns()
 
-    def connect_parent(self):
+    def connect_parent(self) -> None:
         self.connect_standardWithSimpleIkRef()
 
-    def connect_standard(self):
+    def connect_standard(self) -> None:
         # self.connect_standardWithIkRef()
         """Standard IK Connection
 
@@ -329,7 +329,7 @@ class Component(MainComponent):
         self.connectRef(self.settings["ikrefarray"], self.ik_cns)
         self.connectRef(self.settings["ikrefarray"], self.upv_cns, True)
 
-    def postConnect(self):
+    def postConnect(self) -> None:
         """Post connection actions."""
 
         # lock parameters
@@ -349,7 +349,7 @@ class Component(MainComponent):
             chain.setAttr("visibility", False)
         att.setKeyableAttributes(self.ikRot_ctl, ["rx", "ry", "rz"])
 
-    def connect_ymt_shoulder(self):
+    def connect_ymt_shoulder(self) -> None:
         self.connect_standard()
 
         # If the parent component hasn't been generated we skip the connection

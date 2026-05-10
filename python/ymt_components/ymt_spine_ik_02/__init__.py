@@ -40,7 +40,7 @@ class Component(component.Main):
     # =====================================================
     # OBJECTS
     # =====================================================
-    def addObjects(self):
+    def addObjects(self) -> None:
         """Add all the objects needed to create the component."""
 
         # FIXME: remove unneccessary guide.tan
@@ -134,7 +134,7 @@ class Component(component.Main):
         else:
             self.addObjectsFkControl()
 
-    def addObjectsFkControl(self):
+    def addObjectsFkControl(self) -> None:
 
         parentdiv = self.root
         parentctl = self.root
@@ -153,7 +153,7 @@ class Component(component.Main):
         # add visual reference
         # icon.connection_display_curve(self.getName("visualFKRef"), self.fk_ctl)
 
-    def addObjectsChainIk(self, i, crv):
+    def addObjectsChainIk(self, i: int, crv: object) -> None:
 
         cvs = crv.length()
         if i == 0:
@@ -246,7 +246,7 @@ class Component(component.Main):
         self.ik_global_ref.append(ik_global_ref)
         ymtutil.setKeyableAttributesDontLockVisibility(ik_global_ref, [])
 
-    def _getTransformWithRollByBlade(self, t):
+    def _getTransformWithRollByBlade(self, t: object) -> None:
         # t = getTransform(self.guide.root)
         a = self.guide.blades["blade"].y
         x = vector.Blade(t).x
@@ -269,7 +269,7 @@ class Component(component.Main):
 
         return datatypes.Matrix(mat)
 
-    def _addObjectsFkControl(self, i, parentdiv, parentctl, t, parent_twistRef):
+    def _addObjectsFkControl(self, i: int, parentdiv: object, parentctl: object, t: object, parent_twistRef: object) -> None:
         # References
         tm = datatypes.TransformationMatrix(t)
         tm = pym2m.add_rotation(tm, [0.0, 0.0, math.pi / -2.0], "XYZ", om.MSpace.kObject, unit="rad")
@@ -401,7 +401,7 @@ class Component(component.Main):
     # =====================================================
     # ATTRIBUTES
     # =====================================================
-    def addAttributes(self):
+    def addAttributes(self) -> None:
         """Create the anim and setupr rig attributes for the component"""
 
         if self.settings["ik0refarray"]:
@@ -521,7 +521,7 @@ class Component(component.Main):
     # =====================================================
     # OPERATORS
     # =====================================================
-    def addOperators(self):
+    def addOperators(self) -> None:
         """Create operators and set the relations for the component rig
 
         Apply operators, constraints, expressions to the hierarchy.
@@ -541,7 +541,7 @@ class Component(component.Main):
 
         self.addOperatorsNotGlobalMaster()
 
-    def addOperatorsNotGlobalMaster(self):
+    def addOperatorsNotGlobalMaster(self) -> None:
         # Curves -------------------------------------------
         op = applyop.gear_curveslide2_op(self.slv_crv, self.mst_crv, 0, 1.5, .5, .5)
 
@@ -592,7 +592,7 @@ class Component(component.Main):
                                     e,
                                     self.settings["cnxOffset"])
 
-    def addOperatorsIkTwist(self):
+    def addOperatorsIkTwist(self) -> None:
 
         for i in range(1, self.settings["ikNb"] - 1):
 
@@ -622,7 +622,7 @@ class Component(component.Main):
             pm.connectAttr(inv + ".outFloat", c + ".target[0].targetWeight")
             pm.connectAttr(str(self.ik_att[i - 1]), c + ".target[1].targetWeight")
 
-    def addFkOperator(self, i, rootWorld_node, crv_node):
+    def addFkOperator(self, i: int, rootWorld_node: object, crv_node: object) -> None:
 
         if i == 0 and self.settings["isSplitHip"]:
             s = self.fk_hip_ctl
@@ -755,7 +755,7 @@ class Component(component.Main):
             pm.setAttr(aim + ".upVectorZ", 0)
             # applyop.aimCns(self.div_cns_npo[i], self.div_cns[i - 1], axis="yx", maintainOffset=True)
 
-    def addOperatorsOrientationLock(self, i, cns):
+    def addOperatorsOrientationLock(self, i: int, cns: object) -> None:
         # Orientation Lock
         if i == 0:
             dm_node = node.createDecomposeMatrixNode(
@@ -783,12 +783,12 @@ class Component(component.Main):
             self.div_cns[i].attr("rotate").disconnect()
             pm.connectAttr(blend_node + ".output", self.div_cns[i] + ".rotate")
 
-    def connect_standard(self):
+    def connect_standard(self) -> None:
         self.parent.addChild(self.root)
         self.connectRef(self.settings["ik0refarray"], self.ik_npo[0])
         self.connectRef(self.settings["ik1refarray"], self.ik_npo[-1])
 
-    def connect_master(self, mstr_out, slave_in, idx, offset):
+    def connect_master(self, mstr_out: object, slave_in: object, idx: int, offset: float) -> None:
         """Connect master and slave chain
 
         Args:
@@ -813,7 +813,7 @@ class Component(component.Main):
     # CONNECTOR
     # =====================================================
 
-    def setRelation(self):
+    def setRelation(self) -> None:
         """Set the relation beetween object from guide to rig"""
         if self.settings["isGlobalMaster"]:
             return
@@ -854,7 +854,7 @@ class Component(component.Main):
                 self.aliasRelatives["%s_ctl" % (i)] = (i + 1)
 
 
-def test():
+def test() -> None:
     import pymel.core as pm
     import maya.cmds as cmds
     for x in [
@@ -872,7 +872,7 @@ def test():
     cmds.refresh(suspend=False)
 
 
-def cross(u, v):
+def cross(u: float, v: float) -> None:
     dim = len(u)
     s = []
     for i in range(dim):
@@ -889,7 +889,7 @@ def cross(u, v):
     return s
 
 
-def getCurveUAtPoint(crv, position):
+def getCurveUAtPoint(crv: object, position: object) -> None:
     point = om1.MPoint(position[0], position[1], position[2])
 
     dag = om1.MDagPath()
@@ -915,7 +915,7 @@ def getCurveUAtPoint(crv, position):
     return length_at / length
 
 
-def vecProjection(a, b):
+def vecProjection(a: object, b: object) -> None:
 
     dot = a * b
     length = b.length()

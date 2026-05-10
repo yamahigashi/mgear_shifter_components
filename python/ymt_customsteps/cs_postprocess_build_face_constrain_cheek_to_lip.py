@@ -118,7 +118,7 @@ class CustomShifterStep(cstp.customShifterMainStep):
         ]
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.name = "Sknning Surface"
         self.defaultConfig = [
             {
@@ -202,9 +202,7 @@ class CustomShifterStep(cstp.customShifterMainStep):
             },
         ]
 
-    def run(self, stepDict):
-        # type: (dict) -> None
-
+    def run(self, stepDict: dict[str, object]) -> None:
         self.rig = stepDict["mgearRun"]
         self.config = stepDict.get("cs_connect_cheek_to_lip_config", self.defaultConfig)
 
@@ -228,7 +226,7 @@ class CustomShifterStep(cstp.customShifterMainStep):
 
             self.connect(src, dst, rates, mode=mode)
 
-    def connect(self, src, dst, rates, mode="addNpo"):
+    def connect(self, src: list[str], dst: str, rates: list[float], mode: str = "addNpo") -> None:
 
         dst_node = pm.PyNode(dst)
 
@@ -237,7 +235,7 @@ class CustomShifterStep(cstp.customShifterMainStep):
         elif mode == "parent":
             target = dst_node.getParent()
         elif mode == "addNpo":
-            target = ymt_util.addNPOPreservingMatrixConnections(dst_node)[0]  # type: pm.PyNode
+            target = ymt_util.addNPOPreservingMatrixConnections(dst_node)[0]
         else:
             raise ValueError("Invalid mode: {}".format(mode))
 
@@ -253,7 +251,7 @@ class CustomShifterStep(cstp.customShifterMainStep):
         cmds.setAttr(target.longName() + ".rx", lock=False)
         cmds.setAttr(target.longName() + ".ry", lock=False)
         cmds.setAttr(target.longName() + ".rz", lock=False)
-        cns = cmds.parentConstraint(src, target.longName(), mo=True)[0]  # type: str
+        cns = cmds.parentConstraint(src, target.longName(), mo=True)[0]
         cmds.setAttr("{}.interpType".format(cns), 2)  # shortest
         cmds.setAttr(target.longName() + ".tx", lock=lockedTx)
         cmds.setAttr(target.longName() + ".ty", lock=lockedTy)

@@ -12,17 +12,17 @@ from . import utils
 
 class toggleCombo(QtWidgets.QComboBox):
 
-    def __init__(self, parent=None):
+    def __init__(self, parent: object = None) -> None:
         super(toggleCombo, self).__init__(parent)
         self.firstUpdate = False
 
         self.currentIndexChanged['QString'].connect(self.handleChanged)
 
-    def wheelEvent(self, event):
+    def wheelEvent(self, event: object) -> None:
         event.ignore()
 
     # def focusInEvent(self, event):
-    def showEvent(self, event):
+    def showEvent(self, event: object) -> None:
         self.model = utils.getModel(self)
         self.uihost_name = str(self.property("Object"))
         self.combo_attr = str(self.property("Attr"))
@@ -36,7 +36,7 @@ class toggleCombo(QtWidgets.QComboBox):
             self.model, self.uihost_name, self.combo_attr))
         self.firstUpdate = True
 
-    def handleChanged(self):
+    def handleChanged(self) -> None:
         if self.firstUpdate:
             if self.currentIndex() == self.count() - 1:
                 print("Space Transfer")
@@ -58,7 +58,7 @@ class toggleCombo(QtWidgets.QComboBox):
 
 class bakeSprings(QtWidgets.QPushButton):
 
-    def mousePressEvent(self, event):
+    def mousePressEvent(self, event: object) -> None:
 
         model = utils.getModel(self)
         utils.bakeSprings(model)
@@ -66,7 +66,7 @@ class bakeSprings(QtWidgets.QPushButton):
 
 class clearSprings(QtWidgets.QPushButton):
 
-    def mousePressEvent(self, event):
+    def mousePressEvent(self, event: object) -> None:
 
         model = utils.getModel(self)
         utils.clearSprings(model)
@@ -76,23 +76,18 @@ class ikfkMatchButton(QtWidgets.QPushButton):
 
     MAXIMUM_TRY_FOR_SEARCHING_FK = 1000
 
-    def __init__(self, *args, **kwargs):
-        # type: (*str, **str) -> None
+    def __init__(self, *args: object, **kwargs: object) -> None:
         super(ikfkMatchButton, self).__init__(*args, **kwargs)
         self.numFkControllers = None
 
-    def searchNumberOfFkControllers(self):
-        # type: () -> None
-
+    def searchNumberOfFkControllers(self) -> None:
         for i in range(self.MAXIMUM_TRY_FOR_SEARCHING_FK):
             prop = self.property("fk{0}".format(str(i)))
             if not prop:
                 self.numFkControllers = i
                 break
 
-    def mousePressEvent(self, event):
-        # type: (QtCore.QEvent) -> None
-
+    def mousePressEvent(self, event: object) -> None:
         mouse_button = event.button()
 
         model = utils.getModel(self)
@@ -126,14 +121,11 @@ class ikfkMatchButton(QtWidgets.QPushButton):
 
 class SpineIkfkMatchButton(QtWidgets.QPushButton):
 
-    def __init__(self, *args, **kwargs):
-        # type: (*str, **str) -> None
+    def __init__(self, *args: object, **kwargs: object) -> None:
         super(SpineIkfkMatchButton, self).__init__(*args, **kwargs)
         self.numFkControllers = None
 
-    def mousePressEvent(self, event):
-        # type: (QtCore.QEvent) -> None
-
+    def mousePressEvent(self, event: object) -> None:
         uihost_name = str(self.property("Object"))
         mouse_button = event.button()
         model = utils.getModel(self)
@@ -150,7 +142,7 @@ class SpineIkfkMatchButton(QtWidgets.QPushButton):
 
 class selGroup(QtWidgets.QPushButton):
 
-    def mousePressEvent(self, event):
+    def mousePressEvent(self, event: object) -> None:
 
         model = utils.getModel(self)
         group_suffix = str(self.property("groupSuffix"))
@@ -160,7 +152,7 @@ class selGroup(QtWidgets.QPushButton):
 
 class keyGroup(QtWidgets.QPushButton):
 
-    def mousePressEvent(self, event):
+    def mousePressEvent(self, event: object) -> None:
 
         model = utils.getModel(self)
         group_suffix = str(self.property("groupSuffix"))
@@ -170,7 +162,7 @@ class keyGroup(QtWidgets.QPushButton):
 
 class toggleAttrButton(QtWidgets.QPushButton):
 
-    def mousePressEvent(self, event):
+    def mousePressEvent(self, event: object) -> None:
 
         model = utils.getModel(self)
         object_name = str(self.property("Object"))
@@ -181,13 +173,13 @@ class toggleAttrButton(QtWidgets.QPushButton):
 
 class resetTransform(QtWidgets.QPushButton):
 
-    def mousePressEvent(self, event):
+    def mousePressEvent(self, event: object) -> None:
         utils.resetSelTrans()
 
 
 class resetBindPose(QtWidgets.QPushButton):
 
-    def mousePressEvent(self, event):
+    def mousePressEvent(self, event: object) -> None:
 
         model = utils.getModel(self)
 
@@ -196,21 +188,21 @@ class resetBindPose(QtWidgets.QPushButton):
 
 class MirrorPoseButton(QtWidgets.QPushButton):
 
-    def mousePressEvent(self, event):
+    def mousePressEvent(self, event: object) -> None:
 
         utils.mirrorPose()
 
 
 class FlipPoseButton(QtWidgets.QPushButton):
 
-    def mousePressEvent(self, event):
+    def mousePressEvent(self, event: object) -> None:
 
         utils.mirrorPose(True)
 
 
 class QuickSelButton(QtWidgets.QPushButton):
 
-    def mousePressEvent(self, event):
+    def mousePressEvent(self, event: object) -> None:
 
         model = utils.getModel(self)
         channel = str(self.property("channel"))
@@ -223,7 +215,7 @@ class SelectButton(QtWidgets.QWidget):
     over = False
     color_over = QtGui.QColor(255, 255, 255, 255)
 
-    def __init__(self, parent=None):
+    def __init__(self, parent: object = None) -> None:
         super(SelectButton, self).__init__(parent)
         self.defaultBGColor = QtGui.QPalette().color(self.backgroundRole())
         self.setBorderColor(self.defaultBGColor)
@@ -232,19 +224,19 @@ class SelectButton(QtWidgets.QWidget):
         p.setColor(self.backgroundRole(), QtGui.QColor(000, 000, 000, 000))
         self.setPalette(p)
 
-    def enterEvent(self, event):
+    def enterEvent(self, event: object) -> None:
         self.over = True
         QtWidgets.QToolTip.showText(QtGui.QCursor.pos(),
                                     str(self.property("object")))
         self.repaint()
         self.update()
 
-    def leaveEvent(self, event):
+    def leaveEvent(self, event: object) -> None:
         self.over = False
         self.repaint()
         self.update()
 
-    def rectangleSelection(self, event, firstLoop):
+    def rectangleSelection(self, event: object, firstLoop: bool) -> None:
         if firstLoop:
             key_modifier = event.modifiers()
         else:
@@ -259,7 +251,7 @@ class SelectButton(QtWidgets.QWidget):
         mouse_button = event.button()
         utils.selectObj(model, object, mouse_button, key_modifier)
 
-    def mousePressEvent(self, event):
+    def mousePressEvent(self, event: object) -> None:
 
         model = utils.getModel(self)
         object = str(self.property("object")).split(",")
@@ -268,7 +260,7 @@ class SelectButton(QtWidgets.QWidget):
 
         utils.selectObj(model, object, mouse_button, key_modifier)
 
-    def paintEvent(self, event):
+    def paintEvent(self, event: object) -> None:
         painter = QtGui.QPainter()
         painter.begin(self)
         if self.over:
@@ -278,7 +270,7 @@ class SelectButton(QtWidgets.QWidget):
         self.drawShape(painter)
         painter.end()
 
-    def paintSelected(self, paint=False):
+    def paintSelected(self, paint: bool = False) -> None:
         if paint:
             p = self.palette()
             p.setColor(self.foregroundRole(), QtGui.QColor(255, 255, 255, 255))
@@ -291,10 +283,15 @@ class SelectButton(QtWidgets.QWidget):
             self.setPalette(p)
             self.setBorderColor(self.defaultBGColor)
 
-    def setBorderColor(self, color):
+    def setBorderColor(self, color: QtGui.QColor) -> None:
         self.borderColor = color
 
-    def drawPathWithBorder(self, painter, path, borderWidth):
+    def drawPathWithBorder(
+        self,
+        painter: QtGui.QPainter,
+        path: QtGui.QPainterPath,
+        borderWidth: int,
+    ) -> None:
         painter.setRenderHint(QtGui.QPainter.Antialiasing)
         pen = QtGui.QPen(self.borderColor, borderWidth)
         painter.setPen(pen)
@@ -303,14 +300,14 @@ class SelectButton(QtWidgets.QWidget):
 
 
 class SelectButtonStyleSheet(QtWidgets.QFrame):
-    def __init__(self, parent=None):
+    def __init__(self, parent: object = None) -> None:
         """ This class allows you to charge a QFrame widget on your picker
         that will maintain the StyleSheet compatibility coming form your UI
         file.
         """
         super(SelectButtonStyleSheet, self).__init__(parent)
 
-    def __get_background_color(self, control, stylesheet):
+    def __get_background_color(self, control: str, stylesheet: list[str]) -> list[str]:
         """ Returns the background color for the given control on the
         style sheet provided
         """
@@ -324,7 +321,7 @@ class SelectButtonStyleSheet(QtWidgets.QFrame):
                 current_style += i
         return re.findall(r"\S+[a-z][-][a-z].+\W;", current_style)
 
-    def __create_new_style(self, control_object, control_style, paint):
+    def __create_new_style(self, control_object: str, control_style: str, paint: bool) -> str:
         """ Generates a simple qt style sheet update for the given control.
         This needs to be done to force the Maya control selection give the
         effect of the button been hovered.
@@ -368,7 +365,7 @@ class SelectButtonStyleSheet(QtWidgets.QFrame):
 
         return new_style
 
-    def enterEvent(self, event):
+    def enterEvent(self, event: object) -> None:
         if not self.isEnabled():
             return
         point = QtGui.QCursor.pos()
@@ -378,11 +375,11 @@ class SelectButtonStyleSheet(QtWidgets.QFrame):
         self.repaint()
         self.update()
 
-    def leaveEvent(self, event):
+    def leaveEvent(self, event: object) -> None:
         self.repaint()
         self.update()
 
-    def rectangleSelection(self, event, firstLoop):
+    def rectangleSelection(self, event: object, firstLoop: bool) -> None:
         if not self.isEnabled():
             return
 
@@ -401,7 +398,7 @@ class SelectButtonStyleSheet(QtWidgets.QFrame):
 
         utils.selectObj(model, control_object, mouse_button, key_modifier)
 
-    def mousePressEvent(self, event):
+    def mousePressEvent(self, event: object) -> None:
         if not self.isEnabled():
             return
 
@@ -412,7 +409,7 @@ class SelectButtonStyleSheet(QtWidgets.QFrame):
 
         utils.selectObj(model, control_object, mouse_button, key_modifier)
 
-    def paintSelected(self, paint=False):
+    def paintSelected(self, paint: bool = False) -> None:
         """ This method is responsible of been able to have the hover state
         been activated when the control is selected on Maya's viewport
         """
@@ -487,7 +484,7 @@ class SelectBtn_StyleSheet_Draw(SelectButtonStyleSheet):
 
 class SelectBtn_Box(SelectButton):
 
-    def drawShape(self, painter):
+    def drawShape(self, painter: QtGui.QPainter) -> None:
         borderWidth = 1
         x = borderWidth / 2.0
         y = borderWidth / 2.0
@@ -507,7 +504,7 @@ class SelectBtn_Box(SelectButton):
 
 class SelectBtn_OutlineBox(SelectButton):
 
-    def drawShape(self, painter):
+    def drawShape(self, painter: QtGui.QPainter) -> None:
         borderWidth = 1
         x = borderWidth / 2.0
         y = borderWidth / 2.0
@@ -539,7 +536,7 @@ class SelectBtn_OutlineBox(SelectButton):
 
 class SelectBtn_Circle(SelectButton):
 
-    def drawShape(self, painter):
+    def drawShape(self, painter: QtGui.QPainter) -> None:
         borderWidth = 1
         x = borderWidth / 2.0
         y = borderWidth / 2.0
@@ -553,7 +550,7 @@ class SelectBtn_Circle(SelectButton):
 
 class SelectBtn_OutlineCircle(SelectButton):
 
-    def drawShape(self, painter):
+    def drawShape(self, painter: QtGui.QPainter) -> None:
         borderWidth = 1
         x = borderWidth / 2.0
         y = borderWidth / 2.0
@@ -579,7 +576,7 @@ class SelectBtn_OutlineCircle(SelectButton):
 
 class SelectBtn_TriangleLeft(SelectButton):
 
-    def drawShape(self, painter):
+    def drawShape(self, painter: QtGui.QPainter) -> None:
         borderWidth = 1
         w = self.width() - borderWidth
         h = self.height() - borderWidth
@@ -595,7 +592,7 @@ class SelectBtn_TriangleLeft(SelectButton):
 
 class SelectBtn_OutlineTriangleLeft(SelectButton):
 
-    def drawShape(self, painter):
+    def drawShape(self, painter: QtGui.QPainter) -> None:
         borderWidth = 1
         w = self.width() - borderWidth
         h = self.height() - borderWidth
@@ -611,7 +608,7 @@ class SelectBtn_OutlineTriangleLeft(SelectButton):
 
 class SelectBtn_TriangleRight(SelectButton):
 
-    def drawShape(self, painter):
+    def drawShape(self, painter: QtGui.QPainter) -> None:
         borderWidth = 1
         w = self.width() - borderWidth
         h = self.height() - borderWidth
@@ -627,7 +624,7 @@ class SelectBtn_TriangleRight(SelectButton):
 
 class SelectBtn_OutlineTriangleRight(SelectButton):
 
-    def drawShape(self, painter):
+    def drawShape(self, painter: QtGui.QPainter) -> None:
         borderWidth = 1
         w = self.width() - borderWidth
         h = self.height() - borderWidth
@@ -642,7 +639,7 @@ class SelectBtn_OutlineTriangleRight(SelectButton):
 
 
 # ------------------------------------------
-def _boilSelector(selectorName, color, shape):
+def _boilSelector(selectorName: str, color: type, shape: type) -> type:
     class SelectorClass(color, shape):
         pass
 

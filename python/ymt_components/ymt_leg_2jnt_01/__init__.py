@@ -27,7 +27,7 @@ class Component(leg_2jnt_01.Component):
     # =====================================================
     # OBJECTS
     # =====================================================
-    def addObjects(self):
+    def addObjects(self) -> None:
         """Add all the objects needed to create the component."""
 
         self.WIP = self.options["mode"]

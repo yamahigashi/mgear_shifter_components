@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
+from __future__ import annotations
 import re
 import math
 import sys
 import contextlib
+from collections.abc import Iterator, Sequence
 
 from Qt import QtWidgets
 
@@ -36,6 +38,7 @@ from mgear.core.transform import (
 from mgear.core.primitive import addTransform
 
 from ymt_shifter_utility import twistSplineBuilder as tsBuilder
+from ymt_shifter_utility.type_protocols import ComponentLike, DagNodeLike, MatrixLike, PymelNode, VectorLike
 from ymt_shifter_utility import synoptic
 
 from logging import (
@@ -73,7 +76,7 @@ if sys.version_info > (3, 0):
 
 
 ##########################################################
-def collect_synoptic_windows(parent=None):
+def collect_synoptic_windows(parent: QtWidgets.QWidget | None = None) -> list[QtWidgets.QWidget]:
     synoptics = []
     # active_window = None
     for w in QtWidgets.QApplication.topLevelWidgets():
@@ -99,20 +102,20 @@ def collect_synoptic_windows(parent=None):
     return synoptics
 
 
-def show():
+def show() -> None:
     wins = collect_synoptic_windows()
     for w in wins:
         w.showNormal()
 
 
-def hide():
+def hide() -> None:
     wins = collect_synoptic_windows()
     for w in wins:
         w.showNormal()
         w.showMinimized()
 
 
-def setKeyableAttributesDontLockVisibility(nodes, params=None):
+def setKeyableAttributesDontLockVisibility(nodes: PymelNode | Sequence[PymelNode], params: Sequence[str] | None = None) -> None:
 
     # if not params:
     #     params = ["tx", "ty", "tz",
@@ -129,8 +132,7 @@ def setKeyableAttributesDontLockVisibility(nodes, params=None):
             n.setAttr("v", lock=False)
 
 
-def getFullPath(start, routes=None):
-    # type: (pm.nt.transform, List[pm.nt.transform]|None) -> List[pm.nt.transform]
+def getFullPath(start: pm.nt.transform, routes: List[pm.nt.transform]|None = None) -> List[pm.nt.transform]:
     if isinstance(start, unicode):
         start = pm.PyNode(start)
 
@@ -143,16 +145,14 @@ def getFullPath(start, routes=None):
     return getFullPath(start.getParent(), routes + [start, ])
 
 
-def getDecomposeMatrixOfAtoB(a, b, skip_last=False):
-    # type: (pm.PyNode, pm.PyNode, bool) -> pm.nt.DecomposeMatrix
+def getDecomposeMatrixOfAtoB(a: pm.PyNode, b: pm.PyNode, skip_last: bool = False) -> pm.nt.DecomposeMatrix:
     """Returns matrix of A to B"""
     mul_node = getMultMatrixOfAtoB(a, b, skip_last=skip_last)
     dm_node = node.createDecomposeMatrixNode(mul_node.attr("matrixSum"))
     return dm_node
 
 
-def getMultMatrixOfAtoB(a, b, skip_last=False):
-    # type: (pm.PyNode, pm.PyNode, bool) -> pm.nt.DecomposeMatrix
+def getMultMatrixOfAtoB(a: pm.PyNode, b: pm.PyNode, skip_last: bool = False) -> pm.nt.DecomposeMatrix:
     """Returns matrix of A to B"""
     down, _, up = findPathAtoB(a, b)
     mul_node = pm.createNode("multMatrix")
@@ -168,8 +168,7 @@ def getMultMatrixOfAtoB(a, b, skip_last=False):
     return mul_node
 
 
-def findPathAtoB(a, b):
-    # type: (pm.nt.transform, pm.nt.transform) -> Tuple[List[pm.nt.transform], pm.nt.transform, List[pm.nt.transform]]
+def findPathAtoB(a: pm.nt.transform, b: pm.nt.transform) -> Tuple[List[pm.nt.transform], pm.nt.transform, List[pm.nt.transform]]:
     """Returns route of A to B in formed Tuple[down(to root), turning point, up(to leaf)]"""
     # aPath = ["x", "a", "b", "c"]
     # bPath = ["b", "c"]
@@ -183,8 +182,7 @@ def findPathAtoB(a, b):
     return _findPathAtoB(aPath, bPath)
 
 
-def _findPathAtoB(aPath, bPath):
-    # type: (List, List) -> Tuple[List, Any, List]
+def _findPathAtoB(aPath: List, bPath: List) -> Tuple[List, Any, List]:
     """Returns route of A to B in formed Tuple[down(to root), turning point, up(to leaf)]
 
     >>> aPath = ["x", "a", "b", "c"]
@@ -222,7 +220,7 @@ def _findPathAtoB(aPath, bPath):
     return down, sharedNode, up
 
 
-def applyPathCnsLocal(target, curve, u):
+def applyPathCnsLocal(target: PymelNode, curve: PymelNode, u: float) -> PymelNode:
     cns = applyop.pathCns(target, curve, cnsType=False, u=u, tangent=False)
     pm.connectAttr(str(curve) + ".local", str(cns) + ".geometryPath", f=True)  # tobe local space
 
@@ -243,8 +241,7 @@ def applyPathCnsLocal(target, curve, u):
     return cns
 
 
-def addCtlMetadata(self, ctl):
-    # type: (component.Main, pm.datatypes.Transform) -> None
+def addCtlMetadata(self: component.Main, ctl: pm.datatypes.Transform) -> None:
 
     name = ctl.name()
 
@@ -285,8 +282,7 @@ def addCtlMetadata(self, ctl):
                            value=self.options["side_center_name"])
 
 
-def edit_controller_shape(name, pos=None, rot=None, scl=None, color=None):
-    # type: (Text, Optional[Tuple[float, float, float]], Optional[Tuple[float, float, float]], Optional[Tuple[float, float, float]], Optional[int]) -> None
+def edit_controller_shape(name: Text, pos: Optional[Tuple[float, float, float]] = None, rot: Optional[Tuple[float, float, float]] = None, scl: Optional[Tuple[float, float, float]] = None, color: Optional[int] = None) -> None:
     """Change controller shape."""
     locator = cmds.ls(name, recursive=True) or None
     if not locator:
@@ -316,17 +312,19 @@ def edit_controller_shape(name, pos=None, rot=None, scl=None, color=None):
             cmds.setAttr("{}.overrideColor".format(shape), color)
 
 
-def addJointCtl(self,
-                parent,
-                name,
-                m,
-                color,
-                iconShape,
-                tp=None,
-                lp=True,
-                mirrorConf=[0, 0, 0, 0, 0, 0, 0, 0, 0],
-                guide_loc_ref=None,
-                ** kwargs):
+def addJointCtl(
+    self: ComponentLike,
+    parent: PymelNode,
+    name: str,
+    m: MatrixLike,
+    color: int | Sequence[float],
+    iconShape: str,
+    tp: PymelNode | None = None,
+    lp: bool = True,
+    mirrorConf: Sequence[int] = (0, 0, 0, 0, 0, 0, 0, 0, 0),
+    guide_loc_ref: str | None = None,
+    **kwargs: object,
+) -> PymelNode:
     """
     Create the control and apply the shape, if this is alrealdy stored
     in the guide controllers grp.
@@ -485,7 +483,7 @@ def addJointCtl(self,
     return ctl
 
 
-def addJointTransform(parent, name, m=dt.Matrix()):
+def addJointTransform(parent: PymelNode | None, name: str, m: MatrixLike = dt.Matrix()) -> PymelNode:
     """Create a transform dagNode.
 
     Arguments:
@@ -507,7 +505,7 @@ def addJointTransform(parent, name, m=dt.Matrix()):
     return node
 
 
-def addJointTransformFromPos(parent, name, pos=dt.Vector(0, 0, 0)):
+def addJointTransformFromPos(parent: PymelNode | None, name: str, pos: VectorLike = dt.Vector(0, 0, 0)) -> PymelNode:
     """Create a transform dagNode.
 
     Arguments:
@@ -528,7 +526,7 @@ def addJointTransformFromPos(parent, name, pos=dt.Vector(0, 0, 0)):
     return node
 
 
-def getAsMFnNode(name, ctor):
+def getAsMFnNode(name: str, ctor: object) -> object:
 
     objects = om.MSelectionList()
     objects.add(name)
@@ -537,7 +535,7 @@ def getAsMFnNode(name, ctor):
     return ctor(dag)
 
 
-def getCurveShapeName(crv):
+def getCurveShapeName(crv: str | PymelNode | object) -> str:
     if isinstance(crv, str):
         crv = pm.PyNode(crv)
 
@@ -553,14 +551,14 @@ def getCurveShapeName(crv):
     return crv.name() if hasattr(crv, "name") else str(crv)
 
 
-def getAsMFnNurbsCurve(crv):
+def getAsMFnNurbsCurve(crv: str | PymelNode | om.MFnNurbsCurve) -> om.MFnNurbsCurve:
     if isinstance(crv, om.MFnNurbsCurve):
         return crv
 
     return getAsMFnNode(getCurveShapeName(crv), om.MFnNurbsCurve)
 
 
-def _getMSpace(space):
+def _getMSpace(space: str | int) -> int:
     if space in (om.MSpace.kWorld, om.MSpace.kObject):
         return space
 
@@ -570,24 +568,24 @@ def _getMSpace(space):
     return om.MSpace.kObject
 
 
-def getCurveDegree(crv):
+def getCurveDegree(crv: str | PymelNode) -> int:
     return cmds.getAttr("{}.degree".format(getCurveShapeName(crv)))
 
 
-def getCurveCVs(crv, space="world"):
+def getCurveCVs(crv: str | PymelNode, space: str | int = "world") -> list[dt.Vector]:
     crv_fn = getAsMFnNurbsCurve(crv)
     return [dt.Vector(p[0], p[1], p[2])
             for p in crv_fn.cvPositions(_getMSpace(space))]
 
 
-def setCurveCV(crv, index, position, space="world"):
+def setCurveCV(crv: str | PymelNode, index: int, position: Sequence[float], space: str | int = "world") -> None:
     crv_fn = getAsMFnNurbsCurve(crv)
     point = om.MPoint(position[0], position[1], position[2])
     crv_fn.setCVPosition(index, point, _getMSpace(space))
     crv_fn.updateCurve()
 
 
-def setCurveCVs(crv, positions, space="world"):
+def setCurveCVs(crv: str | PymelNode, positions: Sequence[Sequence[float]], space: str | int = "world") -> None:
     crv_fn = getAsMFnNurbsCurve(crv)
     points = om.MPointArray()
     for p in positions:
@@ -596,7 +594,7 @@ def setCurveCVs(crv, positions, space="world"):
     crv_fn.updateCurve()
 
 
-def findGuideObjectByLocalName(guide, local_name, includeShapes=False):
+def findGuideObjectByLocalName(guide: object, local_name: str, includeShapes: bool = False) -> PymelNode | None:
     root = guide.root.longName() if hasattr(guide.root, "longName") else str(guide.root)
     kwargs = {"ad": True, "fullPath": True}
     if not includeShapes:
@@ -605,7 +603,7 @@ def findGuideObjectByLocalName(guide, local_name, includeShapes=False):
     children = cmds.listRelatives(root, **kwargs) or []
     target = "{}_{}".format(guide.fullName, local_name)
 
-    def _short_name(node):
+    def _short_name(node: str) -> str:
         return node.rsplit("|", 1)[-1].rsplit(":", 1)[-1]
 
     for child in children:
@@ -622,8 +620,7 @@ def findGuideObjectByLocalName(guide, local_name, includeShapes=False):
         "Object {} not found in guide {}.".format(local_name, guide.fullName))
 
 
-def transform_to_euler(t):
-    # type: (om.MTransformationMatrix|dt.Matrix) -> tuple[float, float, float]
+def transform_to_euler(t: om.MTransformationMatrix|dt.Matrix) -> tuple[float, float, float]:
 
     if not isinstance(t, om.MTransformationMatrix):
         mat = om.MMatrix(t)
@@ -638,18 +635,18 @@ def transform_to_euler(t):
 # norm = self.guide.blades["blade"].y
 # pfx = self.getName("twistSpline")
 def convertToTwistSpline(
-    comp: "component.Main",  # type: component.Main
+    comp: ComponentLike,
     prefix: str,
-    positions: list[dt.Vector],
-    crv: Union[pm.nt.NurbsCurve, pm.nt.Transform, str, om.MFnNurbsCurve],
+    positions: Sequence[VectorLike],
+    crv: PymelNode | str | om.MFnNurbsCurve,
     ikNb: int,
-    norm: dt.Vector,
-    isClosed: bool=False,
-    is_cv_ctl: bool=True,
-    is_roll_ctl: bool=True,
-    is_otans_ctl: bool=True,
-    is_itans_ctl: bool=True,
-):
+    norm: VectorLike,
+    isClosed: bool = False,
+    is_cv_ctl: bool = True,
+    is_roll_ctl: bool = True,
+    is_otans_ctl: bool = True,
+    is_itans_ctl: bool = True,
+) -> tuple[list[str], list[str], list[str], list[str], str, PymelNode]:
 
     if isinstance(crv, om.MFnNurbsCurve):
         curveFn = crv
@@ -726,7 +723,15 @@ def convertToTwistSpline(
     return cvs, oTans, iTans, joints, master, pm.PyNode(spline)
 
 
-def edit_twistspline_ctl_of_shifter_attributes(comp, objects, is_primary_ctl, is_detail_ctl, ctl_params, scl, col):
+def edit_twistspline_ctl_of_shifter_attributes(
+    comp: ComponentLike,
+    objects: Sequence[str],
+    is_primary_ctl: bool,
+    is_detail_ctl: bool,
+    ctl_params: Sequence[str],
+    scl: float,
+    col: int | Sequence[float],
+) -> None:
 
     for x in objects:
         ctl = pm.PyNode(x)
@@ -747,8 +752,7 @@ def edit_twistspline_ctl_of_shifter_attributes(comp, objects, is_primary_ctl, is
             edit_controller_shape(ctl.name(), scl=(0., 0., 0.), color=col)
 
 
-def build_twist_spline(name, num_ik, num_joints, max_param, spread=1.0, closed=True):
-    # type: (Text, int, int, float, float, bool) -> Tuple[List[Text], List[Text], List[Text], List[Text], List[Text], List[Text], Text, Text, Text, Text]
+def build_twist_spline(name: Text, num_ik: int, num_joints: int, max_param: float, spread: float = 1.0, closed: bool = True) -> Tuple[List[Text], List[Text], List[Text], List[Text], List[Text], List[Text], Text, Text, Text, Text]:
     """ Wrapper of tsBuilder.makeTwistSpline
 
     Arguments:
@@ -785,13 +789,11 @@ def build_twist_spline(name, num_ik, num_joints, max_param, spread=1.0, closed=T
     return cvs, bfrs, oTans, iTans, jPars, joints, group, spline, master, riderCnst  # type: ignore
 
 
-def alignControllers(cvs, bfrs, oTans, iTans, curveFn, ikNb, norm):
-    # type: (List[Text], List[Text], List[Text], List[Text], om.MFnNurbsCurve, int, om.MVector) -> None
+def alignControllers(cvs: List[Text], bfrs: List[Text], oTans: List[Text], iTans: List[Text], curveFn: om.MFnNurbsCurve, ikNb: int, norm: om.MVector) -> None:
 
     curveLen = curveFn.length()
 
-    def insertNpo(obj):
-        # type: (Text) -> Text
+    def insertNpo(obj: Text) -> Text:
         obj_node = pm.PyNode(obj)
         parent = obj_node.getParent()
         t = getTransform(obj_node)
@@ -852,8 +854,7 @@ def alignControllers(cvs, bfrs, oTans, iTans, curveFn, ikNb, norm):
         insertNpo(cv)
 
 
-def alignDeformers(joints, positions, riderCnst, curveFn):
-    # type: (List, List, Text, om.MFnNurbsCurve) -> None
+def alignDeformers(joints: List, positions: List, riderCnst: Text, curveFn: om.MFnNurbsCurve) -> None:
     # align deformer joints to the given positions
 
     curveLen = curveFn.length()
@@ -869,7 +870,7 @@ def alignDeformers(joints, positions, riderCnst, curveFn):
         p = joint.translation(om.MSpace.kWorld)
         _positions.append(p)
 
-    def _searchNearestParam(pos):
+    def _searchNearestParam(pos: Sequence[float]) -> float:
 
         res = _positions[0]
         cur = None
@@ -890,7 +891,7 @@ def alignDeformers(joints, positions, riderCnst, curveFn):
         cmds.setAttr("{0}.params[{1}].param".format(riderCnst, i), param)
 
 
-def withCurvePos(curveFn, it, offset=0.):
+def withCurvePos(curveFn: om.MFnNurbsCurve, it: Sequence[object], offset: float = 0.0) -> Iterator[tuple[tuple[float, float, float], object]]:
 
     curveLen = curveFn.length()
 
@@ -900,7 +901,7 @@ def withCurvePos(curveFn, it, offset=0.):
         pos = point[0], point[1], point[2]
 
         yield pos, it[0]
-        return 
+        return
 
     for i, element in enumerate(it):
 
@@ -910,9 +911,8 @@ def withCurvePos(curveFn, it, offset=0.):
 
         yield pos, element
 
-    
-def _getRotationsAtEachPoint(bfrs, norm):
-    # type: (List[Text], om.MVector) -> List[Tuple[float, float, float]]
+
+def _getRotationsAtEachPoint(bfrs: List[Text], norm: om.MVector) -> List[Tuple[float, float, float]]:
     # pylint: disable=too-many-locals
 
     rotations = []
@@ -950,13 +950,13 @@ def _getRotationsAtEachPoint(bfrs, norm):
     return rotations
 
 
-def iter_tr_xyz(object_name):
+def iter_tr_xyz(object_name: str) -> Iterator[str]:
     for attr in ("t", "r"):
         for axis in ("x", "y", "z"):
             yield "{}.{}{}".format(object_name, attr, axis)
 
 
-def add3DChain(parent, name, positions, normal, negate=False, vis=True):
+def add3DChain(parent: PymelNode, name: str, positions: Sequence[VectorLike], normal: VectorLike, negate: bool = False, vis: bool = True) -> list[PymelNode]:
     """Create a 2D joint chain. And then align given positions to the chain.
 
     Warning:
@@ -1001,8 +1001,7 @@ def add3DChain(parent, name, positions, normal, negate=False, vis=True):
     return joints
 
 
-def __has_make_nurbs_surface_hostory(surface_name):
-    # type: (str) -> bool
+def __has_make_nurbs_surface_hostory(surface_name: str) -> bool:
     """Return True if the surface has makeNurbPlane history"""
     for history in cmds.listHistory(surface_name) or []:
         if cmds.nodeType(history) == "makeNurbPlane":
@@ -1011,12 +1010,11 @@ def __has_make_nurbs_surface_hostory(surface_name):
     return False
 
 
-def serialize_mesh_shape(mesh_name):
-    # type: (str) -> str
+def serialize_mesh_shape(mesh_name: str) -> str:
     """Serialize a mesh shape to a string"""
     meshes = cmds.ls(mesh_name, dag=True, type="mesh")
-    
-    def _serialize_mesh(mesh_name):
+
+    def _serialize_mesh(mesh_name: str) -> dict[str, object]:
         # to store the mesh shape, we need to store the vertices, faces, normals, and uvs
         # using OpenMaya to get the data
         mesh = getAsMFnNode(mesh_name, om.MFnMesh)
@@ -1065,8 +1063,7 @@ def serialize_mesh_shape(mesh_name):
     return str(serialized_data)
 
 
-def deserialize_mesh_shape(mesh_name, serialized_data):
-    # type: (str, str) -> str
+def deserialize_mesh_shape(mesh_name: str, serialized_data: str) -> str:
     """Deserialize a NURBS surface from a string"""
 
     if not isinstance(mesh_name, (str, unicode)):
@@ -1123,8 +1120,7 @@ def deserialize_mesh_shape(mesh_name, serialized_data):
     return container
 
 
-def serialize_nurbs_surface(surface_name):
-    # type: (str) -> str
+def serialize_nurbs_surface(surface_name: str) -> str:
     """Serialize a NURBS surface to a string"""
 
     if not isinstance(surface_name, (str, unicode)):
@@ -1183,8 +1179,7 @@ def serialize_nurbs_surface(surface_name):
     return serialized_text
 
 
-def deserialize_nurbs_surface(surface_name, serialized_data):
-    # type: (str, str) -> str
+def deserialize_nurbs_surface(surface_name: str, serialized_data: str) -> str:
     """Deserialize a NURBS surface from a string"""
 
     if not isinstance(surface_name, (str, unicode)):
@@ -1264,8 +1259,7 @@ def deserialize_nurbs_surface(surface_name, serialized_data):
     return new_surface
 
 
-def create_rivet_pin(mesh_name, position, name=None):
-    # type: (Text, Tuple[Text, Text, Text], Optional[Text]) -> Text
+def create_rivet_pin(mesh_name: Text, position: Tuple[Text, Text, Text], name: Optional[Text] = None) -> Text:
     """Apply uvPin constrain to given world position"""
 
     pin = cmds.createNode("uvPin")
@@ -1306,8 +1300,7 @@ def create_rivet_pin(mesh_name, position, name=None):
     return output
 
 
-def get_original_and_deformed_mesh(mesh_name):
-    # type: (Text) -> Tuple[Text, Text]
+def get_original_and_deformed_mesh(mesh_name: Text) -> Tuple[Text, Text]:
     """Get original and deformed mesh shape.
 
     Args:
@@ -1343,8 +1336,7 @@ def get_original_and_deformed_mesh(mesh_name):
     return orig.split(".")[0], deform
 
 
-def get_uv_at_position(mesh_name, position):
-    # type: (Text, Tuple[Text, Text, Text]) -> Tuple[Text, Text]
+def get_uv_at_position(mesh_name: Text, position: Tuple[Text, Text, Text]) -> Tuple[Text, Text]:
     """Get uv at given world position"""
 
     obj_type = cmds.objectType(mesh_name)
@@ -1368,8 +1360,7 @@ def get_uv_at_position(mesh_name, position):
     return uv
 
 
-def get_uv_at_mesh_position(mesh_name, position):
-    # type: (Text, Tuple[Text, Text, Text]) -> Tuple[Text, Text]
+def get_uv_at_mesh_position(mesh_name: Text, position: Tuple[Text, Text, Text]) -> Tuple[Text, Text]:
     """Get uv at given world position"""
 
     sel = om.MSelectionList()
@@ -1382,8 +1373,7 @@ def get_uv_at_mesh_position(mesh_name, position):
     return uv
 
 
-def get_uv_at_nurbs_surface_position(surface_name, position):
-    # type: (Text, Tuple[Text, Text, Text]) -> Tuple[Text, Text]
+def get_uv_at_nurbs_surface_position(surface_name: Text, position: Tuple[Text, Text, Text]) -> Tuple[Text, Text]:
     """Get uv at given world position"""
 
     sel = om.MSelectionList()
@@ -1406,8 +1396,7 @@ def get_uv_at_nurbs_surface_position(surface_name, position):
     return u / max_range_u, v / max_range_v
 
 
-def apply_rivet_constrain_on_vertex(mesh, vertex_id):
-    # type: (Text, int) -> Text
+def apply_rivet_constrain_on_vertex(mesh: Text, vertex_id: int) -> Text:
     """Apply uvPin constrain to given world position"""
 
     sel = om.MSelectionList()
@@ -1419,8 +1408,7 @@ def apply_rivet_constrain_on_vertex(mesh, vertex_id):
     return create_rivet_pin(mesh, position)
 
 
-def apply_rivet_constrain_to_selected(mesh, targets):
-    # type: (Text, List[Text]|Text) -> List[Text]
+def apply_rivet_constrain_to_selected(mesh: Text, targets: List[Text]|Text) -> List[Text]:
     """Apply uvPin constrain to given objects"""
 
     if not isinstance(targets, list):
@@ -1445,8 +1433,7 @@ def apply_rivet_constrain_to_selected(mesh, targets):
     return pins
 
 
-def apply_rivet_constrain_using_skin_weight(mesh, targets):
-    # type: (str, list[str]|str) -> list[str]
+def apply_rivet_constrain_using_skin_weight(mesh: str, targets: list[str]|str) -> list[str]:
     """Apply parent constrain to given objects with weight from skinCluster"""
 
     if not isinstance(targets, list):
@@ -1478,8 +1465,7 @@ def apply_rivet_constrain_using_skin_weight(mesh, targets):
     return cns
 
 
-def __get_skin_weights(mesh_name, cns_name):
-    # type: (str, str) -> Dict[str, float]
+def __get_skin_weights(mesh_name: str, cns_name: str) -> Dict[str, float]:
 
     # find closest vertex
     mesh_path = om.MGlobal.getSelectionListByName(mesh_name).getDagPath(0)
@@ -1488,8 +1474,7 @@ def __get_skin_weights(mesh_name, cns_name):
     return __get_skin_weights_of_position(mesh_name, pos)
 
 
-def __get_skin_weights_of_position(mesh_name, position):
-    # type: (str, str) -> dict[str, float]
+def __get_skin_weights_of_position(mesh_name: str, position: str) -> dict[str, float]:
 
     # find closest vertex
     mesh_path = om.MGlobal.getSelectionListByName(mesh_name).getDagPath(0)
@@ -1509,8 +1494,7 @@ def __get_skin_weights_of_position(mesh_name, position):
     return influences
 
 
-def get_influences(skin_fn, weights):
-    # type: (oma.MFnSkinCluster, list[float]) -> dict[str, float]
+def get_influences(skin_fn: oma.MFnSkinCluster, weights: list[float]) -> dict[str, float]:
     influences = skin_fn.influenceObjects()
     res = {}
 
@@ -1521,8 +1505,7 @@ def get_influences(skin_fn, weights):
     return res
 
 
-def get_nearest_vertex_on_point(mesh_fn, pos1):
-    # type: (om.MFnMesh, om.MPoint) -> tuple[int, float]
+def get_nearest_vertex_on_point(mesh_fn: om.MFnMesh, pos1: om.MPoint) -> tuple[int, float]:
 
     it_vertex = om.MItMeshVertex(mesh_fn)
 
@@ -1544,8 +1527,7 @@ def get_nearest_vertex_on_point(mesh_fn, pos1):
     return nearest_vertex, min_distance
 
 
-def create_dummy_edges_from_positions(positions):
-    # type: (List[Tuple[float, float, float]]) -> Tuple[List[Text], om.MFnMesh]
+def create_dummy_edges_from_positions(positions: List[Tuple[float, float, float]]) -> Tuple[List[Text], om.MFnMesh]:
     plane = draw_plane_from_positions(positions)  # type: ignore
 
     edge_list = ["{}.e[{}]".format(plane.fullPathName(), 0)]
@@ -1556,14 +1538,12 @@ def create_dummy_edges_from_positions(positions):
     return edge_list, plane
 
 
-def create_dummy_edges_from_objects(objects):
-    # type: (List[Text]) -> Tuple[List[Text], om.MFnMesh]
+def create_dummy_edges_from_objects(objects: List[Text]) -> Tuple[List[Text], om.MFnMesh]:
     positions = [cmds.xform(x, q=True, ws=True, t=True) for x in objects]
     return create_dummy_edges_from_positions(positions)
 
 
-def draw_plane_from_positions(positions, t=None):
-    # type: (List[Tuple[float, float, float]], dt.Matrix|None) -> om.MFnMesh
+def draw_plane_from_positions(positions: List[Tuple[float, float, float]], t: dt.Matrix|None = None) -> om.MFnMesh:
     if t is not None:
         v = om.MTransformationMatrix(om.MMatrix(t)).translation(om.MSpace.kWorld)
         positions = [(x[0] - v.x, x[1] - v.y, x[2] - v.z) for x in positions]
@@ -1610,22 +1590,19 @@ def draw_plane_from_positions(positions, t=None):
     return mesh
 
 
-def get_centroid_from_objects(objects):
-    # type: (List[Text]) -> Tuple[float, float, float]
+def get_centroid_from_objects(objects: List[Text]) -> Tuple[float, float, float]:
     positions = [cmds.xform(x, q=True, ws=True, t=True) for x in objects]
     return get_centroid_from_positions(positions)
 
 
-def get_centroid_from_positions(positions):
-    # type: (List[Tuple[float, float, float]]) -> Tuple[float, float, float]
+def get_centroid_from_positions(positions: List[Tuple[float, float, float]]) -> Tuple[float, float, float]:
     mean_x = sum(p[0] for p in positions) / len(positions)
     mean_y = sum(p[1] for p in positions) / len(positions)
     mean_z = sum(p[2] for p in positions) / len(positions)
     return mean_x, mean_y, mean_z
 
 
-def get_normalized_vector_node_from_attribute_path(attr_path):
-    # type: (Text) -> Text
+def get_normalized_vector_node_from_attribute_path(attr_path: Text) -> Text:
     """Get normalized vector node from given attribute path"""
     vecProd = cmds.createNode("vectorProduct")
     cmds.setAttr(vecProd + ".operation", 1)  # dot product
@@ -1650,8 +1627,7 @@ def get_normalized_vector_node_from_attribute_path(attr_path):
 
 
 @contextlib.contextmanager
-def unlockAttribute(node, attrs=None):
-    # type: (Text, List[Text]|None) -> Generator[None, None, None]
+def unlockAttribute(node: Text, attrs: List[Text]|None = None) -> Generator[None, None, None]:
     """Temporarily unlock given attributes of given node.
 
     store original lock state and restore it after function call"""
@@ -1671,7 +1647,7 @@ def unlockAttribute(node, attrs=None):
 
 
 @contextlib.contextmanager
-def overrideNamingAttributeTemporary(comp, name=None, side=None, index=None):
+def overrideNamingAttributeTemporary(comp: ComponentLike, name: str | None = None, side: str | None = None, index: int | None = None) -> Iterator[None]:
     currentName = comp.name
     currentIndex = comp.index
     currentSide = comp.side
@@ -1692,8 +1668,7 @@ def overrideNamingAttributeTemporary(comp, name=None, side=None, index=None):
     comp.side = currentSide
 
 
-def addNPOPreservingMatrixConnections(ctl):
-    # type: (dt.Transform) -> dt.Transform
+def addNPOPreservingMatrixConnections(ctl: dt.Transform) -> dt.Transform:
 
     from mgear.rigbits import addNPO
 
@@ -1703,8 +1678,7 @@ def addNPOPreservingMatrixConnections(ctl):
     newNPO = addNPO(ctl)
     ctlName = ctl.longName()
 
-    def get_connections(attributes):
-        # type: (list[str]) -> list[str]
+    def get_connections(attributes: list[str]) -> list[str]:
         connections = []
         for attr in attributes:
             connections.extend(cmds.listConnections(
@@ -1717,8 +1691,7 @@ def addNPOPreservingMatrixConnections(ctl):
 
         return connections
 
-    def mimic_connections(node, pos_connections, rot_connections, scl_connections):
-        # type: (str, list, list, list) -> None
+    def mimic_connections(node: str, pos_connections: list, rot_connections: list, scl_connections: list) -> None:
 
         # if all S, R, T are connected to the same node, we can use a single multMatrix
         if pos_connections and rot_connections and scl_connections:
@@ -1822,8 +1795,7 @@ def addNPOPreservingMatrixConnections(ctl):
     return newNPO
 
 
-def demote_controller(ctl):
-    # type: (dt.Transform|str) -> dt.Transform
+def demote_controller(ctl: dt.Transform|str) -> dt.Transform:
 
     if isinstance(ctl, str):
         ctl = pm.PyNode(ctl)

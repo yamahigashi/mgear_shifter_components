@@ -26,7 +26,7 @@ class Component(component.Main):
     # =====================================================
     # OBJECTS
     # =====================================================
-    def addToSubGroup(self, obj, group_name):
+    def addToSubGroup(self, obj: object, group_name: str) -> None:
 
         if self.settings["ctlGrp"]:
             ctlGrp = self.settings["ctlGrp"]
@@ -35,7 +35,7 @@ class Component(component.Main):
 
         self.addToGroup(obj, group_name, parentGrp=ctlGrp)
 
-    def addObjects(self):
+    def addObjects(self) -> None:
         """Add all the objects needed to create the component."""
         self.detailControllersGroupName = "controllers_detail"  # TODO: extract to settings
         self.primaryControllersGroupName = "controllers_primary"  # TODO: extract to settings
@@ -167,7 +167,7 @@ class Component(component.Main):
     # =====================================================
     # ATTRIBUTES
     # =====================================================
-    def addAttributes(self):
+    def addAttributes(self) -> None:
         """Create the anim and setupr rig attributes for the component"""
 
         self.sideRotation_att = self.addAnimParam(
@@ -186,7 +186,7 @@ class Component(component.Main):
     # =====================================================
     # OPERATORS
     # =====================================================
-    def addOperators(self):
+    def addOperators(self) -> None:
         """Create operators and set the relations for the component rig
 
         Apply operators, constraints, expressions to the hierarchy.
@@ -332,7 +332,7 @@ class Component(component.Main):
     # =====================================================
     # CONNECTOR
     # =====================================================
-    def setRelation(self):
+    def setRelation(self) -> None:
         """Set the relation beetween object from guide to rig"""
         self.relatives["root"] = self.root
         self.relatives["jaw"] = self.jawLow_rot

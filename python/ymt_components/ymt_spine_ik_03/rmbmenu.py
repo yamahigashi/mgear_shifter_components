@@ -54,7 +54,7 @@ class ShifterMarkingMenu(rmbmenu.ShifterMarkingMenu):
 
     comp_name = os.path.basename(os.path.dirname(__file__))
 
-    def build_specialized(self, targets):
+    def build_specialized(self, targets: List[Text]) -> None:
         # self.menu is the parent marking menu that menuItems should be attached to
         cmds.setParent(self.menu, m=True)
 
@@ -64,8 +64,7 @@ class ShifterMarkingMenu(rmbmenu.ShifterMarkingMenu):
         cmds.menuItem(l="Select IK0", rp='NE', command=partial(self.select_ik0, targets))
         cmds.menuItem(l="Select IK1", rp='NW', command=partial(self.select_ik1, targets))
 
-    def reset_fk(self, targets, flag):
-        # type: (List[Text], bool) -> None
+    def reset_fk(self, targets: List[Text], flag: bool) -> None:
 
         root = control_util.get_component_root(targets[0])
         controllers = control_util.get_component_controllers(root)
@@ -76,8 +75,7 @@ class ShifterMarkingMenu(rmbmenu.ShifterMarkingMenu):
             node = pm.PyNode(target)
             transform.resetTransform(node)
 
-    def select_ik(self, targets, flag):
-        # type: (List[Text], bool) -> None
+    def select_ik(self, targets: List[Text], flag: bool) -> None:
 
         root = control_util.get_component_root(targets[0])
         controllers = control_util.get_component_controllers(root)
@@ -87,8 +85,7 @@ class ShifterMarkingMenu(rmbmenu.ShifterMarkingMenu):
         for target in controllers:
             cmds.select(target, add=True)
 
-    def select_ik0(self, targets, flag):
-        # type: (List[Text], bool) -> None
+    def select_ik0(self, targets: List[Text], flag: bool) -> None:
 
         root = control_util.get_component_root(targets[0])
         controllers = control_util.get_component_controllers(root)
@@ -98,8 +95,7 @@ class ShifterMarkingMenu(rmbmenu.ShifterMarkingMenu):
         for target in controllers:
             cmds.select(target, add=True)
 
-    def select_ik1(self, targets, flag):
-        # type: (List[Text], bool) -> None
+    def select_ik1(self, targets: List[Text], flag: bool) -> None:
 
         root = control_util.get_component_root(targets[0])
         controllers = control_util.get_component_controllers(root)

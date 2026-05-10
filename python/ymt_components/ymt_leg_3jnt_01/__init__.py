@@ -29,7 +29,7 @@ class Component(component.Main):
     # =====================================================
     # OBJECTS
     # =====================================================
-    def addObjects(self):
+    def addObjects(self) -> None:
         """Add all the objects needed to create the component."""
 
         self.setup = primitive.addTransformFromPos(
@@ -560,7 +560,7 @@ class Component(component.Main):
         self.line_ref = icon.connection_display_curve(
             self.getName("visalRef"), [self.upv_ctl, self.knee_ctl])
 
-    def addAttributes(self):
+    def addAttributes(self) -> None:
 
         self.blend_att = self.addAnimParam(
             "blend", "Fk/Ik Blend", "double", self.settings["blend"], 0, 1)
@@ -681,7 +681,7 @@ class Component(component.Main):
     # =====================================================
     # OPERATORS
     # =====================================================
-    def addOperators(self):
+    def addOperators(self) -> None:
         """Create operators and set the relations for the component rig
 
         Apply operators, constraints, expressions to the hierarchy.
@@ -1130,7 +1130,7 @@ class Component(component.Main):
         pm.parentConstraint(self.legBones[2], self.match_fk2_off, mo=True)
 
 
-    def verifyAlignmentAccuracy(self, jnts, guides, degree=10):
+    def verifyAlignmentAccuracy(self, jnts: object, guides: object, degree: int=10) -> None:
         # type: (List[Tuple[float]], List[Tuple[float]], Optional[int]) -> Bool
         """
         Validate if the joint is in the same direction as the guides.
@@ -1167,7 +1167,7 @@ class Component(component.Main):
     # CONNECTOR
     # =====================================================
 
-    def setRelation(self):
+    def setRelation(self) -> None:
         """Set the relation beetween object from guide to rig"""
         self.relatives["root"] = self.legBones[0]
         self.relatives["knee"] = self.legBones[1]
@@ -1190,7 +1190,7 @@ class Component(component.Main):
         self.aliasRelatives["eff"] = "tip"
 
     # standard connection definition.
-    def connect_standard(self):
+    def connect_standard(self) -> None:
         self.parent.addChild(self.root)
 
         # Set the Ik Reference

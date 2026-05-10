@@ -35,7 +35,7 @@ from ymt_shifter_utility import (
 )
 
 
-def initialize_tsbuilder_conventions():
+def initialize_tsbuilder_conventions() -> None:
     # Naming Convention
     tsBuilder.DFM_ORG_FMT = "{0}_deformers"  # Deformer Organizer
     tsBuilder.DFM_BFR_FMT = "{0}_riderPart{1:02d}"  # Rider Buffer
@@ -64,7 +64,7 @@ class Component(component.Main):
     # =====================================================
     # OBJECTS
     # =====================================================
-    def addObjects(self):
+    def addObjects(self) -> None:
         """Add all the objects needed to create the component."""
 
         # FIXME: remove unneccessary guide.tan
@@ -189,7 +189,7 @@ class Component(component.Main):
         icon.connection_display_curve(self.getName("visualIKRef"), self.ik_ctl)
         self.fk_ctl = self.addObjectsFkControl(self.bts_joints)
 
-    def addObjectsChainIk(self, i, crv, twist_iks):
+    def addObjectsChainIk(self, i: int, crv: object, twist_iks: object) -> None:
 
         if i == 0:
             u = 0.
@@ -267,7 +267,7 @@ class Component(component.Main):
         self.ik_global_ref.append(ik_global_ref)
         ymtutil.setKeyableAttributesDontLockVisibility(ik_global_ref, [])
 
-    def _getTransformWithRollByBlade(self, t):
+    def _getTransformWithRollByBlade(self, t: object) -> None:
         # t = getTransform(self.guide.root)
         a = self.guide.blades["blade"].y
         x = vector.Blade(t).x
@@ -290,7 +290,7 @@ class Component(component.Main):
 
         return datatypes.Matrix(mat)
 
-    def addObjectsFkControl(self, joints):
+    def addObjectsFkControl(self, joints: object) -> None:
 
         parentdiv = self.root
         parentctl = self.root
@@ -314,7 +314,7 @@ class Component(component.Main):
         icon.connection_display_curve(self.getName("visualFKRef"), self.fk_ctl)
         return self.fk_ctl
 
-    def _addObjectsFkControl(self, i, parentdiv, parentctl, t, pt):
+    def _addObjectsFkControl(self, i: int, parentdiv: object, parentctl: object, t: object, pt: object) -> None:
         # References
         tm = datatypes.TransformationMatrix(t)
         tm = pym2m.add_rotation(tm, [0.0, 0.0, math.pi / -2.0], "XYZ", om.MSpace.kObject, unit="rad")
@@ -445,7 +445,7 @@ class Component(component.Main):
     # =====================================================
     # ATTRIBUTES
     # =====================================================
-    def addAttributes(self):
+    def addAttributes(self) -> None:
         """Create the anim and setupr rig attributes for the component"""
 
         if self.settings["ik0refarray"]:
@@ -515,7 +515,7 @@ class Component(component.Main):
     # =====================================================
     # OPERATORS
     # =====================================================
-    def addOperators(self):
+    def addOperators(self) -> None:
         """Create operators and set the relations for the component rig
 
         Apply operators, constraints, expressions to the hierarchy.
@@ -575,7 +575,7 @@ class Component(component.Main):
                 if "useOrient" in attr:
                     cmds.setAttr("{}.{}".format(driver_shape_name, attr), True)
 
-    def addFkOperator(self, i, rootWorld_node):
+    def addFkOperator(self, i: int, rootWorld_node: object) -> None:
 
         if i == 0 and self.settings["isSplitHip"]:
             self.addFkHipOperator()
@@ -640,7 +640,7 @@ class Component(component.Main):
         self.div_cns[i].attr("r") >> self.fk_npo[i].attr("r")
         self.div_cns[i].attr("t") >> self.fk_npo[i].attr("t")
 
-    def addFkHipOperator(self):
+    def addFkHipOperator(self) -> None:
         s = self.fk_hip_ctl
         d = self.fk_local_npo[0],
         # maintainOffset, skipRotate, skipTranslate
@@ -651,7 +651,7 @@ class Component(component.Main):
         # maintainOffset, skipRotate, skipTranslate
         pm.parentConstraint(s, d, mo=True)
 
-    def connectRef(self, refArray, cns_obj, upVAttr=None, init_refNames=False):
+    def connectRef(self, refArray: str, cns_obj: object, upVAttr: bool=None, init_refNames: bool=False) -> None:
         """Connect the cns_obj to a multiple object using parentConstraint.
 
         Args:
@@ -704,7 +704,7 @@ class Component(component.Main):
                         attr_name = f"{cns_node}.{attr}"
                         pm.connectAttr(node_name + ".outColorR", attr_name)
 
-    def connect_standard(self):
+    def connect_standard(self) -> None:
         self.parent.addChild(self.root)
         self.connectRef(self.settings["ik0refarray"], self.ik_npo[0])
         self.connectRef(self.settings["ik1refarray"], self.ik_npo[-1])
@@ -713,7 +713,7 @@ class Component(component.Main):
     # CONNECTOR
     # =====================================================
 
-    def setRelation(self):
+    def setRelation(self) -> None:
         """Set the relation beetween object from guide to rig"""
 
         self.relatives["root"] = self.fk_ctl[0]
@@ -743,7 +743,7 @@ class Component(component.Main):
             self.aliasRelatives["%s_ctl" % (i)] = (i + 2)
 
 
-    def addToSubGroup(self, obj, group_name):
+    def addToSubGroup(self, obj: object, group_name: str) -> None:
 
         if self.settings["ctlGrp"]:
             ctlGrp = self.settings["ctlGrp"]
@@ -753,7 +753,7 @@ class Component(component.Main):
         self.addToGroup(obj, group_name, parentGrp=ctlGrp)
 
 
-def test():
+def test() -> None:
     import pymel.core as pm
     import maya.cmds as cmds
     for x in [
@@ -771,7 +771,7 @@ def test():
     cmds.refresh(suspend=False)
 
 
-def cross(u, v):
+def cross(u: float, v: float) -> None:
     dim = len(u)
     s = []
     for i in range(dim):
@@ -788,7 +788,7 @@ def cross(u, v):
     return s
 
 
-def getCurveFn(crv):
+def getCurveFn(crv: object) -> object:
     # type: (pm.nt.NurbsCurve|pm.nt.Transform|str) -> om.MFnNurbsCurve
 
     objects = om.MSelectionList()
@@ -814,7 +814,7 @@ def getCurveFn(crv):
     raise RuntimeError("Failed to get MFnNurbsCurve for the curve: {}".format(crv.name()))
 
 
-def getCurveUAtPoint(crv, position):
+def getCurveUAtPoint(crv: object, position: object) -> None:
     point = om1.MPoint(position[0], position[1], position[2])
 
     dag = om1.MDagPath()
@@ -840,7 +840,7 @@ def getCurveUAtPoint(crv, position):
     return length_at / length
 
 
-def vecProjection(a, b):
+def vecProjection(a: object, b: object) -> None:
 
     dot = a * b
     length = b.length()

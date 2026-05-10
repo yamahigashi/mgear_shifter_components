@@ -67,20 +67,20 @@ class Guide(guide.ComponentGuide):
 
     connectors = []
 
-    def getObjectByLocalName(self, local_name, includeShapes=False):
+    def getObjectByLocalName(self, local_name: str, includeShapes: object=False) -> None:
         return ymt_utility.findGuideObjectByLocalName(
             self, local_name, includeShapes=includeShapes)
 
     # =====================================================
     ##
     # @param self
-    def postInit(self):
+    def postInit(self) -> None:
         self.save_transform = ["root", "sizeRef", "lookat", "sliding_surface"]
 
     # =====================================================
     # Add more object to the object definition list.
     # @param self
-    def addObjects(self):
+    def addObjects(self) -> None:
 
         self.root = self.addRoot()
         vTemp = transform.getOffsetPosition(self.root, [0, 0, 1])
@@ -95,7 +95,7 @@ class Guide(guide.ComponentGuide):
         else:
             pm.parent(self.sliding_surface, self.root, absolute=False, relative=True)
 
-    def addSliderSurface(self, name, parent, position=None):
+    def addSliderSurface(self, name: str, parent: object, position: object=None) -> None:
         """pass."""
         if name not in self.tra.keys():
             self.tra[name] = transform.getTransformFromPos(position)
@@ -113,7 +113,7 @@ class Guide(guide.ComponentGuide):
     # =====================================================
     # Add more parameter to the parameter definition list.
     # @param self
-    def addParameters(self):
+    def addParameters(self) -> None:
 
         self.pIcon = self.addParam("icon", "string", "cube")
 
@@ -136,7 +136,7 @@ class Guide(guide.ComponentGuide):
         self.pSlidingSurface   = self.addParam("isSlidingSurface", "bool", True)
         self.pSurfaceReference = self.addParam("surfaceReference", "string", "")
 
-    def postDraw(self):
+    def postDraw(self) -> None:
         "Add post guide draw elements to the guide"
         size = pm.xform(self.root, q=True, ws=True, scale=True)[0]
         self.add_ref_axis(self.root,
@@ -144,7 +144,7 @@ class Guide(guide.ComponentGuide):
                           inverted=True,
                           width=.5 / size)
 
-    def setFromHierarchy(self, root):
+    def setFromHierarchy(self, root: object) -> None:
         self.root = root
         self.model = self.root.getParent(generations=-1)
         self.setParamDefValuesFromProperty(self.root)
@@ -158,7 +158,7 @@ class Guide(guide.ComponentGuide):
         self.sliding_surface = pm.PyNode(sliding_surface)
         pm.parent(self.sliding_surface, self.root, absolute=False, relative=True)
 
-    def get_guide_template_dict(self):
+    def get_guide_template_dict(self) -> None:
         """Override the base class method to add more data to the guide template dict"""
         c_dict = super(Guide, self).get_guide_template_dict()
 
@@ -167,7 +167,7 @@ class Guide(guide.ComponentGuide):
 
         return c_dict
 
-    def set_from_dict(self, c_dict):
+    def set_from_dict(self, c_dict: object) -> None:
         """Override the base class method to add more data to the guide template dict"""
 
         super(Guide, self).set_from_dict(c_dict)
@@ -180,7 +180,7 @@ class Guide(guide.ComponentGuide):
         sliding_surface = ymt_utility.deserialize_nurbs_surface(self.getName("sliding_surface"), c_dict["sliding_surface"])
         self.sliding_surface = pm.PyNode(sliding_surface)
 
-    def symmetrize(self):
+    def symmetrize(self) -> bool:
         """Inverse the transform of each element of the guide."""
 
         if not super(Guide, self).symmetrize():
@@ -204,7 +204,7 @@ class Guide(guide.ComponentGuide):
 class settingsTab(QtWidgets.QDialog, sui.Ui_Form):
     """The Component settings UI"""
 
-    def __init__(self, parent=None):
+    def __init__(self, parent: object=None) -> None:
         super(settingsTab, self).__init__(parent)
         self.setupUi(self)
 
@@ -212,7 +212,7 @@ class settingsTab(QtWidgets.QDialog, sui.Ui_Form):
 class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
     """Create the component setting window"""
 
-    def __init__(self, parent=None):
+    def __init__(self, parent: object=None) -> None:
         self.toolName = TYPE
         # Delete old instances of the componet settings window.
         pyqt.deleteInstances(self, MayaQDockWidget)
@@ -240,7 +240,7 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
         self.create_componentLayout()
         self.create_componentConnections()
 
-    def setup_componentSettingWindow(self):
+    def setup_componentSettingWindow(self) -> None:
         self.mayaMainWindow = pyqt.maya_main_window()
 
         self.setObjectName(self.toolName)
@@ -248,10 +248,10 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
         self.setWindowTitle(TYPE)
         self.resize(280, 520)
 
-    def create_componentControls(self):
+    def create_componentControls(self) -> None:
         return
 
-    def populate_componentControls(self):
+    def populate_componentControls(self) -> None:
         """Populate Controls
 
         Populate the controls values from the custom attributes of the
@@ -310,7 +310,7 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
         surfaceReference = self.root.attr("surfaceReference").get()
         self.settingsTab.surfaceReference_listWidget.addItem(surfaceReference)
 
-    def create_componentLayout(self):
+    def create_componentLayout(self) -> None:
 
         self.settings_layout = QtWidgets.QVBoxLayout()
         self.settings_layout.addWidget(self.tabs)
@@ -318,7 +318,7 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
 
         self.setLayout(self.settings_layout)
 
-    def create_componentConnections(self):
+    def create_componentConnections(self) -> None:
 
         self.settingsTab.joint_checkBox.stateChanged.connect(
             partial(self.updateCheck,
@@ -407,7 +407,7 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
             )
         )
 
-    def eventFilter(self, sender, event):
+    def eventFilter(self, sender: object, event: object) -> object:
         if event.type() == QtCore.QEvent.ChildRemoved:
             if sender == self.settingsTab.ikRefArray_listWidget:
                 self.updateListAttr(sender, "ikrefarray")
@@ -415,5 +415,5 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
         else:
             return QtWidgets.QDialog.eventFilter(self, sender, event)
 
-    def dockCloseEventTriggered(self):
+    def dockCloseEventTriggered(self) -> None:
         pyqt.deleteInstances(self, MayaQDockWidget)

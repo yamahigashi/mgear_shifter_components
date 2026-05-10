@@ -2,7 +2,7 @@ import mgear.core.pyqt as gqt
 QtGui, QtCore, QtWidgets, wrapInstance = gqt.qt_import()
 
 class Ui_Form(object):
-    def setupUi(self, Form):
+    def setupUi(self, Form: QtWidgets.QWidget) -> None:
         Form.setObjectName("Form")
         Form.resize(733, 550)
         self.gridLayout = QtWidgets.QGridLayout(Form)
@@ -202,7 +202,7 @@ class Ui_Form(object):
         self.scale_pushButton.clicked.connect(self.sz_checkBox.toggle)
         QtCore.QMetaObject.connectSlotsByName(Form)
 
-    def retranslateUi(self, Form):
+    def retranslateUi(self, Form: QtWidgets.QWidget) -> None:
         Form.setWindowTitle(gqt.fakeTranslate("Form", "Form", None, -1))
         self.joint_checkBox.setText(gqt.fakeTranslate("Form", "Joint", None, -1))
         self.uniScale_checkBox.setText(gqt.fakeTranslate("Form", "Uniform Scale", None, -1))

@@ -12,12 +12,10 @@ import mgear.shifter.custom_step as cstp
 
 class CustomShifterStep(cstp.customShifterMainStep):
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.name = "Sknning Surface"
 
-    def run(self, stepDict):
-        # type: (dict) -> None
-
+    def run(self, stepDict: dict[str, object]) -> None:
         self.rig = stepDict["mgearRun"]
 
         src = "forehead_C0_ctl"

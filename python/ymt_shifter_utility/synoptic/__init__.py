@@ -1,4 +1,5 @@
 import os
+from types import ModuleType
 
 import importlib
 try:
@@ -26,12 +27,12 @@ SYNOPTIC_DIRECTORIES = mgear.core.utils.gatherCustomModuleDirectories(
 ##################################################
 # OPEN
 ##################################################
-def open(*args):
+def open(*args: object) -> None:
     # open the synoptic dialog, without clean old instances
     pyqt.showDialog(Synoptic, False)
 
 
-def importTab(tabName):
+def importTab(tabName: str) -> ModuleType:
     """Import Synoptic Tab
 
     Args:
@@ -60,7 +61,7 @@ class Synoptic(MayaQWidgetDockableMixin, QtWidgets.QDialog):
     default_width = 325
     margin = 15 * 2
 
-    def __init__(self, parent=None):
+    def __init__(self, parent: object = None) -> None:
         self.toolName = SYNOPTIC_WIDGET_NAME
         # Delete old instances of the componet settings window.
         pyqt.deleteInstances(self, MayaQDockWidget)
@@ -68,7 +69,7 @@ class Synoptic(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         self.create_widgets()
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
 
-    def closeEvent(self, evnt):
+    def closeEvent(self, evnt: object) -> None:
         """oon close, kill all callbacks
 
         Args:
@@ -86,7 +87,7 @@ class Synoptic(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         self.tabs.clear()
         super(Synoptic, self).closeEvent(evnt)
 
-    def create_widgets(self):
+    def create_widgets(self) -> None:
         self.setupUi()
 
         # Connect Signal
@@ -96,7 +97,7 @@ class Synoptic(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         # Initialise
         self.updateModelList()
 
-    def setupUi(self):
+    def setupUi(self) -> None:
         # Widgets
         self.setObjectName(SYNOPTIC_WIDGET_NAME)
         self.resize(560, 775)
@@ -193,7 +194,7 @@ class Synoptic(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         self.gridLayout_2.addWidget(self.mainContainer, 0, 0, 1, 1)
 
     # Singal Methods =============================
-    def updateModelList(self):
+    def updateModelList(self) -> None:
         # avoiding unnecessary firing currentIndexChanged event before
         # finish to model_list
         try:
@@ -212,7 +213,7 @@ class Synoptic(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         self.model_list.currentIndexChanged.connect(self.updateTabs)
         self.updateTabs()
 
-    def updateTabs(self):
+    def updateTabs(self) -> None:
 
         for i in range(self.tabs.count()):
             tab = self.tabs.widget(i)
@@ -275,9 +276,7 @@ class Synoptic(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         header_space = 45
         self.resize(max_w + self.margin, max_h + self.margin + header_space)
 
-    def wrapTabContents(self, synoptic_tab):
-        # type: (SynopticTab) -> QtWidgets.QWidget
-
+    def wrapTabContents(self, synoptic_tab: object) -> QtWidgets.QWidget:
         # horizontal layout:
         #     spacer >>  SynopticTab << spacer
 
@@ -319,9 +318,7 @@ class SynopticTabWrapper(QtWidgets.QWidget):
     is children of.
     """
 
-    def __init__(self, *args, **kwargs):
-        # type: () -> None
-
+    def __init__(self, *args: object, **kwargs: object) -> None:
         super(SynopticTabWrapper, self).__init__(*args, **kwargs)
 
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
@@ -331,18 +328,14 @@ class SynopticTabWrapper(QtWidgets.QWidget):
 
         self.offset = QtCore.QPoint()
 
-    def setSpacerLeft(self, spacer):
-        # type: (QtWidgets.QSpacerItem) -> None
-
+    def setSpacerLeft(self, spacer: QtWidgets.QSpacerItem) -> None:
         # QSpacerItem can't be traversed from its parent widget
         self.spacer = spacer
 
     # ------------------------------------------------------------------------
     # utility for mouse event
     # ------------------------------------------------------------------------
-    def searchMainSynopticTab(self):
-        # type: () -> (MainSynopticTab, bool)
-
+    def searchMainSynopticTab(self) -> tuple[object, bool]:
         # avoiding cyclic import, declaration here not top of code
         from mgear.synoptic.tabs import MainSynopticTab
         for kid in self.children():
@@ -357,15 +350,11 @@ class SynopticTabWrapper(QtWidgets.QWidget):
             mgear.log(mes, mgear.sev_warning)
             return None, False
 
-    def calculateOffset(self):
-        # type: () -> QtCore.QPoint
-
+    def calculateOffset(self) -> QtCore.QPoint:
         w = self.spacer.geometry().width()
         return QtCore.QPoint(w * -1, 0)
 
-    def offsetEvent(self, event):
-        # type: (QtGui.QMouseEvent) -> QtGui.QMouseEvent
-
+    def offsetEvent(self, event: QtGui.QMouseEvent) -> QtGui.QMouseEvent:
         offsetev = QtGui.QMouseEvent(
             event.type(),
             event.pos() + self.offset,
@@ -380,9 +369,7 @@ class SynopticTabWrapper(QtWidgets.QWidget):
     # ------------------------------------------------------------------------
     # mouse events
     # ------------------------------------------------------------------------
-    def mousePressEvent(self, event):
-        # type: (QtGui.QMouseEvent) -> None
-
+    def mousePressEvent(self, event: QtGui.QMouseEvent) -> None:
         self.syn_w, self.syn_wid_is_mainsyntab = self.searchMainSynopticTab()
         self.offset = self.calculateOffset()
         self.origin = event.pos()
@@ -395,8 +382,7 @@ class SynopticTabWrapper(QtWidgets.QWidget):
         else:
             self.syn_w.mousePressEvent(self.offsetEvent(event))
 
-    def mouseMoveEvent(self, event):
-        # type: (QtGui.QMouseEvent) -> None
+    def mouseMoveEvent(self, event: QtGui.QMouseEvent) -> None:
         self.syn_w, self.syn_wid_is_mainsyntab = self.searchMainSynopticTab()
 
         if self.rubberband.isVisible():
@@ -409,9 +395,7 @@ class SynopticTabWrapper(QtWidgets.QWidget):
         else:
             self.syn_w.mouseMoveEvent(self.offsetEvent(event))
 
-    def mouseReleaseEvent(self, event):
-        # type: (QtGui.QMouseEvent) -> None
-
+    def mouseReleaseEvent(self, event: QtGui.QMouseEvent) -> None:
         if self.rubberband.isVisible():
             self.rubberband.hide()
 

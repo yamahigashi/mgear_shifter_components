@@ -13,7 +13,7 @@ from Qt.QtWidgets import *
 
 
 class Ui_Form(object):
-    def setupUi(self, Form):
+    def setupUi(self, Form: QtWidgets.QWidget) -> None:
         if not Form.objectName():
             Form.setObjectName("Form")
         Form.resize(419, 555)
@@ -138,7 +138,7 @@ class Ui_Form(object):
         QMetaObject.connectSlotsByName(Form)
     # setupUi
 
-    def retranslateUi(self, Form):
+    def retranslateUi(self, Form: QtWidgets.QWidget) -> None:
         Form.setWindowTitle(QCoreApplication.translate("Form", "Form", None))
         self.groupBox_3.setTitle(QCoreApplication.translate("Form", "Surface", None))
         self.isSlidingSurface.setText(QCoreApplication.translate("Form", "Sliding on Surface", None))

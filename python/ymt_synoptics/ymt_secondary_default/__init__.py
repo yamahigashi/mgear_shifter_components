@@ -22,17 +22,16 @@ class SynopticTab(MainSynopticTab, widget.Ui_baker):
 
     # ============================================
     # INIT
-    def __init__(self, parent=None):
+    def __init__(self, parent: object=None) -> None:
         super(SynopticTab, self).__init__(self, parent)
 
-    def selAll_clicked(self):
-        # type: () -> None
+    def selAll_clicked(self) -> None:
         model = utils.getModel(self)
         modifiers = QtWidgets.QApplication.keyboardModifiers()
         selAll(model, modifiers)
 
 
-def selAll(model, modifiers):
+def selAll(model: object, modifiers: object) -> None:
     """Select all controlers
 
     Args:

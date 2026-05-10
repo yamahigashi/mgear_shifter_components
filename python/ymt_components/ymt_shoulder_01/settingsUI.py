@@ -9,7 +9,7 @@
 from Qt import QtCore, QtWidgets
 
 class Ui_Form(object):
-    def setupUi(self, Form):
+    def setupUi(self, Form: QtWidgets.QWidget) -> None:
         Form.setObjectName("Form")
         Form.resize(269, 559)
         self.upvRefArray_groupBox = QtWidgets.QGroupBox(Form)
@@ -220,7 +220,7 @@ class Ui_Form(object):
         self.retranslateUi(Form)
         QtCore.QMetaObject.connectSlotsByName(Form)
 
-    def retranslateUi(self, Form):
+    def retranslateUi(self, Form: QtWidgets.QWidget) -> None:
         Form.setWindowTitle(QtWidgets.QApplication.translate("Form", "Form", None, -1))
         self.upvRefArray_groupBox.setTitle(QtWidgets.QApplication.translate("Form", "Reference Array", None, -1))
         self.refArrayAdd_pushButton.setText(QtWidgets.QApplication.translate("Form", "<<", None, -1))

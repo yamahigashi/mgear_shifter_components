@@ -9,7 +9,7 @@ except ImportError:
 from mgear import rigbits
 import mgear.shifter.custom_step as cstp
 try:
-    import skeleposerEditor as editor  # type: ignore
+    import skeleposerEditor as editor
 except ImportError:
     raise ImportError(
         "skeleposerEditor not found. Please install it from "
@@ -20,12 +20,10 @@ import ymt_shifter_utility as ymt_util
 
 class CustomShifterStep(cstp.customShifterMainStep):
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.name = "Add Skeleposer"
 
-    def run(self, stepDict):
-        # type: (dict) -> None
-
+    def run(self, stepDict: dict[str, object]) -> None:
         cmds.loadPlugin("skeleposer.mll", quiet=True)
 
         rig = stepDict.get("mgearRun")
@@ -37,8 +35,7 @@ class CustomShifterStep(cstp.customShifterMainStep):
         self.insert_adj_nodes()
         self.add_skeleposer_node()
 
-    def insert_adj_nodes(self):
-        # type: () -> None
+    def insert_adj_nodes(self) -> None:
         """Insert an adjust node for skeleposer."""
 
         self.adj_node_uuids = []
@@ -50,7 +47,7 @@ class CustomShifterStep(cstp.customShifterMainStep):
                 continue
 
             try:
-                npo = ymt_util.addNPOPreservingMatrixConnections(pm.PyNode(ctrl))[0]  # type: pm.PyNode
+                npo = ymt_util.addNPOPreservingMatrixConnections(pm.PyNode(ctrl))[0]
             except RuntimeError as e:
                 print("addNPO failed for {}".format(ctrl))
                 print(e)
@@ -71,8 +68,7 @@ class CustomShifterStep(cstp.customShifterMainStep):
             self.adj_node_uuids.append(adj_uuid)
             self.adj_to_ctrl[adj_uuid] = uuid
 
-    def add_skeleposer_node(self):
-        # type: () -> None
+    def add_skeleposer_node(self) -> None:
         """Add a skeleposer node to the rig and register joints."""
 
         name = self.rig_name + "_skeleposer"
@@ -108,14 +104,13 @@ class CustomShifterStep(cstp.customShifterMainStep):
 
                     cmds.setAttr(adj + "." + a, lock=True)
 
-    def get_controller_uuids(self):
-        # type: () -> list[str]
+    def get_controller_uuids(self) -> list[str]:
         """Get all controllers from the rig using rig sets."""
 
         res = []
 
-        def _recursive_get_children(sets_name):
-            members = cmds.sets(sets_name, q=True) or []  # type: any
+        def _recursive_get_children(sets_name: str) -> None:
+            members = cmds.sets(sets_name, q=True) or []
             for elem in members:
                 if "_ctl" in elem and cmds.nodeType(elem) == "transform":
                     uuid = cmds.ls(elem, uuid=True)[0]
@@ -130,8 +125,7 @@ class CustomShifterStep(cstp.customShifterMainStep):
         return list(set(res))
 
 
-def is_connected_or_locked(node, attr):
-    # type: (str, str) -> bool
+def is_connected_or_locked(node: str, attr: str) -> bool:
     """Check if the attribute is connected or locked."""
 
     if not cmds.objExists(node):
@@ -147,10 +141,9 @@ def is_connected_or_locked(node, attr):
         return True
 
     return False
-    
 
-def is_all_axis_connected_or_locked(node, attr):
-    # type: (str, str) -> bool
+
+def is_all_axis_connected_or_locked(node: str, attr: str) -> bool:
     """Check if the attribute is connected or locked."""
 
     if not cmds.objExists(node):

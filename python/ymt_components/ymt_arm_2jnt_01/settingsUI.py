@@ -9,7 +9,7 @@
 from Qt import QtCore, QtWidgets
 
 class Ui_Form(object):
-    def setupUi(self, Form):
+    def setupUi(self, Form: QtWidgets.QWidget) -> None:
         Form.setObjectName("Form")
         Form.resize(255, 290)
         self.ikRefArray_groupBox = QtWidgets.QGroupBox(Form)
@@ -96,7 +96,7 @@ class Ui_Form(object):
         self.ikfk_spinBox.valueChanged.connect(self.ikfk_slider.setValue)
         QtCore.QMetaObject.connectSlotsByName(Form)
 
-    def retranslateUi(self, Form):
+    def retranslateUi(self, Form: QtWidgets.QWidget) -> None:
         Form.setWindowTitle(QtWidgets.QApplication.translate("Form", "Form", None, -1))
         self.ikRefArray_groupBox.setTitle(QtWidgets.QApplication.translate("Form", "IK Reference Array", None, -1))
         self.ikRefArrayAdd_pushButton.setText(QtWidgets.QApplication.translate("Form", "<<", None, -1))

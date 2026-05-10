@@ -55,14 +55,13 @@ QtGui, QtCore, QtWidgets, wrapInstance = gqt.qt_import()
 
 class AbstractController(object):
 
-    def __init__(self, button):
+    def __init__(self, button: object) -> None:
         self.button = button
 
 
 class ikfkMatchAllButton(AbstractController):
 
-    def mousePressEvent(self, event):
-        # type: (QtCore.QEvent) -> None
+    def mousePressEvent(self, event: QtCore.QEvent) -> None:
 
         mouse_button = event.button()
         model = syn_uti.getModel(self.button)
@@ -84,8 +83,7 @@ class ikfkMatchAllButton(AbstractController):
 
 class ikfkMatchButton(AbstractController):
 
-    def mousePressEvent(self, event):
-        # type: (QtCore.QEvent) -> None
+    def mousePressEvent(self, event: QtCore.QEvent) -> None:
 
         mouse_button = event.button()
         model = syn_uti.getModel(self.button)
@@ -107,8 +105,7 @@ class ikfkMatchButton(AbstractController):
 
 class ikRotSpaceMatchButton(AbstractController):
 
-    def mousePressEvent(self, event):
-        # type: (QtCore.QEvent) -> None
+    def mousePressEvent(self, event: QtCore.QEvent) -> None:
 
         mouse_button = event.button()
         model = syn_uti.getModel(self.button)
@@ -131,8 +128,7 @@ class IkFkTransfer(syn_uti.IkFkTransfer):
 
     # ----------------------------------------------------------------
 
-    def setCtrls(self, fks, ik, upv):
-        # type: (list[str], str, str) -> None
+    def setCtrls(self, fks: list[str], ik: str, upv: str) -> None:
         """gather maya PyNode represented each controllers"""
 
         self.fkCtrls = [self._getNode(x) for x in fks]
@@ -149,8 +145,7 @@ class IkFkTransfer(syn_uti.IkFkTransfer):
 
     # ----------------------------------------------------------------
 
-    def transfer(self, startFrame, endFrame, onlyKeyframes, switchTo=None, *args, **kargs):
-        # type: (int, int, bool, str, *str, **str) -> None
+    def transfer(self, startFrame: int, endFrame: int, onlyKeyframes: bool, switchTo: Optional[str] = None, *args: str, **kargs: str) -> None:
 
         if switchTo is not None:
             if "fk" in switchTo.lower():
@@ -184,8 +179,7 @@ class IkFkTransfer(syn_uti.IkFkTransfer):
                            startFrame, endFrame, onlyKeyframes)
 
     @staticmethod
-    def showUI(model, ikfk_attr, uihost, fks, ik, upv, *args):
-        # type: (pm.nodetypes.Transform, str, str, List[str], str, str, *str) -> None
+    def showUI(model: pm.nodetypes.Transform, ikfk_attr: str, uihost: str, fks: List[str], ik: str, upv: str, *args: str) -> None:
 
         try:
             for c in gqt.maya_main_window().children():
@@ -216,9 +210,7 @@ class IkFkTransfer(syn_uti.IkFkTransfer):
             mgear.log(e, mgear.sev_error)
 
     @staticmethod
-    def execute(model, ikfk_attr, uihost, fks, ik, upv,
-                startFrame=None, endFrame=None, onlyKeyframes=None, switchTo=None):
-        # type: (pm.nodetypes.Transform, str, str, List[str], str, str, int, int, bool, str) -> None
+    def execute(model: pm.nodetypes.Transform, ikfk_attr: str, uihost: str, fks: List[str], ik: str, upv: str, startFrame: Optional[int] = None, endFrame: Optional[int] = None, onlyKeyframes: Optional[bool] = None, switchTo: Optional[str] = None) -> None:
         """transfer without displaying UI"""
 
         if startFrame is None:
@@ -246,15 +238,13 @@ class IkFkTransfer(syn_uti.IkFkTransfer):
         ui.transfer(startFrame, endFrame, onlyKeyframes, switchTo="fk")
 
     @staticmethod
-    def toIK(model, ikfk_attr, uihost, fks, ik, upv, **kwargs):
-        # type: (pm.nodetypes.Transform, str, str, List[str], str, str, **str) -> None
+    def toIK(model: pm.nodetypes.Transform, ikfk_attr: str, uihost: str, fks: List[str], ik: str, upv: str, **kwargs: str) -> None:
 
         kwargs.update({"switchTo": "ik"})
         IkFkTransfer.execute(model, ikfk_attr, uihost, fks, ik, upv, **kwargs)
 
     @staticmethod
-    def toFK(model, ikfk_attr, uihost, fks, ik, upv, **kwargs):
-        # type: (pm.nodetypes.Transform, str, str, List[str], str, str, **str) -> None
+    def toFK(model: pm.nodetypes.Transform, ikfk_attr: str, uihost: str, fks: List[str], ik: str, upv: str, **kwargs: str) -> None:
 
         kwargs.update({"switchTo": "fk"})
         IkFkTransfer.execute(model, ikfk_attr, uihost, fks, ik, upv, **kwargs)
@@ -264,8 +254,7 @@ class IkFkTransfer(syn_uti.IkFkTransfer):
 # IK FK switch match
 ##################################################
 # ================================================
-def ikFkMatch(model, ikfk_attr, uiHost_name, fks, ik, upv, ikRot=None):
-    # type: (pm.nodetypes.Transform, str, str, List[str], str, str, str) -> None
+def ikFkMatch(model: pm.nodetypes.Transform, ikfk_attr: str, uiHost_name: str, fks: List[str], ik: str, upv: str, ikRot: Optional[str] = None) -> None:
 
     nameSpace = syn_uti.getNamespace(model)
 
@@ -315,7 +304,7 @@ def ikFkMatch(model, ikfk_attr, uiHost_name, fks, ik, upv, ikRot=None):
         oAttr.set(1.0)
 
 
-def ikRotSpaceMatch(model, uiHost_name, ikRot, rotSpaceAttr="arm_rot_space"):
+def ikRotSpaceMatch(model: object, uiHost_name: Text, ikRot: Text, rotSpaceAttr: Text = "arm_rot_space") -> None:
 
     nameSpace = syn_uti.getNamespace(model)
 
@@ -337,8 +326,7 @@ def ikRotSpaceMatch(model, uiHost_name, ikRot, rotSpaceAttr="arm_rot_space"):
     cmds.xform(ikRot.name(), worldSpace=True, matrix=worldRot)
 
 
-def _getNode(nameSpace, name):
-    # type: (str, str) -> pm.nodetypes.Transform
+def _getNode(nameSpace: str, name: str) -> pm.nodetypes.Transform:
 
     node = syn_uti.getNode(":".join([nameSpace, name]))
 
@@ -348,8 +336,7 @@ def _getNode(nameSpace, name):
     return node
 
 
-def _getMth(nameSpace, name):
-    # type: (str, str) -> pm.nodetypes.Transform
+def _getMth(nameSpace: str, name: str) -> pm.nodetypes.Transform:
     tmp = name.split("_")
     tmp[-1] = "mth"
     return _getNode(nameSpace, "_".join(tmp))

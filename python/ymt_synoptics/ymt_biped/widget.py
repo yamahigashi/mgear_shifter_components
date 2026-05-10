@@ -40,7 +40,7 @@ from ymt_synoptics.ymt_biped.control import (
 
 
 class Ui_biped_body(object):
-    def setupUi(self, biped_body):
+    def setupUi(self, biped_body: object) -> None:
         if not biped_body.objectName():
             biped_body.setObjectName(u"biped_body")
         biped_body.resize(325, 840)
@@ -7504,7 +7504,7 @@ class Ui_biped_body(object):
         QMetaObject.connectSlotsByName(biped_body)
     # setupUi
 
-    def retranslateUi(self, biped_body):
+    def retranslateUi(self, biped_body: object) -> None:
         biped_body.setWindowTitle(QCoreApplication.translate("biped_body", u"Form", None))
         self.b_selD.setText(QCoreApplication.translate("biped_body", u"D", None))
         self.b_selD.setProperty("channel", QCoreApplication.translate("biped_body", u"D", None))

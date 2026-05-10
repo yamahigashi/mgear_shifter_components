@@ -22,7 +22,7 @@ class Component(component.Main):
     # =====================================================
     # OBJECTS
     # =====================================================
-    def _needToMirror(self):
+    def _needToMirror(self) -> bool:
         if self.settings["mirrorBehaviour"] and self.negate:
             return True
 
@@ -35,7 +35,7 @@ class Component(component.Main):
 
         return False
 
-    def addObjects(self):
+    def addObjects(self) -> None:
         """Add all the objects needed to create the component."""
 
         if self.settings["neutralRotation"]:
@@ -86,7 +86,7 @@ class Component(component.Main):
         if self.settings["joint"]:
             self.jnt_pos.append([self.ctl, 0, None, self.settings["uniScale"]])
 
-    def addAttributes(self):
+    def addAttributes(self) -> None:
         # Ref
         if self.settings["ikrefarray"]:
             ref_names = self.get_valid_alias_list(
@@ -98,13 +98,13 @@ class Component(component.Main):
                     0,
                     ref_names)
 
-    def addOperators(self):
+    def addOperators(self) -> None:
         return
 
     # =====================================================
     # CONNECTOR
     # =====================================================
-    def setRelation(self):
+    def setRelation(self) -> None:
         """Set the relation beetween object from guide to rig"""
         self.relatives["root"] = self.ctl
         self.controlRelatives["root"] = self.ctl
@@ -113,15 +113,15 @@ class Component(component.Main):
 
         self.aliasRelatives["root"] = "ctl"
 
-    def addConnection(self):
+    def addConnection(self) -> None:
         """Add more connection definition to the set"""
         self.connections["standard"] = self.connect_standard
         self.connections["orientation"] = self.connect_orientation
 
-    def connect_standard(self):
+    def connect_standard(self) -> None:
         """standard connection definition for the component"""
         self.connect_standardWithSimpleIkRef()
 
-    def connect_orientation(self):
+    def connect_orientation(self) -> None:
         """Orient connection definition for the component"""
         self.connect_orientCns()

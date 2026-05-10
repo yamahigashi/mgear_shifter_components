@@ -42,9 +42,7 @@ class MainSynopticTab(QtWidgets.QDialog):
 
     # ============================================
     # INIT
-    def __init__(self, klass, parent=None):
-        # type: (MainSynopticTab, QtWidgets.QWidget) -> None
-
+    def __init__(self, klass: object, parent: object = None) -> None:
         print("Loading synoptic tab of {0}".format(self.name))
 
         super(MainSynopticTab, self).__init__(parent)
@@ -60,17 +58,13 @@ class MainSynopticTab(QtWidgets.QDialog):
         # close button by default.
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
 
-    def setBackground(self):
-        # type: () -> None
-
+    def setBackground(self) -> None:
         # Retarget background Image to absolute path
         if self.bgPath is not None:
             self.img_background.setPixmap(QtGui.QPixmap(self.bgPath))
 
-    def connectSignals(self):
-        # type: () -> None
-
-        def _conn(entry):
+    def connectSignals(self) -> None:
+        def _conn(entry: dict[str, object]) -> None:
             name = entry.get("name")
             buttonName = "b_{0}".format(name)
             button = getattr(self, buttonName, None)
@@ -89,8 +83,7 @@ class MainSynopticTab(QtWidgets.QDialog):
         for entry in self.default_buttons + self.buttons:
             _conn(entry)
 
-    def connectMaya(self):
-        # type: () -> None
+    def connectMaya(self) -> None:
         # script job callback
         # ptr = long(QtCompat.getCppPointer(self)[0])
         # ptr = long(QtCompat.getCppPointer(self))
@@ -98,7 +91,7 @@ class MainSynopticTab(QtWidgets.QDialog):
 
         self.cbManager = callbackManager.CallbackManager()
 
-    def selectChanged(self, *args):
+    def selectChanged(self, *args: object) -> None:
         # wrap to catch exception guaranteeing core does not stop at this
         try:
             self.__selectChanged(*args)
@@ -116,7 +109,7 @@ class MainSynopticTab(QtWidgets.QDialog):
             except RuntimeError:
                 pass
 
-    def __selectChanged(self, *args):
+    def __selectChanged(self, *args: object) -> None:
 
         sels = []
         [sels.append(x.name()) for x in pm.ls(sl=True)]
@@ -155,9 +148,7 @@ class MainSynopticTab(QtWidgets.QDialog):
                 else:
                     selB.paintSelected(False)
 
-    def _getButtonAbsoluteGeometry(self, button):
-        # type: (widgets.SelectButton) -> QtCore.QSize
-
+    def _getButtonAbsoluteGeometry(self, button: object) -> QtCore.QRect:
         if button in self._buttonGeometry.keys():
             return self._buttonGeometry[button]
 
@@ -170,20 +161,14 @@ class MainSynopticTab(QtWidgets.QDialog):
 
         return geo
 
-    def mousePressEvent_(self, event):
-        # type: (QtGui.QMouseEvent) -> None
-
+    def mousePressEvent_(self, event: QtGui.QMouseEvent) -> None:
         self.origin = event.pos()
         QtWidgets.QWidget.mousePressEvent(self, event)
 
-    def mouseMoveEvent_(self, event):
-        # type: (QtGui.QMouseEvent) -> None
-
+    def mouseMoveEvent_(self, event: QtGui.QMouseEvent) -> None:
         QtWidgets.QWidget.mouseMoveEvent(self, event)
 
-    def mouseReleaseEvent_(self, event):
-        # type: (QtGui.QMouseEvent) -> None
-
+    def mouseReleaseEvent_(self, event: QtGui.QMouseEvent) -> None:
         if not self.origin:
             self.origin = event.pos()
 
@@ -219,24 +204,19 @@ class MainSynopticTab(QtWidgets.QDialog):
 
     # ============================================
     # BUTTONS
-    def selAll_clicked(self):
-        # type: () -> None
+    def selAll_clicked(self) -> None:
         model = utils.getModel(self)
         utils.selAll(model)
 
-    def resetAll_clicked(self):
-        # type: () -> None
+    def resetAll_clicked(self) -> None:
         print("resetAll")
 
-    def resetSel_clicked(self):
-        # type: () -> None
+    def resetSel_clicked(self) -> None:
         print("resetSel")
 
-    def keyAll_clicked(self):
-        # type: () -> None
+    def keyAll_clicked(self) -> None:
         model = utils.getModel(self)
         utils.keyAll(model)
 
-    def keySel_clicked(self):
-        # type: () -> None
+    def keySel_clicked(self) -> None:
         utils.keySel()

@@ -15,5 +15,5 @@ class SynopticTab(MainSynopticTab, widget.Ui_visibility):
 
     # ============================================
     # INIT
-    def __init__(self, parent=None):
+    def __init__(self, parent: object = None) -> None:
         super(SynopticTab, self).__init__(self, parent)

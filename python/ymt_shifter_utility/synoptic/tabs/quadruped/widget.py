@@ -28,7 +28,7 @@ import mgear.core.pyqt as gqt
 QtGui, QtCore, QtWidgets, wrapInstance = gqt.qt_import()
 
 class Ui_biped_body(object):
-    def setupUi(self, biped_body):
+    def setupUi(self, biped_body: object) -> None:
         biped_body.setObjectName("biped_body")
         biped_body.resize(338, 700)
         self.b_selD = QuickSelButton(biped_body)
@@ -12055,7 +12055,7 @@ class Ui_biped_body(object):
         self.retranslateUi(biped_body)
         QtCore.QMetaObject.connectSlotsByName(biped_body)
 
-    def retranslateUi(self, biped_body):
+    def retranslateUi(self, biped_body: object) -> None:
         biped_body.setWindowTitle(gqt.fakeTranslate("biped_body", "Form", None, -1))
         self.b_selD.setText(gqt.fakeTranslate("biped_body", "D", None, -1))
         self.b_selD.setProperty("channel", gqt.fakeTranslate("biped_body", "D", None, -1))

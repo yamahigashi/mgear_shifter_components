@@ -59,7 +59,7 @@ if sys.version_info >= (3, 0):  # pylint: disable=using-constant-test  # pylint:
     reload = importlib.reload
 
 PY2 = sys.version_info[0] == 2
-__MENU_CLASSES__ = {}  # type: Dict[Text, Tuple[ShifterMarkingMenu, int]]
+__MENU_CLASSES__: Dict[Text, Tuple[object, int]] = {}
 
 handler = StreamHandler()
 handler.setLevel(DEBUG)
@@ -74,7 +74,7 @@ logger.propagate = False
 ###############################################################################
 
 
-def initialize():
+def initialize() -> None:
     rmbmenuhook.enable()
     comp_list = shifter.getComponentDirectories()
 
@@ -90,8 +90,7 @@ def initialize():
 
 
 
-def add_to_menu(name, klass, priority):
-    # type: (Text, ShifterMarkingMenu, int) -> None
+def add_to_menu(name: Text, klass: ShifterMarkingMenu, priority: int) -> None:
 
     if name in list(__MENU_CLASSES__.keys()):
         # already loaded
@@ -101,8 +100,7 @@ def add_to_menu(name, klass, priority):
     rmbmenuhook.registerMenu(name, klass, priority)
 
 
-def get_modules(component_directory):
-    # type: (Dict[Text, List[Text]]) -> List[Text]
+def get_modules(component_directory: Dict[Text, List[Text]]) -> List[Text]:
     comp_list = []
 
     trackLoadComponent = []
@@ -139,8 +137,7 @@ def get_modules(component_directory):
     return comp_list
 
 
-def load_modules(component_list):
-    # type: (List[Text]) -> None
+def load_modules(component_list: List[Text]) -> None:
 
     for comp_name in component_list:
         if comp_name in list(__MENU_CLASSES__.keys()):
@@ -155,7 +152,7 @@ def load_modules(component_list):
             module = utils.importFromStandardOrCustomDirectories(
                 dirs, defFmt, customFmt, comp_name
             )
-            six.moves.reload_module(module)  # type: ignore
+            six.moves.reload_module(module)
 
         except Exception as e:
             import traceback
@@ -177,14 +174,14 @@ def load_modules(component_list):
 class ShifterMarkingMenu(rmbmenuhook.Menu):
     """The abstract base class to show RMB menu for mGrear shifter controllers."""
 
-    comp_name = "" # type: Union[Text, List[Text]]  # must declared in each specialized class
+    comp_name: Union[Text, List[Text]] = ""  # must declared in each specialized class
     # comp_name = os.path.basename(os.path.dirname(__file__))
 
-    object = None  # type: Optional[Text]  # the selected object when invoked the menu
-    EVENT_FILTER_FUNCTIONS = []  # type: List[Callable]
+    object: Optional[Text] = None  # the selected object when invoked the menu
+    EVENT_FILTER_FUNCTIONS: List[Callable[[Text], bool]] = []
 
 
-    def shouldBuild(self):
+    def shouldBuild(self) -> bool:
 
         if not self.object:
             return False
@@ -200,12 +197,10 @@ class ShifterMarkingMenu(rmbmenuhook.Menu):
 
         return True
 
-    def is_mgear_controller(self, obj):
-        # type: (Text) -> bool
+    def is_mgear_controller(self, obj: Text) -> bool:
         return control_util.is_mgear_controller(obj)
 
-    def is_mycomponent_controller(self, obj):
-        # type: (Text) -> bool
+    def is_mycomponent_controller(self, obj: Text) -> bool:
         """Returns whether the selected object belongs to my component."""
 
         incoming = control_util.get_component_type(obj)
@@ -215,8 +210,7 @@ class ShifterMarkingMenu(rmbmenuhook.Menu):
         else:
             return incoming == self.comp_name
 
-    def is_match_additional_conditians(self, obj):
-        # type: (Text) -> bool
+    def is_match_additional_conditians(self, obj: Text) -> bool:
 
         for func in self.EVENT_FILTER_FUNCTIONS:
             if not func(self.object):
@@ -224,18 +218,17 @@ class ShifterMarkingMenu(rmbmenuhook.Menu):
 
         return True
 
-    def build(self):
+    def build(self) -> None:
         targets = self.get_targets()
         self.build_default(targets)
         self.build_specialized(targets)
 
-    def build_default(self, targets):
+    def build_default(self, targets: List[Text]) -> None:
         cmds.setParent(self.menu, m=True)
         cmds.menuItem(label="Reset", radialPosition='S', command=partial(self.reset_transform, targets))
         cmds.menuItem(label="Select Controllers", radialPosition='N', command=partial(self.select_controllers, targets))
 
-    def get_targets(self):
-        # type: () -> List[Text]
+    def get_targets(self) -> List[Text]:
 
         sel = cmds.ls(sl=True)
         if sel:
@@ -246,8 +239,7 @@ class ShifterMarkingMenu(rmbmenuhook.Menu):
 
         return [self.object]
 
-    def reset_transform(self, targets, flag):
-        # type: (List[Text], bool) -> None
+    def reset_transform(self, targets: List[Text], flag: bool) -> None:
         """Reset tragets transforms.
 
         If control-key is pressed when the command is executed,
@@ -275,8 +267,7 @@ class ShifterMarkingMenu(rmbmenuhook.Menu):
             node = pm.PyNode(target)
             transform.resetTransform(node, t=t, r=r, s=s)
 
-    def select_controllers(self, targets, flag):
-        # type: (List[Text], bool) -> None
+    def select_controllers(self, targets: List[Text], flag: bool) -> None:
 
         all_controllers = []
         for target in targets:
@@ -286,12 +277,11 @@ class ShifterMarkingMenu(rmbmenuhook.Menu):
         cmds.select(all_controllers)
 
     @abc.abstractmethod
-    def build_specialized(self, targets):
+    def build_specialized(self, targets: List[Text]) -> None:
         pass
 
 
-def is_key_modifiers_pressed(key):
-    # type: (QtCore.Qt.KeyboardModifier) -> bool
+def is_key_modifiers_pressed(key: QtCore.Qt.KeyboardModifier) -> bool:
 
     modifiers = QtWidgets.QApplication.keyboardModifiers()
     return modifiers == key
@@ -302,8 +292,8 @@ class DefaultShifterMarkingMenu(ShifterMarkingMenu):
 
     comp_name = "__DEFAULT__"
 
-    def shouldBuild(self):
+    def shouldBuild(self) -> bool:
         return self.is_mgear_controller(self.object)
 
-    def build_specialized(self, targets):
+    def build_specialized(self, targets: List[Text]) -> None:
         self.build_default(targets)

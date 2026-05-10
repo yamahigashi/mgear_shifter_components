@@ -7,12 +7,10 @@ import mgear.shifter.custom_step as cstp
 class CustomShifterStep(cstp.customShifterMainStep):
     """Connect riderConstraint global spread to its root global scale."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.name = "Connect riderConstraint to its root"
 
-    def run(self, stepDict):
-        # type: (dict) -> None
-
+    def run(self, stepDict: dict[str, object]) -> None:
         constraints = cmds.ls(type="riderConstraint")
         if not constraints:
             return
@@ -20,7 +18,7 @@ class CustomShifterStep(cstp.customShifterMainStep):
         for constraint in constraints:
             self.connect_rider_constraint(constraint)
 
-    def connect_rider_constraint(self, constraint):
+    def connect_rider_constraint(self, constraint: str) -> None:
         print("Connect riderConstraint to its root: {}".format(constraint))
         nodes = cmds.listConnections(constraint, source=True, destination=False, type="transform") or []
         if not nodes:

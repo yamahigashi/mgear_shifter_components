@@ -47,16 +47,14 @@ logger.propagate = False
 # =============================================================================
 
 
-def get_head_ref_choices(root):
-    # type: (Text) -> List[Text]
+def get_head_ref_choices(root: Text) -> List[Text]:
 
     uihost = control_util.get_ui_host(root)
     choices = control_util.get_attribute_choices(uihost, "neck_headref")
     return choices
 
 
-def switch_head_ref(root, choice_index):
-    # type: (Text, Text) -> None
+def switch_head_ref(root: Text, choice_index: Text) -> None:
     ns = ":".join(root.split(":")[:-1])
     host = control_util.get_ui_host(root)
     choices = get_head_ref_choices(root)

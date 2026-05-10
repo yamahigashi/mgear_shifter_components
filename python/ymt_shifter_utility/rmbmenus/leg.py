@@ -73,8 +73,8 @@ class ShifterMarkingMenu(rmbmenu.ShifterMarkingMenu):
 
     EVENT_FILTER_FUNCTIONS = [
     ]
-  
-    def build_specialized(self, targets):
+
+    def build_specialized(self, targets: List[str]) -> None:
         # self.menu is the parent marking menu that menuItems should be attached to
         cmds.setParent(self.menu, menu=True)
 
@@ -85,8 +85,7 @@ class ShifterMarkingMenu(rmbmenu.ShifterMarkingMenu):
         cmds.setParent(self.menu, menu=True)
         cmds.menuItem(l="Reset Foot AUX", rp='SE', command=partial(self.reset_foot_aux, targets))
 
-    def reset_foot_aux(self, targets, flag):
-        # type: (List[Text], bool) -> None
+    def reset_foot_aux(self, targets: List[str], flag: bool) -> None:
         aux_controllers = self.get_foot_aux_controllers(targets)
 
         import pymel.core as pm
@@ -94,15 +93,13 @@ class ShifterMarkingMenu(rmbmenu.ShifterMarkingMenu):
             node = pm.PyNode(target)
             transform.resetTransform(node)
 
-    def get_foot_aux_controllers(self, targets):
-        # type: (List[Text]) -> List[Text]
-
+    def get_foot_aux_controllers(self, targets: List[str]) -> List[str]:
         for t in targets:
             if "leg" in t:
                 leg_root = control_util.get_component_root(t)
                 foot_root = leg_root.replace("leg", "foot")
                 break
-            
+
             if "foot" in t:
                 foot_root = control_util.get_component_root(t)
                 break
@@ -113,8 +110,7 @@ class ShifterMarkingMenu(rmbmenu.ShifterMarkingMenu):
         controllers = control_util.get_component_controllers(foot_root)
         return controllers
 
-    def get_leg_root(self, targets):
-        # type: (List[Text]) -> Text
+    def get_leg_root(self, targets: List[str]) -> str:
         for target in targets:
             root = control_util.get_component_root(target)
             if "leg" in root:
@@ -128,7 +124,7 @@ class ShifterMarkingMenu(rmbmenu.ShifterMarkingMenu):
 
         raise Exception("could not found the leg controller")
 
-    def space_switch_ikfk(self, targets, transfer, flag):
+    def space_switch_ikfk(self, targets: List[str], transfer: bool, flag: bool) -> None:
 
         current_namespace = ":".join(targets[0].split(":")[:-1])
         leg_root = self.get_leg_root(targets)

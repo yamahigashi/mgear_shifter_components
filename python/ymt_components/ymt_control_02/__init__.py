@@ -25,7 +25,7 @@ class Component(component.Main):
     # OBJECTS
     # =====================================================
 
-    def initialHierarchy(self):
+    def initialHierarchy(self) -> None:
         """
         Create the inital structure for the rig.
 
@@ -53,7 +53,7 @@ class Component(component.Main):
 
         return
 
-    def addObjects(self):
+    def addObjects(self) -> None:
         """Add all the objects needed to create the component."""
 
         if self.settings["neutralRotation"]:
@@ -102,7 +102,7 @@ class Component(component.Main):
         if self.settings["joint"]:
             self.jnt_pos.append([self.ctl, 0, None, self.settings["uniScale"]])
 
-    def addAttributes(self):
+    def addAttributes(self) -> None:
         # Ref
         if self.settings["ikrefarray"]:
             ref_names = self.get_valid_alias_list(
@@ -114,7 +114,7 @@ class Component(component.Main):
                     0,
                     ref_names)
 
-    def addOperators(self):
+    def addOperators(self) -> None:
         # nodes
         cmds.connectAttr("{}.scale".format(self.ctl.name()), "{}.input1".format(self.scale_node))
         cmds.setAttr("{}.input2X".format(self.scale_node), 1.0)
@@ -127,7 +127,7 @@ class Component(component.Main):
     # =====================================================
     # CONNECTOR
     # =====================================================
-    def setRelation(self):
+    def setRelation(self) -> None:
         """Set the relation beetween object from guide to rig"""
         self.relatives["root"] = self.ctl
         self.relatives["scale_node"] = self.scale_node
@@ -138,20 +138,20 @@ class Component(component.Main):
 
         self.aliasRelatives["root"] = "ctl"
 
-    def addConnection(self):
+    def addConnection(self) -> None:
         """Add more connection definition to the set"""
         self.connections["standard"] = self.connect_standard
         self.connections["orientation"] = self.connect_orientation
 
-    def connect_standard(self):
+    def connect_standard(self) -> None:
         """standard connection definition for the component"""
         self.connect_standardWithSimpleIkRef()
 
-    def connect_orientation(self):
+    def connect_orientation(self) -> None:
         """Orient connection definition for the component"""
         self.connect_orientCns()
 
-    def postConnect(self):
+    def postConnect(self) -> None:
         if self.parent_comp is not None:
             # self.parent
             parent_scale_node = self.parent_comp.getRelation("scale_node")

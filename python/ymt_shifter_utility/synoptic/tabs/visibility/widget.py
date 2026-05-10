@@ -7,7 +7,7 @@ QtGui, QtCore, QtWidgets, wrapInstance = gqt.qt_import()
 
 class Ui_visibility(object):
 
-    def setupUi(self, visibility):
+    def setupUi(self, visibility: object) -> None:
         visibility.setObjectName("visibility")
         visibility.resize(325, 840)
         visibility.setMinimumSize(QtCore.QSize(325, 790))
@@ -27,7 +27,7 @@ class Ui_visibility(object):
         self.retranslateUi(visibility)
         QtCore.QMetaObject.connectSlotsByName(visibility)
 
-    def retranslateUi(self, visibility):
+    def retranslateUi(self, visibility: object) -> None:
         visibility.setWindowTitle(gqt.fakeTranslate("visibility", "Form", None, -1))
         self.widget.setProperty("geo_root", gqt.fakeTranslate("visibility", "geo_root", None, -1))
 

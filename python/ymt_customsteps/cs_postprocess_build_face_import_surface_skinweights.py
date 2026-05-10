@@ -14,19 +14,15 @@ import mgear.shifter.custom_step as cstp
 
 class CustomShifterStep(cstp.customShifterMainStep):
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.name = "Sknning Surface"
 
-    def run(self, stepDict):
-        # type: (dict) -> None
-
+    def run(self, stepDict: dict[str, object]) -> None:
         self.rig = stepDict["mgearRun"]
         self.skin_file = self.get_skin_file()
         skin.importSkinPack(self.skin_file)
 
-    def get_skin_file(self):
-        # type: () -> str
-
+    def get_skin_file(self) -> str:
         rig_name = self.rig.options["rig_name"]
         file_name = f"{rig_name}_surface_C0_surface.gSkinPack"
         # file_name = f"face_surface_C0_surface.gSkinPack"

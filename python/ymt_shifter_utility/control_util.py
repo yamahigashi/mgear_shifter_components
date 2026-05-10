@@ -88,19 +88,17 @@ logger.propagate = False
 ###############################################################################
 
 
-def is_mgear_controller(obj):
-    # type: (Text) -> bool
+def is_mgear_controller(obj: str) -> bool:
     return "isCtl" in cmds.listAttr(obj)
 
 
-def get_component_type(obj):
-    # type: (Text) -> Optional[Text]
+def get_component_type(obj: str) -> Optional[str]:
     """Returns selected object's component type name."""
 
     if "compRoot" not in cmds.listAttr(obj):
         return None
 
-    root = cmds.listConnections("{}.compRoot".format(obj), s=True, d=False) or []  # type: ignore
+    root = cmds.listConnections("{}.compRoot".format(obj), s=True, d=False) or []
     if not root or len(root) == 0:
         logger.debug("could not find component root")
         return None
@@ -109,16 +107,15 @@ def get_component_type(obj):
     return comp_type
 
 
-def get_ui_host(obj):
-    # type: (Text) -> Optional[Text]
+def get_ui_host(obj: str) -> Optional[str]:
     """Returns selected object's uiHost."""
 
     if "componentType" in cmds.listAttr(obj):
-        connections = cmds.listConnections("{}.compCtl".format(obj), s=True, d=False) or []  # type: ignore
-        connections = cmds.listConnections("{}.message".format(connections[0]), s=False, d=True, plugs=True) or []  # type: ignore
+        connections = cmds.listConnections("{}.compCtl".format(obj), s=True, d=False) or []
+        connections = cmds.listConnections("{}.message".format(connections[0]), s=False, d=True, plugs=True) or []
 
     else:
-        connections = cmds.listConnections("{}.message".format(obj), s=False, d=True, plugs=True) or []  # type: ignore
+        connections = cmds.listConnections("{}.message".format(obj), s=False, d=True, plugs=True) or []
 
     connections = [x for x in connections if "ctl_cnx" in x]
 
@@ -132,8 +129,7 @@ def get_ui_host(obj):
     return ".".join(connections[0].split(".")[:-1])
 
 
-def get_component_root(obj):
-    # type: (Text) -> Optional[Text]
+def get_component_root(obj: str) -> Optional[str]:
 
     if obj.endswith("root"):
         roots = [obj]
@@ -150,8 +146,7 @@ def get_component_root(obj):
     return roots[0]
 
 
-def get_component_controllers(obj):
-    # type: (Text) -> List[Text]
+def get_component_controllers(obj: str) -> List[str]:
 
     root = get_component_root(obj)
     connections = cmds.listConnections("{}.compCtl".format(root), s=True, d=False)
@@ -163,17 +158,16 @@ def get_component_controllers(obj):
     return connections
 
 
-def get_attribute_choices(node, attr):
-    # type: (Text, Text) -> List[Text]
+def get_attribute_choices(node: str, attr: str) -> List[str]:
 
     """Returns enum attribute's choices."""
     if not cmds.listAttr("{}.{}".format(node, attr)):
         logger.warning("%s has no attribute named %s", node, attr)
         return []
 
-    res = cmds.attributeQuery(attr, node=node, listEnum=True)  # type: ignore
+    res = cmds.attributeQuery(attr, node=node, listEnum=True)
     if not res:
         logger.warning("%s attribute %s has no choises", node, attr)
         return []
 
-    return res[0].split(":")  # type: ignore
+    return res[0].split(":")

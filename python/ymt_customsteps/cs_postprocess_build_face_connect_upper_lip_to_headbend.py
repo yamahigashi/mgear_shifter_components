@@ -14,7 +14,7 @@ import ymt_shifter_utility as ymt_util
 class CustomShifterStep(cstp.customShifterMainStep):
     """Custom Shifter Step Class for connecting upper lip to headbend2."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.name = "Connect upper lip to headbend"
         self.defaultConfig = {
             "src": "headBend_C2_ctl",
@@ -23,9 +23,7 @@ class CustomShifterStep(cstp.customShifterMainStep):
             "slider": "mouthSlide_C0_ctl",
         }
 
-    def run(self, stepDict):
-        # type: (dict) -> None
-
+    def run(self, stepDict: dict[str, object]) -> None:
         self.rig = stepDict["mgearRun"]
         self.config = stepDict.get("cs_connect_lip_to_headbend", self.defaultConfig)
 
@@ -35,12 +33,12 @@ class CustomShifterStep(cstp.customShifterMainStep):
         self.connect_to_bend2(src, dst)
         self.reconnect_slider_matrix()
 
-    def connect_to_bend2(self, src, dst):
-        npo = ymt_util.addNPOPreservingMatrixConnections(pm.PyNode(dst))[0]  # type: pm.PyNode
+    def connect_to_bend2(self, src: str, dst: str) -> None:
+        npo = ymt_util.addNPOPreservingMatrixConnections(pm.PyNode(dst))[0]
         cns = cmds.parentConstraint(src, npo.longName(), mo=True)[0]
         cmds.setAttr("{}.interpType".format(cns), 0)  # no flip
 
-    def reconnect_slider_matrix(self):
+    def reconnect_slider_matrix(self) -> None:
         """Reconnects the constraints using a local matrices,
 
         due to the original constraints being broken by the disconnecting.
@@ -51,14 +49,14 @@ class CustomShifterStep(cstp.customShifterMainStep):
 
         # first, search the multMatrix node of the old constraint
         connections = cmds.listConnections(
-            "{}.matrix".format(old),  # type: ignore
+            "{}.matrix".format(old),
             s=False,
             d=True
         ) or []
 
         for c in connections:
             sources = cmds.listConnections(
-                "{}.matrixIn".format(c),  # type: ignore
+                "{}.matrixIn".format(c),
                 s=True,
                 d=False
             )

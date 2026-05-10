@@ -23,7 +23,7 @@ class Component(component.Main):
     # =====================================================
     # OBJECTS
     # =====================================================
-    def addObjects(self):
+    def addObjects(self) -> None:
         """Add all the objects needed to create the component."""
 
         self.div_count = len(self.guide.apos) - 6
@@ -183,7 +183,7 @@ class Component(component.Main):
     # =====================================================
     # ATTRIBUTES
     # =====================================================
-    def addAttributes(self):
+    def addAttributes(self) -> None:
         """Create the anim and setupr rig attributes for the component"""
 
         # Anim -------------------------------------------
@@ -206,7 +206,7 @@ class Component(component.Main):
     # =====================================================
     # OPERATORS
     # =====================================================
-    def addOperators(self):
+    def addOperators(self) -> None:
         """Create operators and set the relations for the component rig
 
         Apply operators, constraints, expressions to the hierarchy.
@@ -320,7 +320,7 @@ class Component(component.Main):
     # =====================================================
     # CONNECTOR
     # =====================================================
-    def setRelation(self):
+    def setRelation(self) -> None:
         """Set the relation beetween object from guide to rig"""
 
         self.relatives["root"] = self.fk_ctl[0]
@@ -346,7 +346,7 @@ class Component(component.Main):
             self.relatives["%s_loc" % self.div_count] = self.fk_ctl[-1]
             self.jointRelatives["%s_loc" % self.div_count] = self.div_count - 1
 
-    def addConnection(self):
+    def addConnection(self) -> None:
         """Add more connection definition to the set"""
 
         self.connections["leg_2jnt_01"] = self.connect_leg_2jnt_01
@@ -354,7 +354,7 @@ class Component(component.Main):
         self.connections["leg_3jnt_01"] = self.connect_leg_3jnt_01
         self.connections["arm_2jnt_01"] = self.connect_arm_2jnt_01
 
-    def connect_leg_2jnt_01(self):
+    def connect_leg_2jnt_01(self) -> None:
         """Connector for leg 2jnt"""
 
         # If the parent component hasn't been generated we skip the connection
@@ -369,7 +369,7 @@ class Component(component.Main):
 
         return
 
-    def connect_arm_2jnt_01(self):
+    def connect_arm_2jnt_01(self) -> None:
         """Connector for leg 2jnt"""
 
         # If the parent component hasn't been generated we skip the connection
@@ -384,7 +384,7 @@ class Component(component.Main):
 
         return
 
-    def connect_leg_ms_2jnt_01(self):
+    def connect_leg_ms_2jnt_01(self) -> None:
         """Connector for leg ms 2jnt"""
 
         # If the parent component hasn't been generated we skip the connection
@@ -409,7 +409,7 @@ class Component(component.Main):
 
         return
 
-    def connect_leg_3jnt_01(self):
+    def connect_leg_3jnt_01(self) -> None:
         """Connector for leg 3jnt"""
 
         # If the parent component hasn't been generated we skip the connection

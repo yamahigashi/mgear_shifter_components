@@ -18,14 +18,14 @@ COLOR_RED = "rgb(155, 45, 34)"
 # ==============================================================================
 # Functions
 # ==============================================================================
-def safeSetAttr(node, attr="v", value=None):
+def safeSetAttr(node: str, attr: str = "v", value: object = None) -> None:
     try:
         mc.setAttr("{}.{}".format(node, attr), value)
     except Exception:
         pass
 
 
-def getHidden(nodes):
+def getHidden(nodes: list[str]) -> list[str]:
     """Oh the list of nodes provided, return non visible ones
 
     Args:
@@ -41,7 +41,7 @@ def getHidden(nodes):
     return hiddenNodes
 
 
-def getVisible(nodes):
+def getVisible(nodes: list[str]) -> list[str]:
     """Oh the list of nodes provided, return visible ones
 
     Args:
@@ -57,7 +57,7 @@ def getVisible(nodes):
     return visibleNodes
 
 
-def getMeshesFromHierarchy(node):
+def getMeshesFromHierarchy(node: str) -> list[str]:
     """Get transforms with shapes, meshes
 
     Args:
@@ -74,7 +74,7 @@ def getMeshesFromHierarchy(node):
     return meshNodes
 
 
-def getBaseNames(nodes):
+def getBaseNames(nodes: list[str]) -> list[str]:
     """strip the nameSpace off of the list of provided nodes
 
     Args:
@@ -87,7 +87,7 @@ def getBaseNames(nodes):
     return baseNodeNames
 
 
-def getMatching(token, toQuery):
+def getMatching(token: str, toQuery: list[str]) -> list[str]:
     """use the token to search a list of strings, return all matching token
 
     Args:
@@ -102,7 +102,7 @@ def getMatching(token, toQuery):
     return matching
 
 
-def getTokens(userInput):
+def getTokens(userInput: str) -> list[str]:
     """splits up the userInput via commas, strips spaces
 
     Args:
@@ -127,7 +127,7 @@ class ToggleGeoVisibility(QtWidgets.QWidget):
     # gray color
     connectedColor.setColor('#696969')
 
-    def __init__(self, parent=None):
+    def __init__(self, parent: object = None) -> None:
         super(ToggleGeoVisibility, self).__init__(parent)
         self.parent = parent
         self.model = None
@@ -136,10 +136,10 @@ class ToggleGeoVisibility(QtWidgets.QWidget):
         self.gui()
         self.connectSignals()
 
-    def showEvent(self, event):
+    def showEvent(self, event: object) -> None:
         self.refresh()
 
-    def colorItemBasedOnAttr(self, item):
+    def colorItemBasedOnAttr(self, item: object) -> None:
         """Color the widgetitem based on the state of the visibility control
 
         Args:
@@ -159,14 +159,14 @@ class ToggleGeoVisibility(QtWidgets.QWidget):
                 brush = self.hiddenColor
         item.setForeground(brush)
 
-    def upateAllResultColors(self):
+    def upateAllResultColors(self) -> None:
         """Queary every item, its respective mesh node and color
         """
         for row in range(self.resultWidget.count()):
             item = self.resultWidget.item(row)
             self.colorItemBasedOnAttr(item)
 
-    def setInfomation(self):
+    def setInfomation(self) -> None:
         """set the model on the widget and refresh/update info
 
         Args:
@@ -177,7 +177,7 @@ class ToggleGeoVisibility(QtWidgets.QWidget):
         self.nameSpace = utils.getNamespace(utils.getModel(self))
         # self.refresh()
 
-    def connectSignals(self):
+    def connectSignals(self) -> None:
         """connect widgets/signals to the functions
         """
         self.searchLineEdit.textChanged.connect(self.queryNames)
@@ -190,7 +190,7 @@ class ToggleGeoVisibility(QtWidgets.QWidget):
         self.unHideAllButton.clicked.connect(self.unHideAll)
         self.selectButton.clicked.connect(self.specificSelection)
 
-    def displayResults(self, resultsToDisplay):
+    def displayResults(self, resultsToDisplay: list[str]) -> None:
         """clear and display the provided list
 
         Args:
@@ -199,7 +199,7 @@ class ToggleGeoVisibility(QtWidgets.QWidget):
         self.resultWidget.clear()
         self.resultWidget.addItems(sorted(set(resultsToDisplay)))
 
-    def hideResults(self, resultsToDisplay):
+    def hideResults(self, resultsToDisplay: list[str]) -> None:
         """clear and display the provided list
 
         Args:
@@ -212,7 +212,7 @@ class ToggleGeoVisibility(QtWidgets.QWidget):
             else:
                 item.setHidden(True)
 
-    def getNodeWithNameSpace(self, node):
+    def getNodeWithNameSpace(self, node: str) -> str:
         """In the future this will need to change to allow for set name prefix
 
         Args:
@@ -227,7 +227,7 @@ class ToggleGeoVisibility(QtWidgets.QWidget):
             ns = "{0}:".format(self.nameSpace)
         return "{0}{1}".format(ns, node)
 
-    def queryNames(self, userInput):
+    def queryNames(self, userInput: str) -> None:
         """Take the userInput and query against all controls
         remove duplicates and sort
 
@@ -240,7 +240,7 @@ class ToggleGeoVisibility(QtWidgets.QWidget):
          for token in allTokens]
         self.hideResults(searchResults)
 
-    def setNodeInfoForQuery(self, nodesToGet="all"):
+    def setNodeInfoForQuery(self, nodesToGet: str = "all") -> None:
         """Query the controls set in the scene from the scene.
         TODO: Open this up to select multiple areas for query
         """
@@ -258,13 +258,13 @@ class ToggleGeoVisibility(QtWidgets.QWidget):
         baseNodeNames = set(getBaseNames(meshNodes))
         self.modelControls = list(baseNodeNames)
 
-    def selectAllResults(self):
+    def selectAllResults(self) -> None:
         """Select all items in results widget
         """
         self.resultWidget.clearSelection()
         self.resultWidget.selectAll()
 
-    def hideSelected(self, *args):
+    def hideSelected(self, *args: object) -> None:
         """When something is selected on the results widget, select it in core
 
         Args:
@@ -277,7 +277,7 @@ class ToggleGeoVisibility(QtWidgets.QWidget):
             itemsToColor.append(item)
         [self.colorItemBasedOnAttr(item) for item in itemsToColor]
 
-    def unHideSelected(self, *args):
+    def unHideSelected(self, *args: object) -> None:
         """When something is selected on the results widget, select it in core
 
         Args:
@@ -290,7 +290,7 @@ class ToggleGeoVisibility(QtWidgets.QWidget):
             itemsToColor.append(item)
         [self.colorItemBasedOnAttr(item) for item in itemsToColor]
 
-    def unHideAll(self, *args):
+    def unHideAll(self, *args: object) -> None:
         """When something is selected on the results widget, select it in core
 
         Args:
@@ -305,7 +305,7 @@ class ToggleGeoVisibility(QtWidgets.QWidget):
 
         [self.colorItemBasedOnAttr(x) for x in itemsToColor]
 
-    def specificSelection(self, *args):
+    def specificSelection(self, *args: object) -> None:
         """When something is selected on the results widget, select it in core
 
         Args:
@@ -316,7 +316,7 @@ class ToggleGeoVisibility(QtWidgets.QWidget):
             selectionList.append(self.getNodeWithNameSpace(item.text()))
         mc.select(selectionList)
 
-    def refresh(self):
+    def refresh(self) -> None:
         """refresh the ui
         """
         self.setInfomation()
@@ -328,7 +328,7 @@ class ToggleGeoVisibility(QtWidgets.QWidget):
         self.displayResults(self.modelControls)
         self.upateAllResultColors()
 
-    def filterByVisibility(self, nodesToGet):
+    def filterByVisibility(self, nodesToGet: str) -> None:
         """A refresh function specifically for changing what types of nodes
         to display, hidden or visible
 
@@ -341,7 +341,7 @@ class ToggleGeoVisibility(QtWidgets.QWidget):
         self.displayResults(self.modelControls)
         self.upateAllResultColors()
 
-    def toggleResultsDisplay(self, nodesToGet, toggled):
+    def toggleResultsDisplay(self, nodesToGet: str, toggled: bool) -> None:
         """Mutually exclusive checked buttons
 
         Args:
@@ -357,7 +357,7 @@ class ToggleGeoVisibility(QtWidgets.QWidget):
             nodesToGet = "all"
         self.filterByVisibility(nodesToGet)
 
-    def gui(self):
+    def gui(self) -> None:
         """set the widget layout and content
         """
         self.mainLayout = QtWidgets.QVBoxLayout()

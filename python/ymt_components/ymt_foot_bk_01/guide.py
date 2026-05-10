@@ -47,12 +47,12 @@ class Guide(guide.ComponentGuide):
 
     connectors = ["leg_2jnt_01", "leg_ms_2jnt_01", "leg_3jnt_01"]
 
-    def postInit(self):
+    def postInit(self) -> None:
         """Initialize the position for the guide"""
         self.save_transform = ["root", "#_loc", "heel", "outpivot", "inpivot"]
         self.addMinMax("#_loc", 1, -1)
 
-    def addObjects(self):
+    def addObjects(self) -> None:
         """Add the Guide Root, blade and locators"""
 
         self.root = self.addRoot()
@@ -73,7 +73,7 @@ class Guide(guide.ComponentGuide):
         cnt = [self.root, self.heel, self.outpivot, self.heel, self.inpivot]
         self.dispcrv = self.addDispCurve("1", cnt)
 
-    def addParameters(self):
+    def addParameters(self) -> None:
         """Add the configurations settings"""
 
         self.pRoll = self.addParam("useRollCtl", "bool", True)
@@ -89,7 +89,7 @@ class Guide(guide.ComponentGuide):
 class settingsTab(QtWidgets.QDialog, sui.Ui_Form):
     """The Component settings UI"""
 
-    def __init__(self, parent=None):
+    def __init__(self, parent: object=None) -> None:
         super(settingsTab, self).__init__(parent)
         self.setupUi(self)
 
@@ -97,7 +97,7 @@ class settingsTab(QtWidgets.QDialog, sui.Ui_Form):
 class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
     """Create the component setting window"""
 
-    def __init__(self, parent=None):
+    def __init__(self, parent: object=None) -> None:
         self.toolName = TYPE
         # Delete old instances of the componet settings window.
         pyqt.deleteInstances(self, MayaQDockWidget)
@@ -111,7 +111,7 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
         self.create_componentLayout()
         self.create_componentConnections()
 
-    def setup_componentSettingWindow(self):
+    def setup_componentSettingWindow(self) -> None:
         self.mayaMainWindow = pyqt.maya_main_window()
 
         self.setObjectName(self.toolName)
@@ -119,10 +119,10 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
         self.setWindowTitle(TYPE)
         self.resize(280, 350)
 
-    def create_componentControls(self):
+    def create_componentControls(self) -> None:
         return
 
-    def populate_componentControls(self):
+    def populate_componentControls(self) -> None:
         """Populate Controls
 
         Populate the controls values from the custom attributes of the
@@ -150,7 +150,7 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
         comboIndex = self.connector_items.index(currentConnector)
         self.mainSettingsTab.connector_comboBox.setCurrentIndex(comboIndex)
 
-    def create_componentLayout(self):
+    def create_componentLayout(self) -> None:
 
         self.settings_layout = QtWidgets.QVBoxLayout()
         self.settings_layout.addWidget(self.tabs)
@@ -158,7 +158,7 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
 
         self.setLayout(self.settings_layout)
 
-    def create_componentConnections(self):
+    def create_componentConnections(self) -> None:
 
         self.settingsTab.useRollCtl_checkBox.stateChanged.connect(
             partial(self.updateCheck,
@@ -169,5 +169,5 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
                     self.mainSettingsTab.connector_comboBox,
                     self.connector_items))
 
-    def dockCloseEventTriggered(self):
+    def dockCloseEventTriggered(self) -> None:
         pyqt.deleteInstances(self, MayaQDockWidget)

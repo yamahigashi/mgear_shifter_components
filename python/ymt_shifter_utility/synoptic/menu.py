@@ -6,7 +6,7 @@ except ImportError:
 import mgear
 
 
-def install():
+def install() -> None:
     """Install synotic menu
     """
     pm.setParent(mgear.menu_id, menu=True)

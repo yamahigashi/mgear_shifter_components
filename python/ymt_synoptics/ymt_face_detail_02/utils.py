@@ -24,7 +24,7 @@ SYNOPTIC_WIDGET_NAME = "synoptic_view"
 #
 ##################################################
 
-def getSynopticWidget(widget, max_iter=20):
+def getSynopticWidget(widget: object, max_iter: object=20) -> object:
     """Return the widget where the synoptic panel is attach
 
     Arguments:
@@ -43,7 +43,7 @@ def getSynopticWidget(widget, max_iter=20):
     return False
 
 
-def getModel(widget):
+def getModel(widget: object) -> object:
     """Get the model Name
 
     Args:
@@ -75,7 +75,7 @@ def getModel(widget):
 # SELECT
 ##################################################
 # ================================================
-def selectObj(model, object_names, mouse_button, key_modifier):
+def selectObj(model: object, object_names: object, mouse_button: object, key_modifier: object) -> None:
     """Select an object
 
     Args:

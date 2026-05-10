@@ -41,7 +41,7 @@ class Component(MainComponent):
     # =====================================================
     # Add all the objects needed to create the component.
     # @param self
-    def addObjects(self):
+    def addObjects(self) -> None:
 
         po = dt.Vector(self.settings["ctlOffsetPosX"], self.settings["ctlOffsetPosY"], self.settings["ctlOffsetPosZ"])
         so = dt.Vector(self.settings["ctlOffsetSclX"], self.settings["ctlOffsetSclY"], self.settings["ctlOffsetSclZ"])
@@ -78,7 +78,7 @@ class Component(MainComponent):
     # =====================================================
     # PROPERTY
     # =====================================================
-    def addAttributes(self):
+    def addAttributes(self) -> None:
 
         cmds.loadPlugin("lookdevKit.mll", quiet=True)
 
@@ -91,13 +91,13 @@ class Component(MainComponent):
     # =====================================================
     # OPERATORS
     # =====================================================
-    def addOperators(self):
+    def addOperators(self) -> None:
         return
 
     # =====================================================
     # CONNECTOR
     # =====================================================
-    def setRelation(self):
+    def setRelation(self) -> None:
         self.relatives["root"] = self.ctl
         self.relatives["tip"] = self.orbit_ctl
 
@@ -105,14 +105,14 @@ class Component(MainComponent):
         self.jointRelatives["tip"] = 0
 
     # @param self
-    def addConnection(self):
+    def addConnection(self) -> None:
         self.connections["arm"] = self.connect_arm
 
-    def connect_standard(self):
+    def connect_standard(self) -> None:
         self.parent.addChild(self.root)
         self.connect_standardWithRotRef(self.settings["refArray"], self.orbit_cns)
 
-    def insert_dummy_arm(self, arm_comp):
+    def insert_dummy_arm(self, arm_comp: object) -> None:
         # IK dummy Chain -----------------------------------------
         chain_pos = [
             self.guide.apos[0],
@@ -129,7 +129,7 @@ class Component(MainComponent):
         t = tra.getTransform(arm_comp.dummy_chain[0])
         arm_comp.dummy_chain_npo = pri.addTransform(arm_comp.dummy_chain[0], self.getName("dummychain_npo"), t)
 
-    def set_softik_dummy(self, arm_comp):
+    def set_softik_dummy(self, arm_comp: object) -> None:
         # --------------------------------------------------
         # refs: https://qiita.com/hossan_TK9004/items/a76a58a49f6affb1ab21
         nt = cmds.createNode('network', n='softIK_info')
@@ -224,7 +224,7 @@ class Component(MainComponent):
         cmds.connectAttr('{}.outColorG'.format(cond), '{}.translateY'.format(self.softdummy_npo))
         cmds.connectAttr('{}.outColorB'.format(cond), '{}.translateZ'.format(self.softdummy_npo))
 
-    def add_arm_connection_attr(self, arm_comp):
+    def add_arm_connection_attr(self, arm_comp: object) -> None:
         self.roll_att_pos = self.addAnimParam("roll_pos", "rollPositive", "double", 0.0, 0, 1.0)
         self.roll_att_neg = self.addAnimParam("roll_neg", "rollNegative", "double", 0.0, 0, 1.0)
         self.bendH_att_pos = self.addAnimParam("bendH_pos", "bendHorizonPositive", "double", 0.12, 0, 1.0)
@@ -232,7 +232,7 @@ class Component(MainComponent):
         self.bendV_att_pos = self.addAnimParam("bendV_pos", "bendVerticalPositive", "double", 0.45, 0, 1.0)
         self.bendV_att_neg = self.addAnimParam("bendV_neg", "bendVerticalNegative", "double", 0.4, 0, 1.0)
 
-    def decompose_rotate(self, src, rate_for_radian=2. / math.pi, smooth_step=False):
+    def decompose_rotate(self, src: object, rate_for_radian: object=2. / math.pi, smooth_step: object=False) -> None:
         decomp = pm.createNode("decomposeRotate")
         pm.connectAttr(src + ".rotate", decomp + ".rotate")
         pm.connectAttr(src + ".rotateOrder", decomp + ".rotateOrder")
@@ -291,7 +291,7 @@ class Component(MainComponent):
 
         return toQuat
 
-    def smooth_step(self, in_port):
+    def smooth_step(self, in_port: object) -> None:
         cond = pm.createNode("condition")
         pm.connectAttr(in_port, "{}.firstTerm".format(cond))
         pm.setAttr("{}.secondTerm".format(cond), 0.)
@@ -315,7 +315,7 @@ class Component(MainComponent):
     # def sigmoid(self):
     #    return vec3(1.0) / (vec3(1.0) + exp(-(x * 10.0 - 5.0)))
 
-    def add_arm_connection_object(self, arm_comp):
+    def add_arm_connection_object(self, arm_comp: object) -> None:
         t = tra.getTransformLookingAt(self.guide.apos[0], self.guide.apos[1], self.normal, axis="xy", negate=self.negate)
         self.arm_npo = pri.addTransform(self.ctl_npo, self.getName("dummy_npo"), t)
         pm.connectAttr("{}.rotate".format(self.ctl), "{}.rotate".format(self.arm_npo))
@@ -352,7 +352,7 @@ class Component(MainComponent):
         pm.connectAttr(slerp + ".outputQuat", quat2euler + ".inputQuat")
         pm.connectAttr(quat2euler + ".outputRotate", self.shoulder_npo + ".rotate")
 
-    def reparent_arm_hierarchy(self, arm_comp):
+    def reparent_arm_hierarchy(self, arm_comp: object) -> None:
 
         self.orbit_ref2.addChild(arm_comp.ik_cns)
         self.orbit_ref2.addChild(arm_comp.upv_cns)
@@ -362,7 +362,7 @@ class Component(MainComponent):
         self.orbit_ref2.addChild(arm_comp.armChainUpvRef[0])
         self.orbit_ref2.addChild(arm_comp.ikHandleUpvRef)
 
-    def connect_arm(self, arm_comp):
+    def connect_arm(self, arm_comp: object) -> None:
         if not cmds.pluginInfo("rotationDriver.py", q=True, loaded=True):
             cmds.loadPlugin("rotationDriver.py", quiet=True)
 
@@ -388,7 +388,7 @@ class Component(MainComponent):
             cycle = cmds.cycleCheck(evaluation=cycle)
 
 
-def getFullPath(start, routes=None):
+def getFullPath(start: object, routes: object=None) -> object:
     # type: (pm.nt.transform, List[pm.nt.transform]) -> List[pm.nt.transform]
     if not routes:
         routes = []
@@ -400,7 +400,7 @@ def getFullPath(start, routes=None):
         return getFullPath(start.getParent(), routes + [start ])
 
 
-def findPathAtoB(a, b):
+def findPathAtoB(a: object, b: object) -> None:
     # type: (pm.nt.transform, pm.nt.transform) -> Tuple[List[pm.nt.transform], pm.nt.transform, List[pm.nt.transform]]
     """Returns route of A to B in formed Tuple[down(to root), turning point, up(to leaf)]"""
     # aPath = ["x", "a", "b", "c"]
@@ -415,7 +415,7 @@ def findPathAtoB(a, b):
     return _findPathAtoB(aPath, bPath)
 
 
-def _findPathAtoB(aPath, bPath):
+def _findPathAtoB(aPath: object, bPath: object) -> None:
     # type: (List, List) -> Tuple[List, Any, List]
     """Returns route of A to B in formed Tuple[down(to root), turning point, up(to leaf)]
 

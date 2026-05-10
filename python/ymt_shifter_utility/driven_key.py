@@ -31,6 +31,7 @@ import json
 import os
 import re
 from collections import defaultdict
+from collections.abc import Iterator
 from typing import Any, Optional, Sequence, Union
 
 import maya.cmds as cmds
@@ -53,7 +54,7 @@ _ANIM_TYPES = {
 _FLOAT_ATTR_RE = re.compile(r"^[^\.]+\.[^\.]+$")  # quick sanity check
 
 
-def _iter_anim_curves(driven_node: str):
+def _iter_anim_curves(driven_node: str) -> Iterator[tuple[str, str]]:
     """Yield (driven_plug, animCurve) pairs for every driven attr on *driven_node*."""
     attrs = cmds.listAttr(driven_node, k=True, s=True) or []
     for attr in attrs:
@@ -331,4 +332,3 @@ if __name__ == "__main__":
     else:
         parser.print_help()
         sys.exit(1)
-

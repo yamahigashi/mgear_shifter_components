@@ -12,12 +12,10 @@ import mgear.shifter.custom_step as cstp
 
 class CustomShifterStep(cstp.customShifterMainStep):
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.name = "Sknning Surface"
 
-    def run(self, stepDict):
-        # type: (dict) -> None
-
+    def run(self, stepDict: dict[str, object]) -> None:
         self.rig = stepDict["mgearRun"]
         self.deformers = [
             "headBend_C0_0_jnt",
@@ -35,17 +33,13 @@ class CustomShifterStep(cstp.customShifterMainStep):
         self.surfaces = self.find_surfaces()
         self.skinning()
 
-    def find_surfaces(self):
-        # type: () -> list[str]
-
+    def find_surfaces(self) -> list[str]:
         # surfaces = []
         print(self.rig)
 
         return cmds.ls("surface_C0_surface")
 
-    def skinning(self):
-        # type: () -> None
-
+    def skinning(self) -> None:
         cmds.select(self.deformers)
         skin = self.skin = cmds.skinCluster(
             self.deformers,

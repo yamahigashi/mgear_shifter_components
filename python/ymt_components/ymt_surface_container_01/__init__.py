@@ -59,7 +59,7 @@ class Component(component.Main):
     # =====================================================
     # OBJECTS
     # =====================================================
-    def addObjects(self):
+    def addObjects(self) -> None:
         """Add all the objects needed to create the component."""
 
         self.WIP = self.options["mode"]
@@ -72,7 +72,7 @@ class Component(component.Main):
         self.sliding_surface.visibility.set(False)
         cmds.makeIdentity(self.sliding_surface.name(), apply=True, t=1,  r=1, s=1, n=0, pn=1)
 
-    def _visi_off_lock(self, obj):
+    def _visi_off_lock(self, obj: object) -> None:
         """Short cuts."""
         obj.visibility.set(False)
         ymt_util.setKeyableAttributesDontLockVisibility(obj, [])
@@ -81,14 +81,14 @@ class Component(component.Main):
     # =====================================================
     # ATTRIBUTES
     # =====================================================
-    def addAttributes(self):
+    def addAttributes(self) -> None:
         """Create the anim and setupr rig attributes for the component"""
         pass
 
     # =====================================================
     # OPERATORS
     # =====================================================
-    def addOperators(self):
+    def addOperators(self) -> None:
         """Create operators and set the relations for the component rig
 
         Apply operators, constraints, expressions to the hierarchy.
@@ -101,13 +101,13 @@ class Component(component.Main):
     # =====================================================
     # CONNECTOR
     # =====================================================
-    def addConnection(self):
+    def addConnection(self) -> None:
         pass
 
-    def connect_standard(self):
+    def connect_standard(self) -> None:
         self.parent.addChild(self.root)
 
-    def setRelation(self):
+    def setRelation(self) -> None:
         """Set the relation beetween object from guide to rig"""
         self.relatives["root"] = self.root
         self.controlRelatives["root"] = self.root

@@ -38,7 +38,7 @@ class Component(MainComponent):
 
     # Add all the objects needed to create the component.
     # @param self
-    def addObjects(self):
+    def addObjects(self) -> None:
 
         self.normal = self.guide.blades["blade"].z * -1.
 
@@ -95,7 +95,7 @@ class Component(MainComponent):
     # =====================================================
     # Add parameters to the anim and setup properties to control the component.
     # @param self
-    def addAttributes(self):
+    def addAttributes(self) -> None:
         # Anim -------------------------------------------
         ref_names = ["self", "head"]
         self.neckref_att = self.addAnimEnumParam("neck_ref", "Neck Ref", 1, ref_names)
@@ -115,7 +115,7 @@ class Component(MainComponent):
     # In order to keep the code clean and easier to debug,
     # we shouldn't create any new object in this method.
     # @param self
-    def addOperators(self):
+    def addOperators(self) -> None:
         pass
 
     # =====================================================
@@ -123,7 +123,7 @@ class Component(MainComponent):
     # =====================================================
     # Set the relation beetween object from guide to rig.\n
     # @param self
-    def setRelation(self):
+    def setRelation(self) -> None:
         self.relatives["root"] = self.root
         self.relatives["eff0"] = self.root
         self.relatives["tan2"] = self.head_ctl
@@ -138,7 +138,7 @@ class Component(MainComponent):
         self.jointRelatives["head"] = len(self.jnt_pos) - 1
         self.jointRelatives["eff1"] = len(self.jnt_pos) - 1
 
-    def connect_standard(self):
+    def connect_standard(self) -> None:
 
         self.parent.addChild(self.root)
 
@@ -152,7 +152,7 @@ class Component(MainComponent):
         else:
             self.connect_with_nodespaghetti()
 
-    def connect_with_exprespy(self):
+    def connect_with_exprespy(self) -> None:
         if not cmds.pluginInfo("exprespy", q=True, loaded=True):
             cmds.loadPlugin("exprespy.mll", quiet=True)
             mgear.log("load plugin exprespy.mll")
@@ -239,7 +239,7 @@ class Component(MainComponent):
         import exprespy.cmd
         exprespy.cmd.setCode(self.exprespy_node_name, exprespy_code, raw=False)
 
-    def connect_with_nodespaghetti(self):
+    def connect_with_nodespaghetti(self) -> None:
 
         # Head position
         mult = pm.createNode("multMatrix")
@@ -377,7 +377,7 @@ class Component(MainComponent):
         pm.setAttr("{}.inputRotateZ".format(comp_off), cmds.getAttr("{}.rz".format(self.neck_off)))
 
 
-def getFullPath(start, routes=None):
+def getFullPath(start: object, routes: object=None) -> object:
     # type: (pm.nt.transform, List[pm.nt.transform]) -> List[pm.nt.transform]
     if not routes:
         routes = []
@@ -389,7 +389,7 @@ def getFullPath(start, routes=None):
         return getFullPath(start.getParent(), routes + [start ])
 
 
-def findPathAtoB(a, b):
+def findPathAtoB(a: object, b: object) -> None:
     # type: (pm.nt.transform, pm.nt.transform) -> Tuple[List[pm.nt.transform], pm.nt.transform, List[pm.nt.transform]]
     """Returns route of A to B in formed Tuple[down(to root), turning point, up(to leaf)]"""
     # aPath = ["x", "a", "b", "c"]
@@ -404,7 +404,7 @@ def findPathAtoB(a, b):
     return _findPathAtoB(aPath, bPath)
 
 
-def _findPathAtoB(aPath, bPath):
+def _findPathAtoB(aPath: object, bPath: object) -> None:
     # type: (List, List) -> Tuple[List, Any, List]
     """Returns route of A to B in formed Tuple[down(to root), turning point, up(to leaf)]
 

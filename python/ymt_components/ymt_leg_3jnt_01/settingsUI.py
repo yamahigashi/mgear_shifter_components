@@ -28,7 +28,7 @@ import mgear.core.pyqt as gqt
 QtGui, QtCore, QtWidgets, wrapInstance = gqt.qt_import()
 
 class Ui_Form(object):
-    def setupUi(self, Form):
+    def setupUi(self, Form: QtWidgets.QWidget) -> None:
         Form.setObjectName("Form")
         Form.resize(269, 596)
         self.gridLayout = QtWidgets.QGridLayout(Form)
@@ -219,7 +219,7 @@ class Ui_Form(object):
         self.full3BonesIK_spinBox.valueChanged.connect(self.full3BonesIK_slider.setValue)
         QtCore.QMetaObject.connectSlotsByName(Form)
 
-    def retranslateUi(self, Form):
+    def retranslateUi(self, Form: QtWidgets.QWidget) -> None:
         Form.setWindowTitle(gqt.fakeTranslate("Form", "Form", None, -1))
         self.ikfk_label.setText(gqt.fakeTranslate("Form", "IK/FK Blend", None, -1))
         self.maxStretch_label.setText(gqt.fakeTranslate("Form", "Max Stretch", None, -1))

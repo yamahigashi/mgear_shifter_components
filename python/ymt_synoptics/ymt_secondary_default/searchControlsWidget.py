@@ -4,7 +4,7 @@ from mgear.vendor.Qt import QtWidgets
 from mgear.synoptic import utils
 
 
-def getControlsFromSets(desiredSet, listToPopulate):
+def getControlsFromSets(desiredSet: object, listToPopulate: object) -> None:
     """Crawl set and retrieve anything that is not another set
 
     Args:
@@ -18,7 +18,7 @@ def getControlsFromSets(desiredSet, listToPopulate):
             listToPopulate.append(child)
 
 
-def getBaseNames(nodes):
+def getBaseNames(nodes: object) -> object:
     """strip the nameSpace off of the list of provided nodes
 
     Args:
@@ -31,7 +31,7 @@ def getBaseNames(nodes):
     return baseNodeNames
 
 
-def getMatching(token, toQuery):
+def getMatching(token: object, toQuery: object) -> object:
     """use the token to search a list of strings, return all matching token
 
     Args:
@@ -46,7 +46,7 @@ def getMatching(token, toQuery):
     return matching
 
 
-def getTokens(userInput):
+def getTokens(userInput: object) -> object:
     """splits up the userInput via commas, strips spaces
 
     Args:
@@ -62,7 +62,7 @@ def getTokens(userInput):
 class ControlListerUI(QtWidgets.QWidget):
     """widget for listing all controls under a namespace"""
 
-    def __init__(self, parent=None):
+    def __init__(self, parent: object=None) -> None:
         super(ControlListerUI, self).__init__(parent)
         # self.parent = parent
         # self.model = model
@@ -72,14 +72,14 @@ class ControlListerUI(QtWidgets.QWidget):
         self.gui()
         self.connectSignals()
 
-    def connectSignals(self):
+    def connectSignals(self) -> None:
         """connect widgets/signals to the functions
         """
         self.searchLineEdit.textChanged.connect(self.queryNames)
         self.resultWidget.itemSelectionChanged.connect(self.specificSelection)
         self.selectAllButton.clicked.connect(self.selectAllResults)
 
-    def displayResults(self, resultsToDisplay):
+    def displayResults(self, resultsToDisplay: object) -> None:
         """clear and display the provided list
 
         Args:
@@ -88,7 +88,7 @@ class ControlListerUI(QtWidgets.QWidget):
         self.resultWidget.clear()
         self.resultWidget.addItems(resultsToDisplay)
 
-    def getNodeWithNameSpace(self, node):
+    def getNodeWithNameSpace(self, node: object) -> object:
         """In the future this will need to change to allow for set name prefix
 
         Args:
@@ -103,7 +103,7 @@ class ControlListerUI(QtWidgets.QWidget):
             ns = "{0}:".format(self.namespace)
         return "{0}{1}".format(ns, node)
 
-    def queryNames(self, userInput):
+    def queryNames(self, userInput: object) -> None:
         """Take the userInput and query against all controls
         remove duplicates and sort
 
@@ -118,7 +118,7 @@ class ControlListerUI(QtWidgets.QWidget):
         searchResults = sorted(searchResults)
         self.displayResults(searchResults)
 
-    def setControlsToQuery(self):
+    def setControlsToQuery(self) -> None:
         """Query the controls set in the scene from the scene.
         TODO: Open this up to select multiple areas for query
         """
@@ -129,13 +129,13 @@ class ControlListerUI(QtWidgets.QWidget):
         baseControlNames = set(getBaseNames(setControls))
         self.modelControls = list(baseControlNames)
 
-    def selectAllResults(self):
+    def selectAllResults(self) -> None:
         """Select all items in results widget
         """
         self.resultWidget.clearSelection()
         self.resultWidget.selectAll()
 
-    def specificSelection(self, *args):
+    def specificSelection(self, *args: object) -> None:
         """When something is selected on the results widget, select it in core
 
         Args:
@@ -146,7 +146,7 @@ class ControlListerUI(QtWidgets.QWidget):
             selectionList.append(self.getNodeWithNameSpace(item.text()))
         cmds.select(selectionList)
 
-    def refresh(self):
+    def refresh(self) -> None:
         """refresh the ui
         """
         self.model = utils.getModel(self)
@@ -156,7 +156,7 @@ class ControlListerUI(QtWidgets.QWidget):
         self.setControlsToQuery()
         self.queryNames("")
 
-    def gui(self):
+    def gui(self) -> None:
         """set the widget layout and content
         """
         self.mainLayout = QtWidgets.QVBoxLayout()
@@ -176,5 +176,5 @@ class ControlListerUI(QtWidgets.QWidget):
 
         self.mainLayout.addWidget(self.resultWidget)
 
-    def showEvent(self, event):  # @UnusedVariable
+    def showEvent(self, event: object) -> None:
         self.refresh()

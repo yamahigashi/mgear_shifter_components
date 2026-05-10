@@ -33,19 +33,18 @@ class SynopticTab(MainSynopticTab, widget.Ui_biped_body):
 
     # ============================================
     # INIT
-    def __init__(self, parent=None):
+    def __init__(self, parent: object=None) -> None:
         super(SynopticTab, self).__init__(self, parent)
         self.cbManager.selectionChangedCB(self.name, self.selectChanged)
 
     # ============================================
     # BUTTONS
-    def selAll_clicked(self):
-        # type: () -> None
+    def selAll_clicked(self) -> None:
         model = utils.getModel(self)
         modifiers = QtWidgets.QApplication.keyboardModifiers()
         selAll(model, modifiers)
 
-    def selRight_clicked(self):
+    def selRight_clicked(self) -> None:
         model = utils.getModel(self)
         # i : num of fingers, j : finger length
         object_names = ["finger_R%s_fk%s_ctl" % (i, j)
@@ -55,7 +54,7 @@ class SynopticTab(MainSynopticTab, widget.Ui_biped_body):
         modifiers = QtWidgets.QApplication.keyboardModifiers()
         utils.selectObj(model, object_names, None, modifiers)
 
-    def selLeft_clicked(self):
+    def selLeft_clicked(self) -> None:
         model = utils.getModel(self)
         # i : num of fingers, j : finger length
         object_names = ["finger_L%s_fk%s_ctl" % (i, j)
@@ -65,7 +64,7 @@ class SynopticTab(MainSynopticTab, widget.Ui_biped_body):
         modifiers = QtWidgets.QApplication.keyboardModifiers()
         utils.selectObj(model, object_names, None, modifiers)
 
-    def keyRight_clicked(self):
+    def keyRight_clicked(self) -> None:
         model = utils.getModel(self)
         # i : num of fingers, j : finger length
         object_names = ["finger_R%s_fk%s_ctl" % (i, j)
@@ -74,7 +73,7 @@ class SynopticTab(MainSynopticTab, widget.Ui_biped_body):
         object_names.extend(thumb_names)
         utils.keyObj(model, object_names)
 
-    def keyLeft_clicked(self):
+    def keyLeft_clicked(self) -> None:
         model = utils.getModel(self)
         # i : num of fingers, j : finger length
         object_names = ["finger_L%s_fk%s_ctl" % (i, j)
@@ -84,7 +83,7 @@ class SynopticTab(MainSynopticTab, widget.Ui_biped_body):
         utils.keyObj(model, object_names)
 
 
-def selAll(model, modifiers):
+def selAll(model: object, modifiers: object) -> None:
     """Select all controlers
 
     Args:

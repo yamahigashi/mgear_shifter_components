@@ -10,7 +10,7 @@
 from Qt import QtCore, QtGui, QtWidgets
 
 class Ui_ymt_face(object):
-    def setupUi(self, ymt_face):
+    def setupUi(self, ymt_face: object) -> None:
         ymt_face.setObjectName("ymt_face")
         ymt_face.resize(325, 840)
         ymt_face.setMinimumSize(QtCore.QSize(325, 790))
@@ -10934,7 +10934,7 @@ class Ui_ymt_face(object):
         self.retranslateUi(ymt_face)
         QtCore.QMetaObject.connectSlotsByName(ymt_face)
 
-    def retranslateUi(self, ymt_face):
+    def retranslateUi(self, ymt_face: object) -> None:
         ymt_face.setWindowTitle(QtWidgets.QApplication.translate("ymt_face", "Form", None, -1))
         self.b_selD.setText(QtWidgets.QApplication.translate("ymt_face", "D", None, -1))
         self.b_selD.setProperty("channel", QtWidgets.QApplication.translate("ymt_face", "D", None, -1))

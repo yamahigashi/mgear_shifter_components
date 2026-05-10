@@ -82,7 +82,7 @@ class Component(component.Main):
     # =====================================================
     # OBJECTS
     # =====================================================
-    def addObjects(self):
+    def addObjects(self) -> None:
         """Add all the objects needed to create the component."""
 
         self.normal = self.guide.blades["blade"].z * -1.0
@@ -173,7 +173,7 @@ class Component(component.Main):
             self.sliding_surface.visibility.set(False)
             pm.makeIdentity(self.sliding_surface, apply=True, t=1,  r=1, s=1, n=0, pn=1)  # type: ignore
 
-    def getNumberOfLocators(self, query):
+    def getNumberOfLocators(self, query: object) -> None:
         # type: (Text) -> int
         """ _uplocs."""
         num = 0
@@ -187,7 +187,7 @@ class Component(component.Main):
 
         return num
 
-    def addCurves(self, upPositions, lowPositions):
+    def addCurves(self, upPositions: object, lowPositions: object) -> None:
 
         gen2 = curve.createCurveFromCurveEvenLength
         gen3 = curve.addCurve
@@ -242,7 +242,7 @@ class Component(component.Main):
 
         return
 
-    def getBboxRadius(self):
+    def getBboxRadius(self) -> None:
         # localBBOX
 
         localBBox = self.guide.eyeMesh.getBoundingBox(invisible=True, space="world")
@@ -251,7 +251,7 @@ class Component(component.Main):
 
         return wRadius, dRadius
 
-    def getEyeballBboxRadius(self):
+    def getEyeballBboxRadius(self) -> None:
         # localBBOX
 
         localBBox = self.guide.eyeballMesh.getBoundingBox(invisible=True, space="world")
@@ -260,7 +260,7 @@ class Component(component.Main):
 
         return wRadius, dRadius
 
-    def addControllers(self):
+    def addControllers(self) -> None:
 
         axis = "zy"
         self.bboxCenter = meshNavigation.bboxCenter(self.guide.eyeMesh)
@@ -301,7 +301,7 @@ class Component(component.Main):
         self.addBlinkControllers(t)
         self.jnt_pos.append([self.arrow_ctl, "eyeball"])
 
-    def addOverControllers(self, t):
+    def addOverControllers(self, t: object) -> None:
 
         up_blink_pos = self.upPos
         lo_blink_pos = self.lowPos
@@ -331,7 +331,7 @@ class Component(component.Main):
             self.over_ctl,
             params=["tx", "ty", "tz", "ro", "rx", "ry", "rz", "sx", "sy", "sz"])
 
-    def addLookAtControlers(self, t_root, t_look):
+    def addLookAtControlers(self, t_root: object, t_look: object) -> None:
 
         self.center_lookat = addTransform(self.over_ctl, self.getName("center_lookat"), t_root)
         ymt_util.setKeyableAttributesDontLockVisibility(self.center_lookat, params=[])
@@ -358,7 +358,7 @@ class Component(component.Main):
             params=["tx", "ty", "tz", "ro", "rx", "ry", "rz", "sx", "sy", "sz"]
         )
 
-    def addAimControllers(self, t):
+    def addAimControllers(self, t: object) -> None:
 
         radius = abs(self.getEyeballBboxRadius()[0] / 1.7)
         pos = transform.getPositionFromMatrix(t)
@@ -377,7 +377,7 @@ class Component(component.Main):
         ymt_util.setKeyableAttributesDontLockVisibility(aimTrigger_lvl, [])
         ymt_util.setKeyableAttributesDontLockVisibility(self.aimTrigger_ref, [])
 
-    def addBlinkControllers(self, t):
+    def addBlinkControllers(self, t: object) -> None:
         blink_root = addTransform(self.over_ctl, self.getName("blink_root"), t)
 
         inv = datatypes.EulerRotation(180.0, 0.0, 0.0)
@@ -414,7 +414,7 @@ class Component(component.Main):
         ymt_util.setKeyableAttributesDontLockVisibility(self.blink_upper_ctl, params=["ty"])
         ymt_util.setKeyableAttributesDontLockVisibility(self.blink_lower_ctl, params=["ty"])
 
-    def addCurveControllers(self, t):
+    def addCurveControllers(self, t: object) -> None:
 
         # upper eyelid controls
         upperCtlNames = ["inCorner", "upInMid", "upMid", "upOutMid", "outCorner"]
@@ -429,7 +429,7 @@ class Component(component.Main):
         # self.lowControls.insert(0, self.upControls[0])
         # self.lowControls.append(self.upControls[-1])
 
-    def addCurveJoints(self, t):
+    def addCurveJoints(self, t: object) -> None:
 
         skip = not self.settings.get("isSplitCorners", False)
 
@@ -444,7 +444,7 @@ class Component(component.Main):
         self.lowDetailNpos = npos
         self.lowDetailAimNpos = aim_npos
 
-    def _addCurveControllers(self, t, crv, ctlNames, inCtl=None, outCtl=None):
+    def _addCurveControllers(self, t: object, crv: object, ctlNames: str, inCtl: object=None, outCtl: object=None) -> None:
 
         cvs = ymt_util.getCurveCVs(crv, space="world")
         if self.negate:
@@ -511,7 +511,7 @@ class Component(component.Main):
 
         return ctls
 
-    def addToSubGroup(self, obj, group_name):
+    def addToSubGroup(self, obj: object, group_name: str) -> None:
 
         if self.settings["ctlGrp"]:
             ctlGrp = self.settings["ctlGrp"]
@@ -520,7 +520,7 @@ class Component(component.Main):
 
         self.addToGroup(obj, group_name, parentGrp=ctlGrp)
 
-    def _selectNearestCvIndex(self, crv, pos):
+    def _selectNearestCvIndex(self, crv: object, pos: float) -> None:
 
         cvs = ymt_util.getCurveCVs(crv, space="world")
         min_dist = 9999999999
@@ -533,7 +533,7 @@ class Component(component.Main):
 
         return nearest
 
-    def _addCurveDetailControllers(self, t, crv, detailCrv, name, skipHeadAndTail=False):
+    def _addCurveDetailControllers(self, t: object, crv: object, detailCrv: object, name: str, skipHeadAndTail: object=False) -> None:
 
         controls = []
         npos = []
@@ -601,7 +601,7 @@ class Component(component.Main):
 
         return controls, npos, aim_npos
 
-    def addWires(self):
+    def addWires(self) -> None:
         # adding wires
         self.w1 = pm.wire(self.upCrv, w=self.upBlink)[0]
         self.w2 = pm.wire(self.lowCrv, w=self.lowBlink)[0]
@@ -641,7 +641,7 @@ class Component(component.Main):
     # =====================================================
     # ATTRIBUTES
     # =====================================================
-    def addAttributes(self):
+    def addAttributes(self) -> None:
         """Create the anim and setupr rig attributes for the component"""
 
         if not self.settings["ui_host"]:
@@ -651,7 +651,7 @@ class Component(component.Main):
         self.addEyeTrackingAttributes()
         self.addTensionOnBlinkAttributes()
 
-    def addBlinkAttributes(self):
+    def addBlinkAttributes(self) -> None:
 
         height = (self.upPos - self.lowPos).length()
         invHeight = 1.0 / height
@@ -673,7 +673,7 @@ class Component(component.Main):
         pm.connectAttr(self.upHeightRatio + ".outputX", uplow)
         pm.connectAttr(self.loHeightRatio + ".outputX", lowup)
 
-    def addEyeTrackingAttributes(self):
+    def addEyeTrackingAttributes(self) -> None:
 
         height = (self.upPos - self.lowPos).length()
 
@@ -752,7 +752,7 @@ class Component(component.Main):
 
         pm.connectAttr(mult_node + ".outputX", str(self.trackLvl[1]) + ".tx")
 
-    def addTensionOnBlinkAttributes(self):
+    def addTensionOnBlinkAttributes(self) -> None:
 
         name = self.getName("Eyelid Tension").replace("_", " ")
         self.tension_att = self.addAnimParam("tension" + self.side, name, "float", 0, minValue=0, maxValue=1)
@@ -779,7 +779,7 @@ class Component(component.Main):
     # =====================================================
     # OPERATORS
     # =====================================================
-    def addOperators(self):
+    def addOperators(self) -> None:
         """Create operators and set the relations for the component rig
 
         Apply operators, constraints, expressions to the hierarchy.
@@ -789,7 +789,7 @@ class Component(component.Main):
         """
         pass
 
-    def connect_standard(self):
+    def connect_standard(self) -> None:
 
         self.parent.addChild(self.root)
         if self.connect_surface_slider and self.surfRef:
@@ -804,7 +804,7 @@ class Component(component.Main):
                 import traceback
                 traceback.print_exc()
 
-    def connect_lookat(self):
+    def connect_lookat(self) -> None:
         try:
             self.connect_standard()
         except Exception as _:
@@ -818,7 +818,7 @@ class Component(component.Main):
             traceback.print_exc()
 
 
-    def __connect_lookat(self):
+    def __connect_lookat(self) -> None:
 
         # find the pupil component from the child components of myself
         # and get the lookat object from it. If not found, raise an exception
@@ -846,7 +846,7 @@ class Component(component.Main):
             force=True
         )
 
-    def connect_detail_controller_to_slide_ghost(self):
+    def connect_detail_controller_to_slide_ghost(self) -> None:
 
         for i, ctl in enumerate(self.upDetailControllers):
             self._connect_slide_ghost2(ctl, "upEyelid_crvdetail" + str(i))
@@ -854,7 +854,7 @@ class Component(component.Main):
         for i, ctl in enumerate(self.lowDetailControllers):
             self._connect_slide_ghost2(ctl, "lowEyelid_crvdetail" + str(i))
 
-    def _connect_slide_ghost2(self, surfaceCtl, index):
+    def _connect_slide_ghost2(self, surfaceCtl: object, index: int) -> None:
 
         # create ghost controls
         t = surfaceCtl.getMatrix(worldSpace=True)
@@ -904,11 +904,11 @@ class Component(component.Main):
     # =====================================================
     # CONNECTOR
     # =====================================================
-    def addConnection(self):
+    def addConnection(self) -> None:
         self.connections["standard"] = self.connect_standard
         self.connections["pupil_01"] = self.connect_lookat
 
-    def setRelation(self):
+    def setRelation(self) -> None:
         """Set the relation beetween object from guide to rig"""
         self.relatives["root"] = self.over_ctl
 
@@ -926,7 +926,7 @@ class Component(component.Main):
         self.relatives["outloc"] = self.upDetailControllers[-1]
 
 
-def rotate_vector(pos, rot, front=om.MVector(0, 0, 1)):
+def rotate_vector(pos: float, rot: object, front: object=om.MVector(0, 0, 1)) -> None:
     # type: (Tuple[float, float, float], Tuple[float, float, float], None|om.MVector) -> datatypes.Vector
     """
     ベクトル pos を回転ベクトル rot で回転させる。

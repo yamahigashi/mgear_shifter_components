@@ -38,14 +38,14 @@ class Guide(guide.ComponentGuide):
     email = EMAIL
     version = VERSION
 
-    def postInit(self):
+    def postInit(self) -> None:
         """Initialize the position for the guide"""
 
         self.save_transform = ["root", "#_loc"]
         self.save_blade = ["blade"]
         self.addMinMax("#_loc", 1, -1)
 
-    def addObjects(self):
+    def addObjects(self) -> None:
         """Add the Guide Root, blade and locators"""
 
         self.root = self.addRoot()
@@ -56,7 +56,7 @@ class Guide(guide.ComponentGuide):
         centers.extend(self.locs)
         self.dispcrv = self.addDispCurve("crv", centers)
 
-    def addParameters(self):
+    def addParameters(self) -> None:
         """Add the configurations settings"""
 
         self.pType = self.addParam("mode", "long", 0, 0)
@@ -79,14 +79,14 @@ class Guide(guide.ComponentGuide):
 
 class settingsTab(QtWidgets.QDialog, sui.Ui_Form):
 
-    def __init__(self, parent=None):
+    def __init__(self, parent: object=None) -> None:
         super(settingsTab, self).__init__(parent)
         self.setupUi(self)
 
 
 class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
 
-    def __init__(self, parent=None):
+    def __init__(self, parent: object=None) -> None:
         self.toolName = TYPE
         # Delete old instances of the componet settings window.
         pyqt.deleteInstances(self, MayaQDockWidget)
@@ -100,7 +100,7 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
         self.create_componentLayout()
         self.create_componentConnections()
 
-    def setup_componentSettingWindow(self):
+    def setup_componentSettingWindow(self) -> None:
         self.mayaMainWindow = pyqt.maya_main_window()
 
         self.setObjectName(self.toolName)
@@ -108,10 +108,10 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
         self.setWindowTitle(TYPE)
         self.resize(280, 350)
 
-    def create_componentControls(self):
+    def create_componentControls(self) -> None:
         return
 
-    def populate_componentControls(self):
+    def populate_componentControls(self) -> None:
         """Populate Controls
 
         Populate the controls values from the custom attributes of the
@@ -140,7 +140,7 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
         for item in ikRefArrayItems:
             self.settingsTab.ikRefArray_listWidget.addItem(item)
 
-    def create_componentLayout(self):
+    def create_componentLayout(self) -> None:
 
         self.settings_layout = QtWidgets.QVBoxLayout()
         self.settings_layout.addWidget(self.tabs)
@@ -148,7 +148,7 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
 
         self.setLayout(self.settings_layout)
 
-    def create_componentConnections(self):
+    def create_componentConnections(self) -> None:
 
         self.settingsTab.ikfk_slider.valueChanged.connect(
             partial(self.updateSlider, self.settingsTab.ikfk_slider, "blend"))
@@ -175,7 +175,7 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
                     "ikrefarray"))
         self.settingsTab.ikRefArray_listWidget.installEventFilter(self)
 
-    def eventFilter(self, sender, event):
+    def eventFilter(self, sender: object, event: object) -> object:
         if event.type() == QtCore.QEvent.ChildRemoved:
             if sender == self.settingsTab.ikRefArray_listWidget:
                 self.updateListAttr(sender, "ikrefarray")
@@ -183,5 +183,5 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
         else:
             return QtWidgets.QDialog.eventFilter(self, sender, event)
 
-    def dockCloseEventTriggered(self):
+    def dockCloseEventTriggered(self) -> None:
         pyqt.deleteInstances(self, MayaQDockWidget)

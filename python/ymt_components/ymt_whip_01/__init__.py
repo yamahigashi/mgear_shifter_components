@@ -1,5 +1,4 @@
 """mGear shifter components"""
-# ruff: noqa: ANN201, ANN001, E501
 # pylint: disable=import-error,W0201,C0111,C0112
 import re
 import inspect
@@ -54,7 +53,7 @@ class Component(component.Main):
     # =====================================================
     # OBJECTS
     # =====================================================
-    def addObjects(self):
+    def addObjects(self) -> None:
         """Add all the objects needed to create the component."""
 
         # FIXME: remove unneccessary guide.tan
@@ -154,7 +153,7 @@ class Component(component.Main):
         else:
             self.addObjectsFkControl()
 
-    def addObjectsFkControl(self):
+    def addObjectsFkControl(self) -> None:
 
         parentdiv = self.root
         parentctl = self.root
@@ -174,7 +173,7 @@ class Component(component.Main):
         # add visual reference
         icon.connection_display_curve(self.getName("visualFKRef"), self.fk_ctl)
 
-    def addLengthCtrl(self, crv):
+    def addLengthCtrl(self, crv: object) -> None:
         t = getTransform(self.guide.root)
         t = self._getTransformWithRollByBlade(t)
         cvs = crv.length()
@@ -226,7 +225,7 @@ class Component(component.Main):
         ymt_util.setKeyableAttributesDontLockVisibility(self.scale_ctl, self.s_params)
         ymt_util.setKeyableAttributesDontLockVisibility(self.length_ctl, ["tx", "ty", "tz"])
 
-    def addObjectsChainIk(self, i, crv):
+    def addObjectsChainIk(self, i: int, crv: object) -> None:
 
         cvs = crv.length()
         if i == 0:
@@ -333,7 +332,7 @@ class Component(component.Main):
         self.ik_global_ref.append(ik_global_ref)
         ymt_util.setKeyableAttributesDontLockVisibility(ik_global_ref, [])
 
-    def _getTransformWithRollByBlade(self, t):
+    def _getTransformWithRollByBlade(self, t: object) -> None:
         # t = getTransform(self.guide.root)
         a = self.guide.blades["blade"].y
         x = vector.Blade(t).x
@@ -349,7 +348,7 @@ class Component(component.Main):
 
         return datatypes.Matrix(tm)
 
-    def _addObjectsFkControl(self, i, parentdiv, parentctl, t, parent_twistRef):
+    def _addObjectsFkControl(self, i: int, parentdiv: object, parentctl: object, t: object, parent_twistRef: object) -> None:
         # References
         tm = datatypes.TransformationMatrix(t)
         pym2m.add_rotation(tm, (0., 0., math.pi / -2.), 'xyz', 'object', 'rad')  # TODO: align with convention
@@ -455,7 +454,7 @@ class Component(component.Main):
     # =====================================================
     # ATTRIBUTES
     # =====================================================
-    def addAttributes(self):
+    def addAttributes(self) -> None:
         """Create the anim and setupr rig attributes for the component"""
 
         if not self.settings["ui_host"]:
@@ -640,7 +639,7 @@ class Component(component.Main):
     # =====================================================
     # OPERATORS
     # =====================================================
-    def addOperators(self):
+    def addOperators(self) -> None:
         """Create operators and set the relations for the component rig
 
         Apply operators, constraints, expressions to the hierarchy.
@@ -700,7 +699,7 @@ class Component(component.Main):
         # TODO: Add option for length controller to be added or not
         self.addOperatorLengthExpression()
 
-    def addOperatorsNotGlobalMaster(self):
+    def addOperatorsNotGlobalMaster(self) -> None:
         # Curves -------------------------------------------
         op = applyop.gear_curveslide2_op(self.slv_crv, self.mst_crv, 0, 1.5, .5, .5)
         op.rename(self.getName("slideCurveOp"))
@@ -766,7 +765,7 @@ class Component(component.Main):
                                     e,
                                     self.settings["cnxOffset"])
 
-    def addOperatorsIkTwist(self):
+    def addOperatorsIkTwist(self) -> None:
 
         for i in range(1, self.settings["ikNb"] - 1):
 
@@ -796,7 +795,7 @@ class Component(component.Main):
             pm.connectAttr(inv + ".outFloat", c + ".target[0].targetWeight")
             pm.connectAttr(str(self.ik_att[i - 1]), c + ".target[1].targetWeight")
 
-    def addOperatorsIkRoll(self):
+    def addOperatorsIkRoll(self) -> None:
 
         for i in range(0, self.settings["ikNb"]):
 
@@ -824,7 +823,7 @@ class Component(component.Main):
 
             self.ik_decompose_rot.append(rot)
 
-    def addFkOperator(self, i, rootWorld_node, crv_node):
+    def addFkOperator(self, i: int, rootWorld_node: object, crv_node: object) -> None:
 
         fk_local_npo_xfoms = []
         if i not in [len(self.guide.apos), 0]:
@@ -991,7 +990,7 @@ class Component(component.Main):
                              upVector=upv,
                              )
 
-    def addOperatorsOrientationLock(self, i, cns):
+    def addOperatorsOrientationLock(self, i: int, cns: object) -> None:
         # Orientation Lock
         if i == 0:
             dm_node = node.createDecomposeMatrixNode(
@@ -1019,7 +1018,7 @@ class Component(component.Main):
             self.div_cns[i].attr("rotate").disconnect()
             pm.connectAttr(blend_node + ".output", self.div_cns[i] + ".rotate")
 
-    def addOperatorLengthExpression(self):
+    def addOperatorLengthExpression(self) -> None:
         rewrite_map = [
             ["scale_ctl", self.length_ctl],
             ["fk0_npo", self.fk_npo[0]],
@@ -1038,9 +1037,9 @@ class Component(component.Main):
         self.exprespy = create_exprespy_node(self.length_control_expression_archtype, self.getName("exprespy"), rewrite_map, additional_code)
         ymt_util.setKeyableAttributesDontLockVisibility(self.fk_upvectors, [])
 
-    def length_control_expression_archtype(curve_length, scale_ctl, fk0_npo, curve_op, scale_cns):
+    def length_control_expression_archtype(curve_length: float, scale_ctl: object, fk0_npo: object, curve_op: object, scale_cns: object) -> object:
         from maya.api.OpenMaya import MVector
-        def sigmoid(x, mi, mx):
+        def sigmoid(x: float, mi: float, mx: float) -> None:
             return mi + (mx-mi)*(lambda t: (1+((200. / curve_length)*100.)**(-t+0.5))**(-1) )( (x-mi)/(mx-mi))
 
         tz = scale_ctl.translateY
@@ -1066,7 +1065,7 @@ class Component(component.Main):
         scale_cns.scale = MVector(s, s, s)
         fk0_npo.visibility = vis
 
-    def addOperatorSineCurveExprespy(self):
+    def addOperatorSineCurveExprespy(self) -> None:
         rewrite_map = [
             ["__scale_ctl", self.length_ctl],
             ["__curve_length", self.slv_crv_fn.length()],
@@ -1111,22 +1110,22 @@ class Component(component.Main):
                                               additional_code)
         # cmds.setAttr("{}.IN[4]".format(self.exprespy2), "{}.worldSpace".format(self.mst_crv.name()))
 
-    def sinewave_expression_archtype(COUNT, __scale_ctl, __curve_length, __wave_offset_att, __wave_power_att, __wave_length_att, __mst_crv, __divisions, __negate, __dropoff):
+    def sinewave_expression_archtype(COUNT: int, __scale_ctl: object, __curve_length: float, __wave_offset_att: float, __wave_power_att: float, __wave_length_att: float, __mst_crv: object, __divisions: int, __negate: bool, __dropoff: float) -> object:
 
         if not COUNT:
             import math
 
-            def sigmoid(x, mx):
+            def sigmoid(x: float, mx: float) -> None:
                 # return mi + (mx-mi)*(lambda t: (1+(100.)**(-t+0.5))**(-1) )( (x-mi)/(mx-mi))
                 x = (x * 10) / mx - 5.
                 return 1 / (1 + math.exp(-x))
 
-            def get_sin_at_pos(pos, s):
+            def get_sin_at_pos(pos: float, s: float) -> None:
 
                 x = math.sin(math.pi * (2. / (__wave_length_att / 100.0)) * ((__wave_offset_att / 100.0) * (__wave_length_att / 100.0) + pos * s)) * __curve_length * (__wave_power_att / 100.0) * 0.5
                 return sigmoid(pos, __dropoff / 100.0) * x
 
-            def get_tan_at_pos(pos, s):
+            def get_tan_at_pos(pos: float, s: float) -> object:
                 a = get_sin_at_pos(pos, s)
                 b = get_sin_at_pos(pos + (1. / __divisions), s)
                 if (b - a) < 0.:
@@ -1145,7 +1144,7 @@ class Component(component.Main):
         s = __scale_ctl.ty / __curve_length
         s = min(s, s2)
 
-    def connectRef(self, refArray, cns_obj, upVAttr=None, init_refNames=False):
+    def connectRef(self, refArray: str, cns_obj: object, upVAttr: bool=None, init_refNames: bool=False) -> None:
         """Connect the cns_obj to a multiple object using parentConstraint.
 
         Args:
@@ -1198,7 +1197,7 @@ class Component(component.Main):
                         attr_name = f"{cns_node}.{attr}"
                         pm.connectAttr(node_name + ".outColorR", attr_name)
 
-    def connect_standard(self):
+    def connect_standard(self) -> None:
         self.parent.addChild(self.root)
         self.connectRef(self.settings["ik0refarray"], self.ik_npo[0])
         self.connectRef(self.settings["ik1refarray"], self.ik_npo[-1])
@@ -1210,7 +1209,7 @@ class Component(component.Main):
         self.mst_crv.setAttr("visibility", False)
         self.slv_crv.setAttr("visibility", False)
 
-    def connect_master(self, mstr_out, slave_in, idx, offset):
+    def connect_master(self, mstr_out: object, slave_in: object, idx: int, offset: float) -> None:
         """Connect master and slave chain
 
         Args:
@@ -1235,7 +1234,7 @@ class Component(component.Main):
     # CONNECTOR
     # =====================================================
 
-    def setRelation(self):
+    def setRelation(self) -> None:
         """Set the relation beetween object from guide to rig"""
         if self.settings["isGlobalMaster"]:
             return
@@ -1254,7 +1253,7 @@ class Component(component.Main):
             self.aliasRelatives["%s_ctl" % (i)] = (i + 1)
 
 
-def test():
+def test() -> None:
     import pymel.core as pm
     import maya.cmds as cmds
     for x in [
@@ -1272,7 +1271,7 @@ def test():
     cmds.refresh(suspend=False)
 
 
-def cross(u, v):
+def cross(u: float, v: float) -> None:
     dim = len(u)
     s = []
     for i in range(dim):
@@ -1289,7 +1288,7 @@ def cross(u, v):
     return s
 
 
-def getCurveUAtPoint(crv, position):
+def getCurveUAtPoint(crv: object, position: object) -> None:
     point = om1.MPoint(position[0], position[1], position[2])
 
     dag = om1.MDagPath()
@@ -1315,7 +1314,7 @@ def getCurveUAtPoint(crv, position):
     return length_at / length
 
 
-def vecProjection(a, b):
+def vecProjection(a: object, b: object) -> None:
 
     dot = a * b
     length = b.length()
@@ -1325,7 +1324,7 @@ def vecProjection(a, b):
     return p
 
 
-def create_exprespy_node(func, name, rewrite_map, additional_code=None):
+def create_exprespy_node(func: object, name: str, rewrite_map: object, additional_code: object=None) -> None:
     code = inspect.getsource(func)
     code = textwrap.dedent("".join(code.splitlines(True)[1:]))
 
@@ -1342,7 +1341,7 @@ def create_exprespy_node(func, name, rewrite_map, additional_code=None):
     return exp_node
 
 
-def get_nearest_axis_orient(a, b):
+def get_nearest_axis_orient(a: object, b: object) -> None:
     # returns normalized axis of orientation of a to b
     ta = getTransform(a)
     tb = getTransform(b)

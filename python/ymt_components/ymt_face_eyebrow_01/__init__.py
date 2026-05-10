@@ -84,7 +84,7 @@ class Component(component.Main):
     # =====================================================
     # OBJECTS
     # =====================================================
-    def addObjects(self):
+    def addObjects(self) -> None:
         """Add all the objects needed to create the component."""
 
         self.normal = self.guide.blades["blade"].z * -1.
@@ -165,13 +165,13 @@ class Component(component.Main):
             self.sliding_surface.visibility.set(False)
             pm.makeIdentity(self.sliding_surface, apply=True, t=1,  r=1, s=1, n=0, pn=1)
 
-    def _visi_off_lock(self, node):
+    def _visi_off_lock(self, node: object) -> None:
         """Short cuts."""
         node.visibility.set(False)
         ymt_util.setKeyableAttributesDontLockVisibility(node, [])
         cmds.setAttr("{}.visibility".format(node.name()), l=False)
 
-    def addContainers(self):
+    def addContainers(self) -> None:
 
         t = getTransform(self.root)
         scl = [1, 1, 1]
@@ -213,7 +213,7 @@ class Component(component.Main):
         self.addToSubGroup(self.mainControl, self.primaryControllersGroupName)
         self.secondaryControlsParentGrp = addTransform(self.root, self.getName("secondaryControls"), t)
 
-    def getNumberOfLocators(self, query):
+    def getNumberOfLocators(self, query: object) -> None:
         # type: (Text) -> int
         num = 0
         for k, v in self.guide.tra.items():
@@ -223,7 +223,7 @@ class Component(component.Main):
 
         return num
 
-    def addCurves(self, crv_root):
+    def addCurves(self, crv_root: object) -> None:
 
         t = getTransform(self.root)
         points = [x - self.root.getTranslation(space="world") for x in self.uplocsPos]
@@ -280,7 +280,7 @@ class Component(component.Main):
             self.secUpvs.append(upv)
         self.addSecondaryCnsCurve(self.secondaryControls)
 
-    def _foreachControlOption(self, controlParentGrp, ctlOptions):
+    def _foreachControlOption(self, controlParentGrp: object, ctlOptions: object) -> None:
 
         oName = ctlOptions[0]
         oSide = ctlOptions[1]
@@ -330,7 +330,7 @@ class Component(component.Main):
 
         return ctl, upv
 
-    def addMainCnsCurve(self, ctls):
+    def addMainCnsCurve(self, ctls: object) -> None:
         crv_degree = 2
 
         t = getTransform(self.root)
@@ -369,7 +369,7 @@ class Component(component.Main):
             # collect mainCrv upv
             self.mainCtlUpvs.append(mainCtlUpv)
 
-    def addRope(self):
+    def addRope(self) -> None:
         v = self.root.getTranslation(space="world")
 
         mainRope = curve.createCurveFromCurve(self.mainCurve, self.getName("mainRope"), nbPoints=self.NB_ROPE, parent=self.rope_root)
@@ -395,7 +395,7 @@ class Component(component.Main):
                 offset = [cv[0], cv[1], cv[2] + self.FRONT_OFFSET]
                 ymt_util.setCurveCV(crv, i, offset, space="world")
 
-    def addSecondaryCnsCurve(self, ctls):
+    def addSecondaryCnsCurve(self, ctls: object) -> None:
         crv_degree = 2
 
         t = getTransform(self.root)
@@ -413,7 +413,7 @@ class Component(component.Main):
         self.secondaryCurves.append(crv)
         self.rigCurves.append(crv)
 
-    def _foreachSecCtrlPos(self, i, ctlPos, sec_number_index):
+    def _foreachSecCtrlPos(self, i: int, ctlPos: object, sec_number_index: int) -> None:
 
         i_name = i
 
@@ -423,7 +423,7 @@ class Component(component.Main):
 
         return options
 
-    def _foreachMainCtrlPos(self, i, ctlPos, isLast):
+    def _foreachMainCtrlPos(self, i: int, ctlPos: object, isLast: bool) -> None:
 
         options = []
 
@@ -458,11 +458,11 @@ class Component(component.Main):
 
         return options
 
-    def reparentControls(self):
+    def reparentControls(self) -> None:
         pm.parent(self.mainControls[1].getParent(2), self.mainControls[0])
         pm.parent(self.mainControls[-2].getParent(2), self.mainControls[-1])
 
-    def attachSecondaryControlsToMainCurve(self):
+    def attachSecondaryControlsToMainCurve(self) -> None:
 
         secControlsMerged = []
         tempMainCtlCurves = self.mainCtlCurves
@@ -501,9 +501,9 @@ class Component(component.Main):
                     't',
                     True)
 
-    def connectWires(self):
+    def connectWires(self) -> None:
         # set drivers
-        def wire(s, d):
+        def wire(s: float, d: float) -> None:
             wire = pm.wire(s, w=d, dropoffDistance=[0, 1000])
             # pm.connectAttr(s.attr("local"),       wire[0].attr("baseWire[0]"),     f=True)  # tobe local space
             # pm.connectAttr(d.attr("local"), wire[0].attr("deformedWire[0]"), f=True)  # tobe local space
@@ -521,7 +521,7 @@ class Component(component.Main):
             wire(self.mainRopes[i],     drv)
             wire(self.mainRopeUpvs[i],  drv)
 
-    def addToSubGroup(self, obj, group_name):
+    def addToSubGroup(self, obj: object, group_name: str) -> None:
 
         if self.settings["ctlGrp"]:
             ctlGrp = self.settings["ctlGrp"]
@@ -533,7 +533,7 @@ class Component(component.Main):
     # =====================================================
     # ATTRIBUTES
     # =====================================================
-    def addAttributes(self):
+    def addAttributes(self) -> None:
         """Create the anim and setupr rig attributes for the component"""
 
         if not self.settings["ui_host"]:
@@ -554,7 +554,7 @@ class Component(component.Main):
     # =====================================================
     # OPERATORS
     # =====================================================
-    def addOperators(self):
+    def addOperators(self) -> None:
         """Create operators and set the relations for the component rig
 
         Apply operators, constraints, expressions to the hierarchy.
@@ -567,10 +567,10 @@ class Component(component.Main):
     # =====================================================
     # CONNECTOR
     # =====================================================
-    def addConnection(self):
+    def addConnection(self) -> None:
         pass
 
-    def connect_standard(self):
+    def connect_standard(self) -> None:
 
         self.parent.addChild(self.root)
         if self.surfRef:
@@ -598,7 +598,7 @@ class Component(component.Main):
                 traceback.print_exc()
                 raise
 
-    def connect_eyelookat(self):
+    def connect_eyelookat(self) -> None:
         attrsX = [
             self.follow_lookat_0_x_attr,
             self.follow_lookat_1_x_attr,
@@ -612,7 +612,7 @@ class Component(component.Main):
         self.connect_eyelookat_axis(self.follow_lookat_threshold_x_attr, "translateX", -1.0,1.0, attrsX)
         self.connect_eyelookat_axis(self.follow_lookat_threshold_y_attr, "translateY", 0.0, 1.0, attrsY)
 
-    def connect_eyelookat_axis(self, threshold_attr, attr, clamp_neg, clamp_pos, attrs):
+    def connect_eyelookat_axis(self, threshold_attr: str, attr: str, clamp_neg: object, clamp_pos: object, attrs: object) -> None:
 
         eye_comp = self.rig.findComponent("eye_{}0_root".format(self.side))
         aim = eye_comp.aimTrigger_ref
@@ -702,7 +702,7 @@ class Component(component.Main):
         res1.outputX.connect(npo1.attr(attr))
         res2.outputX.connect(npo2.attr(attr))
 
-    def connect_slide_ghost(self):
+    def connect_slide_ghost(self) -> None:
 
         # create ghost controls
         ghosts = []
@@ -749,7 +749,7 @@ class Component(component.Main):
         self.secondaryControls = real_ctls
         self.setRelation()  # MUST re-setRelation, swapped ghost and real controls
 
-    def setRelation(self):
+    def setRelation(self) -> None:
         """Set the relation beetween object from guide to rig"""
         self.relatives["root"] = self.root
         self.controlRelatives["root"] = self.root
@@ -763,7 +763,7 @@ class Component(component.Main):
             self.jointRelatives["%s_loc" % (i)] = (i + 1)
             self.aliasRelatives["%s_ctl" % (i)] = (i + 1)
 
-    def ghostSliderForEyeBrow(self, ghostControls, surface, sliderParent):
+    def ghostSliderForEyeBrow(self, ghostControls: object, surface: object, sliderParent: object) -> None:
         """Modify the ghost control behaviour to slide on top of a surface
 
         Args:
@@ -830,7 +830,7 @@ class Component(component.Main):
             ymt_util.setKeyableAttributesDontLockVisibility(npo, [])
 
 
-def draw_eye_guide_mesh_plane(points, t):
+def draw_eye_guide_mesh_plane(points: object, t: object) -> None:
     # type: (Tuple[float, float, float], datatypes.Matrix) -> om.MFnMesh
 
     mesh = om.MFnMesh()
@@ -878,7 +878,7 @@ def draw_eye_guide_mesh_plane(points, t):
     return mesh
 
 
-def applyPathCnsLocal(target, curve, u):
+def applyPathCnsLocal(target: str, curve: object, u: float) -> None:
     cns = applyop.pathCns(target, curve, cnsType=False, u=u, tangent=False)
     pm.connectAttr(str(curve) + ".local", str(cns) + ".geometryPath", f=True)  # tobe local space
 

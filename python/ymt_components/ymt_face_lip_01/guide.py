@@ -60,11 +60,11 @@ class Guide(guide.ComponentGuide):
 
     connectors = ["mouth_01"]
 
-    def getObjectByLocalName(self, local_name, includeShapes=False):
+    def getObjectByLocalName(self, local_name: str, includeShapes: object=False) -> None:
         return ymt_utility.findGuideObjectByLocalName(
             self, local_name, includeShapes=includeShapes)
 
-    def setFromHierarchy(self, root):
+    def setFromHierarchy(self, root: object) -> None:
         self.root = root
         self.model = self.root.getParent(generations=-1)
         self.setParamDefValuesFromProperty(self.root)
@@ -78,7 +78,7 @@ class Guide(guide.ComponentGuide):
         self.sliding_surface = pm.PyNode(sliding_surface)
         pm.parent(self.sliding_surface, self.root, absolute=False, relative=True)
 
-    def get_guide_template_dict(self):
+    def get_guide_template_dict(self) -> None:
         """Override the base class method to add more data to the guide template dict"""
         c_dict = super(Guide, self).get_guide_template_dict()
 
@@ -87,7 +87,7 @@ class Guide(guide.ComponentGuide):
 
         return c_dict
 
-    def set_from_dict(self, c_dict):
+    def set_from_dict(self, c_dict: object) -> None:
         """Override the base class method to add more data to the guide template dict"""
 
         super(Guide, self).set_from_dict(c_dict)
@@ -100,7 +100,7 @@ class Guide(guide.ComponentGuide):
         sliding_surface = ymt_utility.deserialize_nurbs_surface(self.getName("sliding_surface"), c_dict["sliding_surface"])
         self.sliding_surface = pm.PyNode(sliding_surface)
 
-    def postInit(self):
+    def postInit(self) -> None:
         """Initialize the position for the guide"""
 
         self.save_transform = ["root", "sliding_surface", "#_uploc", "#_lowloc", "inloc", "outloc", "uploc", "lowloc", "tan"]
@@ -108,7 +108,7 @@ class Guide(guide.ComponentGuide):
         self.addMinMax("#_uploc", 1, -1)
         self.addMinMax("#_lowloc", 1, -1)
 
-    def addObjects(self):
+    def addObjects(self) -> None:
         """Add the Guide Root, blade and locators"""
 
         self.root = self.addRoot()
@@ -149,7 +149,7 @@ class Guide(guide.ComponentGuide):
         else:
             pm.parent(self.sliding_surface, self.root, absolute=False, relative=True)
 
-    def addSliderSurface(self, name, parent, position=None):
+    def addSliderSurface(self, name: str, parent: object, position: object=None) -> None:
         """pass."""
         if name not in self.tra.keys():
             self.tra[name] = transform.getTransformFromPos(position)
@@ -165,7 +165,7 @@ class Guide(guide.ComponentGuide):
         return sliding_surface
 
 
-    def addParameters(self):
+    def addParameters(self) -> None:
         """Add the configurations settings"""
 
         self.pNeutralPose = self.addParam("neutralpose", "bool", False)
@@ -177,7 +177,7 @@ class Guide(guide.ComponentGuide):
         self.pSlidingSurface   = self.addParam("isSlidingSurface", "bool", True)
         self.pSurfaceReference = self.addParam("surfaceReference", "string", "")
 
-    def modalPositions(self):
+    def modalPositions(self) -> bool:
         """Launch a modal dialog to set position of the guide."""
         self.sections_number = None
         self.dir_axis = None
@@ -225,14 +225,14 @@ class Guide(guide.ComponentGuide):
 ##########################################################
 class settingsTab(QtWidgets.QDialog, sui.Ui_Form):
 
-    def __init__(self, parent=None):
+    def __init__(self, parent: object=None) -> None:
         super(settingsTab, self).__init__(parent)
         self.setupUi(self)
 
 
 class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
 
-    def __init__(self, parent=None):
+    def __init__(self, parent: object=None) -> None:
         self.toolName = TYPE
         # Delete old instances of the componet settings window.
         pyqt.deleteInstances(self, MayaQDockWidget)
@@ -246,7 +246,7 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
         self.create_componentLayout()
         self.create_componentConnections()
 
-    def setup_componentSettingWindow(self):
+    def setup_componentSettingWindow(self) -> None:
         self.mayaMainWindow = pyqt.maya_main_window()
 
         self.setObjectName(self.toolName)
@@ -254,10 +254,10 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
         self.setWindowTitle(TYPE)
         self.resize(280, 350)
 
-    def create_componentControls(self):
+    def create_componentControls(self) -> None:
         pass
 
-    def populate_componentControls(self):
+    def populate_componentControls(self) -> None:
         """Populate Controls
 
         Populate the controls values from the custom attributes of the
@@ -288,7 +288,7 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
         surfaceReference = self.root.attr("surfaceReference").get()
         self.settingsTab.surfaceReference_listWidget.addItem(surfaceReference)
 
-    def create_componentLayout(self):
+    def create_componentLayout(self) -> None:
 
         self.settings_layout = QtWidgets.QVBoxLayout()
         self.settings_layout.addWidget(self.tabs)
@@ -296,7 +296,7 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
 
         self.setLayout(self.settings_layout)
 
-    def create_componentConnections(self):
+    def create_componentConnections(self) -> None:
 
         self.settingsTab.overrideNegate_checkBox.stateChanged.connect(
             partial(self.updateCheck,
@@ -329,7 +329,7 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
             )
         )
 
-    def updateMasterChain(self, lEdit, targetAttr):
+    def updateMasterChain(self, lEdit: object, targetAttr: str) -> None:
         oType = pm.nodetypes.Transform
 
         oSel = pm.selected()
@@ -368,12 +368,12 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
                 pm.displayWarning("The previous Master Chain have been "
                                   "cleared")
 
-    def _get_chain_segments_length(self, chain_root):
+    def _get_chain_segments_length(self, chain_root: object) -> None:
         module = shifter.importComponentGuide(chain_root.comp_type.get())
         componentGuide = module.Guide
         comp_guide = componentGuide()
         comp_guide.setFromHierarchy(chain_root)
         return len(comp_guide.pos)
 
-    def dockCloseEventTriggered(self):
+    def dockCloseEventTriggered(self) -> None:
         pyqt.deleteInstances(self, MayaQDockWidget)

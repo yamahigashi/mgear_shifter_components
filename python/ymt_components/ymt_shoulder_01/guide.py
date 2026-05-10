@@ -75,14 +75,14 @@ class Guide(ComponentGuide):
     # =====================================================
     ##
     # @param self
-    def postInit(self):
+    def postInit(self) -> None:
         self.save_transform = ["root", "tip"]
         self.save_blade = ["blade"]
 
     # =====================================================
     ## Add more object to the object definition list.
     # @param self
-    def addObjects(self):
+    def addObjects(self) -> None:
 
         self.root = self.addRoot()
         vTemp = tra.getOffsetPosition( self.root, [2,0,0])
@@ -97,7 +97,7 @@ class Guide(ComponentGuide):
     # =====================================================
     ## Add more parameter to the parameter definition list.
     # @param self
-    def addParameters(self):
+    def addParameters(self) -> None:
 
         self.pRefArray  = self.addParam("refArray", "string", "")
         self.pUseIndex = self.addParam("useIndex", "bool", False)
@@ -122,14 +122,14 @@ class Guide(ComponentGuide):
 
 class settingsTab(QtWidgets.QDialog, sui.Ui_Form):
 
-    def __init__(self, parent=None):
+    def __init__(self, parent: object=None) -> None:
         super(settingsTab, self).__init__(parent)
         self.setupUi(self)
 
 
 class componentSettings(MayaQWidgetDockableMixin, componentMainSettings):
 
-    def __init__(self, parent = None):
+    def __init__(self, parent: object = None) -> None:
         self.toolName = TYPE
         # Delete old instances of the componet settings window.
         gqt.deleteInstances(self, MayaQDockWidget)
@@ -144,7 +144,7 @@ class componentSettings(MayaQWidgetDockableMixin, componentMainSettings):
         self.create_componentLayout()
         self.create_componentConnections()
 
-    def setup_componentSettingWindow(self):
+    def setup_componentSettingWindow(self) -> None:
         self.mayaMainWindow = gqt.maya_main_window()
 
         self.setObjectName(self.toolName)
@@ -152,11 +152,11 @@ class componentSettings(MayaQWidgetDockableMixin, componentMainSettings):
         self.setWindowTitle(TYPE)
         self.resize(280, 350)
 
-    def create_componentControls(self):
+    def create_componentControls(self) -> None:
         return
 
 
-    def populate_componentControls(self):
+    def populate_componentControls(self) -> None:
         """
         Populate the controls values from the custom attributes of the component.
 
@@ -179,7 +179,7 @@ class componentSettings(MayaQWidgetDockableMixin, componentMainSettings):
         self.settingsTab.ctlOffsetRotY_doubleSpinBox.setValue(self.root.attr("ctlOffsetRotY").get())
         self.settingsTab.ctlOffsetRotZ_doubleSpinBox.setValue(self.root.attr("ctlOffsetRotZ").get())
 
-    def create_componentLayout(self):
+    def create_componentLayout(self) -> None:
 
         self.settings_layout = QtWidgets.QVBoxLayout()
         self.settings_layout.addWidget(self.tabs)
@@ -187,7 +187,7 @@ class componentSettings(MayaQWidgetDockableMixin, componentMainSettings):
 
         self.setLayout(self.settings_layout)
 
-    def create_componentConnections(self):
+    def create_componentConnections(self) -> None:
 
         self.settingsTab.refArrayAdd_pushButton.clicked.connect(partial(self.addItem2listWidget, self.settingsTab.refArray_listWidget, "refArray"))
         self.settingsTab.refArrayRemove_pushButton.clicked.connect(partial(self.removeSelectedFromListWidget, self.settingsTab.refArray_listWidget, "refArray"))
@@ -206,7 +206,7 @@ class componentSettings(MayaQWidgetDockableMixin, componentMainSettings):
         self.settingsTab.ctlOffsetPosZ_doubleSpinBox.valueChanged.connect(partial(self.updateSpinBox, self.settingsTab.ctlOffsetPosZ_doubleSpinBox, "ctlOffsetPosZ"))
 
 
-    def eventFilter(self, sender, event):
+    def eventFilter(self, sender: object, event: object) -> None:
         if event.type() == QtCore.QEvent.ChildRemoved:
             if sender == self.settingsTab.refArray_listWidget:
                 self.updateListAttr(sender, "refArray")
@@ -214,5 +214,5 @@ class componentSettings(MayaQWidgetDockableMixin, componentMainSettings):
 
 
 
-    def dockCloseEventTriggered(self):
+    def dockCloseEventTriggered(self) -> None:
         gqt.deleteInstances(self, MayaQDockWidget)

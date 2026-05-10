@@ -28,7 +28,7 @@ import mgear.core.pyqt as gqt
 QtGui, QtCore, QtWidgets, wrapInstance = gqt.qt_import()
 
 class Ui_Form(object):
-    def setupUi(self, Form):
+    def setupUi(self, Form: QtWidgets.QWidget) -> None:
         Form.setObjectName("Form")
         Form.resize(255, 290)
         self.gridLayout = QtWidgets.QGridLayout(Form)
@@ -115,7 +115,7 @@ class Ui_Form(object):
         self.ikfk_spinBox.valueChanged.connect(self.ikfk_slider.setValue)
         QtCore.QMetaObject.connectSlotsByName(Form)
 
-    def retranslateUi(self, Form):
+    def retranslateUi(self, Form: QtWidgets.QWidget) -> None:
         Form.setWindowTitle(gqt.fakeTranslate("Form", "Form", None, -1))
         self.mode_label.setText(gqt.fakeTranslate("Form", "Mode:", None, -1))
         self.mode_comboBox.setItemText(0, gqt.fakeTranslate("Form", "FK", None, -1))

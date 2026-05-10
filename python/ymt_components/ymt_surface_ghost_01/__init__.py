@@ -77,7 +77,7 @@ class Component(component.Main):
     # =====================================================
     # OBJECTS
     # =====================================================
-    def addObjects(self):
+    def addObjects(self) -> None:
         """Add all the objects needed to create the component."""
 
         self.WIP = self.options["mode"]
@@ -144,7 +144,7 @@ class Component(component.Main):
     # =====================================================
     # ATTRIBUTES
     # =====================================================
-    def addAttributes(self):
+    def addAttributes(self) -> None:
         """Create the anim and setupr rig attributes for the component"""
 
         if not self.settings["ui_host"]:
@@ -153,7 +153,7 @@ class Component(component.Main):
     # =====================================================
     # OPERATORS
     # =====================================================
-    def addOperators(self):
+    def addOperators(self) -> None:
         """Create operators and set the relations for the component rig
 
         Apply operators, constraints, expressions to the hierarchy.
@@ -163,7 +163,7 @@ class Component(component.Main):
         """
         pass
 
-    def connectRef(self, refArray, cns_obj, upVAttr=None, init_refNames=False):
+    def connectRef(self, refArray: str, cns_obj: object, upVAttr: bool=None, init_refNames: bool=False) -> None:
         """Connect the cns_obj to a multiple object using parentConstraint.
 
         Args:
@@ -173,7 +173,7 @@ class Component(component.Main):
         """
         pass
 
-    def connect_standard(self):
+    def connect_standard(self) -> None:
         self.parent.addChild(self.root)
         if self.surfRef:
             ref = self.rig.findComponent(self.surfRef)
@@ -195,7 +195,7 @@ class Component(component.Main):
                 import traceback
                 traceback.print_exc()
 
-    def connect_slide_ghost(self):
+    def connect_slide_ghost(self) -> None:
 
         # create ghost controls
         self.ghostCtl = ghost.createGhostCtl(self.surfaceCtl, self.slider_root)
@@ -291,7 +291,7 @@ class Component(component.Main):
         ymt_util.setKeyableAttributesDontLockVisibility(npo, [])
         self.setRelation()  # MUST re-setRelation, swapped ghost and real controls
 
-    def connect_rivet(self):
+    def connect_rivet(self) -> None:
         rivets = ymt_util.apply_rivet_constrain_to_selected(self.sliding_surface, self.npo)
         cmds.parent(rivets[0], self.sliding_surface.getParent().longName(), relative=True)
         cmds.parentConstraint(rivets[0], self.npo.longName(), mo=True)
@@ -299,23 +299,23 @@ class Component(component.Main):
     # =====================================================
     # CONNECTOR
     # =====================================================
-    def addConnection(self):
+    def addConnection(self) -> None:
         self.connections["standard"] = self.connect_standard
 
-    def setRelation(self):
+    def setRelation(self) -> None:
         """Set the relation beetween object from guide to rig"""
         self.relatives["root"] = self.surfaceCtl
 
     # =====================================================
     # UTILITY
     # =====================================================
-    def _visi_off_lock(self, node):
+    def _visi_off_lock(self, node: object) -> None:
         """Short cuts."""
         node.visibility.set(False)
         ymt_util.setKeyableAttributesDontLockVisibility(node, [])
         cmds.setAttr("{}.visibility".format(node.name()), l=False)
 
-    def removeFromControllerGroup(self, obj):
+    def removeFromControllerGroup(self, obj: object) -> None:
         if self.settings["ctlGrp"]:
             ctlGrp = self.settings["ctlGrp"]
 

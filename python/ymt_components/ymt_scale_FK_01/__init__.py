@@ -27,7 +27,7 @@ class Component(component.Main):
     # =====================================================
     # OBJECTS
     # =====================================================
-    def addObjects(self):
+    def addObjects(self) -> None:
         """Add all the objects needed to create the component."""
 
         self.normal = self.guide.blades["blade"].z * -1
@@ -171,7 +171,7 @@ class Component(component.Main):
 
         self.constructJointHierarchy()
 
-    def constructJointHierarchy(self):
+    def constructJointHierarchy(self) -> None:
         ctl_parent = self.root
         cns_parent = self.root
         for i, (jnt_pos, jnt_name, parent_jnt_org, uniScale) in enumerate(self.jnt_pos_):
@@ -205,7 +205,7 @@ class Component(component.Main):
     # =====================================================
     # ATTRIBUTES
     # =====================================================
-    def addAttributes(self):
+    def addAttributes(self) -> None:
         """Create the anim and setupr rig attributes for the component"""
 
         # Anim -------------------------------------------
@@ -231,7 +231,7 @@ class Component(component.Main):
     # =====================================================
     # OPERATORS
     # =====================================================
-    def addOperators(self):
+    def addOperators(self) -> None:
         """Create operators and set the relations for the component rig
 
         Apply operators, constraints, expressions to the hierarchy.
@@ -322,7 +322,7 @@ class Component(component.Main):
     # =====================================================
     # CONNECTOR
     # =====================================================
-    def setRelation(self):
+    def setRelation(self) -> None:
         """Set the relation beetween object from guide to rig"""
 
         self.relatives["root"] = self.loc[0]
@@ -349,20 +349,20 @@ class Component(component.Main):
         self.aliasRelatives["%s_loc" % (len(self.loc) - 1)] = len(self.loc) - 1
 
     # @param self
-    def addConnection(self):
+    def addConnection(self) -> None:
         """Add more connection definition to the set"""
 
         self.connections["standard"] = self.connect_standard
         self.connections["orientation"] = self.connect_orientation
         self.connections["parent"] = self.connect_parent
 
-    def connect_orientation(self):
+    def connect_orientation(self) -> None:
         """orientation connection definition for the component"""
         self.connect_orientCns()
 
-    def connect_standard(self):
+    def connect_standard(self) -> None:
         """standard connection definition for the component"""
         self.connect_standardWithSimpleIkRef()
 
-    def connect_parent(self):
+    def connect_parent(self) -> None:
         self.connect_standardWithSimpleIkRef()
