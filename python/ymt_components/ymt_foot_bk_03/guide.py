@@ -4,10 +4,11 @@
 """Guide Foot banking 01 module"""
 
 from functools import partial
+import importlib
 try:
-    import mgear.pymaya as pm
+    pm = importlib.import_module("mgear.pymaya")
 except ImportError:
-    import pymel.core as pm
+    pm = importlib.import_module("pymel.core")
 
 from mgear.shifter.component import guide
 from mgear.core import transform, pyqt

@@ -1,14 +1,15 @@
 """mGear shifter components"""
 # pylint: disable=import-error,W0201,C0111,C0112
+import importlib
 import sys
 import maya.cmds as cmds
 
 try:
-    import mgear.pymaya as pm
-    import mgear.pymaya.datatypes as dt
+    pm = importlib.import_module("mgear.pymaya")
+    dt = importlib.import_module("mgear.pymaya.datatypes")
 except ImportError:
-    import pymel.core as pm
-    import pymel.core.datatypes as dt
+    pm = importlib.import_module("pymel.core")
+    dt = importlib.import_module("pymel.core.datatypes")
 
 from mgear.shifter import component
 

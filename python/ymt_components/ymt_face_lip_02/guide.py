@@ -22,14 +22,15 @@ from maya.app.general.mayaMixin import MayaQWidgetDockableMixin
 from maya.app.general.mayaMixin import MayaQDockWidget
 
 from . import settingsUI as sui
+import importlib
 try:
-    import mgear.pymaya as pm
+    pm = importlib.import_module("mgear.pymaya")
 except ImportError:
-    import pymel.core as pm
+    pm = importlib.import_module("pymel.core")
 try:
-    from mgear.pymaya import datatypes
+    datatypes = importlib.import_module("mgear.pymaya.datatypes")
 except ImportError:
-    from pymel.core import datatypes
+    datatypes = importlib.import_module("pymel.core.datatypes")
 
 import ymt_shifter_utility as ymt_utility
 from mgear.shifter.component import chain_guide_initializer

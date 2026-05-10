@@ -5,10 +5,11 @@
 # Maya
 import maya.cmds as cmds
 import maya.cmds as mel
+import importlib
 try:
-    import mgear.pymaya as pm
+    pm = importlib.import_module("mgear.pymaya")
 except ImportError:
-    import pymel.core as pm
+    pm = importlib.import_module("pymel.core")
 
 # import maya.OpenMaya as om
 

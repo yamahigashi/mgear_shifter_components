@@ -2,10 +2,11 @@
 import traceback
 
 # dcc
+import importlib
 try:
-    import mgear.pymaya as pm
+    pm = importlib.import_module("mgear.pymaya")
 except ImportError:
-    import pymel.core as pm
+    pm = importlib.import_module("pymel.core")
 
 # mgear
 import mgear

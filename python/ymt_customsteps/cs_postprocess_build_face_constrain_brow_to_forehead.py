@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 import maya.cmds as cmds
+import importlib
 try:
-    import mgear.pymaya as pm
+    pm = importlib.import_module("mgear.pymaya")
 except ImportError:
-    import pymel.core as pm
+    pm = importlib.import_module("pymel.core")
 
 from mgear import rigbits
 import mgear.shifter.custom_step as cstp

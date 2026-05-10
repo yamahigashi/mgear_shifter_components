@@ -9,14 +9,15 @@ else:
     addDoubleLinear = "addDoubleLinear"
     pointMatrixMult = "pointMatrixMult"
 
+import importlib
 try:
-    import mgear.pymaya as pm
+    pm = importlib.import_module("mgear.pymaya")
 except ImportError:
-    import pymel.core as pm
+    pm = importlib.import_module("pymel.core")
 try:
-    from mgear.pymaya import datatypes as dt
+    dt = importlib.import_module("mgear.pymaya.datatypes")
 except ImportError:
-    from pymel.core import datatypes as dt
+    dt = importlib.import_module("pymel.core.datatypes")
 
 # mgear
 from mgear.shifter.component import MainComponent

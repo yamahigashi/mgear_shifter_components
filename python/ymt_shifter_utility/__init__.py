@@ -12,14 +12,15 @@ import maya.api.OpenMayaAnim as oma
 
 from pymel.core import nodetypes
 from pymel import versions
+import importlib
 try:
-    import mgear.pymaya as pm
+    pm = importlib.import_module("mgear.pymaya")
 except ImportError:
-    import pymel.core as pm
+    pm = importlib.import_module("pymel.core")
 try:
-    from mgear.pymaya import datatypes as dt
+    dt = importlib.import_module("mgear.pymaya.datatypes")
 except ImportError:
-    from pymel.core import datatypes as dt
+    dt = importlib.import_module("pymel.core.datatypes")
 
 from mgear.core import (
     attribute,

@@ -3,10 +3,11 @@ import math
 from mgear.shifter import component
 from mgear.core import attribute, transform, primitive
 
+import importlib
 try:
-    import mgear.pymaya as pm
+    pm = importlib.import_module("mgear.pymaya")
 except ImportError:
-    import pymel.core as pm
+    pm = importlib.import_module("pymel.core")
 
 import ymt_shifter_utility as ymt_util
 

@@ -30,10 +30,11 @@
 
 from functools import partial
 # pyMel
+import importlib
 try:
-    import mgear.pymaya as pm
+    pm = importlib.import_module("mgear.pymaya")
 except ImportError:
-    import pymel.core as pm
+    pm = importlib.import_module("pymel.core")
 
 # mgear
 import mgear.shifter_classic_components.arm_2jnt_04.guide as arm_2jnt_04

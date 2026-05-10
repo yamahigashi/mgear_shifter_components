@@ -1,9 +1,10 @@
 import os
 
+import importlib
 try:
-    import mgear.pymaya as pm
+    pm = importlib.import_module("mgear.pymaya")
 except ImportError:
-    import pymel.core as pm
+    pm = importlib.import_module("pymel.core")
 
 from maya.app.general.mayaMixin import MayaQDockWidget
 from maya.app.general.mayaMixin import MayaQWidgetDockableMixin

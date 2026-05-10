@@ -36,10 +36,11 @@ from logging import (  # noqa:F401 pylint: disable=unused-import, wrong-import-o
     INFO
 )
 
+import importlib
 try:
-    import mgear.pymaya as pm
+    pm = importlib.import_module("mgear.pymaya")
 except ImportError:
-    import pymel.core as pm
+    pm = importlib.import_module("pymel.core")
 
 handler = StreamHandler()
 handler.setLevel(DEBUG)

@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 import os
 import maya.cmds as cmds
+import importlib
 try:
-    import mgear.pymaya as pm
+    pm = importlib.import_module("mgear.pymaya")
 except ImportError:
-    import pymel.core as pm
+    pm = importlib.import_module("pymel.core")
 import mgear.core.skin as skin
 
 from mgear import rigbits

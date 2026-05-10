@@ -9,14 +9,15 @@ import traceback
 import maya.cmds as cmds
 import maya.api.OpenMaya as om
 
+import importlib
 try:
-    import mgear.pymaya as pm
+    pm = importlib.import_module("mgear.pymaya")
 except ImportError:
-    import pymel.core as pm
+    pm = importlib.import_module("pymel.core")
 try:
-    from mgear.pymaya import datatypes
+    datatypes = importlib.import_module("mgear.pymaya.datatypes")
 except ImportError:
-    from pymel.core import datatypes
+    datatypes = importlib.import_module("pymel.core.datatypes")
 
 from mgear import rigbits
 from mgear.rigbits import ghost

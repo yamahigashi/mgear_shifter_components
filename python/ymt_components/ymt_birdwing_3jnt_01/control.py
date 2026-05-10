@@ -6,10 +6,11 @@ from typing import ClassVar, Optional
 import maya.cmds as cmds
 from maya.api import OpenMaya as om2
 
+import importlib
 try:
-    import mgear.pymaya as pm
+    pm = importlib.import_module("mgear.pymaya")
 except ImportError:
-    import pymel.core as pm
+    pm = importlib.import_module("pymel.core")
 
 import mgear
 from mgear.core import anim_utils, pyqt as gqt

@@ -29,10 +29,11 @@ from mgear.core import (
 )
 
 from . import settingsUI as sui
+import importlib
 try:
-    import mgear.pymaya as pm
+    pm = importlib.import_module("mgear.pymaya")
 except ImportError:
-    import pymel.core as pm
+    pm = importlib.import_module("pymel.core")
 # from pymel.core import datatypes
 
 import ymt_shifter_utility as ymt_utility

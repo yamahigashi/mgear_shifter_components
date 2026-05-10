@@ -5,10 +5,11 @@ from typing import ClassVar, Optional
 
 from maya import cmds
 
+import importlib
 try:
-    import mgear.pymaya as pm
+    pm = importlib.import_module("mgear.pymaya")
 except ImportError:
-    import pymel.core as pm
+    pm = importlib.import_module("pymel.core")
 
 from maya.app.general.mayaMixin import MayaQDockWidget, MayaQWidgetDockableMixin
 from mgear.core import attribute, pyqt, transform

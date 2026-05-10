@@ -9,14 +9,15 @@ from mgear.vendor.Qt import QtWidgets, QtCore
 from maya.app.general.mayaMixin import MayaQWidgetDockableMixin
 from maya.app.general.mayaMixin import MayaQDockWidget
 
+import importlib
 try:
-    import mgear.pymaya as pm
+    pm = importlib.import_module("mgear.pymaya")
 except ImportError:
-    import pymel.core as pm
+    pm = importlib.import_module("pymel.core")
 try:
-    from mgear.pymaya import datatypes
+    datatypes = importlib.import_module("mgear.pymaya.datatypes")
 except ImportError:
-    from pymel.core import datatypes
+    datatypes = importlib.import_module("pymel.core.datatypes")
 from mgear import shifter
 
 from . import settingsUI as sui
