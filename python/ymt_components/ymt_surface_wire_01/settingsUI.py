@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 ################################################################################
 ## Form generated from reading UI file 'settingsUI.ui'
@@ -16,36 +15,36 @@ from Qt.QtWidgets import *
 class Ui_Form(object):
     def setupUi(self, Form):
         if not Form.objectName():
-            Form.setObjectName(u"Form")
+            Form.setObjectName("Form")
         Form.resize(419, 555)
         self.verticalLayout = QVBoxLayout(Form)
-        self.verticalLayout.setObjectName(u"verticalLayout")
+        self.verticalLayout.setObjectName("verticalLayout")
         self.groupBox_3 = QGroupBox(Form)
-        self.groupBox_3.setObjectName(u"groupBox_3")
+        self.groupBox_3.setObjectName("groupBox_3")
         self.gridLayout_4 = QGridLayout(self.groupBox_3)
-        self.gridLayout_4.setObjectName(u"gridLayout_4")
+        self.gridLayout_4.setObjectName("gridLayout_4")
         self.gridLayout_4.setSizeConstraint(QLayout.SetDefaultConstraint)
         self.isSlidingSurface = QCheckBox(self.groupBox_3)
-        self.isSlidingSurface.setObjectName(u"isSlidingSurface")
+        self.isSlidingSurface.setObjectName("isSlidingSurface")
         self.isSlidingSurface.setChecked(True)
         self.isSlidingSurface.setTristate(False)
 
         self.gridLayout_4.addWidget(self.isSlidingSurface, 0, 0, 1, 1)
 
         self.ikRefArray_groupBox = QGroupBox(self.groupBox_3)
-        self.ikRefArray_groupBox.setObjectName(u"ikRefArray_groupBox")
+        self.ikRefArray_groupBox.setObjectName("ikRefArray_groupBox")
         self.ikRefArray_groupBox.setEnabled(True)
         self.ikRefArray_groupBox.setMaximumSize(QSize(16777215, 166))
         self.ikRefArray_groupBox.setFlat(False)
         self.gridLayout_7 = QGridLayout(self.ikRefArray_groupBox)
-        self.gridLayout_7.setObjectName(u"gridLayout_7")
+        self.gridLayout_7.setObjectName("gridLayout_7")
         self.gridLayout_7.setSizeConstraint(QLayout.SetMaximumSize)
         self.ikRefArray_horizontalLayout_4 = QHBoxLayout()
-        self.ikRefArray_horizontalLayout_4.setObjectName(u"ikRefArray_horizontalLayout_4")
+        self.ikRefArray_horizontalLayout_4.setObjectName("ikRefArray_horizontalLayout_4")
         self.ikRefArray_verticalLayout_7 = QVBoxLayout()
-        self.ikRefArray_verticalLayout_7.setObjectName(u"ikRefArray_verticalLayout_7")
+        self.ikRefArray_verticalLayout_7.setObjectName("ikRefArray_verticalLayout_7")
         self.surfaceReference_listWidget = QListWidget(self.ikRefArray_groupBox)
-        self.surfaceReference_listWidget.setObjectName(u"surfaceReference_listWidget")
+        self.surfaceReference_listWidget.setObjectName("surfaceReference_listWidget")
         self.surfaceReference_listWidget.setAutoScroll(False)
         self.surfaceReference_listWidget.setProperty("showDropIndicator", False)
         self.surfaceReference_listWidget.setDragDropOverwriteMode(False)
@@ -64,14 +63,14 @@ class Ui_Form(object):
 
         self.ikRefArray_verticalLayout_8 = QVBoxLayout()
         self.ikRefArray_verticalLayout_8.setSpacing(3)
-        self.ikRefArray_verticalLayout_8.setObjectName(u"ikRefArray_verticalLayout_8")
+        self.ikRefArray_verticalLayout_8.setObjectName("ikRefArray_verticalLayout_8")
         self.surfaceReferenceAdd_pushButton = QPushButton(self.ikRefArray_groupBox)
-        self.surfaceReferenceAdd_pushButton.setObjectName(u"surfaceReferenceAdd_pushButton")
+        self.surfaceReferenceAdd_pushButton.setObjectName("surfaceReferenceAdd_pushButton")
 
         self.ikRefArray_verticalLayout_8.addWidget(self.surfaceReferenceAdd_pushButton)
 
         self.surfaceReferenceRemove_pushButton = QPushButton(self.ikRefArray_groupBox)
-        self.surfaceReferenceRemove_pushButton.setObjectName(u"surfaceReferenceRemove_pushButton")
+        self.surfaceReferenceRemove_pushButton.setObjectName("surfaceReferenceRemove_pushButton")
 
         self.ikRefArray_verticalLayout_8.addWidget(self.surfaceReferenceRemove_pushButton)
 
@@ -86,7 +85,7 @@ class Ui_Form(object):
         self.gridLayout_7.addLayout(self.ikRefArray_horizontalLayout_4, 1, 0, 1, 1)
 
         self.textEdit = QTextEdit(self.ikRefArray_groupBox)
-        self.textEdit.setObjectName(u"textEdit")
+        self.textEdit.setObjectName("textEdit")
         self.textEdit.setMaximumSize(QSize(16777215, 66))
         self.textEdit.setFocusPolicy(Qt.NoFocus)
         self.textEdit.setContextMenuPolicy(Qt.NoContextMenu)
@@ -102,32 +101,32 @@ class Ui_Form(object):
         self.verticalLayout.addWidget(self.groupBox_3)
 
         self.groupBox = QGroupBox(Form)
-        self.groupBox.setObjectName(u"groupBox")
+        self.groupBox.setObjectName("groupBox")
         self.verticalLayout_3 = QVBoxLayout(self.groupBox)
-        self.verticalLayout_3.setObjectName(u"verticalLayout_3")
+        self.verticalLayout_3.setObjectName("verticalLayout_3")
         self.sourceKeyable_checkBox = QCheckBox(self.groupBox)
-        self.sourceKeyable_checkBox.setObjectName(u"sourceKeyable_checkBox")
-        self.sourceKeyable_checkBox.setText(u"Source control keyable")
+        self.sourceKeyable_checkBox.setObjectName("sourceKeyable_checkBox")
+        self.sourceKeyable_checkBox.setText("Source control keyable")
 
         self.verticalLayout_3.addWidget(self.sourceKeyable_checkBox)
 
         self.overrideNegate_checkBox = QCheckBox(self.groupBox)
-        self.overrideNegate_checkBox.setObjectName(u"overrideNegate_checkBox")
-        self.overrideNegate_checkBox.setText(u"Surface control keyable")
+        self.overrideNegate_checkBox.setObjectName("overrideNegate_checkBox")
+        self.overrideNegate_checkBox.setText("Surface control keyable")
         self.overrideNegate_checkBox.setChecked(False)
 
         self.verticalLayout_3.addWidget(self.overrideNegate_checkBox)
 
         self.addJoints_checkBox = QCheckBox(self.groupBox)
-        self.addJoints_checkBox.setObjectName(u"addJoints_checkBox")
-        self.addJoints_checkBox.setText(u"Add Joints")
+        self.addJoints_checkBox.setObjectName("addJoints_checkBox")
+        self.addJoints_checkBox.setText("Add Joints")
         self.addJoints_checkBox.setChecked(True)
 
         self.verticalLayout_3.addWidget(self.addJoints_checkBox)
 
         self.surfaceKeyable_checkBox = QCheckBox(self.groupBox)
-        self.surfaceKeyable_checkBox.setObjectName(u"surfaceKeyable_checkBox")
-        self.surfaceKeyable_checkBox.setText(u"Override Negate Axis Direction For \"R\" Side")
+        self.surfaceKeyable_checkBox.setObjectName("surfaceKeyable_checkBox")
+        self.surfaceKeyable_checkBox.setText("Override Negate Axis Direction For \"R\" Side")
 
         self.verticalLayout_3.addWidget(self.surfaceKeyable_checkBox)
 
@@ -135,18 +134,18 @@ class Ui_Form(object):
         self.verticalLayout.addWidget(self.groupBox)
 
         self.groupBox_2 = QGroupBox(Form)
-        self.groupBox_2.setObjectName(u"groupBox_2")
+        self.groupBox_2.setObjectName("groupBox_2")
         self.verticalLayout_2 = QVBoxLayout(self.groupBox_2)
-        self.verticalLayout_2.setObjectName(u"verticalLayout_2")
+        self.verticalLayout_2.setObjectName("verticalLayout_2")
         self.horizontalLayout = QHBoxLayout()
-        self.horizontalLayout.setObjectName(u"horizontalLayout")
+        self.horizontalLayout.setObjectName("horizontalLayout")
         self.ctlNum_label = QLabel(self.groupBox_2)
-        self.ctlNum_label.setObjectName(u"ctlNum_label")
+        self.ctlNum_label.setObjectName("ctlNum_label")
 
         self.horizontalLayout.addWidget(self.ctlNum_label)
 
         self.ctlNum_doubleSpinBox = QDoubleSpinBox(self.groupBox_2)
-        self.ctlNum_doubleSpinBox.setObjectName(u"ctlNum_doubleSpinBox")
+        self.ctlNum_doubleSpinBox.setObjectName("ctlNum_doubleSpinBox")
         sizePolicy = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
@@ -166,14 +165,14 @@ class Ui_Form(object):
         self.verticalLayout_2.addLayout(self.horizontalLayout)
 
         self.horizontalLayout_4 = QHBoxLayout()
-        self.horizontalLayout_4.setObjectName(u"horizontalLayout_4")
+        self.horizontalLayout_4.setObjectName("horizontalLayout_4")
         self.ctlSize_label = QLabel(self.groupBox_2)
-        self.ctlSize_label.setObjectName(u"ctlSize_label")
+        self.ctlSize_label.setObjectName("ctlSize_label")
 
         self.horizontalLayout_4.addWidget(self.ctlSize_label)
 
         self.ctlSize_doubleSpinBox = QDoubleSpinBox(self.groupBox_2)
-        self.ctlSize_doubleSpinBox.setObjectName(u"ctlSize_doubleSpinBox")
+        self.ctlSize_doubleSpinBox.setObjectName("ctlSize_doubleSpinBox")
         sizePolicy.setHeightForWidth(self.ctlSize_doubleSpinBox.sizePolicy().hasHeightForWidth())
         self.ctlSize_doubleSpinBox.setSizePolicy(sizePolicy)
         self.ctlSize_doubleSpinBox.setWrapping(False)
@@ -189,10 +188,10 @@ class Ui_Form(object):
         self.verticalLayout_2.addLayout(self.horizontalLayout_4)
 
         self.horizontalLayout_3 = QHBoxLayout()
-        self.horizontalLayout_3.setObjectName(u"horizontalLayout_3")
+        self.horizontalLayout_3.setObjectName("horizontalLayout_3")
         self.controlShape_label = QLabel(self.groupBox_2)
-        self.controlShape_label.setObjectName(u"controlShape_label")
-        self.controlShape_label.setText(u"Control Shape")
+        self.controlShape_label.setObjectName("controlShape_label")
+        self.controlShape_label.setText("Control Shape")
 
         self.horizontalLayout_3.addWidget(self.controlShape_label)
 
@@ -211,7 +210,7 @@ class Ui_Form(object):
         self.controlShape_comboBox.addItem("")
         self.controlShape_comboBox.addItem("")
         self.controlShape_comboBox.addItem("")
-        self.controlShape_comboBox.setObjectName(u"controlShape_comboBox")
+        self.controlShape_comboBox.setObjectName("controlShape_comboBox")
         sizePolicy.setHeightForWidth(self.controlShape_comboBox.sizePolicy().hasHeightForWidth())
         self.controlShape_comboBox.setSizePolicy(sizePolicy)
 
@@ -237,13 +236,13 @@ class Ui_Form(object):
     # setupUi
 
     def retranslateUi(self, Form):
-        Form.setWindowTitle(QCoreApplication.translate("Form", u"Form", None))
-        self.groupBox_3.setTitle(QCoreApplication.translate("Form", u"Surface", None))
-        self.isSlidingSurface.setText(QCoreApplication.translate("Form", u"Sliding on Surface", None))
+        Form.setWindowTitle(QCoreApplication.translate("Form", "Form", None))
+        self.groupBox_3.setTitle(QCoreApplication.translate("Form", "Surface", None))
+        self.isSlidingSurface.setText(QCoreApplication.translate("Form", "Sliding on Surface", None))
         self.ikRefArray_groupBox.setTitle("")
-        self.surfaceReferenceAdd_pushButton.setText(QCoreApplication.translate("Form", u"<<", None))
-        self.surfaceReferenceRemove_pushButton.setText(QCoreApplication.translate("Form", u">>", None))
-        self.textEdit.setHtml(QCoreApplication.translate("Form", u"<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n"
+        self.surfaceReferenceAdd_pushButton.setText(QCoreApplication.translate("Form", "<<", None))
+        self.surfaceReferenceRemove_pushButton.setText(QCoreApplication.translate("Form", ">>", None))
+        self.textEdit.setHtml(QCoreApplication.translate("Form", "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n"
 "<html><head><meta name=\"qrichtext\" content=\"1\" /><meta charset=\"utf-8\" /><style type=\"text/css\">\n"
 "p, li { white-space: pre-wrap; }\n"
 "hr { height: 1px; border-width: 0; }\n"
@@ -252,24 +251,24 @@ class Ui_Form(object):
 "</style></head><body style=\" font-family:'Segoe UI'; font-size:9pt; font-weight:400; font-style:normal;\">\n"
 "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">Reference to the &quot;sliding_surface&quot; of other components.</p>\n"
 "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">When setting this value, please ensure that the component comes before this component in the order on the outliner.</p></body></html>", None))
-        self.groupBox.setTitle(QCoreApplication.translate("Form", u"GroupBox", None))
+        self.groupBox.setTitle(QCoreApplication.translate("Form", "GroupBox", None))
         self.groupBox_2.setTitle("")
-        self.ctlNum_label.setText(QCoreApplication.translate("Form", u"Num Ctl", None))
-        self.ctlSize_label.setText(QCoreApplication.translate("Form", u"Ctl Size", None))
-        self.controlShape_comboBox.setItemText(0, QCoreApplication.translate("Form", u"Arrow", None))
-        self.controlShape_comboBox.setItemText(1, QCoreApplication.translate("Form", u"Circle", None))
-        self.controlShape_comboBox.setItemText(2, QCoreApplication.translate("Form", u"Compas", None))
-        self.controlShape_comboBox.setItemText(3, QCoreApplication.translate("Form", u"Cross", None))
-        self.controlShape_comboBox.setItemText(4, QCoreApplication.translate("Form", u"Crossarrow", None))
-        self.controlShape_comboBox.setItemText(5, QCoreApplication.translate("Form", u"Cube", None))
-        self.controlShape_comboBox.setItemText(6, QCoreApplication.translate("Form", u"Cubewithpeak", None))
-        self.controlShape_comboBox.setItemText(7, QCoreApplication.translate("Form", u"Cylinder", None))
-        self.controlShape_comboBox.setItemText(8, QCoreApplication.translate("Form", u"Diamond", None))
-        self.controlShape_comboBox.setItemText(9, QCoreApplication.translate("Form", u"Flower", None))
-        self.controlShape_comboBox.setItemText(10, QCoreApplication.translate("Form", u"Null", None))
-        self.controlShape_comboBox.setItemText(11, QCoreApplication.translate("Form", u"Pyramid", None))
-        self.controlShape_comboBox.setItemText(12, QCoreApplication.translate("Form", u"Sphere", None))
-        self.controlShape_comboBox.setItemText(13, QCoreApplication.translate("Form", u"Square", None))
+        self.ctlNum_label.setText(QCoreApplication.translate("Form", "Num Ctl", None))
+        self.ctlSize_label.setText(QCoreApplication.translate("Form", "Ctl Size", None))
+        self.controlShape_comboBox.setItemText(0, QCoreApplication.translate("Form", "Arrow", None))
+        self.controlShape_comboBox.setItemText(1, QCoreApplication.translate("Form", "Circle", None))
+        self.controlShape_comboBox.setItemText(2, QCoreApplication.translate("Form", "Compas", None))
+        self.controlShape_comboBox.setItemText(3, QCoreApplication.translate("Form", "Cross", None))
+        self.controlShape_comboBox.setItemText(4, QCoreApplication.translate("Form", "Crossarrow", None))
+        self.controlShape_comboBox.setItemText(5, QCoreApplication.translate("Form", "Cube", None))
+        self.controlShape_comboBox.setItemText(6, QCoreApplication.translate("Form", "Cubewithpeak", None))
+        self.controlShape_comboBox.setItemText(7, QCoreApplication.translate("Form", "Cylinder", None))
+        self.controlShape_comboBox.setItemText(8, QCoreApplication.translate("Form", "Diamond", None))
+        self.controlShape_comboBox.setItemText(9, QCoreApplication.translate("Form", "Flower", None))
+        self.controlShape_comboBox.setItemText(10, QCoreApplication.translate("Form", "Null", None))
+        self.controlShape_comboBox.setItemText(11, QCoreApplication.translate("Form", "Pyramid", None))
+        self.controlShape_comboBox.setItemText(12, QCoreApplication.translate("Form", "Sphere", None))
+        self.controlShape_comboBox.setItemText(13, QCoreApplication.translate("Form", "Square", None))
 
     # retranslateUi
 

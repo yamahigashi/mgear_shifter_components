@@ -191,7 +191,7 @@ class Guide(guide.ComponentGuide):
 
         super(Guide, self).setFromHierarchy(root)
         pm.delete(self.sliding_surface)
-        
+
         sliding_surface = ymt_utility.deserialize_nurbs_surface(self.getName("sliding_surface"), info)
         self.sliding_surface = pm.PyNode(sliding_surface)
         pm.parent(self.sliding_surface, self.root, absolute=False, relative=True)
@@ -209,7 +209,7 @@ class Guide(guide.ComponentGuide):
         """Override the base class method to add more data to the guide template dict"""
 
         super(Guide, self).set_from_dict(c_dict)
-        try:  # noqa: FURB107
+        try:
             if self.sliding_surface is not None:
                 pm.delete(self.sliding_surface)
         except AttributeError:

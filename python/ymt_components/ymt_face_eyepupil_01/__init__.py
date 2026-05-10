@@ -26,19 +26,19 @@ if sys.version_info > (3, 0):
     from typing import TYPE_CHECKING
     if TYPE_CHECKING:
         from typing import (
-            Optional,  # noqa: F401
-            Dict,  # noqa: F401
-            List,  # noqa: F401
-            Tuple,  # noqa: F401
-            Pattern,  # noqa: F401
-            Callable,  # noqa: F401
-            Any,  # noqa: F401
-            Text,  # noqa: F401
-            Generator,  # noqa: F401
-            Union  # noqa: F401
+            Optional,
+            Dict,
+            List,
+            Tuple,
+            Callable,
+            Any,
+            Text,
+            Union
         )
+        from re import Pattern
+        from collections.abc import Generator
 
-from logging import (  # noqa:F401 pylint: disable=unused-import, wrong-import-order
+from logging import (
     StreamHandler,
     getLogger,
     # WARN,
@@ -243,7 +243,7 @@ class Component(component.Main):
                 mo=True,
                 skipTranslate=["x", "y", "z"]
             )
- 
+
 
     def connect_slide_ghost(self):
 

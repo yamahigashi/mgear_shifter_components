@@ -42,19 +42,19 @@ if sys.version_info > (3, 0):
     from typing import TYPE_CHECKING
     if TYPE_CHECKING:
         from typing import (
-            Optional,  # noqa: F401
-            Dict,  # noqa: F401
-            List,  # noqa: F401
-            Tuple,  # noqa: F401
-            Pattern,  # noqa: F401
-            Callable,  # noqa: F401
-            Any,  # noqa: F401
-            Text,  # noqa: F401
-            Generator,  # noqa: F401
-            Union  # noqa: F401
+            Optional,
+            Dict,
+            List,
+            Tuple,
+            Callable,
+            Any,
+            Text,
+            Union
         )
+        from re import Pattern
+        from collections.abc import Generator
 
-from logging import (  # noqa:F401 pylint: disable=unused-import, wrong-import-order
+from logging import (
     StreamHandler,
     getLogger,
     # WARN,
@@ -246,7 +246,7 @@ class Component(component.Main):
         # localBBOX
 
         localBBox = self.guide.eyeMesh.getBoundingBox(invisible=True, space="world")
-        wRadius = abs((localBBox[0][0] - localBBox[1][0]))
+        wRadius = abs(localBBox[0][0] - localBBox[1][0])
         dRadius = abs((localBBox[0][1] - localBBox[1][1]) / 1.7)
 
         return wRadius, dRadius
@@ -255,7 +255,7 @@ class Component(component.Main):
         # localBBOX
 
         localBBox = self.guide.eyeballMesh.getBoundingBox(invisible=True, space="world")
-        wRadius = abs((localBBox[0][0] - localBBox[1][0]))
+        wRadius = abs(localBBox[0][0] - localBBox[1][0])
         dRadius = abs((localBBox[0][1] - localBBox[1][1]) / 1.7)
 
         return wRadius, dRadius
@@ -274,7 +274,7 @@ class Component(component.Main):
             self.frontPos,
             self.normalVec,
             axis=axis,
-        ) 
+        )
 
         # averagePosition,
         t_arrow = setMatrixPosition(t, self.eyeballPivotPos)
@@ -935,7 +935,7 @@ def rotate_vector(pos, rot, front=om.MVector(0, 0, 1)):
     :return: 回転後のベクトル [x', y', z']
     """
     v = om.MVector(pos[0], pos[1], pos[2])
-    
+
     # 回転軸ベクトル (回転方向を表すベクトル)
     r = om.MVector(rot[0], rot[1], rot[2])
     if front is None:

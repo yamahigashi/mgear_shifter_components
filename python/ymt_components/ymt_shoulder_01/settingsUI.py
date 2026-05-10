@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 # Form implementation generated from reading ui file 'D:/matsumoto/projects/gdl/svn/trunk/maya/maya_modules/red/python/ymt_component/ymt_shoulder_01/settingsUI.ui'
 #
@@ -7,7 +6,7 @@
 #
 # WARNING! All changes made in this file will be lost!
 
-from Qt import QtCore, QtGui, QtWidgets
+from Qt import QtCore, QtWidgets
 
 class Ui_Form(object):
     def setupUi(self, Form):

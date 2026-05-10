@@ -386,7 +386,7 @@ def getFullPath(start, routes=None):
         return routes
 
     else:
-        return getFullPath(start.getParent(), routes + [start, ])
+        return getFullPath(start.getParent(), routes + [start ])
 
 
 def findPathAtoB(a, b):

@@ -56,23 +56,23 @@ import ymt_shifter_utility.curve as curve
 
 if sys.version_info >= (3, 0):  # pylint: disable=using-constant-test  # pylint: disable=using-constant-test, wrong-import-order
     # For type annotation
-    from typing import (  # NOQA: F401 pylint: disable=unused-import
+    from typing import (
         Optional,
         Dict,
         List,
         Tuple,
-        Pattern,
         Callable,
         Any,
         Text,
-        Generator,
         Union
     )
-    from pathlib import Path  # NOQA: F401, F811 pylint: disable=unused-import,reimported
-    from types import ModuleType  # NOQA: F401 pylint: disable=unused-import
-    from six.moves import reload_module as reload  # NOQA: F401 pylint: disable=unused-import
+    from re import Pattern
+    from collections.abc import Generator
+    from pathlib import Path
+    from types import ModuleType
+    from six.moves import reload_module as reload
 
-from logging import (  # noqa:F401 pylint: disable=unused-import, wrong-import-order
+from logging import (
     StreamHandler,
     getLogger,
     WARN,
@@ -664,7 +664,7 @@ class Component(component.Main):
         try:
             self.connect_ghosts()
 
-        except Exception as e:
+        except Exception:
             traceback.print_exc()
 
             raise
@@ -782,7 +782,7 @@ class Component(component.Main):
         for grp_name, grp in self.groups.items():
             try:
                 grp.remove(obj)
-            except (ValueError) as e:
+            except (ValueError):
                 pass
                 # logger.error(e)
 
@@ -874,14 +874,14 @@ def draw_eye_guide_mesh_plane(points, t):
     mean = (mean_x, mean_y, mean_z)
 
     # Simple unitCube coordinates
-    vertices = [om.MPoint(mean), ]
+    vertices = [om.MPoint(mean) ]
     polygonCounts = []
     polygonConnects = []
 
     for i, p in enumerate(points):
         vertices.append(om.MPoint(p))    # 0
 
-        if 1 < i:
+        if i > 1:
             polygonCounts.append(3)
             polygonConnects.append(i)
             polygonConnects.append(i - 1)
@@ -947,7 +947,7 @@ def ghostSliderForMouth(ghostControls, intTra, surface, sliderParent):
         gDriver = primitive.addTransform(surface.getParent(), "{}_slideDriver".format(ctl.name()), t)
         drivers.append(gDriver)
 
-        if 0 == i:
+        if i == 0:
             connCenter(ctl, gDriver, ctlGhost)
 
         else:
@@ -963,7 +963,7 @@ def ghostSliderForMouth(ghostControls, intTra, surface, sliderParent):
         sliders.append(slider)
 
         # connexion
-        if 0 == i:
+        if i == 0:
             dm_node = node.createDecomposeMatrixNode(gDriver.attr("matrix"))
 
         else:

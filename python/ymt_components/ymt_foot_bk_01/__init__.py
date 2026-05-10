@@ -126,7 +126,7 @@ class Component(component.Main):
             loc = primitive.addTransform(parent, self.getName("bk%s_loc" % i), t)
             self.bk_loc.append(loc)
 
-            if 0 < i:
+            if i > 0:
                 return loc
 
             ctl = self.addCtl(loc,

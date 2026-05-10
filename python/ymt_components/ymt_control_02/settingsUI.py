@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 # Form implementation generated from reading ui file 'D:/Projects/Pipeline/rez-packages/third/github.com/yamahigashi/ymtshiftercomponents/0.2.0/mgear_shifter_components/python/ymt_components/ymt_control_02/settingsUI.ui',
 # licensing of 'D:/Projects/Pipeline/rez-packages/third/github.com/yamahigashi/ymtshiftercomponents/0.2.0/mgear_shifter_components/python/ymt_components/ymt_control_02/settingsUI.ui' applies.
@@ -8,7 +7,7 @@
 #
 # WARNING! All changes made in this file will be lost!
 
-from Qt import QtCore, QtGui, QtWidgets
+from Qt import QtCore, QtWidgets
 
 class Ui_Form(object):
     def setupUi(self, Form):

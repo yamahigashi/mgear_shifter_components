@@ -734,7 +734,7 @@ class Component(component.Main):
             dm_node = node.createDecomposeMatrixNode(mulmat_node2 + ".output")
             pm.connectAttr(dm_node + ".outputTranslate", str(d) + ".t")
 
-            check_list = (pm.Attribute, unicode, str)  # noqa
+            check_list = (pm.Attribute, unicode, str)
             cond = pm.createNode("condition")
             pm.setAttr(cond + ".operation", 4)  # greater
             attribute.connectSet(self.fk_collapsed_att, cond + ".secondTerm", check_list)
@@ -886,7 +886,7 @@ class Component(component.Main):
             return mi + (mx-mi)*(lambda t: (1+((200. / curve_length)*100.)**(-t+0.5))**(-1) )( (x-mi)/(mx-mi))
 
         tz = scale_ctl.translateY
-        if 0.0 < tz:
+        if tz > 0.0:
             s = sigmoid(tz * (200. / curve_length), 0.0001, 100.0) * 0.01
             vis = True
             fk0_npo.scale = MVector(1., 1., 1.)
@@ -899,7 +899,7 @@ class Component(component.Main):
         fk0_npo.visibility = vis
 
         length_ratio = tz / curve_length
-        if 1.0 < length_ratio:
+        if length_ratio > 1.0:
             sine_npo.scale = MVector(length_ratio, length_ratio, length_ratio)
         else:
             sine_npo.scale = MVector(1., 1., 1.)
@@ -951,7 +951,7 @@ class Component(component.Main):
         cmds.setAttr("{}.ry".format(self.sine_handle_x), 90.0)
 
         # ensure plugin loaded
-        if 0 == cmds.pluginInfo("maya-math-nodes", query=True, loaded=True):
+        if cmds.pluginInfo("maya-math-nodes", query=True, loaded=True) == 0:
             cmds.loadPlugin("maya-math-nodes")
         mult = pm.createNode("math_Multiply")
         pm.connectAttr(str(self.sinewave_offset_y_att), "{}.input1".format(mult))

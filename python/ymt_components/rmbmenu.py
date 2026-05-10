@@ -1,10 +1,7 @@
-# -*- coding: utf-8 -*-
 """Module for hook right mouse button using rmbmenuhook.
 ref: https://github.com/bohdon/maya-workflowtools/tree/main/src/workflowtools/scripts/rmbmenuhook"""
 
 import os
-import re
-import math
 import sys
 import abc
 import six
@@ -16,8 +13,6 @@ from maya import (
     mel,
 )
 
-import maya.OpenMaya as om1
-import maya.api.OpenMaya as om
 
 from Qt import (
     QtWidgets,
@@ -25,33 +20,13 @@ from Qt import (
 )
 
 from mgear import shifter
-import mgear.shifter.component as component
-import mgear.synoptic as synoptic
 
-from mgear.core import (
-    attribute,
-    node,
-    icon,
-    # fcurve,
-    vector,
-)
 
-from mgear.core.primitive import addTransform
 # from mgear.shifter import naming
 
 from mgear.core import (
     transform,
-    curve,
-    applyop,
-    attribute,
-    icon,
-    fcurve,
-    vector,
-    meshNavigation,
-    node,
-    primitive,
     utils,
-    anim_utils,
 )
 
 import rmbmenuhook
@@ -59,7 +34,7 @@ import rmbmenuhook
 from ymt_shifter_utility import control_util
 
 
-from logging import (  # noqa:F401 pylint: disable=unused-import, wrong-import-order
+from logging import (
     StreamHandler,
     getLogger,
     WARN,
@@ -74,11 +49,9 @@ if sys.version_info >= (3, 0):  # pylint: disable=using-constant-test  # pylint:
         Dict,
         List,
         Tuple,
-        Pattern,
         Callable,
         Any,
         Text,
-        Generator,
         Union
     )
 
@@ -191,7 +164,7 @@ def load_modules(component_list):
             logger.error(traceback.format_exc())
             continue
 
-        if not getattr(module, "ShifterMarkingMenu"):
+        if not module.ShifterMarkingMenu:
             logger.warning("module %s has no ShifterMarkingMenu class.", comp_name)
             continue
 
@@ -331,6 +304,6 @@ class DefaultShifterMarkingMenu(ShifterMarkingMenu):
 
     def shouldBuild(self):
         return self.is_mgear_controller(self.object)
-  
+
     def build_specialized(self, targets):
         self.build_default(targets)

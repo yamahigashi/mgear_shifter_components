@@ -1,10 +1,7 @@
-# -*- coding: utf-8 -*-
 """Module for hook right mouse button using rmbmenuhook."""
 """https://github.com/bohdon/maya-workflowtools/tree/main/src/workflowtools/scripts/rmbmenuhook"""
 import os
-import re
 import sys
-import six
 from functools import partial
 
 import maya.cmds as cmds
@@ -17,7 +14,7 @@ from ymt_components import rmbmenu
 from ymt_shifter_utility import control_util
 from . import control
 
-from logging import (  # noqa:F401 pylint: disable=unused-import, wrong-import-order
+from logging import (
     StreamHandler,
     getLogger,
     WARN,
@@ -32,11 +29,9 @@ if sys.version_info >= (3, 0):  # pylint: disable=using-constant-test  # pylint:
         Dict,
         List,
         Tuple,
-        Pattern,
         Callable,
         Any,
         Text,
-        Generator,
         Union
     )
 ###############################################################################
@@ -58,7 +53,7 @@ logger.propagate = False
 class ShifterMarkingMenu(rmbmenu.ShifterMarkingMenu):
 
     comp_name = os.path.basename(os.path.dirname(__file__))
-  
+
     def build_specialized(self, targets):
         # self.menu is the parent marking menu that menuItems should be attached to
         cmds.setParent(self.menu, m=True)

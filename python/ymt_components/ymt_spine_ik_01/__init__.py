@@ -623,7 +623,7 @@ class Component(component.Main):
             dm_node = node.createDecomposeMatrixNode(mulmat_node2 + ".output")
             pm.connectAttr(dm_node + ".outputTranslate", str(d) + ".t")
 
-            check_list = (pm.Attribute, unicode, str)  # noqa
+            check_list = (pm.Attribute, unicode, str)
             cond = pm.createNode("condition")
             pm.setAttr(cond + ".operation", 4)  # greater
             attribute.connectSet(self.fk_collapsed_att, cond + ".secondTerm", check_list)

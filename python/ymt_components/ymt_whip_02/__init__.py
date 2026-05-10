@@ -50,7 +50,7 @@ import ymt_shifter_utility as ymt_util
 from ymt_shifter_utility import twistSplineBuilder as tsBuilder
 from ymt_shifter_utility import pymel_to_pymaya as pym2m
 
-from logging import (  # noqa:F401 pylint: disable=unused-import, wrong-import-order
+from logging import (
     # StreamHandler,
     getLogger,
     # WARN,
@@ -62,17 +62,17 @@ if sys.version_info > (3, 0):
     from typing import TYPE_CHECKING
     if TYPE_CHECKING:
         from typing import (
-            Optional,  # noqa: F401
-            Dict,  # noqa: F401
-            List,  # noqa: F401
-            Tuple,  # noqa: F401
-            Pattern,  # noqa: F401
-            Callable,  # noqa: F401
-            Any,  # noqa: F401
-            Text,  # noqa: F401
-            Generator,  # noqa: F401
-            Union  # noqa: F401
+            Optional,
+            Dict,
+            List,
+            Tuple,
+            Callable,
+            Any,
+            Text,
+            Union
         )
+        from re import Pattern
+        from collections.abc import Generator
 logger = getLogger(__name__)
 logger.setLevel(INFO)
 # logger.setLevel(WARN)
@@ -746,7 +746,7 @@ class Component(component.Main):
         # Curves -------------------------------------------
 
         # ensure plugin loaded
-        if 0 == cmds.pluginInfo("rotationDriver", query=True, loaded=True):
+        if cmds.pluginInfo("rotationDriver", query=True, loaded=True) == 0:
             cmds.loadPlugin("rotationDriver")
 
         self.decomp_tip_ik_rot = pm.createNode("decomposeRotate")
@@ -785,7 +785,7 @@ class Component(component.Main):
             dm_node = node.createDecomposeMatrixNode(mulmat_node2 + ".output")
             pm.connectAttr(dm_node + ".outputTranslate", str(d) + ".t")
 
-            check_list = (pm.Attribute, six.string_types)  # noqa
+            check_list = (pm.Attribute, six.string_types)
             cond = pm.createNode("condition")
             pm.setAttr(cond + ".operation", 4)  # greater
             attribute.connectSet(self.fk_collapsed_att, cond + ".secondTerm", check_list)
@@ -830,7 +830,7 @@ class Component(component.Main):
             fk0_npo.scale = MVector(1., 1., 1.)
             scale_master.Stretch = s
 
-        elif 0.0 < tz:
+        elif tz > 0.0:
             s = tz / curve_length
             vis = True
             fk0_npo.scale = MVector(1., 1., 1.)

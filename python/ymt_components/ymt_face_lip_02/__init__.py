@@ -48,22 +48,22 @@ if sys.version_info > (3, 0):
     from typing import TYPE_CHECKING
     if TYPE_CHECKING:
         from typing import (
-            Optional,  # noqa: F401
-            Dict,  # noqa: F401
-            List,  # noqa: F401
-            Tuple,  # noqa: F401
-            Pattern,  # noqa: F401
-            Callable,  # noqa: F401
-            Any,  # noqa: F401
-            Text,  # noqa: F401
-            Generator,  # noqa: F401
-            Union  # noqa: F401
+            Optional,
+            Dict,
+            List,
+            Tuple,
+            Callable,
+            Any,
+            Text,
+            Union
         )
+        from re import Pattern
+        from collections.abc import Generator
 
-from logging import (  # noqa:F401 pylint: disable=unused-import, wrong-import-order
+from logging import (
     StreamHandler,
     getLogger,
-    WARN,  # noqa: F401
+    WARN,
     DEBUG,
     INFO
 )
@@ -307,11 +307,11 @@ class Component(component.Main):
             mirror = i > self.num_locs / 2
             lower = i > self.left_index and i < self.right_index
 
-            if i == 0: 
+            if i == 0:
                 oSide = "C"
                 _index = 0
 
-            elif i == self.bottom_index: 
+            elif i == self.bottom_index:
                 oSide = "C"
                 _index = 1
 
@@ -343,13 +343,13 @@ class Component(component.Main):
 
                 m = getTransform(cns)
                 m = setMatrixPosition(m, self._objToWorld(self.locsPos[i]))
-     
+
                 if mirror:
                     if lower:
                         m = setMatrixScale(m, scl=[1, 1, 1])
                     else:
                         m = setMatrixScale(m, scl=[-1, 1, 1])
-     
+
                 else:
                     if lower:
                         m = setMatrixScale(m, scl=[-1, 1, 1])
@@ -366,11 +366,11 @@ class Component(component.Main):
                     pos = cmds.xform(rightNpo.longName(), q=True, ws=True, translation=True)
                     cmds.xform(rightNpo.longName(), ws=True, matrix=[item for tup in m.get() for item in tup])
                     cmds.xform(rightNpo.longName(), ws=True, translation=pos)
-     
+
                 npo_name = self.getName("rope_{}_jnt_npo".format(_index))
                 npo = addTransform(cns, npo_name, m)
                 npos.append(npo)
-     
+
                 ctl = self.addCtl(
                     npo,
                     "%s_crvdetail" % _index,
@@ -382,9 +382,9 @@ class Component(component.Main):
                     # ro=datatypes.Vector(1.57079633, 0, 0),
                     po=po
                 )
-    
+
                 controls.append(ctl)
-     
+
                 # getting joint parent
                 self.jnt_pos.append([ctl, "{}".format(i)])
                 self.addToSubGroup(ctl, self.detailControllersGroupName)
@@ -552,10 +552,10 @@ class Component(component.Main):
             src = self.lips_C_upper_ctl.longName()
 
             # Center
-            if i == 0: 
+            if i == 0:
                 pass
 
-            elif i == self.bottom_index: 
+            elif i == self.bottom_index:
                 src = self.lips_C_lower_ctl.longName()
 
             # Left
@@ -586,11 +586,11 @@ class Component(component.Main):
         mid = length / 2.0
 
         # Center
-        if i == 0: 
+        if i == 0:
             div = mid
             prof = "upperPuckerRoll_profile"
 
-        elif i == self.bottom_index: 
+        elif i == self.bottom_index:
             div = mid
             prof = "lowerPuckerRoll_profile"
 
@@ -677,7 +677,7 @@ class Component(component.Main):
 
         return npos, ctls
 
-    def _constrainCtlRotToCurve(self, ctls, crv): 
+    def _constrainCtlRotToCurve(self, ctls, crv):
 
         # for i, cv in enumerate(cvs):
         for i in (1, 2, 4, 5, 7, 8, 10, 11):
@@ -703,7 +703,7 @@ class Component(component.Main):
             cmds.connectAttr(crvShape + ".local", motPath + ".geometryPath")
 
             mirror = i > 6
-            lower = 3 < i and i < 9
+            lower = i > 3 and i < 9
             outpath = motPath + ".rotateZ"
 
             if lower:
@@ -919,7 +919,7 @@ class Component(component.Main):
             return
 
         for grp_name, grp in self.groups.items():
-            try:  # noqa: FURB107
+            try:
                 grp.remove(obj)
             except ValueError:
                 pass
@@ -1129,7 +1129,7 @@ def ghostSliderForMouth(ghostControls, intTra, surface, sliderParent):
         gDriver = addTransform(surface.getParent(), "{}_slideDriver".format(ctl.name()), t)
         drivers.append(gDriver)
 
-        if 0 == i:
+        if i == 0:
             connCenter(ctl, gDriver, ctlGhost)
 
         else:
@@ -1145,7 +1145,7 @@ def ghostSliderForMouth(ghostControls, intTra, surface, sliderParent):
         sliders.append(slider)
 
         # connexion
-        if 0 == i:
+        if i == 0:
             dm_node = node.createDecomposeMatrixNode(gDriver.attr("matrix"))
 
         else:
@@ -1249,7 +1249,7 @@ def calculate_flatness_ratio(points):
     # type: (list[tuple[float, float, float]]) -> tuple[tuple[float, float, float], float]
 
     try:
-        import numpy as np  # type: ignore  # noqa: F401
+        import numpy as np  # type: ignore
         return calculate_flatness_ratio_using_numpy(points)
 
     except ImportError:
@@ -1260,7 +1260,7 @@ def calculate_flatness_ratio(points):
 def calculate_flatness_ratio_using_numpy(points):
     # type: (list[tuple[float, float, float]]) -> tuple[tuple[float, float, float], float]
 
-    import numpy as np  # type: ignore  # noqa: F401
+    import numpy as np  # type: ignore
     mean = np.mean(points, axis=0)
     centered_points = points - mean
 
@@ -1290,7 +1290,7 @@ def calculate_flatness_ratio_simple(points):
         raise ValueError("ポイントリストが空です。")
 
     n = len(points)
-    
+
     # 1. データの中心化
     mean_x = sum(p[0] for p in points) / n
     mean_y = sum(p[1] for p in points) / n

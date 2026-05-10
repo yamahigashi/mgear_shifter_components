@@ -2,20 +2,15 @@
 # GLOBAL
 ##################################################
 import re
-import traceback
 
-import maya.cmds as cmds
 import importlib
 try:
     pm = importlib.import_module("mgear.pymaya")
 except ImportError:
     pm = importlib.import_module("pymel.core")
 
-import mgear
 import mgear.core.pyqt as gqt
 
-import mgear.core.transform as tra
-import mgear.synoptic.utils as syn_uti
 # import mgear.core.synoptic.widgets as syn_widget
 
 QtGui, QtCore, QtWidgets, wrapInstance = gqt.qt_import()

@@ -23,7 +23,6 @@ SOFTWARE.
 '''
 # pylint: disable=bad-indentation
 
-from itertools import product
 from maya import cmds, OpenMaya
 
 # Naming Convention

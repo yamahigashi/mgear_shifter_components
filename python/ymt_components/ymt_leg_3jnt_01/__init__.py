@@ -1052,10 +1052,7 @@ class Component(component.Main):
             else:
                 subdiv = 45
 
-            if i < (self.settings["div0"] + 1):
-                perc = i * .333 / (self.settings["div0"] + 1.0)
-
-            elif i < (self.settings["div0"] + self.settings["div1"] + 2):
+            if i < (self.settings["div0"] + 1) or i < (self.settings["div0"] + self.settings["div1"] + 2):
                 perc = i * .333 / (self.settings["div0"] + 1.0)
             else:
                 perc = (.5
@@ -1162,7 +1159,7 @@ class Component(component.Main):
         startToEnd2.normalize()
 
         # Calculate the angle between the two vectors
-        angle = startToEnd1.angle(startToEnd2) * (180 / 3.141592653589793) 
+        angle = startToEnd1.angle(startToEnd2) * (180 / 3.141592653589793)
 
         return angle < degree
 

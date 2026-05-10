@@ -6,7 +6,6 @@ from functools import partial
 # mgear
 from mgear.shifter.component.guide import ComponentGuide
 import mgear.core.transform as tra
-import mgear.core.vector as vec
 
 # Pyside
 from mgear.shifter.component.guide import componentMainSettings

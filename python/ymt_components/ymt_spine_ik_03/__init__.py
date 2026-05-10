@@ -326,7 +326,7 @@ class Component(component.Main):
             mat[8], mat[9], mat[10], mat[11],
             mat[12], mat[13], mat[14], mat[15]
         ])
-            
+
 
         tm = datatypes.TransformationMatrix(pt)
         tm = pym2m.add_rotation(tm, [0.0, 0.0, math.pi / -2.0], "XYZ", om.MSpace.kObject, unit="rad")
@@ -536,7 +536,7 @@ class Component(component.Main):
         pm.parentConstraint(self.bts_joints[0], self.fk_npo[0], maintainOffset=True, skipRotate=("x", "y", "z"))
 
         # ensure plugin loaded
-        if 0 == cmds.pluginInfo("rotationDriver", query=True, loaded=True):
+        if cmds.pluginInfo("rotationDriver", query=True, loaded=True) == 0:
             cmds.loadPlugin("rotationDriver")
 
         decomp_tip_ik_rot = cmds.createNode("decomposeRotate")
@@ -606,7 +606,7 @@ class Component(component.Main):
             dm_node = node.createDecomposeMatrixNode(mulmat_node2 + ".output")
             pm.connectAttr(dm_node + ".outputTranslate", str(d) + ".t")
 
-            check_list = (pm.Attribute, six.string_types)  # noqa
+            check_list = (pm.Attribute, six.string_types)
 
             cond = pm.createNode("condition")
             pm.setAttr(cond + ".operation", 4)  # greater
@@ -623,7 +623,7 @@ class Component(component.Main):
             pm.setAttr(cond + ".colorIfFalseB", 0.)
 
             pm.connectAttr(cond + ".outColor", str(d) + ".r")
-            
+
         # References
         tmp_div_npo_transform = getTransform(self.div_cns_npo[i])  # to fix mismatch before/after later
 

@@ -23,7 +23,8 @@ import ymt_shifter_utility as yu
 
 import typing
 if typing.TYPE_CHECKING:
-    from typing import Sequence, Union, Optional
+    from typing import Union, Optional
+    from collections.abc import Sequence
     Vector3 = Sequence[float]
 
 #############################################
@@ -285,7 +286,7 @@ class Component(component.Main):
         attribute.lockAttribute(self.root_ctl, ["sx", "sy", "sz", "v"])
 
         ##################################################>
-        # FK Controlers 
+        # FK Controlers
         ##################################################>
 
         # FK0 --------------------------------------------

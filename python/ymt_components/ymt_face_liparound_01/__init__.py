@@ -48,22 +48,22 @@ if sys.version_info > (3, 0):
     from typing import TYPE_CHECKING
     if TYPE_CHECKING:
         from typing import (
-            Optional,  # noqa: F401
-            Dict,  # noqa: F401
-            List,  # noqa: F401
-            Tuple,  # noqa: F401
-            Pattern,  # noqa: F401
-            Callable,  # noqa: F401
-            Any,  # noqa: F401
-            Text,  # noqa: F401
-            Generator,  # noqa: F401
-            Union  # noqa: F401
+            Optional,
+            Dict,
+            List,
+            Tuple,
+            Callable,
+            Any,
+            Text,
+            Union
         )
+        from re import Pattern
+        from collections.abc import Generator
 
-from logging import (  # noqa:F401 pylint: disable=unused-import, wrong-import-order
+from logging import (
     StreamHandler,
     getLogger,
-    WARN,  # noqa: F401
+    WARN,
     DEBUG,
     INFO
 )
@@ -318,11 +318,11 @@ class Component(component.Main):
             lower = i > self.left_index and i < self.right_index
 
             # sub component name
-            if i == 0: 
+            if i == 0:
                 oSide = "C"
                 _index = 0
 
-            elif i == self.bottom_index: 
+            elif i == self.bottom_index:
                 oSide = "C"
                 _index = 1
 
@@ -386,7 +386,7 @@ class Component(component.Main):
 
                 npo_name = self.getName("rope_{}_jnt_npo".format(_index))
                 npo = addTransform(cns, npo_name, m)
-     
+
                 t = getTransform(npo)
                 ctl = self.addCtl(
                     npo,
@@ -511,7 +511,7 @@ class Component(component.Main):
         # if 8 locs, : up is 0, left is 2, bottom is 4, right is 6
         nic = self.numInterControls  # shortcuts
         t = 0
-        l = nic * 1 + 1  # noqa: E741
+        l = nic * 1 + 1
         b = nic * 2 + 2
         r = nic * 3 + 3
         for i in range(self.numInterControls):
@@ -674,7 +674,7 @@ class Component(component.Main):
         if outer_l_ref is None or outer_r_ref is None:
             logger.error("No outer mouth component found: mouthOuter_L0_root or mouthOuter_R0_root")
             raise Exception("No outer mouth component found: mouthOuter_L0_root or mouthOuter_R0_root")
-            
+
         liplow_ref = self.parent_comp.liplow_ctl
 
         int_c = rigbits.createInterpolateTransform([jaw_ctl_ref, liplow_ref])
@@ -688,7 +688,7 @@ class Component(component.Main):
             int_c,
             self.lips_C_lower_ctl,
             int_l,
-            int_r 
+            int_r
         )
 
         self.connect_mouth_ghost(liplow_ref)
@@ -748,7 +748,7 @@ class Component(component.Main):
             return
 
         for grp_name, grp in self.groups.items():
-            try:  # noqa: FURB107
+            try:
                 grp.remove(obj)
             except ValueError:
                 pass
@@ -870,7 +870,7 @@ def ghostSliderForMouth(ctlGhost, surface, sliderParent):
 
     def conn(ctl, driver, ghost):
         for attr in ("translate", "scale", "rotate"):
-            try:  # noqa: FURB107
+            try:
                 pm.connectAttr("{}.{}".format(ctl, attr), "{}.{}".format(driver, attr))
                 pm.disconnectAttr("{}.{}".format(ctl, attr), "{}.{}".format(ghost, attr))
             except RuntimeError:

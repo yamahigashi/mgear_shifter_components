@@ -28,7 +28,7 @@ import ymt_shifter_utility as ymt_util
 if sys.version_info >= (3, 0):  # pylint: disable=using-constant-test
     # For type annotation
     from typing import Optional, Dict, List, Tuple, Pattern, Callable, Any, Text  # NOQA
-    import pathlib  # noqa
+    import pathlib
 
 
 ##########################################################

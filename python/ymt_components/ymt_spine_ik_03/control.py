@@ -1,30 +1,20 @@
 # import re
 import importlib
 import sys
-import six
-import maya.cmds as cmds
 try:
     pm = importlib.import_module("mgear.pymaya")
 except ImportError:
     pm = importlib.import_module("pymel.core")
 
-import mgear
-from mgear.vendor.Qt import QtCore, QtWidgets
-from mgear.core import attribute
-from mgear.core import pyqt
 import mgear.core.anim_utils as anim_utils
-import mgear.synoptic.utils as syn_utils
-import mgear.core.utils as utils
 
-import gml_maya.decorator as deco
 from ymt_shifter_utility import control_util
-from ymt_shifter_utility.control_util import get_ui_host
 try:
     node_utils = importlib.import_module("gml_maya.node")
 except ImportError:
     node_utils = importlib.import_module("gml_maya.util.node_util")
 
-from logging import (  # noqa:F401 pylint: disable=unused-import, wrong-import-order
+from logging import (
     StreamHandler,
     getLogger,
     WARN,
@@ -39,11 +29,9 @@ if sys.version_info >= (3, 0):  # pylint: disable=using-constant-test  # pylint:
         Dict,
         List,
         Tuple,
-        Pattern,
         Callable,
         Any,
         Text,
-        Generator,
         Union
     )
 ###############################################################################

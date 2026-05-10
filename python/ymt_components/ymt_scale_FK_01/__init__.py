@@ -199,7 +199,7 @@ class Component(component.Main):
 
             cmds.connectAttr("{}.matrixSum".format(mulMat), "{}.inputMatrix".format(decomp))
             cmds.connectAttr("{}.outputScale".format(decomp), "{}.scale".format(cns))
-            cns_parent = cns 
+            cns_parent = cns
             self.jnt_pos.append([cns, i, None, False])
 
     # =====================================================

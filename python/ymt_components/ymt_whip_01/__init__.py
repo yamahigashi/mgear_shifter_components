@@ -1,5 +1,5 @@
 """mGear shifter components"""
-# ruff: noqa: UP032, UP031, ANN201, ANN001, D102, N802, E501, N816, I001
+# ruff: noqa: ANN201, ANN001, E501
 # pylint: disable=import-error,W0201,C0111,C0112
 import re
 import inspect
@@ -307,9 +307,7 @@ class Component(component.Main):
                              tp=self.previusTag,
                              mirrorConf=self.mirror_conf)
 
-        if i == 0:
-            ik_roll_npo = addTransform(ik_ctl, "ik%s_roll_npo" % i, local_t)
-        elif i == (self.settings["ikNb"] - 1):
+        if i == 0 or i == (self.settings["ikNb"] - 1):
             ik_roll_npo = addTransform(ik_ctl, "ik%s_roll_npo" % i, local_t)
         else:
             ik_roll_npo = self.addCtl(ik_ctl,
@@ -720,7 +718,7 @@ class Component(component.Main):
             self.addOperatorsIkTwist()
 
         # ensure plugin loaded
-        if 0 == cmds.pluginInfo("rotationDriver", query=True, loaded=True):
+        if cmds.pluginInfo("rotationDriver", query=True, loaded=True) == 0:
             cmds.loadPlugin("rotationDriver")
 
         self.decomp_tip_ik_rot = pm.createNode("decomposeRotate")
@@ -845,7 +843,7 @@ class Component(component.Main):
             dm_node = node.createDecomposeMatrixNode(mulmat_node2 + ".output")
             pm.connectAttr(dm_node + ".outputTranslate", str(d) + ".t")
 
-            check_list = (pm.Attribute, unicode, str)  # noqa
+            check_list = (pm.Attribute, unicode, str)
             cond = pm.createNode("condition")
             pm.setAttr(cond + ".operation", 4)  # greater
             attribute.connectSet(self.fk_collapsed_att, cond + ".secondTerm", check_list)
@@ -1054,7 +1052,7 @@ class Component(component.Main):
             curve_op.slave_length = curve_length   # * s
             curve_op.maxstretch = s
 
-        elif 0.0 < tz:
+        elif tz > 0.0:
             s = tz / curve_length
             vis = True
             fk0_npo.scale = MVector(1., 1., 1.)

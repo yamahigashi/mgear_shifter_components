@@ -365,7 +365,7 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
 
     def _get_chain_segments_length(self, chain_root):
         module = shifter.importComponentGuide(chain_root.comp_type.get())
-        componentGuide = getattr(module, "Guide")
+        componentGuide = module.Guide
         comp_guide = componentGuide()
         comp_guide.setFromHierarchy(chain_root)
         return len(comp_guide.pos)

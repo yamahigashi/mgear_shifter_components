@@ -3,7 +3,7 @@
 from functools import partial
 
 from mgear.shifter.component import guide
-from mgear.core import transform, pyqt, attribute
+from mgear.core import transform, pyqt
 from mgear.vendor.Qt import QtWidgets, QtCore
 
 from maya.app.general.mayaMixin import MayaQWidgetDockableMixin

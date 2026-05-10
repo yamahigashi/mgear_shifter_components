@@ -9,10 +9,8 @@ from mgear.core import dag
 from mgear.vendor.Qt import QtWidgets, QtCore
 from mgear import shifter
 from mgear.core import (
-    transform,
-    vector
+    transform
 )
-from mgear.core.primitive import addTransform
 
 
 from maya.app.general.mayaMixin import MayaQWidgetDockableMixin
@@ -420,7 +418,7 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
 
     def _get_chain_segments_length(self, chain_root):
         module = shifter.importComponentGuide(chain_root.comp_type.get())
-        componentGuide = getattr(module, "Guide")
+        componentGuide = module.Guide
         comp_guide = componentGuide()
         comp_guide.setFromHierarchy(chain_root)
         return len(comp_guide.pos)

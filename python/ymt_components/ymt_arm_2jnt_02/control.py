@@ -2,7 +2,6 @@
 # GLOBAL
 ##################################################
 import sys
-import re
 import traceback
 
 import maya.cmds as cmds
@@ -15,7 +14,6 @@ except ImportError:
 import mgear
 from mgear.core import (
     pyqt as gqt,
-    transform,
     anim_utils,
 )
 
@@ -25,9 +23,8 @@ import mgear.synoptic.utils as syn_uti
 import gml_maya.decorator as deco
 
 from ymt_components.control import AbstractControllerButton
-import ymt_components.ymt_arm_2jnt_02 as comp
 
-from logging import (  # noqa:F401 pylint: disable=unused-import, wrong-import-order
+from logging import (
     StreamHandler,
     getLogger,
     WARN,
@@ -42,11 +39,9 @@ if sys.version_info >= (3, 0):  # pylint: disable=using-constant-test  # pylint:
         Dict,
         List,
         Tuple,
-        Pattern,
         Callable,
         Any,
         Text,
-        Generator,
         Union
     )
 ###############################################################################

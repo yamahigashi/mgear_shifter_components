@@ -44,22 +44,22 @@ if sys.version_info > (3, 0):
     from typing import TYPE_CHECKING
     if TYPE_CHECKING:
         from typing import (
-            Optional,  # noqa: F401
-            Dict,  # noqa: F401
-            List,  # noqa: F401
-            Tuple,  # noqa: F401
-            Pattern,  # noqa: F401
-            Callable,  # noqa: F401
-            Any,  # noqa: F401
-            Text,  # noqa: F401
-            Generator,  # noqa: F401
-            Union  # noqa: F401
+            Optional,
+            Dict,
+            List,
+            Tuple,
+            Callable,
+            Any,
+            Text,
+            Union
         )
-        from pathlib import Path  # NOQA: F401, F811 pylint: disable=unused-import,reimported
-        from types import ModuleType  # NOQA: F401 pylint: disable=unused-import
-        from six.moves import reload_module as reload  # NOQA: F401 pylint: disable=unused-import
+        from re import Pattern
+        from collections.abc import Generator
+        from pathlib import Path
+        from types import ModuleType
+        from six.moves import reload_module as reload
 
-from logging import (  # noqa:F401 pylint: disable=unused-import, wrong-import-order
+from logging import (
     StreamHandler,
     getLogger,
     # WARN,
@@ -618,7 +618,7 @@ class Component(component.Main):
         aim = eye_comp.aimTrigger_ref
         radius = abs(eye_comp.arrow_npo.attr("translateZ").get())
 
-        # base = radius * math.sin(0.5 * math.pi * 0.4)  # in degree 36 
+        # base = radius * math.sin(0.5 * math.pi * 0.4)  # in degree 36
         # sin = pm.createNode("sin")  # this node is in degree... not radian
         deg2rad_mul = pm.createNode("multiplyDivide")
         deg2rad_mul.operation.set(1)  # multiply
@@ -844,14 +844,14 @@ def draw_eye_guide_mesh_plane(points, t):
     mean = (mean_x, mean_y, mean_z)
 
     # Simple unitCube coordinates
-    vertices = [om.MPoint(mean), ]
+    vertices = [om.MPoint(mean) ]
     polygonCounts = []
     polygonConnects = []
 
     for i, p in enumerate(points):
         vertices.append(om.MPoint(p))    # 0
 
-        if 1 < i:
+        if i > 1:
             polygonCounts.append(3)
             polygonConnects.append(i)
             polygonConnects.append(i - 1)

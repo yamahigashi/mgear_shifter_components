@@ -153,7 +153,7 @@ class Guide(guide.ComponentGuide):
 
         super(Guide, self).setFromHierarchy(root)
         pm.delete(self.sliding_surface)
-        
+
         sliding_surface = ymt_utility.deserialize_nurbs_surface(self.getName("sliding_surface"), info)
         self.sliding_surface = pm.PyNode(sliding_surface)
         pm.parent(self.sliding_surface, self.root, absolute=False, relative=True)
