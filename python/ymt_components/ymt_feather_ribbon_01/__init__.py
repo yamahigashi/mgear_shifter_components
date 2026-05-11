@@ -152,6 +152,7 @@ class Component(component.Main):
         pm.orientConstraint(refs["root_ctl"], self.anchor_npos[0][0], mo=True)
         for anchor_name, anchor_npos in zip(self.anchor_names[1:], self.anchor_npos[1:]):
             pm.parentConstraint(refs[anchor_name], anchor_npos[0], mo=True)
+        self._connect_curl_rotations(refs)
 
     def _add_anchor_controls(self) -> None:
         for anchor_index, name in enumerate(self.anchor_names):
@@ -455,7 +456,13 @@ class Component(component.Main):
                 "ymt_feather_ribbon_01 curl surface deformation requires at least two anchor offset layers."
             )
         for segment_index, npo in enumerate(self.curl_npos):
-            self._connect_curl_basis_matrix(segment_index, npo)
+            self._connect_curl_translate_matrix(segment_index, npo)
+
+    def _connect_curl_rotations(self, refs: dict[str, object]) -> None:
+        for segment_index, npo in enumerate(self.curl_npos):
+            start_name = self.anchor_names[segment_index]
+            end_name = self.anchor_names[segment_index + 1]
+            self._connect_curl_rotation_blend(segment_index, npo, refs[start_name], refs[end_name])
 
     def _connect_curl_deforms(self) -> None:
         for ctl, deform in zip(self.curl_ctls, self.curl_deforms):
@@ -466,57 +473,52 @@ class Component(component.Main):
                     force=True,
                 )
 
-    def _connect_curl_basis_matrix(self, segment_index: int, npo: PymelNode) -> None:
-        top_midpoint = self._create_midpoint_translate_node(
-            self.anchor_ctls[segment_index][0],
-            self.anchor_ctls[segment_index + 1][0],
-            "curl%sTopMid" % segment_index,
-        )
+    def _connect_curl_translate_matrix(self, segment_index: int, npo: PymelNode) -> None:
         lower_midpoint = self._create_midpoint_translate_node(
             self.anchor_ctls[segment_index][-1],
             self.anchor_ctls[segment_index + 1][-1],
             "curl%sLowerMid" % segment_index,
         )
-        lower_vector = self._create_subtract_vector_node(
+        translate_matrix = self._create_compose_translate_node(
             lower_midpoint + ".output3D",
-            top_midpoint + ".output3D",
-            "curl%sLowerVector" % segment_index,
-        )
-        secondary_target = self._create_sum_vector_node(
-            lower_midpoint + ".output3D",
-            lower_vector + ".output3D",
-            "curl%sSecondaryTarget" % segment_index,
-        )
-        input_matrix = self._create_compose_translate_node(
-            lower_midpoint + ".output3D",
-            "curl%sInputMatrix" % segment_index,
-        )
-        secondary_matrix = self._create_compose_translate_node(
-            secondary_target + ".output3D",
-            "curl%sSecondaryMatrix" % segment_index,
+            "curl%sTranslateMatrix" % segment_index,
         )
 
-        aim = cmds.createNode("aimMatrix", name=self.getName("curl%s_aimMatrix" % segment_index))
-        cmds.setAttr(aim + ".primaryMode", 1)
-        cmds.setAttr(aim + ".primaryInputAxis", 1.0, 0.0, 0.0)
-        cmds.setAttr(aim + ".secondaryMode", 1)
-        cmds.setAttr(aim + ".secondaryInputAxis", 0.0, 1.0, 0.0)
-        cmds.connectAttr(input_matrix + ".outputMatrix", aim + ".inputMatrix", force=True)
+        local_translate_matrix = cmds.createNode(
+            "multMatrix", name=self.getName("curl%s_translateLocalMatrix" % segment_index)
+        )
+        cmds.connectAttr(translate_matrix + ".outputMatrix", local_translate_matrix + ".matrixIn[0]", force=True)
         cmds.connectAttr(
-            self._node_name(self.anchor_ctls[segment_index + 1][-1]) + ".worldMatrix[0]",
-            aim + ".primaryTargetMatrix",
+            self._node_name(npo) + ".parentInverseMatrix[0]",
+            local_translate_matrix + ".matrixIn[1]",
             force=True,
         )
-        cmds.connectAttr(secondary_matrix + ".outputMatrix", aim + ".secondaryTargetMatrix", force=True)
 
-        local_matrix = cmds.createNode("multMatrix", name=self.getName("curl%s_localMatrix" % segment_index))
-        cmds.connectAttr(aim + ".outputMatrix", local_matrix + ".matrixIn[0]", force=True)
-        cmds.connectAttr(self._node_name(npo) + ".parentInverseMatrix[0]", local_matrix + ".matrixIn[1]", force=True)
+        translate_decompose = cmds.createNode(
+            "decomposeMatrix", name=self.getName("curl%s_translateDecomposeMatrix" % segment_index)
+        )
+        cmds.connectAttr(local_translate_matrix + ".matrixSum", translate_decompose + ".inputMatrix", force=True)
+        cmds.connectAttr(translate_decompose + ".outputTranslate", self._node_name(npo) + ".translate", force=True)
 
-        decompose = cmds.createNode("decomposeMatrix", name=self.getName("curl%s_decomposeMatrix" % segment_index))
-        cmds.connectAttr(local_matrix + ".matrixSum", decompose + ".inputMatrix", force=True)
-        cmds.connectAttr(decompose + ".outputTranslate", self._node_name(npo) + ".translate", force=True)
-        cmds.connectAttr(decompose + ".outputRotate", self._node_name(npo) + ".rotate", force=True)
+    def _connect_curl_rotation_blend(
+        self,
+        segment_index: int,
+        npo: PymelNode,
+        start_ref: object,
+        end_ref: object,
+    ) -> None:
+        constraint = cmds.orientConstraint(
+            self._node_name(start_ref),
+            self._node_name(end_ref),
+            self._node_name(npo),
+            maintainOffset=False,
+            name=self.getName("curl%s_rotate_orientCns" % segment_index),
+        )[0]
+        aliases = cmds.orientConstraint(constraint, query=True, weightAliasList=True) or []
+        if len(aliases) != 2:
+            raise RuntimeError("ymt_feather_ribbon_01 failed to create curl rotation anchor blend.")
+        cmds.setAttr("%s.%s" % (constraint, aliases[0]), 0.5)
+        cmds.setAttr("%s.%s" % (constraint, aliases[1]), 0.5)
 
     def _create_midpoint_translate_node(self, a: PymelNode, b: PymelNode, name: str) -> str:
         decompose_a = self._create_decompose_matrix(self._node_name(a) + ".worldMatrix[0]", self.getName(name + "A_dm"))
@@ -526,20 +528,6 @@ class Component(component.Main):
         cmds.connectAttr(decompose_a + ".outputTranslate", midpoint + ".input3D[0]", force=True)
         cmds.connectAttr(decompose_b + ".outputTranslate", midpoint + ".input3D[1]", force=True)
         return midpoint
-
-    def _create_subtract_vector_node(self, a: str, b: str, name: str) -> str:
-        subtract = cmds.createNode("plusMinusAverage", name=self.getName(name + "_pma"))
-        cmds.setAttr(subtract + ".operation", 2)
-        cmds.connectAttr(a, subtract + ".input3D[0]", force=True)
-        cmds.connectAttr(b, subtract + ".input3D[1]", force=True)
-        return subtract
-
-    def _create_sum_vector_node(self, a: str, b: str, name: str) -> str:
-        add = cmds.createNode("plusMinusAverage", name=self.getName(name + "_pma"))
-        cmds.setAttr(add + ".operation", 1)
-        cmds.connectAttr(a, add + ".input3D[0]", force=True)
-        cmds.connectAttr(b, add + ".input3D[1]", force=True)
-        return add
 
     def _create_compose_translate_node(self, translate_attr: str, name: str) -> str:
         compose = cmds.createNode("composeMatrix", name=self.getName(name + "_cm"))
@@ -752,21 +740,14 @@ class Component(component.Main):
         return transform.setMatrixPosition(self._curl_basis_matrix(index), self._curl_ctl_position(index))
 
     def _curl_basis_matrix(self, index: int) -> object:
-        top_midpoint = self._midpoint(
-            self._anchor_layer_position(0, index),
-            self._anchor_layer_position(0, index + 1),
-        )
         lower_midpoint = self._midpoint(
             self._anchor_layer_position(len(self.anchor_offsets) - 1, index),
             self._anchor_layer_position(len(self.anchor_offsets) - 1, index + 1),
         )
-        lower_vector = lower_midpoint - top_midpoint
-        if lower_vector.length() < 0.001:
-            lower_vector = self.lower_axis
         matrix = transform.getTransformLookingAt(
             lower_midpoint,
             self._anchor_layer_position(len(self.anchor_offsets) - 1, index + 1),
-            lower_vector,
+            self.lower_axis,
             axis="xy",
             negate=False,
         )
