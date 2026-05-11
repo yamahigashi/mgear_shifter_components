@@ -77,7 +77,9 @@ class Component(component.Main):
             self.row_names,
         )
         self.anchor_positions = self._get_anchor_positions()
-        self.lower_axis = self._get_parent_chain_lower_axis()
+        self.span_axis = self._get_parent_span_axis()
+        self.wing_normal = self._get_parent_blade_normal()
+        self.lower_axis = self._get_parent_blade_lower_axis()
         self.anchor_offsets = self._collect_anchor_offsets()
 
         self.driver_root = primitive.addTransform(self.root, self.getName("drivers"), transform.getTransform(self.root))
@@ -161,7 +163,7 @@ class Component(component.Main):
             anchor_npos = []
             anchor_ctls = []
             for layer_index, _offset in enumerate(self.anchor_offsets):
-                matrix = transform.getTransformFromPos(self._anchor_layer_position(layer_index, anchor_index))
+                matrix = self._anchor_layer_matrix(layer_index, anchor_index)
                 npo = primitive.addTransform(parent, self.getName("feather_%s_%02d_npo" % (name, layer_index)), matrix)
                 ctl = self.addCtl(
                     npo,
@@ -209,7 +211,7 @@ class Component(component.Main):
     def _add_detail_controls(self) -> None:
         for spec in self.detail_specs:
             detail_name = self._detail_name(spec)
-            matrix = transform.getTransformFromPos(spec["position"])
+            matrix = self._span_frame_matrix(spec["position"], spec["span"])
             npo = primitive.addTransform(self.detail_root, self.getName("%s_npo" % detail_name), matrix)
             aim_npo = primitive.addTransform(npo, self.getName("%s_aim_npo" % detail_name), matrix)
             ctl = self.addCtl(
@@ -516,7 +518,7 @@ class Component(component.Main):
         )[0]
         aliases = cmds.orientConstraint(constraint, query=True, weightAliasList=True) or []
         if len(aliases) != 2:
-            raise RuntimeError("ymt_feather_ribbon_01 failed to create curl rotation anchor blend.")
+            raise RuntimeError(f"ymt_feather_ribbon_01 failed to create curl rotation anchor blend. Constraint: {constraint}, aliases: {aliases}")
         cmds.setAttr("%s.%s" % (constraint, aliases[0]), 0.5)
         cmds.setAttr("%s.%s" % (constraint, aliases[1]), 0.5)
 
@@ -730,6 +732,28 @@ class Component(component.Main):
         offset = self.anchor_offsets[layer_index]
         return self.anchor_positions[anchor_index] + (self.lower_axis * offset * self.size)
 
+    def _anchor_layer_matrix(self, layer_index: int, anchor_index: int) -> object:
+        position = self._anchor_layer_position(layer_index, anchor_index)
+        return self._span_frame_matrix(position, anchor_index)
+
+    def _span_frame_matrix(self, position: VectorLike, anchor_index: int) -> object:
+        start, end = self._span_frame_points(position, anchor_index)
+        matrix = transform.getTransformLookingAt(start, end, self.lower_axis, axis="xy", negate=False)
+        return transform.setMatrixPosition(matrix, position)
+
+    def _span_frame_points(self, position: VectorLike, anchor_index: int) -> tuple[VectorLike, VectorLike]:
+        if anchor_index < len(self.anchor_positions) - 1:
+            return position, position + self._segment_axis(anchor_index)
+        return position - self._segment_axis(anchor_index - 1), position
+
+    def _segment_axis(self, index: int) -> VectorLike:
+        start = self.anchor_positions[index]
+        end = self.anchor_positions[index + 1]
+        axis = end - start
+        if axis.length() < 0.001:
+            raise RuntimeError("ymt_feather_ribbon_01 requires non-zero parent wing guide segment lengths.")
+        return axis.normal()
+
     def _curl_ctl_position(self, index: int) -> VectorLike:
         guide_matrix = self.guide.tra.get("curl%s" % index)
         if guide_matrix is not None:
@@ -744,14 +768,7 @@ class Component(component.Main):
             self._anchor_layer_position(len(self.anchor_offsets) - 1, index),
             self._anchor_layer_position(len(self.anchor_offsets) - 1, index + 1),
         )
-        matrix = transform.getTransformLookingAt(
-            lower_midpoint,
-            self._anchor_layer_position(len(self.anchor_offsets) - 1, index + 1),
-            self.lower_axis,
-            axis="xy",
-            negate=False,
-        )
-        return transform.setMatrixPosition(matrix, lower_midpoint)
+        return self._span_frame_matrix(lower_midpoint, index)
 
     def _midpoint(self, a: VectorLike, b: VectorLike) -> VectorLike:
         return a + ((b - a) * 0.5)
@@ -805,24 +822,32 @@ class Component(component.Main):
             )
         return positions
 
-    def _get_parent_chain_lower_axis(self) -> VectorLike:
-        root, elbow, wrist, hand = self.anchor_positions
+    def _get_parent_span_axis(self) -> VectorLike:
+        root = self.anchor_positions[0]
+        hand = self.anchor_positions[-1]
         tangent = hand - root
         tangent_length = tangent.length()
         if tangent_length < 0.001:
             raise RuntimeError("ymt_feather_ribbon_01 requires a valid parent wing root-to-eff guide axis.")
-        tangent.normalize()
+        return tangent.normal()
 
-        lower_axis = self._point_plane_offset_axis(elbow, root, tangent)
-        lower_axis += self._point_plane_offset_axis(wrist, root, tangent)
+    def _get_parent_blade_normal(self) -> VectorLike:
+        parent_guide = self._get_parent_wing_guide()
+        blades = getattr(parent_guide, "blades", None)
+        blade = blades.get("blade") if blades is not None else None
+        if blade is None:
+            raise RuntimeError("ymt_feather_ribbon_01 requires parent ymt_birdwing_3jnt_01 guide blade.")
+
+        normal = blade.z * -1
+        if normal.length() < 0.001:
+            raise RuntimeError("ymt_feather_ribbon_01 requires a valid parent wing blade normal.")
+        return normal.normal()
+
+    def _get_parent_blade_lower_axis(self) -> VectorLike:
+        lower_axis = self.wing_normal ^ self.span_axis
         if lower_axis.length() < 0.001:
-            raise RuntimeError("ymt_feather_ribbon_01 requires a non-flat parent wing chain plane.")
+            raise RuntimeError("ymt_feather_ribbon_01 parent wing blade normal cannot be parallel to the root-to-eff axis.")
         return lower_axis.normal()
-
-    def _point_plane_offset_axis(self, point: VectorLike, root: VectorLike, tangent: VectorLike) -> VectorLike:
-        offset = point - root
-        projected = tangent * (offset * tangent)
-        return offset - projected
 
     def _get_parent_guide_anchor_positions(self) -> Optional[list[VectorLike]]:  # noqa: UP045
         parent_guide = self._get_parent_wing_guide()

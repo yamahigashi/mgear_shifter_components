@@ -194,6 +194,24 @@ class Component(component.Main):
             self.WIP,
         )
 
+        self.elbow_mid_jnt = primitive.addJoint(
+            self.wingBones[0],
+            self.getName("elbowMid_jnt"),
+            self.wingBones[1].getMatrix(worldSpace=True),
+            self.WIP,
+        )
+        self.elbow_mid_jnt.attr("radius").set(3)
+        self.elbow_mid_jnt.setAttr("jointOrient", 0, 0, 0)
+
+        self.wrist_mid_jnt = primitive.addJoint(
+            self.wingBones[1],
+            self.getName("wristMid_jnt"),
+            self.wingBones[2].getMatrix(worldSpace=True),
+            self.WIP,
+        )
+        self.wrist_mid_jnt.attr("radius").set(3)
+        self.wrist_mid_jnt.setAttr("jointOrient", 0, 0, 0)
+
         # Base control
         t = transform.getTransformFromPos(self.guide.apos[0])
         self.root_npo = primitive.addTransform(self.root, self.getName("root_npo"), t)
@@ -243,12 +261,12 @@ class Component(component.Main):
 
         # Corrective controls at elbow and wrist.
         self.elbow_lvl = primitive.addTransform(
-            self.root, self.getName("elbow_lvl"), transform.getTransform(self.wingBones[1])
+            self.root, self.getName("elbow_lvl"), transform.getTransform(self.elbow_mid_jnt)
         )
         self.elbow_ctl = self.addCtl(
             self.elbow_lvl,
             "elbow_ctl",
-            transform.getTransform(self.wingBones[1]),
+            transform.getTransform(self.elbow_mid_jnt),
             self.color_ik,
             "sphere",
             w=self.size * 0.18,
@@ -258,12 +276,12 @@ class Component(component.Main):
         attribute.lockAttribute(self.elbow_ctl, ["sx", "sy", "sz", "v"])
 
         self.wrist_lvl = primitive.addTransform(
-            self.root, self.getName("wrist_lvl"), transform.getTransform(self.wingBones[2])
+            self.root, self.getName("wrist_lvl"), transform.getTransform(self.wrist_mid_jnt)
         )
         self.wrist_ctl = self.addCtl(
             self.wrist_lvl,
             "wrist_ctl",
-            transform.getTransform(self.wingBones[2]),
+            transform.getTransform(self.wrist_mid_jnt),
             self.color_ik,
             "sphere",
             w=self.size * 0.18,
@@ -409,17 +427,17 @@ class Component(component.Main):
         )
         self.tws0_rot.setAttr("sx", 0.001)
         self.tws1_loc = primitive.addTransform(
-            self.wingBones[1], self.getName("tws1_loc"), transform.getTransform(self.wingBones[1])
+            self.elbow_mid_jnt, self.getName("tws1_loc"), transform.getTransform(self.elbow_mid_jnt)
         )
         self.tws1_rot = primitive.addTransform(
-            self.tws1_loc, self.getName("tws1_rot"), transform.getTransform(self.wingBones[1])
+            self.tws1_loc, self.getName("tws1_rot"), transform.getTransform(self.elbow_mid_jnt)
         )
         self.tws1_rot.setAttr("sx", 0.001)
         self.tws2_loc = primitive.addTransform(
-            self.wingBones[2], self.getName("tws2_loc"), transform.getTransform(self.wingBones[2])
+            self.wrist_mid_jnt, self.getName("tws2_loc"), transform.getTransform(self.wrist_mid_jnt)
         )
         self.tws2_rot = primitive.addTransform(
-            self.tws2_loc, self.getName("tws2_rot"), transform.getTransform(self.wingBones[2])
+            self.tws2_loc, self.getName("tws2_rot"), transform.getTransform(self.wrist_mid_jnt)
         )
         self.tws2_rot.setAttr("sx", 0.001)
         self.tws3_loc = primitive.addTransform(
@@ -434,11 +452,11 @@ class Component(component.Main):
         self.joint_indices = {}
         self.deform_anchor_refs = {}
         self.deform_anchor_drivers = {}
-        for name, wing_bone, correction_ctl in [
-            ("root", self.wingBones[0], None),
-            ("elbow", self.wingBones[1], self.elbow_ctl),
-            ("wrist", self.wingBones[2], self.wrist_ctl),
-            ("eff", self.wingBones[3], None),
+        for name, wing_bone in [
+            ("root", self.wingBones[0]),
+            ("elbow", self.wingBones[1]),
+            ("wrist", self.wingBones[2]),
+            ("eff", self.wingBones[3]),
         ]:
             ref = primitive.addTransform(
                 self.root_ctl,
@@ -447,20 +465,25 @@ class Component(component.Main):
             )
             self.deform_anchor_refs[name] = ref
             pm.parentConstraint(wing_bone, ref, mo=False)
-            driver = ref
-            if correction_ctl:
-                driver = primitive.addTransform(
-                    self.root_ctl,
-                    self.getName("%s_jnt_corr" % name),
-                    transform.getTransform(ref),
-                )
-                node.createMultMatrixNode(
-                    correction_ctl.attr("worldMatrix"),
-                    self.root_ctl.attr("worldInverseMatrix"),
-                    driver,
-                    "rt",
-                )
-            self.deform_anchor_drivers[name] = driver
+            self.deform_anchor_drivers[name] = ref
+
+        self.support_anchor_drivers = {}
+        for name, correction_ctl in [
+            ("elbow_mid", self.elbow_ctl),
+            ("wrist_mid", self.wrist_ctl),
+        ]:
+            driver = primitive.addTransform(
+                self.root_ctl,
+                self.getName("%s_jnt_corr" % name),
+                transform.getTransform(correction_ctl),
+            )
+            node.createMultMatrixNode(
+                correction_ctl.attr("worldMatrix"),
+                self.root_ctl.attr("worldInverseMatrix"),
+                driver,
+                "rt",
+            )
+            self.support_anchor_drivers[name] = driver
 
         self.div_cns = []
         div_index = 0
@@ -488,6 +511,13 @@ class Component(component.Main):
         )
         self.jnt_pos.append([self.end_ref, "end"])
         self.joint_indices["end"] = joint_index
+        joint_index += 1
+
+        self.joint_indices["elbow_mid"] = joint_index
+        self.jnt_pos.append([self.support_anchor_drivers["elbow_mid"], "elbow_mid", "elbow"])
+        joint_index += 1
+        self.joint_indices["wrist_mid"] = joint_index
+        self.jnt_pos.append([self.support_anchor_drivers["wrist_mid"], "wrist_mid", "wrist"])
 
         self.match_fk = []
         for index, fk_ctl in enumerate(self.fk_ctl):
@@ -588,6 +618,14 @@ class Component(component.Main):
             pm.mel.eval("ikSpringSolver;")
             self.ikSolver = "ikSpringSolver"
 
+    def _connect_mid_support_operators(self) -> None:
+        for wing_bone, mid_jnt in [
+            (self.wingBones[1], self.elbow_mid_jnt),
+            (self.wingBones[2], self.wrist_mid_jnt),
+        ]:
+            node.createPairBlend(None, wing_bone, 0.5, 1, mid_jnt)
+            pm.connectAttr(wing_bone + ".translate", mid_jnt + ".translate", f=True)
+
     def _connect_upv_ref_operator(self) -> None:
         self.ikHandleUpvRef = primitive.addIkHandle(
             self.root, self.getName("ikHandleWingUpvRef"), self.upvRefChain, "ikSCsolver"
@@ -595,8 +633,8 @@ class Component(component.Main):
         pm.pointConstraint(self.ik_ctl, self.ikHandleUpvRef)
         pm.parentConstraint(self.upvRefChain[0], self.upv_cns, mo=True)
 
-        pm.parentConstraint(self.wingBones[1], self.elbow_lvl)
-        pm.parentConstraint(self.wingBones[2], self.wrist_lvl)
+        pm.parentConstraint(self.elbow_mid_jnt, self.elbow_lvl)
+        pm.parentConstraint(self.wrist_mid_jnt, self.wrist_lvl)
 
     def _connect_ik_handles(self) -> None:
         self.ikHandle2 = primitive.addIkHandle(
@@ -832,6 +870,7 @@ class Component(component.Main):
         self._connect_twist_and_aim()
         self._connect_soft_ik_and_stretch(multJnt1_node, multJnt2_node)
         self._connect_result_chains(multJnt3_node)
+        self._connect_mid_support_operators()
         self._connect_twist_driver_controls()
         self._connect_volume_driver()
         self._connect_division_operators()
@@ -862,7 +901,7 @@ class Component(component.Main):
     def setRelation(self) -> None:
         """Set the relation between guide objects and rig objects."""
 
-        self.relatives["root"] = self.deform_anchor_drivers["root"]
+        self.relatives["root"] = self.root
         self.relatives["elbow"] = self.deform_anchor_drivers["elbow"]
         self.relatives["wrist"] = self.deform_anchor_drivers["wrist"]
         self.relatives["eff"] = self.deform_anchor_drivers["eff"]
@@ -886,9 +925,12 @@ class Component(component.Main):
     def get_feather_ribbon_refs(self) -> dict[str, object]:
         """Return stable driver objects used by feather ribbon child components."""
         return {
-            "root": self.deform_anchor_drivers["root"],
-            "elbow": self.deform_anchor_drivers["elbow"],
-            "wrist": self.deform_anchor_drivers["wrist"],
+            "root": self.root,
+            # "elbow": self.deform_anchor_drivers["elbow"],
+            # "wrist": self.deform_anchor_drivers["wrist"],
+            # "hand": self.deform_anchor_drivers["eff"],
+            "elbow": self.support_anchor_drivers["elbow_mid"],
+            "wrist": self.support_anchor_drivers["wrist_mid"],
             "hand": self.deform_anchor_drivers["eff"],
             "root_ctl": self.root_ctl,
             "normal": self.normal,
