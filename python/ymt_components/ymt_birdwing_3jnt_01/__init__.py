@@ -883,6 +883,19 @@ class Component(component.Main):
         self.connections["standard"] = self.connect_standard
         self.connections["ymt_shoulder_01"] = self.connect_ymt_shoulder
 
+    def get_feather_ribbon_refs(self) -> dict[str, object]:
+        """Return stable driver objects used by feather ribbon child components."""
+        return {
+            "root": self.deform_anchor_drivers["root"],
+            "elbow": self.deform_anchor_drivers["elbow"],
+            "wrist": self.deform_anchor_drivers["wrist"],
+            "hand": self.deform_anchor_drivers["eff"],
+            "root_ctl": self.root_ctl,
+            "normal": self.normal,
+            "binormal": self.binormal,
+            "size": self.size,
+        }
+
     def connect_standard(self) -> None:
         self.parent.addChild(self.root)
         self.connectRef(self.settings["ikrefarray"], self.ik_cns)
