@@ -126,10 +126,11 @@ def setKeyableAttributesDontLockVisibility(nodes: PymelNode | Sequence[PymelNode
 
     attribute.setKeyableAttributes(nodes, params)
 
-    if not isinstance(nodes, list):
-        nodes = [nodes]
+    try:
         for n in nodes:
             n.setAttr("v", lock=False)
+    except TypeError:
+        nodes.setAttr("v", lock=False)
 
 
 def getFullPath(start: pm.nt.transform, routes: List[pm.nt.transform]|None = None) -> List[pm.nt.transform]:
