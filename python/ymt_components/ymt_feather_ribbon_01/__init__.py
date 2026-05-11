@@ -182,8 +182,7 @@ class Component(component.Main):
 
     def _add_curl_controls(self) -> None:
         for index in range(3):
-            guide_name = "curl%s" % index
-            matrix = self.guide.tra.get(guide_name, self._default_curl_matrix(index))
+            matrix = self._curl_matrix(index)
             npo = primitive.addTransform(self.driver_root, self.getName("curl%s_npo" % index), matrix)
             ctl = self.addCtl(
                 npo,
@@ -264,7 +263,7 @@ class Component(component.Main):
         self.surface_skin_cluster = pm.PyNode(skin)
 
     def _add_surface_skin_joints(self) -> None:
-        for ctl in self._flat_anchor_ctls():
+        for ctl in self._surface_skin_ctls():
             joint = primitive.addJoint(
                 ctl,
                 self.getName("%s_surfaceSkin_jnt" % self._node_name(ctl).replace(self.getName(""), "")),
@@ -289,6 +288,12 @@ class Component(component.Main):
                 targets.append(self.anchor_ctls[segment_index][layer_index])
                 targets.append(self.anchor_ctls[segment_index + 1][layer_index])
             pm.pointConstraint(*targets, npo, mo=True)
+            pm.orientConstraint(
+                self.anchor_ctls[segment_index][0],
+                self.anchor_ctls[segment_index + 1][0],
+                npo,
+                mo=True,
+            )
 
     def _connect_detail_rotations(self) -> None:
         decomposers_by_anchor = [
@@ -370,6 +375,9 @@ class Component(component.Main):
     def _flat_anchor_ctls(self) -> list[object]:
         return [ctl for anchor_ctls in self.anchor_ctls for ctl in anchor_ctls]
 
+    def _surface_skin_ctls(self) -> list[object]:
+        return self._flat_anchor_ctls() + list(self.curl_ctls)
+
     def _detail_name(self, spec: DetailSpec) -> str:
         if spec["section"] < 0:
             return "%s_%02d" % (spec["row"], spec["col"])
@@ -412,7 +420,7 @@ class Component(component.Main):
             if parsed is None:
                 continue
             row, col = parsed
-            position = datatypes.Vector(matrix[12], matrix[13], matrix[14])
+            position = transform.getPositionFromMatrix(matrix)
             u = self._u_from_position(position)
             v = self._v_from_row_name(row)
             specs.append(
@@ -484,12 +492,30 @@ class Component(component.Main):
         offset = self.anchor_offsets[layer_index]
         return self.anchor_positions[anchor_index] + (self.lower_axis * offset * self.size)
 
-    def _default_curl_matrix(self, index: int) -> object:
-        position = self.anchor_positions[index] + (
-            (self.anchor_positions[index + 1] - self.anchor_positions[index]) * 0.5
+    def _curl_matrix(self, index: int) -> object:
+        matrix = self._curl_basis_matrix(index)
+        guide_matrix = self.guide.tra.get("curl%s" % index)
+        if guide_matrix is None:
+            return matrix
+        return transform.setMatrixPosition(
+            matrix,
+            transform.getPositionFromMatrix(guide_matrix),
         )
-        position += self.lower_axis * self.size * 0.5
-        return transform.getTransformFromPos(position)
+
+    def _curl_basis_matrix(self, index: int) -> object:
+        matrix = transform.getTransformLookingAt(
+            self.anchor_positions[index],
+            self.anchor_positions[index + 1],
+            self.lower_axis,
+            axis="xy",
+            negate=False,
+        )
+        return transform.setMatrixPosition(matrix, self._curl_position(index))
+
+    def _curl_position(self, index: int) -> VectorLike:
+        u = (index + 0.5) / max(len(self.anchor_positions) - 1, 1)
+        offset = self._max_lower_edge_offset_at_u(u)
+        return self._position_from_u_and_offset(u, offset)
 
     def _anchor_u_values(self) -> list[float]:
         point_count = max(len(self.anchor_positions) - 1, 1)
