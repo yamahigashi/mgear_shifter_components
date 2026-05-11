@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import importlib
-import math
 import re
 from contextlib import suppress
 from typing import TYPE_CHECKING, Optional, TypedDict
@@ -14,10 +13,6 @@ try:
     pm = importlib.import_module("mgear.pymaya")
 except ImportError:
     pm = importlib.import_module("pymel.core")
-try:
-    datatypes = importlib.import_module("mgear.pymaya.datatypes")
-except ImportError:
-    datatypes = importlib.import_module("pymel.core.datatypes")
 
 from mgear.core import attribute, primitive, transform
 from mgear.shifter import component
@@ -66,7 +61,7 @@ class Component(component.Main):
         """Add controls, optional ribbon surface, and detail feather outputs."""
         self.WIP = self.options["mode"]
         self.ctl_size = self.size * float(self.settings["ctlSize"]) * 0.15
-        self.placement_mode = self.placement_modes[int(self.settings["placementMode"])]
+        self.placement_mode = self._parse_placement_mode(self.settings["placementMode"])
         self.row_names = self._parse_row_names(self.settings["rowNames"])
         self.row_counts = self._parse_row_counts(self.settings["rowCounts"], self.row_names)
         self.row_u_ranges = self._parse_row_u_ranges(self.settings["rowURanges"], self.row_names)
@@ -77,6 +72,8 @@ class Component(component.Main):
             self.row_names,
         )
         self.anchor_positions = self._get_anchor_positions()
+        self.anchor_segment_lengths = self._get_anchor_segment_lengths()
+        self.anchor_total_length = sum(self.anchor_segment_lengths)
         self.span_axis = self._get_parent_span_axis()
         self.wing_normal = self._get_parent_blade_normal()
         self.lower_axis = self._get_parent_blade_lower_axis()
@@ -163,7 +160,7 @@ class Component(component.Main):
             anchor_npos = []
             anchor_ctls = []
             for layer_index, _offset in enumerate(self.anchor_offsets):
-                matrix = self._anchor_layer_matrix(layer_index, anchor_index)
+                matrix = transform.getTransformFromPos(self._anchor_layer_position(layer_index, anchor_index))
                 npo = primitive.addTransform(parent, self.getName("feather_%s_%02d_npo" % (name, layer_index)), matrix)
                 ctl = self.addCtl(
                     npo,
@@ -211,7 +208,7 @@ class Component(component.Main):
     def _add_detail_controls(self) -> None:
         for spec in self.detail_specs:
             detail_name = self._detail_name(spec)
-            matrix = self._span_frame_matrix(spec["position"], spec["span"])
+            matrix = transform.getTransformFromPos(spec["position"])
             npo = primitive.addTransform(self.detail_root, self.getName("%s_npo" % detail_name), matrix)
             aim_npo = primitive.addTransform(npo, self.getName("%s_aim_npo" % detail_name), matrix)
             ctl = self.addCtl(
@@ -453,10 +450,6 @@ class Component(component.Main):
             ymt_util.setKeyableAttributesDontLockVisibility(rivet, [])
 
     def _connect_curl_spaces(self) -> None:
-        if len(self.anchor_offsets) < 2:
-            raise RuntimeError(
-                "ymt_feather_ribbon_01 curl surface deformation requires at least two anchor offset layers."
-            )
         for segment_index, npo in enumerate(self.curl_npos):
             self._connect_curl_translate_matrix(segment_index, npo)
 
@@ -661,14 +654,15 @@ class Component(component.Main):
                 continue
             row, col = parsed
             position = transform.getPositionFromMatrix(matrix)
-            u = self._u_from_position(position)
+            span, local, base_position = self._closest_span_local_from_position(position)
+            u = self._u_from_span_local(span, local)
             v = self._v_from_row_name(row)
             specs.append(
                 self._detail_spec(
                     row,
                     -1,
                     col,
-                    self._anchor_layer_from_position(position, u),
+                    self._anchor_layer_from_position(position, base_position),
                     u,
                     v,
                     position,
@@ -686,9 +680,7 @@ class Component(component.Main):
         v: float,
         position: VectorLike,
     ) -> DetailSpec:
-        span_float = max(0.0, min(0.999, u)) * (len(self.anchor_names) - 1)
-        span = math.floor(span_float)
-        local = span_float - span
+        span, local = self._span_local_from_u(u)
         return {
             "row": row,
             "section": section,
@@ -705,11 +697,28 @@ class Component(component.Main):
         return self._base_position_from_u(u) + (self.lower_axis * offset * self.size)
 
     def _base_position_from_u(self, u: float) -> VectorLike:
-        points = self.anchor_positions
-        span_float = max(0.0, min(0.999, u)) * (len(points) - 1)
-        span = math.floor(span_float)
-        local = span_float - span
-        return points[span] + ((points[span + 1] - points[span]) * local)
+        span, local = self._span_local_from_u(u)
+        return self._position_from_span_local(span, local)
+
+    def _span_local_from_u(self, u: float) -> tuple[int, float]:
+        clamped_u = max(0.0, min(1.0, u))
+        distance = clamped_u * self.anchor_total_length
+        traversed = 0.0
+        for span, segment_length in enumerate(self.anchor_segment_lengths):
+            if distance <= traversed + segment_length or span == len(self.anchor_segment_lengths) - 1:
+                local = (distance - traversed) / segment_length
+                return span, max(0.0, min(1.0, local))
+            traversed += segment_length
+        return len(self.anchor_segment_lengths) - 1, 1.0
+
+    def _u_from_span_local(self, span: int, local: float) -> float:
+        distance = sum(self.anchor_segment_lengths[:span]) + (self.anchor_segment_lengths[span] * local)
+        return max(0.0, min(1.0, distance / self.anchor_total_length))
+
+    def _position_from_span_local(self, span: int, local: float) -> VectorLike:
+        start = self.anchor_positions[span]
+        end = self.anchor_positions[span + 1]
+        return start + ((end - start) * local)
 
     def _collect_anchor_offsets(self) -> list[float]:
         offsets = sorted({offset for profile in self.lower_edge_profiles for offset in profile})
@@ -722,37 +731,18 @@ class Component(component.Main):
             raise RuntimeError("ymt_feather_ribbon_01 requires at least one anchor offset layer.")
         return min(range(len(self.anchor_offsets)), key=lambda index: abs(self.anchor_offsets[index] - offset))
 
-    def _anchor_layer_from_position(self, position: VectorLike, u: float) -> int:
-        return self._anchor_layer_from_offset(self._offset_from_position(position, u))
+    def _anchor_layer_from_position(self, position: VectorLike, base_position: VectorLike) -> int:
+        return self._anchor_layer_from_offset(self._offset_from_position(position, base_position))
 
-    def _offset_from_position(self, position: VectorLike, u: float) -> float:
-        return max(0.0, ((position - self._base_position_from_u(u)) * self.lower_axis) / self.size)
+    def _offset_from_position(self, position: VectorLike, base_position: VectorLike) -> float:
+        offset = ((position - base_position) * self.lower_axis) / self.size
+        if offset < -0.001:
+            raise RuntimeError("ymt_feather_ribbon_01 detail guide locator is on the opposite side of the parent wing blade.")
+        return offset
 
     def _anchor_layer_position(self, layer_index: int, anchor_index: int) -> VectorLike:
         offset = self.anchor_offsets[layer_index]
         return self.anchor_positions[anchor_index] + (self.lower_axis * offset * self.size)
-
-    def _anchor_layer_matrix(self, layer_index: int, anchor_index: int) -> object:
-        position = self._anchor_layer_position(layer_index, anchor_index)
-        return self._span_frame_matrix(position, anchor_index)
-
-    def _span_frame_matrix(self, position: VectorLike, anchor_index: int) -> object:
-        start, end = self._span_frame_points(position, anchor_index)
-        matrix = transform.getTransformLookingAt(start, end, self.lower_axis, axis="xy", negate=False)
-        return transform.setMatrixPosition(matrix, position)
-
-    def _span_frame_points(self, position: VectorLike, anchor_index: int) -> tuple[VectorLike, VectorLike]:
-        if anchor_index < len(self.anchor_positions) - 1:
-            return position, position + self._segment_axis(anchor_index)
-        return position - self._segment_axis(anchor_index - 1), position
-
-    def _segment_axis(self, index: int) -> VectorLike:
-        start = self.anchor_positions[index]
-        end = self.anchor_positions[index + 1]
-        axis = end - start
-        if axis.length() < 0.001:
-            raise RuntimeError("ymt_feather_ribbon_01 requires non-zero parent wing guide segment lengths.")
-        return axis.normal()
 
     def _curl_ctl_position(self, index: int) -> VectorLike:
         guide_matrix = self.guide.tra.get("curl%s" % index)
@@ -768,7 +758,14 @@ class Component(component.Main):
             self._anchor_layer_position(len(self.anchor_offsets) - 1, index),
             self._anchor_layer_position(len(self.anchor_offsets) - 1, index + 1),
         )
-        return self._span_frame_matrix(lower_midpoint, index)
+        matrix = transform.getTransformLookingAt(
+            lower_midpoint,
+            self._anchor_layer_position(len(self.anchor_offsets) - 1, index + 1),
+            self.lower_axis,
+            axis="xy",
+            negate=False,
+        )
+        return transform.setMatrixPosition(matrix, lower_midpoint)
 
     def _midpoint(self, a: VectorLike, b: VectorLike) -> VectorLike:
         return a + ((b - a) * 0.5)
@@ -799,20 +796,34 @@ class Component(component.Main):
             raise RuntimeError("ymt_feather_ribbon_01 requires at least one lower edge offset profile.")
         return max(offsets)
 
-    def _u_from_position(self, position: VectorLike) -> float:
-        root = self.anchor_positions[0]
-        hand = self.anchor_positions[-1]
-        axis = hand - root
-        length = max(axis.length(), 0.001)
-        axis.normalize()
-        return max(0.0, min(1.0, ((position - root) * axis) / length))
+    def _closest_span_local_from_position(self, position: VectorLike) -> tuple[int, float, VectorLike]:
+        best_span = 0
+        best_local = 0.0
+        best_position = self.anchor_positions[0]
+        best_distance = None
+        for span, segment_length in enumerate(self.anchor_segment_lengths):
+            start = self.anchor_positions[span]
+            end = self.anchor_positions[span + 1]
+            axis = (end - start).normal()
+            local_distance = (position - start) * axis
+            local = max(0.0, min(1.0, local_distance / segment_length))
+            candidate = self._position_from_span_local(span, local)
+            distance = (position - candidate).length()
+            if best_distance is None or distance < best_distance:
+                best_span = span
+                best_local = local
+                best_position = candidate
+                best_distance = distance
+        return best_span, best_local, best_position
 
     def _v_from_row_name(self, row: str) -> float:
         if row in self.row_names:
             return (self.row_names.index(row) + 0.5) / max(len(self.row_names), 1)
         if row.isdigit():
-            return (int(row) + 0.5) / max(len(self.row_names), 1)
-        return 0.5
+            row_index = int(row)
+            if 0 <= row_index < len(self.row_names):
+                return (row_index + 0.5) / max(len(self.row_names), 1)
+        raise RuntimeError("ymt_feather_ribbon_01 detail guide row is not defined in rowNames: %s." % row)
 
     def _get_anchor_positions(self) -> list[VectorLike]:
         positions = self._get_parent_guide_anchor_positions()
@@ -821,6 +832,17 @@ class Component(component.Main):
                 "ymt_feather_ribbon_01 requires parent ymt_birdwing_3jnt_01 guide apos: root, elbow, wrist, eff."
             )
         return positions
+
+    def _get_anchor_segment_lengths(self) -> list[float]:
+        lengths = []
+        for index, (start, end) in enumerate(zip(self.anchor_positions[:-1], self.anchor_positions[1:])):
+            length = (end - start).length()
+            if length < 0.001:
+                raise RuntimeError("ymt_feather_ribbon_01 requires non-zero parent wing guide segment %s." % index)
+            lengths.append(length)
+        if len(lengths) != len(self.anchor_names) - 1:
+            raise RuntimeError("ymt_feather_ribbon_01 requires a complete parent wing guide chain.")
+        return lengths
 
     def _get_parent_span_axis(self) -> VectorLike:
         root = self.anchor_positions[0]
@@ -879,18 +901,6 @@ class Component(component.Main):
             raise RuntimeError("ymt_feather_ribbon_01 found multiple parent wing guide candidates: %s." % names)
         return None
 
-    def _get_parent_feather_refs(self) -> Optional[dict[str, object]]:  # noqa: UP045
-        parent_comp = getattr(self, "parent_comp", None)
-        if parent_comp is None or not hasattr(parent_comp, "get_feather_ribbon_refs"):
-            return None
-        return parent_comp.get_feather_ribbon_refs()
-
-    def _get_world_position(self, node: object) -> VectorLike:
-        get_translation = getattr(node, "getTranslation", None)
-        if callable(get_translation):
-            return get_translation(space="world")
-        return datatypes.Vector(cmds.xform(str(node), q=True, ws=True, t=True))
-
     def _parse_detail_guide_name(self, local_name: str) -> Optional[tuple[str, int]]:  # noqa: UP045
         for pattern in DETAIL_GUIDE_PATTERNS:
             match = pattern.match(local_name)
@@ -906,52 +916,69 @@ class Component(component.Main):
         except RuntimeError as exc:
             raise RuntimeError("ymt_feather_ribbon_01 requires the rotationDriver plugin.") from exc
 
+    def _parse_placement_mode(self, value: str) -> str:
+        try:
+            index = int(value)
+        except (TypeError, ValueError) as exc:
+            raise RuntimeError("ymt_feather_ribbon_01 placementMode must be an integer enum index.") from exc
+        if index < 0 or index >= len(self.placement_modes):
+            raise RuntimeError("ymt_feather_ribbon_01 placementMode index is out of range: %s." % index)
+        return self.placement_modes[index]
+
     def _parse_row_names(self, value: str) -> list[str]:
         names = [item.strip() for item in value.split(",") if item.strip()]
-        return names or ["primary", "secondary", "tertial"]
+        if not names:
+            raise RuntimeError("ymt_feather_ribbon_01 rowNames cannot be empty.")
+        if len(set(names)) != len(names):
+            raise RuntimeError("ymt_feather_ribbon_01 rowNames cannot contain duplicates.")
+        return names
 
     def _parse_row_counts(self, value: str, row_names: list[str]) -> list[int]:
         raw_counts = [item.strip() for item in value.split(",") if item.strip()]
+        if len(raw_counts) != len(row_names):
+            raise RuntimeError(
+                "ymt_feather_ribbon_01 rowCounts requires exactly %s values, got %s."
+                % (len(row_names), len(raw_counts))
+            )
         counts = []
         for item in raw_counts:
             try:
-                counts.append(max(1, int(item)))
-            except ValueError:
-                counts.append(1)
-        while len(counts) < len(row_names):
-            counts.append(counts[-1] if counts else 1)
-        return counts[: len(row_names)]
+                count = int(item)
+            except ValueError as exc:
+                raise RuntimeError("ymt_feather_ribbon_01 rowCounts contains a non-integer value: %s." % item) from exc
+            if count < 1:
+                raise RuntimeError("ymt_feather_ribbon_01 rowCounts values must be positive: %s." % item)
+            counts.append(count)
+        return counts
 
     def _parse_row_u_ranges(self, value: str, row_names: list[str]) -> list[tuple[float, float]]:
+        raw_ranges = [part.strip() for part in value.split(",") if part.strip()]
+        if len(raw_ranges) != len(row_names):
+            raise RuntimeError(
+                "ymt_feather_ribbon_01 rowURanges requires exactly %s values, got %s."
+                % (len(row_names), len(raw_ranges))
+            )
         ranges = []
-        for item in [part.strip() for part in value.split(",") if part.strip()]:
+        for item in raw_ranges:
             try:
                 start, end = item.split(":", 1)
-                ranges.append((float(start), float(end)))
-            except ValueError:
-                ranges.append((0.0, 1.0))
-        while len(ranges) < len(row_names):
-            ranges.append((0.0, 1.0))
-        return ranges[: len(row_names)]
+                start_value = float(start)
+                end_value = float(end)
+            except ValueError as exc:
+                raise RuntimeError("ymt_feather_ribbon_01 rowURanges contains a malformed range: %s." % item) from exc
+            if not 0.0 <= start_value <= 1.0 or not 0.0 <= end_value <= 1.0:
+                raise RuntimeError("ymt_feather_ribbon_01 rowURanges values must be between 0 and 1: %s." % item)
+            if start_value > end_value:
+                raise RuntimeError("ymt_feather_ribbon_01 rowURanges start cannot be greater than end: %s." % item)
+            ranges.append((start_value, end_value))
+        return ranges
 
     def _parse_lower_edge_profiles(self, value: str, row_names: list[str]) -> list[list[float]]:
         if not value.strip():
             raise RuntimeError("ymt_feather_ribbon_01 lowerEdgeOffsets cannot be empty.")
 
-        named_profiles = {}
-        unnamed_profiles = []
-        for item in self._split_lower_edge_profile_rows(value):
-            name, _, raw_profile = item.partition(":")
-            if raw_profile:
-                profile = self._parse_float_list(raw_profile)
-                if not profile:
-                    raise RuntimeError("ymt_feather_ribbon_01 lowerEdgeOffsets row '%s' has no numeric values." % name)
-                named_profiles[name.strip()] = profile
-            else:
-                profile = self._parse_float_list(name)
-                if not profile:
-                    raise RuntimeError("ymt_feather_ribbon_01 lowerEdgeOffsets contains a row with no numeric values.")
-                unnamed_profiles.append(profile)
+        named_profiles, unnamed_profiles = self._collect_lower_edge_profiles(value)
+        self._validate_lower_edge_profile_rows(named_profiles, unnamed_profiles, row_names)
 
         profiles = []
         for index, row_name in enumerate(row_names):
@@ -966,6 +993,41 @@ class Component(component.Main):
             profiles.append(profile)
         return profiles
 
+    def _collect_lower_edge_profiles(self, value: str) -> tuple[dict[str, list[float]], list[list[float]]]:
+        named_profiles = {}
+        unnamed_profiles = []
+        for item in self._split_lower_edge_profile_rows(value):
+            name, _, raw_profile = item.partition(":")
+            if raw_profile:
+                row_name = name.strip()
+                if row_name in named_profiles:
+                    raise RuntimeError("ymt_feather_ribbon_01 lowerEdgeOffsets row '%s' is duplicated." % row_name)
+                profile = self._parse_float_list(raw_profile)
+                if not profile:
+                    raise RuntimeError("ymt_feather_ribbon_01 lowerEdgeOffsets row '%s' has no numeric values." % name)
+                named_profiles[row_name] = profile
+            else:
+                profile = self._parse_float_list(name)
+                if not profile:
+                    raise RuntimeError("ymt_feather_ribbon_01 lowerEdgeOffsets contains a row with no numeric values.")
+                unnamed_profiles.append(profile)
+        return named_profiles, unnamed_profiles
+
+    def _validate_lower_edge_profile_rows(
+        self,
+        named_profiles: dict[str, list[float]],
+        unnamed_profiles: list[list[float]],
+        row_names: list[str],
+    ) -> None:
+        unknown_rows = sorted(set(named_profiles).difference(row_names))
+        if unknown_rows:
+            raise RuntimeError("ymt_feather_ribbon_01 lowerEdgeOffsets has unknown rows: %s." % ", ".join(unknown_rows))
+        if len(unnamed_profiles) > len(row_names):
+            raise RuntimeError(
+                "ymt_feather_ribbon_01 lowerEdgeOffsets has too many unnamed rows: %s for %s rowNames."
+                % (len(unnamed_profiles), len(row_names))
+            )
+
     def _split_lower_edge_profile_rows(self, value: str) -> list[str]:
         rows = []
         for line in value.replace(";", "\n").splitlines():
@@ -978,7 +1040,10 @@ class Component(component.Main):
         values = []
         for item in [part.strip() for part in value.split(",") if part.strip()]:
             try:
-                values.append(max(0.0, float(item)))
-            except ValueError:
-                continue
+                parsed = float(item)
+            except ValueError as exc:
+                raise RuntimeError("ymt_feather_ribbon_01 lowerEdgeOffsets contains a non-numeric value: %s." % item) from exc
+            if parsed < 0.0:
+                raise RuntimeError("ymt_feather_ribbon_01 lowerEdgeOffsets cannot contain negative values: %s." % item)
+            values.append(parsed)
         return values
