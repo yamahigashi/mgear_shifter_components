@@ -230,31 +230,22 @@ class Component(component.Main):
 
     def _add_surface(self) -> None:
         surface_u_values = self._surface_u_values()
-        upper_points = [self._base_position_from_u(u) for u in surface_u_values]
-        lower_points = [
-            self._position_from_u_and_offset(u, self._max_lower_edge_offset_at_u(u)) for u in surface_u_values
-        ]
-        upper_curve = cmds.curve(
-            n=self.getName("ribbonUpper_crv"), d=3, p=[self._point_tuple(point) for point in upper_points]
-        )
-        lower_curve = cmds.curve(
-            n=self.getName("ribbonLower_crv"), d=3, p=[self._point_tuple(point) for point in lower_points]
-        )
-        surface = cmds.loft(
-            upper_curve,
-            lower_curve,
+        surface_offsets = self._surface_offsets()
+        surface = cmds.nurbsPlane(
             n=self.getName("ribbonSurface"),
             ch=False,
-            u=True,
-            c=False,
-            ar=True,
-            d=3,
-            ss=max(1, len(self.row_names)),
-            rn=False,
-            po=0,
-            rsn=True,
+            d=1,
+            u=len(surface_u_values) - 1,
+            v=len(surface_offsets) - 1,
         )[0]
-        cmds.delete(upper_curve, lower_curve)
+        surface_shape = self._surface_shape_name(surface)
+        for u_index, u in enumerate(surface_u_values):
+            for v_index, offset in enumerate(surface_offsets):
+                cmds.xform(
+                    "%s.cv[%s][%s]" % (surface_shape, u_index, v_index),
+                    ws=True,
+                    t=self._point_tuple(self._position_from_u_and_offset(u, offset)),
+                )
         self.sliding_surface = pm.PyNode(surface)
         pm.parent(self.sliding_surface, self.no_transform)
         # self.sliding_surface.attr("visibility").set(False)
@@ -301,21 +292,21 @@ class Component(component.Main):
         surface = self._node_name(self.sliding_surface)
         surface_shape = self._surface_shape_name(surface)
         u_count, v_count = self._surface_cv_counts(surface)
-        self._validate_surface_topology(u_count)
+        surface_offsets = self._surface_offsets()
+        self._validate_surface_topology(u_count, v_count, surface_offsets)
         influence_names = self._skin_influence_names(skin)
         influence_by_node = self._skin_influence_names_by_node(skin)
         with suppress(RuntimeError):
             cmds.setAttr(skin + ".normalizeWeights", 0)
 
         for u_index in range(u_count):
-            u = u_index / max(u_count - 1, 1)
             for v_index in range(v_count):
-                v = v_index / max(v_count - 1, 1)
+                offset = surface_offsets[v_index]
                 component = "%s.cv[%s][%s]" % (surface_shape, u_index, v_index)
                 weights = dict.fromkeys(influence_names, 0.0)
-                for joint, weight in self._surface_anchor_weight_entries(u, v, u_index):
+                for joint, weight in self._surface_anchor_weight_entries(offset, u_index):
                     weights[influence_by_node[self._node_name(joint)]] = weight
-                curl_joint, curl_weight = self._surface_curl_weight_entry(u_index, v)
+                curl_joint, curl_weight = self._surface_curl_weight_entry(u_index, offset)
                 weights[influence_by_node[self._node_name(curl_joint)]] = curl_weight
                 total = sum(weights.values())
                 if total <= 0.0:
@@ -326,7 +317,7 @@ class Component(component.Main):
         with suppress(RuntimeError):
             cmds.setAttr(skin + ".normalizeWeights", 1)
             cmds.skinCluster(skin, edit=True, forceNormalizeWeights=True)
-        self._validate_surface_skin_weights(skin, surface_shape, u_count, v_count, influence_by_node)
+        self._validate_surface_skin_weights(skin, surface_shape, u_count, v_count, surface_offsets, influence_by_node)
 
     def _validate_surface_skin_weights(
         self,
@@ -334,13 +325,14 @@ class Component(component.Main):
         surface_shape: str,
         u_count: int,
         v_count: int,
+        surface_offsets: list[float],
         influence_by_node: dict[str, str],
     ) -> None:
         v_index = max(v_count - 1, 0)
-        v = v_index / max(v_count - 1, 1)
+        offset = surface_offsets[v_index]
         for segment_index, joint in enumerate(self.curl_surface_skin_joints):
             u_index = min((segment_index * 2) + 1, max(u_count - 1, 0))
-            expected = self._surface_curl_weight_for_u_index(u_index, v)
+            expected = self._surface_curl_weight_for_u_index(u_index, offset)
             if expected <= 0.05:
                 continue
             component = "%s.cv[%s][%s]" % (surface_shape, u_index, v_index)
@@ -361,11 +353,16 @@ class Component(component.Main):
             int(cmds.getAttr(shape + ".spansV")) + int(cmds.getAttr(shape + ".degreeV")),
         )
 
-    def _validate_surface_topology(self, u_count: int) -> None:
+    def _validate_surface_topology(self, u_count: int, v_count: int, surface_offsets: list[float]) -> None:
         if u_count != self.surface_u_count:
             raise RuntimeError(
                 "ymt_feather_ribbon_01 ribbon surface requires %s U CVs for fixed anchor/curl columns, got %s."
                 % (self.surface_u_count, u_count)
+            )
+        if v_count != len(surface_offsets):
+            raise RuntimeError(
+                "ymt_feather_ribbon_01 ribbon surface requires %s V CVs for fixed offset rows, got %s."
+                % (len(surface_offsets), v_count)
             )
 
     def _surface_shape_name(self, surface: str) -> str:
@@ -400,11 +397,10 @@ class Component(component.Main):
                 raise RuntimeError("ymt_feather_ribbon_01 could not resolve skin influence for '%s'." % joint_name)
         return mapping
 
-    def _surface_anchor_weight_entries(self, u: float, v: float, u_index: int) -> list[tuple[PymelNode, float]]:
+    def _surface_anchor_weight_entries(self, offset: float, u_index: int) -> list[tuple[PymelNode, float]]:
         anchor_entries = self._anchor_weight_entries_for_u_index(u_index)
-        offset = self._max_lower_edge_offset_at_u(u) * v
         layer_entries = self._anchor_layer_weight_entries_for_offset(offset)
-        curl_weight = self._surface_curl_weight_for_u_index(u_index, v)
+        curl_weight = self._surface_curl_weight_for_u_index(u_index, offset)
         anchor_weight = max(0.0, 1.0 - curl_weight)
         entries = []
         for anchor_index, anchor_value in anchor_entries:
@@ -413,16 +409,19 @@ class Component(component.Main):
                 entries.append((joint, anchor_value * layer_value * anchor_weight))
         return entries
 
-    def _surface_curl_weight_entry(self, u_index: int, v: float) -> tuple[PymelNode, float]:
+    def _surface_curl_weight_entry(self, u_index: int, offset: float) -> tuple[PymelNode, float]:
         if not self.curl_surface_skin_joints:
             raise RuntimeError("ymt_feather_ribbon_01 curl surface skin joints were not properly initialized.")
         segment_index = min(max((u_index - 1) // 2, 0), len(self.curl_surface_skin_joints) - 1)
-        return self.curl_surface_skin_joints[segment_index], self._surface_curl_weight_for_u_index(u_index, v)
+        return self.curl_surface_skin_joints[segment_index], self._surface_curl_weight_for_u_index(u_index, offset)
 
-    def _surface_curl_weight_for_u_index(self, u_index: int, v: float) -> float:
+    def _surface_curl_weight_for_u_index(self, u_index: int, offset: float) -> float:
         if u_index % 2 == 0:
             return 0.0
-        return max(0.0, min(1.0, v)) * 0.65
+        max_offset = max(self.anchor_offsets)
+        if max_offset <= 0.0:
+            return 0.0
+        return max(0.0, min(1.0, offset / max_offset)) * 0.65
 
     def _anchor_weight_entries_for_u_index(self, u_index: int) -> list[tuple[int, float]]:
         if u_index % 2 == 0:
@@ -783,6 +782,12 @@ class Component(component.Main):
 
     def _surface_u_values(self) -> list[float]:
         return [index / float(self.surface_u_count - 1) for index in range(self.surface_u_count)]
+
+    def _surface_offsets(self) -> list[float]:
+        offsets = sorted({0.0}.union(self.anchor_offsets))
+        if len(offsets) < 2:
+            raise RuntimeError("ymt_feather_ribbon_01 ribbon surface requires at least two V offset rows.")
+        return offsets
 
     def _max_lower_edge_offset_at_u(self, u: float) -> float:
         offsets = []
