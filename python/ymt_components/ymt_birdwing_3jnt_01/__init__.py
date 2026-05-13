@@ -36,6 +36,9 @@ class Component(component.Main):
     """Shifter component class."""
 
     wrist_control_mode_names = ("IK", "Chain")
+    build_neutral_soft_ik_range = 0.0
+    default_soft_ik_speed = 2.5
+    soft_ik_initial_residual_ratio = 0.1
 
     def _connect_enum_condition(
         self, enum_attr: object, enum_index: int, target_weight: object, true_value: int = 1, false_value: int = 0
@@ -551,11 +554,13 @@ class Component(component.Main):
             int(max(0, min(len(self.wrist_control_mode_names) - 1, self.settings.get("wristControlMode", 0)))),
             self.wrist_control_mode_names,
         )
+        self._softIKRange_initial_value = self.settings["softIKRange"]
+        self._softIKSpeed_initial_value = self.settings["softIKSpeed"]
         self.soft_attr = self.addAnimParam(
             "softIKRange",
             "Soft IK Range Ratio",
             "double",
-            self.settings["softIKRange"],
+            self.build_neutral_soft_ik_range,
             0.0,
             1.0,
         )
@@ -563,7 +568,7 @@ class Component(component.Main):
             "softIKSpeed",
             "Soft IK Speed",
             "double",
-            self.settings["softIKSpeed"],
+            self.default_soft_ik_speed,
             1.001,
             10.0,
         )
@@ -866,6 +871,36 @@ class Component(component.Main):
         pm.parentConstraint(self.wingBones[2], self.match_ik, mo=True)
         pm.parentConstraint(self.wingBones[3], self.match_hand_ik, mo=True)
 
+    def _offset_ik_ctl_for_initial_soft_ik(self) -> None:
+        soft_ik_range = float(self._softIKRange_initial_value)
+        if soft_ik_range <= 0.0:
+            return
+
+        soft_ik_speed = float(self._softIKSpeed_initial_value)
+        if soft_ik_speed <= 1.0:
+            return
+
+        offset_factor = math.log(1.0 / self.soft_ik_initial_residual_ratio) / math.log(soft_ik_speed) - 1.0
+        if offset_factor <= 0.0:
+            return
+
+        root_pos = datatypes.Vector(self.guide.pos["root"])
+        wrist_pos = datatypes.Vector(self.guide.pos["wrist"])
+        direction = wrist_pos - root_pos
+        if direction.length() <= 0.0:
+            return
+
+        direction.normalize()
+        offset = (self.length0 + self.length1) * soft_ik_range * offset_factor
+        current_pos = self.ik_ctl.getTranslation(space="world")
+        self.ik_ctl.setTranslation(current_pos + (direction * offset), space="world")
+
+    def _apply_soft_ik_initial_values(self) -> None:
+        self._offset_ik_ctl_for_initial_soft_ik()
+        self.soft_attr.set(self._softIKRange_initial_value)
+        self.softSpeed_attr.set(self._softIKSpeed_initial_value)
+        self.match_ik.setMatrix(self.ik_ctl.getMatrix(worldSpace=True), worldSpace=True)
+
     def addOperators(self) -> None:
         """Apply operators, constraints, and expressions."""
 
@@ -889,6 +924,7 @@ class Component(component.Main):
         self._connect_volume_driver()
         self._connect_division_operators()
         self._connect_visibility()
+        self._apply_soft_ik_initial_values()
         self._connect_match_refs()
 
     def verifyAlignmentAccuracy(
