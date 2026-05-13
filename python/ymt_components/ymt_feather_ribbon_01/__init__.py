@@ -653,12 +653,13 @@ class Component(component.Main):
 
     def _connect_anchor_root_space(self, refs: dict[str, PymelNode], anchor_name: str, npo: PymelNode) -> None:
         self._ensure_rotation_driver_plugin()
-        pm.pointConstraint(refs[anchor_name], npo, mo=True)
+        rotation_parent = self._create_anchor_rotation_parent(anchor_name, refs[anchor_name], npo)
         entries = self._anchor_root_space_entries(anchor_name)
         sources: list[WeightedRotationSource] = []
+
         for source_name, weight in entries:
             proxy = primitive.addTransform(
-                self.driver_root,
+                rotation_parent,
                 self.getName("feather_%s_%s_rotProxy" % (anchor_name, source_name)),
                 transform.getTransform(npo),
             )
@@ -676,6 +677,27 @@ class Component(component.Main):
             )
         compose = self._compose_weighted_rotation_sources(sources, include_bend_v=False)
         cmds.connectAttr(compose + ".outRotate", self._node_name(npo) + ".rotate", force=True)
+
+    def _create_anchor_rotation_parent(
+        self,
+        anchor_name: str,
+        driven_ref: PymelNode,
+        npo: PymelNode,
+    ) -> PymelNode:
+        parent = npo.getParent()
+        if parent is None:
+            raise RuntimeError("ymt_feather_ribbon_01 anchor rotation parent requires a parented npo: %s." % npo)
+        rotation_parent = primitive.addTransform(
+            parent,
+            self.getName("feather_%s_rotParent" % anchor_name),
+            transform.getTransform(npo),
+        )
+        pm.parent(npo, rotation_parent)
+        pm.pointConstraint(driven_ref, rotation_parent, mo=True)
+        constraint = pm.orientConstraint(driven_ref, rotation_parent, mo=True)
+        pm.setAttr(constraint.attr("interpType"), 0)  # no-flip
+        ymt_util.setKeyableAttributesDontLockVisibility(rotation_parent, [])
+        return rotation_parent
 
     def _anchor_root_space_entries(self, anchor_name: str) -> list[tuple[str, float]]:
         if anchor_name == "elbow":
