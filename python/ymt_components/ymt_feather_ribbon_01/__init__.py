@@ -12,6 +12,10 @@ try:
     pm = importlib.import_module("mgear.pymaya")
 except ImportError:
     pm = importlib.import_module("pymel.core")
+try:
+    datatypes = importlib.import_module("mgear.pymaya.datatypes")
+except ImportError:
+    datatypes = importlib.import_module("pymel.core.datatypes")
 
 from mgear.core import attribute, primitive, transform
 from mgear.shifter import component
@@ -22,6 +26,7 @@ from . import detail_config
 
 if TYPE_CHECKING:
     from ymt_shifter_utility.type_protocols import PymelNode, VectorLike
+
 
 MAYA_2025_API_VERSION = 20250000
 PARENT_COMPONENT_TYPE = "ymt_birdwing_3jnt_01"
@@ -614,6 +619,11 @@ class Component(component.Main):
     def _point_tuple(self, point: VectorLike) -> tuple[float, float, float]:
         return (point[0], point[1], point[2])
 
+    def _to_vector(self, value: object) -> VectorLike:
+        if hasattr(value, "length") and hasattr(value, "normal"):
+            return value
+        return datatypes.Vector(value)
+
     def _collect_detail_specs(self) -> list[DetailSpec]:
         guide_specs = self._collect_detail_guide_specs()
         if guide_specs:
@@ -648,7 +658,7 @@ class Component(component.Main):
             if parsed is None:
                 continue
             row, col = parsed
-            position = transform.getPositionFromMatrix(matrix)
+            position = self._to_vector(transform.getPositionFromMatrix(matrix))
             span, local, base_position = self._closest_span_local_from_position(position)
             u = self._u_from_span_local(span, local)
             v = self._v_from_row_name(row)

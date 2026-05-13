@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from functools import partial
-from typing import ClassVar
+from typing import Any, ClassVar
 
 import importlib
 
@@ -11,12 +11,17 @@ try:
     pm = importlib.import_module("mgear.pymaya")
 except ImportError:
     pm = importlib.import_module("pymel.core")
+try:
+    datatypes = importlib.import_module("mgear.pymaya.datatypes")
+except ImportError:
+    datatypes = importlib.import_module("pymel.core.datatypes")
 
 from maya.app.general.mayaMixin import MayaQDockWidget, MayaQWidgetDockableMixin
 from mgear.core import pyqt, transform
 from mgear.shifter.component import guide
 from mgear.vendor.Qt import QtCore, QtWidgets
 
+from . import detail_config
 from . import settingsUI as sui
 
 
@@ -27,6 +32,8 @@ VERSION = [1, 0, 0]
 TYPE = "ymt_feather_ribbon_01"
 NAME = "featherRibbon"
 DESCRIPTION = "Feather ribbon detail driver for ymt_birdwing_3jnt_01."
+PARENT_COMPONENT_TYPE = "ymt_birdwing_3jnt_01"
+PARENT_ANCHOR_NAMES = ("root", "elbow", "wrist", "eff")
 
 
 class Guide(guide.ComponentGuide):
@@ -51,7 +58,7 @@ class Guide(guide.ComponentGuide):
             "curl2",
             "#_loc",
         ]
-        self.addMinMax("#_loc", 1, -1)
+        self.addMinMax("#_loc", 0, -1)
 
     def addObjects(self) -> None:
         self.root = self.addRoot()
@@ -77,6 +84,29 @@ class Guide(guide.ComponentGuide):
         self.pAddJoints = self.addParam("addJoints", "bool", True)
         self.pUseIndex = self.addParam("useIndex", "bool", False)
         self.pParentJointIndex = self.addParam("parentJointIndex", "long", -1, None, None)
+
+    def setFromHierarchy(self, root: object) -> None:
+        super(Guide, self).setFromHierarchy(root)
+        self._collect_named_detail_guides()
+
+    def _collect_named_detail_guides(self) -> None:
+        prefix = self.fullName + "_"
+        children = pm.listRelatives(self.model, ad=True, typ="transform") or []
+        for node in children:
+            node_name = node.name().split("|")[-1]
+            if not node_name.startswith(prefix):
+                continue
+            local_name = node_name[len(prefix) :]
+            if not detail_config.is_detail_guide_name(local_name):
+                continue
+            if local_name in self.tra:
+                continue
+            matrix = node.getMatrix(worldSpace=True)
+            position = node.getTranslation(space="world")
+            self.tra[local_name] = matrix
+            self.atra.append(matrix)
+            self.pos[local_name] = position
+            self.apos.append(position)
 
 
 class settingsTab(QtWidgets.QDialog, sui.Ui_Form):
@@ -107,7 +137,7 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
         self.setObjectName(self.toolName)
         self.setWindowFlags(QtCore.Qt.Window)
         self.setWindowTitle(TYPE)
-        self.resize(320, 430)
+        self.resize(460, 590)
 
     def create_componentControls(self) -> None:
         return
@@ -115,11 +145,7 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
     def populate_componentControls(self) -> None:
         self.tabs.insertTab(1, self.settingsTab, "Component Settings")
         self.settingsTab.placementMode_comboBox.setCurrentIndex(self.root.attr("placementMode").get())
-        self.settingsTab.rowNames_lineEdit.setText(self.root.attr("rowNames").get())
-        self.settingsTab.rowCounts_lineEdit.setText(self.root.attr("rowCounts").get())
-        self.settingsTab.rowURanges_lineEdit.setText(self.root.attr("rowURanges").get())
-        if self.root.hasAttr("lowerEdgeOffsets"):
-            self.settingsTab.lowerEdgeOffsets_plainTextEdit.setPlainText(self.root.attr("lowerEdgeOffsets").get())
+        self.populate_row_table()
         self.settingsTab.ctlSize_doubleSpinBox.setValue(self.root.attr("ctlSize").get())
         self.populateCheck(self.settingsTab.addJoints_checkBox, "addJoints")
 
@@ -144,18 +170,10 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
         self.settingsTab.placementMode_comboBox.currentIndexChanged.connect(
             partial(self.updateComboBox, self.settingsTab.placementMode_comboBox, "placementMode")
         )
-        self.settingsTab.rowNames_lineEdit.editingFinished.connect(
-            partial(self.update_line_edit, self.settingsTab.rowNames_lineEdit, "rowNames")
-        )
-        self.settingsTab.rowCounts_lineEdit.editingFinished.connect(
-            partial(self.update_line_edit, self.settingsTab.rowCounts_lineEdit, "rowCounts")
-        )
-        self.settingsTab.rowURanges_lineEdit.editingFinished.connect(
-            partial(self.update_line_edit, self.settingsTab.rowURanges_lineEdit, "rowURanges")
-        )
-        self.settingsTab.lowerEdgeOffsets_plainTextEdit.textChanged.connect(
-            partial(self.update_plain_text_edit, self.settingsTab.lowerEdgeOffsets_plainTextEdit, "lowerEdgeOffsets")
-        )
+        self.settingsTab.rowTableWidget.cellChanged.connect(self.update_row_table_settings)
+        self.settingsTab.addRow_pushButton.clicked.connect(self.add_row_table_item)
+        self.settingsTab.removeRow_pushButton.clicked.connect(self.remove_selected_row_table_item)
+        self.settingsTab.generateLocators_pushButton.clicked.connect(self.rebuild_detail_locators)
         self.settingsTab.ctlSize_doubleSpinBox.valueChanged.connect(
             partial(self.updateSpinBox, self.settingsTab.ctlSize_doubleSpinBox, "ctlSize")
         )
@@ -169,9 +187,240 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
     def dockCloseEventTriggered(self) -> None:
         pyqt.deleteInstances(self, MayaQDockWidget)
 
-    def update_line_edit(self, line_edit: QtWidgets.QLineEdit, target_attr: str) -> None:
-        self.root.attr(target_attr).set(line_edit.text())
+    def populate_row_table(self) -> None:
+        table = self.settingsTab.rowTableWidget
+        table.blockSignals(True)
+        table.setRowCount(0)
+        try:
+            row_names, row_counts, row_u_ranges, lower_edge_profiles = self._detail_settings_from_root()
+        except RuntimeError as exc:
+            pm.displayWarning(str(exc))
+            table.blockSignals(False)
+            return
+        for row_name, count, u_range, offsets in zip(row_names, row_counts, row_u_ranges, lower_edge_profiles):
+            self._append_row_table_item(row_name, count, u_range[0], u_range[1], offsets)
+        table.blockSignals(False)
 
-    def update_plain_text_edit(self, plain_text_edit: QtWidgets.QPlainTextEdit, target_attr: str) -> None:
-        if self.root.hasAttr(target_attr):
-            self.root.attr(target_attr).set(plain_text_edit.toPlainText())
+    def add_row_table_item(self) -> None:
+        table = self.settingsTab.rowTableWidget
+        row = table.rowCount()
+        table.blockSignals(True)
+        self._append_row_table_item("row%s" % row, 1, 0.0, 1.0, [0.2])
+        table.blockSignals(False)
+        self.update_row_table_settings()
+
+    def remove_selected_row_table_item(self) -> None:
+        table = self.settingsTab.rowTableWidget
+        rows = sorted({index.row() for index in table.selectedIndexes()}, reverse=True)
+        if not rows and table.rowCount():
+            rows = [table.rowCount() - 1]
+        for row in rows:
+            table.removeRow(row)
+        self.update_row_table_settings()
+
+    def _append_row_table_item(
+        self,
+        row_name: str,
+        count: int,
+        u_start: float,
+        u_end: float,
+        offsets: list[float],
+    ) -> None:
+        table = self.settingsTab.rowTableWidget
+        row = table.rowCount()
+        table.insertRow(row)
+        values = [
+            row_name,
+            str(count),
+            detail_config.format_float(u_start),
+            detail_config.format_float(u_end),
+            ", ".join(detail_config.format_float(offset) for offset in offsets),
+        ]
+        for column, value in enumerate(values):
+            table.setItem(row, column, QtWidgets.QTableWidgetItem(value))
+
+    def update_row_table_settings(self, *_args: object) -> None:
+        try:
+            row_names, row_counts, row_u_ranges, lower_edge_profiles = self._detail_settings_from_table()
+        except RuntimeError as exc:
+            pm.displayWarning(str(exc))
+            return
+        self.root.attr("rowNames").set(",".join(row_names))
+        self.root.attr("rowCounts").set(",".join(str(count) for count in row_counts))
+        self.root.attr("rowURanges").set(
+            ",".join(
+                "%s:%s" % (detail_config.format_float(u_start), detail_config.format_float(u_end))
+                for u_start, u_end in row_u_ranges
+            )
+        )
+        self.root.attr("lowerEdgeOffsets").set(detail_config.format_lower_edge_profiles(row_names, lower_edge_profiles))
+
+    def _detail_settings_from_root(self) -> tuple[list[str], list[int], list[tuple[float, float]], list[list[float]]]:
+        row_names = detail_config.parse_row_names(self.root.attr("rowNames").get())
+        row_counts = detail_config.parse_row_counts(self.root.attr("rowCounts").get(), row_names)
+        row_u_ranges = detail_config.parse_row_u_ranges(self.root.attr("rowURanges").get(), row_names)
+        if not self.root.hasAttr("lowerEdgeOffsets"):
+            raise RuntimeError("ymt_feather_ribbon_01 requires the lowerEdgeOffsets setting.")
+        lower_edge_profiles = detail_config.parse_lower_edge_profiles(
+            self.root.attr("lowerEdgeOffsets").get(), row_names
+        )
+        return row_names, row_counts, row_u_ranges, lower_edge_profiles
+
+    def _detail_settings_from_table(self) -> tuple[list[str], list[int], list[tuple[float, float]], list[list[float]]]:
+        table = self.settingsTab.rowTableWidget
+        row_names = []
+        row_counts = []
+        row_u_ranges = []
+        lower_edge_profiles = []
+        for row in range(table.rowCount()):
+            row_name = self._table_text(row, 0)
+            if not row_name:
+                raise RuntimeError("ymt_feather_ribbon_01 row name cannot be empty.")
+            row_names.append(row_name)
+            try:
+                row_counts.append(int(self._table_text(row, 1)))
+                row_u_ranges.append((float(self._table_text(row, 2)), float(self._table_text(row, 3))))
+            except ValueError as exc:
+                raise RuntimeError("ymt_feather_ribbon_01 row table contains a non-numeric count or U range.") from exc
+            lower_edge_profiles.append(detail_config.parse_float_list(self._table_text(row, 4)))
+        row_names = detail_config.parse_row_names(",".join(row_names))
+        detail_config.validate_detail_row_names(row_names)
+        detail_config.parse_row_counts(",".join(str(count) for count in row_counts), row_names)
+        detail_config.parse_row_u_ranges(
+            ",".join("%s:%s" % (u_start, u_end) for u_start, u_end in row_u_ranges),
+            row_names,
+        )
+        detail_config.parse_lower_edge_profiles(
+            detail_config.format_lower_edge_profiles(row_names, lower_edge_profiles), row_names
+        )
+        return row_names, row_counts, row_u_ranges, lower_edge_profiles
+
+    def _table_text(self, row: int, column: int) -> str:
+        item = self.settingsTab.rowTableWidget.item(row, column)
+        if item is None:
+            return ""
+        return item.text().strip()
+
+    def rebuild_detail_locators(self) -> None:
+        try:
+            row_names, row_counts, row_u_ranges, lower_edge_profiles = self._detail_settings_from_table()
+            parent_root = self._find_parent_wing_root()
+            anchor_positions = self._parent_anchor_positions(parent_root)
+            lower_axis = self._parent_lower_axis(parent_root, anchor_positions)
+            component_size = self._component_size(anchor_positions)
+        except RuntimeError as exc:
+            pm.displayWarning(str(exc))
+            return
+
+        self._delete_existing_detail_locators()
+        created = []
+        for row_index, row_name in enumerate(row_names):
+            detail_index = 0
+            section_count = row_counts[row_index]
+            u_start, u_end = row_u_ranges[row_index]
+            for section in range(section_count):
+                ratio = (section + 0.5) / max(section_count, 1)
+                u = u_start + ((u_end - u_start) * ratio)
+                base_position = self._position_from_u(anchor_positions, u)
+                for offset in lower_edge_profiles[row_index]:
+                    local_name = "detail_%s_%02d_loc" % (row_name, detail_index)
+                    position = base_position + (lower_axis * offset * component_size)
+                    created.append(self._create_detail_locator(local_name, position))
+                    detail_index += 1
+        pm.select(created or self.root)
+        pm.displayInfo("Rebuilt %s ymt_feather_ribbon_01 detail locators." % len(created))
+
+    def _find_parent_wing_root(self) -> Any:
+        side = self.root.attr("comp_side").get()
+        index = self.root.attr("comp_index").get()
+        candidates = []
+        for node in pm.ls(type="transform"):
+            if not node.hasAttr("comp_type") or node.attr("comp_type").get() != PARENT_COMPONENT_TYPE:
+                continue
+            if node.attr("comp_side").get() != side or node.attr("comp_index").get() != index:
+                continue
+            candidates.append(node)
+        if len(candidates) == 1:
+            return candidates[0]
+        if candidates:
+            raise RuntimeError("ymt_feather_ribbon_01 found multiple parent wing guide candidates.")
+        raise RuntimeError("ymt_feather_ribbon_01 requires a matching ymt_birdwing_3jnt_01 guide.")
+
+    def _parent_anchor_positions(self, parent_root: Any) -> list[Any]:
+        prefix = parent_root.name().replace("_root", "")
+        positions = []
+        for name in PARENT_ANCHOR_NAMES:
+            node_name = "%s_%s" % (prefix, name)
+            if not pm.objExists(node_name):
+                raise RuntimeError("ymt_feather_ribbon_01 parent wing guide is missing %s." % name)
+            node = pm.PyNode(node_name)
+            positions.append(datatypes.Vector(pm.xform(node, q=True, ws=True, t=True)))
+        return positions
+
+    def _parent_lower_axis(self, parent_root: Any, anchor_positions: list[Any]) -> Any:
+        prefix = parent_root.name().replace("_root", "")
+        blade_name = "%s_blade" % prefix
+        if not pm.objExists(blade_name):
+            raise RuntimeError("ymt_feather_ribbon_01 parent wing guide is missing blade.")
+        blade = pm.PyNode(blade_name)
+        matrix = pm.xform(blade, q=True, ws=True, matrix=True)
+        wing_normal = datatypes.Vector(matrix[8], matrix[9], matrix[10]) * -1
+        if wing_normal.length() < 0.001:
+            raise RuntimeError("ymt_feather_ribbon_01 requires a valid parent wing blade normal.")
+        span_axis = anchor_positions[-1] - anchor_positions[0]
+        if span_axis.length() < 0.001:
+            raise RuntimeError("ymt_feather_ribbon_01 requires a valid parent wing root-to-eff guide axis.")
+        lower_axis = wing_normal.normal() ^ span_axis.normal()
+        if lower_axis.length() < 0.001:
+            raise RuntimeError(
+                "ymt_feather_ribbon_01 parent wing blade normal cannot be parallel to the root-to-eff axis."
+            )
+        return lower_axis.normal()
+
+    def _component_size(self, anchor_positions: list[Any]) -> float:
+        root_position = datatypes.Vector(pm.xform(self.root, q=True, ws=True, t=True))
+        distances = []
+        for name in ("curl0", "curl1", "curl2"):
+            node_name = "%s_%s" % (self.root.name().replace("_root", ""), name)
+            if pm.objExists(node_name):
+                position = datatypes.Vector(pm.xform(node_name, q=True, ws=True, t=True))
+                distances.append((position - root_position).length())
+        if not distances:
+            distances = [(position - root_position).length() for position in anchor_positions]
+        return max([0.01, *distances])
+
+    def _position_from_u(self, anchor_positions: list[Any], u: float) -> Any:
+        segment_lengths = [(end - start).length() for start, end in zip(anchor_positions[:-1], anchor_positions[1:])]
+        total_length = sum(segment_lengths)
+        if total_length < 0.001:
+            raise RuntimeError("ymt_feather_ribbon_01 requires non-zero parent wing guide length.")
+        distance = max(0.0, min(1.0, u)) * total_length
+        traversed = 0.0
+        for index, segment_length in enumerate(segment_lengths):
+            if distance <= traversed + segment_length or index == len(segment_lengths) - 1:
+                local = (distance - traversed) / segment_length
+                return anchor_positions[index] + ((anchor_positions[index + 1] - anchor_positions[index]) * local)
+            traversed += segment_length
+        return anchor_positions[-1]
+
+    def _delete_existing_detail_locators(self) -> None:
+        prefix = self.root.name().replace("_root", "")
+        nodes = []
+        for node in pm.listRelatives(self.root.getParent(generations=-1), ad=True, typ="transform") or []:
+            node_name = node.name().split("|")[-1]
+            if not node_name.startswith(prefix + "_"):
+                continue
+            local_name = node_name[len(prefix) + 1 :]
+            if detail_config.is_detail_guide_name(local_name):
+                nodes.append(node)
+        if nodes:
+            pm.delete(nodes)
+
+    def _create_detail_locator(self, local_name: str, position: Any) -> Any:
+        prefix = self.root.name().replace("_root", "")
+        created = pm.spaceLocator(name="%s_%s" % (prefix, local_name))
+        node = created[0] if isinstance(created, (list, tuple)) else created
+        node = pm.PyNode(node)
+        node.setTranslation(position, space="world")
+        pm.parent(node, self.root)
+        return node
