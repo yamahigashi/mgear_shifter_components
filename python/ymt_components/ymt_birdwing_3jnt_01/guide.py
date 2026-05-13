@@ -66,6 +66,8 @@ class Guide(guide.ComponentGuide):
         self.pIKSolver = self.addEnumParam("ikSolver", ["IK Spring", "IK Rotation Plane"], 0)
         self.pWristControlMode = self.addEnumParam("wristControlMode", ["IK", "Chain"], 0)
         self.pIKOrient = self.addParam("ikOri", "bool", True)
+        self.pSoftIKRange = self.addParam("softIKRange", "double", 0.0, 0.0, 1.0)
+        self.pSoftIKSpeed = self.addParam("softIKSpeed", "double", 2.5, 1.001, 10.0)
 
         self.pDiv0 = self.addParam("div0", "long", 2, 0, None)
         self.pDiv1 = self.addParam("div1", "long", 2, 0, None)
@@ -124,6 +126,8 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
         self.settingsTab.wristControlMode_comboBox.setCurrentIndex(self.root.attr("wristControlMode").get())
         self.populateCheck(self.settingsTab.neutralRotation_checkBox, "ikOri")
         self.populateCheck(self.settingsTab.smoothStep_checkBox, "smoothStep")
+        self.settingsTab.softIKRange_spinBox.setValue(self.root.attr("softIKRange").get())
+        self.settingsTab.softIKSpeed_spinBox.setValue(self.root.attr("softIKSpeed").get())
         self.settingsTab.div0_spinBox.setValue(self.root.attr("div0").get())
         self.settingsTab.div1_spinBox.setValue(self.root.attr("div1").get())
         self.settingsTab.div2_spinBox.setValue(self.root.attr("div2").get())
@@ -169,6 +173,12 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
         )
         self.settingsTab.neutralRotation_checkBox.stateChanged.connect(
             partial(self.updateCheck, self.settingsTab.neutralRotation_checkBox, "ikOri")
+        )
+        self.settingsTab.softIKRange_spinBox.valueChanged.connect(
+            partial(self.updateSpinBox, self.settingsTab.softIKRange_spinBox, "softIKRange")
+        )
+        self.settingsTab.softIKSpeed_spinBox.valueChanged.connect(
+            partial(self.updateSpinBox, self.settingsTab.softIKSpeed_spinBox, "softIKSpeed")
         )
         self.settingsTab.div0_spinBox.valueChanged.connect(
             partial(self.updateSpinBox, self.settingsTab.div0_spinBox, "div0")

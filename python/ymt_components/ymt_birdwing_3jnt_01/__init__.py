@@ -551,8 +551,22 @@ class Component(component.Main):
             int(max(0, min(len(self.wrist_control_mode_names) - 1, self.settings.get("wristControlMode", 0)))),
             self.wrist_control_mode_names,
         )
-        self.soft_attr = self.addAnimParam("softIKRange", "Soft IK Range Ratio", "double", 0.0001, 0.0001, 1)
-        self.softSpeed_attr = self.addAnimParam("softIKSpeed", "Soft IK Speed", "double", 2.5, 1.001, 10)
+        self.soft_attr = self.addAnimParam(
+            "softIKRange",
+            "Soft IK Range Ratio",
+            "double",
+            self.settings["softIKRange"],
+            0.0,
+            1.0,
+        )
+        self.softSpeed_attr = self.addAnimParam(
+            "softIKSpeed",
+            "Soft IK Speed",
+            "double",
+            self.settings["softIKSpeed"],
+            1.001,
+            10.0,
+        )
         self.stretch_attr = self.addAnimParam("stretch", "Stretch", "double", 0, 0, 1)
         self.roundnessElbow_att = self.addAnimParam("roundnessElbow", "Roundness Elbow", "double", 0, 0, self.size)
         self.roundnessWrist_att = self.addAnimParam("roundnessWrist", "Roundness Wrist", "double", 0, 0, self.size)
