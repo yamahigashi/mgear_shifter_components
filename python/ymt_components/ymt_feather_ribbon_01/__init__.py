@@ -110,6 +110,8 @@ class Component(component.Main):
 
         self.detail_specs = self._collect_detail_specs()
         self.detail_npos = []
+        self.detail_driver_specs = []
+        self.detail_driver_npos = []
         self.detail_aim_npos = []
         self.detail_ctls = []
         self._add_detail_controls()
@@ -231,25 +233,54 @@ class Component(component.Main):
             self.curl_deforms.append(deform)
 
     def _add_detail_controls(self) -> None:
+        controls_by_feather_part: dict[tuple[str, int, int], PymelNode] = {}
         for spec in self.detail_specs:
             detail_name = self._detail_name(spec)
             matrix = transform.getTransformFromPos(spec["position"])
-            npo = primitive.addTransform(self.detail_root, self.getName("%s_npo" % detail_name), matrix)
-            aim_npo = primitive.addTransform(npo, self.getName("%s_aim_npo" % detail_name), matrix)
+            section = int(spec["section"])
+            col = int(spec["col"])
+            if col == 0:
+                parent = self.detail_root
+                tag_parent = self.curl_ctls[min(spec["span"], len(self.curl_ctls) - 1)]
+            else:
+                previous_key = (str(spec["row"]), section, col - 1)
+                if previous_key not in controls_by_feather_part:
+                    raise RuntimeError(
+                        "ymt_feather_ribbon_01 detail FK chain is missing previous feather part: %s_%s_%s."
+                        % previous_key
+                    )
+                parent = controls_by_feather_part[previous_key]
+                tag_parent = parent
+            npo = primitive.addTransform(
+                parent,
+                self.getName("%s_npo" % detail_name),
+                matrix
+            )
+            ctl_parent = npo
+            if col == 0:
+                ctl_parent = primitive.addTransform(
+                    npo,
+                    self.getName("%s_aim_npo" % detail_name),
+                    matrix
+                )
             ctl = self.addCtl(
-                aim_npo,
+                ctl_parent,
                 "%s_ctl" % detail_name,
                 matrix,
                 self.color_fk,
                 "circle",
                 w=self.ctl_size * 0.5,
                 ro=datatypes.Vector(math.radians(90), 0.0, 0.0),
-                tp=self.curl_ctls[min(spec["span"], len(self.curl_ctls) - 1)],
+                tp=tag_parent,
             )
             attribute.setKeyableAttributes(ctl)
             attribute.setInvertMirror(ctl, ["tx", "ty", "tz"])
             self.detail_npos.append(npo)
-            self.detail_aim_npos.append(aim_npo)
+            controls_by_feather_part[(str(spec["row"]), section, col)] = ctl
+            if col == 0:
+                self.detail_driver_specs.append(spec)
+                self.detail_driver_npos.append(npo)
+                self.detail_aim_npos.append(ctl_parent)
             self.detail_ctls.append(ctl)
             if self.settings["addJoints"]:
                 self.jnt_pos.append([ctl, detail_name])
@@ -488,7 +519,7 @@ class Component(component.Main):
         return [(len(self.anchor_offsets) - 1, 1.0)]
 
     def _connect_surface_rivets(self) -> None:
-        for npo in self.detail_npos:
+        for npo in self.detail_driver_npos:
             rivets = ymt_util.apply_rivet_constrain_to_selected(self.sliding_surface, npo)
             rivet = pm.PyNode(rivets[0])
             pm.parent(rivet, self.no_transform, relative=True)
@@ -589,7 +620,7 @@ class Component(component.Main):
             for anchor_ctls in self.anchor_ctls
         ]
 
-        for spec, npo in zip(self.detail_specs, self.detail_npos):
+        for spec, npo in zip(self.detail_driver_specs, self.detail_driver_npos):
             entries = self._driver_entries_for_spec(spec)
             anchor_decomposers = [
                 decomposers_by_anchor[anchor_index][spec["anchor_layer"]]
@@ -599,7 +630,7 @@ class Component(component.Main):
             cmds.connectAttr(compose + ".outRotate", self._node_name(npo) + ".rotate", force=True)
 
     def _connect_curl_aims(self) -> None:
-        for spec, aim_npo in zip(self.detail_specs, self.detail_aim_npos):
+        for spec, aim_npo in zip(self.detail_driver_specs, self.detail_aim_npos):
             curl_ctl = self.curl_ctls[min(int(spec["span"]), len(self.curl_ctls) - 1)]
             curl_npo = self.curl_npos[min(int(spec["span"]), len(self.curl_npos) - 1)]
             cmds.aimConstraint(
