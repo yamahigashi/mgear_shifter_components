@@ -6,27 +6,64 @@ import re
 from typing import Optional
 
 
+# Detail guide locator names encode their row and grid position.
+#
+#     primary_0_2_loc
+#     |       | |
+#     |       | +-- col: feather part index, from feather root to feather tip
+#     |       +---- section: feather index along the wing span
+#     +------------ row: rowNames entry
+#
+# The same indices map to the feather layout like this:
+#
+#     wing root -------------------------------------------- wing tip
+#        section 0        section 1        section 2
+#     +--------------+--------------+--------------+
+# row primary        primary_0_0    primary_1_0    primary_2_0
+#                     primary_0_1    primary_1_1    primary_2_1
+#                      primary_0_2    primary_1_2    primary_2_2
+#
+# row secondary      secondary_0_0  secondary_1_0  secondary_2_0
+#                     secondary_0_1  secondary_1_1  secondary_2_1
+#
+# Each row is a feather row such as primary/secondary/tertial. Section picks
+# which feather along the wing span, and col picks a part on that feather from
+# its root toward its tip. The number of col parts comes from lowerEdgeOffsets.
+#
+# Feather view:
+#
+#     root / arm side                                      tip / hand side
+#
+#     primary row
+#          \ primary_0_0     \ primary_1_0     \ primary_2_0
+#           \ primary_0_1     \ primary_1_1     \ primary_2_1
+#            \ primary_0_2     \ primary_1_2     \ primary_2_2
+#
+#     secondary row
+#             \ secondary_0_0  \ secondary_1_0  \ secondary_2_0
+#              \ secondary_0_1  \ secondary_1_1  \ secondary_2_1
+#
+#     tertial row
+#                \ tertial_0_0  \ tertial_1_0  \ tertial_2_0
+#
+# Rebuild Detail Locators writes this name, setFromHierarchy serializes it,
+# and the rig build parses it back into the DetailSpec row/section/col.
 DETAIL_GUIDE_PATTERNS = (
-    re.compile(r"^detail_(?P<row>[A-Za-z][A-Za-z0-9]*)_(?P<col>\d+)_loc$"),
-    re.compile(r"^_loc(?P<row>\d+)_(?P<col>\d+)$"),
-    re.compile(r"^(?P<row>\d+)_(?P<col>\d+)_loc$"),
+    re.compile(r"^(?P<row>[A-Za-z][A-Za-z0-9]*)_(?P<section>\d+)_(?P<col>\d+)_loc$"),
 )
-LEGACY_DETAIL_GUIDE_PATTERNS = (re.compile(r"^(?P<col>\d+)_loc$"),)
 DETAIL_ROW_NAME_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9]*$")
 
 
-def parse_detail_guide_name(local_name: str) -> Optional[tuple[str, int]]:  # noqa: UP045
+def parse_detail_guide_name(local_name: str) -> Optional[tuple[str, int, int]]:  # noqa: UP045
     for pattern in DETAIL_GUIDE_PATTERNS:
         match = pattern.match(local_name)
         if match:
-            return match.group("row"), int(match.group("col"))
+            return match.group("row"), int(match.group("section")), int(match.group("col"))
     return None
 
 
 def is_detail_guide_name(local_name: str) -> bool:
-    if parse_detail_guide_name(local_name) is not None:
-        return True
-    return any(pattern.match(local_name) for pattern in LEGACY_DETAIL_GUIDE_PATTERNS)
+    return parse_detail_guide_name(local_name) is not None
 
 
 def parse_row_names(value: str) -> list[str]:

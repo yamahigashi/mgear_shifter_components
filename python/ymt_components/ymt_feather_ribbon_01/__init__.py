@@ -705,7 +705,7 @@ class Component(component.Main):
             parsed = self._parse_detail_guide_name(local_name)
             if parsed is None:
                 continue
-            row, col = parsed
+            row, section, col = parsed
             position = self._to_vector(transform.getPositionFromMatrix(matrix))
             span, local, base_position = self._closest_span_local_from_position(position)
             u = self._u_from_span_local(span, local)
@@ -713,7 +713,7 @@ class Component(component.Main):
             specs.append(
                 self._detail_spec(
                     row,
-                    -1,
+                    section,
                     col,
                     self._anchor_layer_from_position(position, base_position),
                     u,
@@ -721,7 +721,7 @@ class Component(component.Main):
                     position,
                 )
             )
-        return sorted(specs, key=lambda item: (str(item["row"]), int(item["col"])))
+        return sorted(specs, key=lambda item: (str(item["row"]), int(item["section"]), int(item["col"])))
 
     def _detail_spec(
         self,
@@ -985,7 +985,7 @@ class Component(component.Main):
             raise RuntimeError("ymt_feather_ribbon_01 found multiple parent wing guide candidates: %s." % names)
         return None
 
-    def _parse_detail_guide_name(self, local_name: str) -> Optional[tuple[str, int]]:  # noqa: UP045
+    def _parse_detail_guide_name(self, local_name: str) -> Optional[tuple[str, int, int]]:  # noqa: UP045
         return detail_config.parse_detail_guide_name(local_name)
 
     def _ensure_rotation_driver_plugin(self) -> None:

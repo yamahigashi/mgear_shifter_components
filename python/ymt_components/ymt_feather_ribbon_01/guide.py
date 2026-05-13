@@ -30,7 +30,7 @@ URL = "yamahigashi.dev"
 EMAIL = "yamahigashi@gmail.com"
 VERSION = [1, 0, 0]
 TYPE = "ymt_feather_ribbon_01"
-NAME = "featherRibbon"
+NAME = "feather"
 DESCRIPTION = "Feather ribbon detail driver for ymt_birdwing_3jnt_01."
 PARENT_COMPONENT_TYPE = "ymt_birdwing_3jnt_01"
 PARENT_ANCHOR_NAMES = ("root", "elbow", "wrist", "eff")
@@ -56,16 +56,14 @@ class Guide(guide.ComponentGuide):
             "curl0",
             "curl1",
             "curl2",
-            "#_loc",
         ]
-        self.addMinMax("#_loc", 0, -1)
 
     def addObjects(self) -> None:
         self.root = self.addRoot()
         self.curl0 = self.addLoc("curl0", self.root, transform.getOffsetPosition(self.root, [1.5, 0.0, -5.0]))
         self.curl1 = self.addLoc("curl1", self.root, transform.getOffsetPosition(self.root, [4.5, 0.0, -5.0]))
         self.curl2 = self.addLoc("curl2", self.root, transform.getOffsetPosition(self.root, [7.0, 0.0, -5.0]))
-        self.locs = self.addLocMulti("#_loc", self.root)
+        self.detail_locs = self._add_detail_locators_from_template()
 
         centers = [self.root, self.curl0, self.curl1, self.curl2]
         self.dispcrv = self.addDispCurve("crv", centers)
@@ -85,13 +83,25 @@ class Guide(guide.ComponentGuide):
         self.pUseIndex = self.addParam("useIndex", "bool", False)
         self.pParentJointIndex = self.addParam("parentJointIndex", "long", -1, None, None)
 
-    def setFromHierarchy(self, root: object) -> None:
+    def setFromHierarchy(self, root: Any) -> None:
         super(Guide, self).setFromHierarchy(root)
-        self._collect_named_detail_guides()
+        self._collect_detail_guides()
 
-    def _collect_named_detail_guides(self) -> None:
+    def _add_detail_locators_from_template(self) -> list[Any]:
+        locators = []
+        for local_name in self._serialized_detail_locator_names():
+            position = transform.getPositionFromMatrix(self.tra[local_name])
+            locators.append(self.addLoc(local_name, self.root, position))
+        return locators
+
+    def _serialized_detail_locator_names(self) -> list[str]:
+        names = [local_name for local_name in self.tra if detail_config.is_detail_guide_name(local_name)]
+        return sorted(names, key=self._detail_locator_sort_key)
+
+    def _collect_detail_guides(self) -> None:
         prefix = self.fullName + "_"
         children = pm.listRelatives(self.model, ad=True, typ="transform") or []
+        detail_nodes = []
         for node in children:
             node_name = node.name().split("|")[-1]
             if not node_name.startswith(prefix):
@@ -101,12 +111,20 @@ class Guide(guide.ComponentGuide):
                 continue
             if local_name in self.tra:
                 continue
+            detail_nodes.append((local_name, node))
+        for local_name, node in sorted(detail_nodes, key=lambda item: self._detail_locator_sort_key(item[0])):
             matrix = node.getMatrix(worldSpace=True)
             position = node.getTranslation(space="world")
             self.tra[local_name] = matrix
             self.atra.append(matrix)
             self.pos[local_name] = position
             self.apos.append(position)
+
+    def _detail_locator_sort_key(self, local_name: str) -> tuple[str, int, int]:
+        parsed = detail_config.parse_detail_guide_name(local_name)
+        if parsed is None:
+            return (local_name, 0, 0)
+        return parsed
 
 
 class settingsTab(QtWidgets.QDialog, sui.Ui_Form):
@@ -315,18 +333,16 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
         self._delete_existing_detail_locators()
         created = []
         for row_index, row_name in enumerate(row_names):
-            detail_index = 0
             section_count = row_counts[row_index]
             u_start, u_end = row_u_ranges[row_index]
             for section in range(section_count):
                 ratio = (section + 0.5) / max(section_count, 1)
                 u = u_start + ((u_end - u_start) * ratio)
                 base_position = self._position_from_u(anchor_positions, u)
-                for offset in lower_edge_profiles[row_index]:
-                    local_name = "detail_%s_%02d_loc" % (row_name, detail_index)
+                for col, offset in enumerate(lower_edge_profiles[row_index]):
+                    local_name = "%s_%d_%d_loc" % (row_name, section, col)
                     position = base_position + (lower_axis * offset * component_size)
                     created.append(self._create_detail_locator(local_name, position))
-                    detail_index += 1
         pm.select(created or self.root)
         pm.displayInfo("Rebuilt %s ymt_feather_ribbon_01 detail locators." % len(created))
 
