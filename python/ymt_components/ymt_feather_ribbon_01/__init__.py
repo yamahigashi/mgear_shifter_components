@@ -148,7 +148,8 @@ class Component(component.Main):
 
         refs = parent_comp.get_feather_ribbon_refs()
         pm.pointConstraint(refs["root"], self.anchor_npos[0][0], mo=True)
-        pm.orientConstraint(refs["root_ctl"], self.anchor_npos[0][0], mo=True)
+        cns = pm.orientConstraint(refs["root_ctl"], self.anchor_npos[0][0], mo=True)
+        pm.setAttr(cns.attr("interpType"), 0)  # no-flip
         for anchor_name, anchor_npos in zip(self.anchor_names[1:], self.anchor_npos[1:]):
             pm.parentConstraint(refs[anchor_name], anchor_npos[0], mo=True)
         self._connect_curl_rotations(refs)
@@ -529,9 +530,12 @@ class Component(component.Main):
             maintainOffset=False,
             name=self.getName("curl%s_rotate_orientCns" % segment_index),
         )[0]
+        cmds.setAttr(constraint + ".interpType", 0)  # no-flip
         aliases = cmds.orientConstraint(constraint, query=True, weightAliasList=True) or []
         if len(aliases) != 2:
-            raise RuntimeError(f"ymt_feather_ribbon_01 failed to create curl rotation anchor blend. Constraint: {constraint}, aliases: {aliases}")
+            raise RuntimeError(
+                f"ymt_feather_ribbon_01 failed to create curl rotation anchor blend. Constraint: {constraint}, aliases: {aliases}"
+            )
         cmds.setAttr("%s.%s" % (constraint, aliases[0]), 0.5)
         cmds.setAttr("%s.%s" % (constraint, aliases[1]), 0.5)
 
@@ -572,6 +576,7 @@ class Component(component.Main):
     def _connect_curl_aims(self) -> None:
         for spec, aim_npo in zip(self.detail_specs, self.detail_aim_npos):
             curl_ctl = self.curl_ctls[min(int(spec["span"]), len(self.curl_ctls) - 1)]
+            curl_npo = self.curl_npos[min(int(spec["span"]), len(self.curl_npos) - 1)]
             cmds.aimConstraint(
                 self._node_name(curl_ctl),
                 self._node_name(aim_npo),
@@ -579,7 +584,7 @@ class Component(component.Main):
                 aimVector=(1, 0, 0),
                 upVector=(0, 1, 0),
                 worldUpType="objectrotation",
-                worldUpObject=self._node_name(self.driver_root),
+                worldUpObject=self._node_name(curl_npo),
                 worldUpVector=(0, 1, 0),
             )
 
@@ -787,8 +792,8 @@ class Component(component.Main):
         )
         matrix = transform.getTransformLookingAt(
             lower_midpoint,
-            self._anchor_layer_position(len(self.anchor_offsets) - 1, index + 1),
-            self.lower_axis,
+            lower_midpoint + self.span_axis,
+            self.wing_normal,
             axis="xy",
             negate=False,
         )
