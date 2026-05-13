@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import math
 import importlib
 from contextlib import suppress
-from typing import TYPE_CHECKING, Optional, TypedDict
+from typing import TYPE_CHECKING, Optional, TypedDict, Union
 
 import maya.cmds as cmds
 
@@ -17,7 +18,7 @@ try:
 except ImportError:
     datatypes = importlib.import_module("pymel.core.datatypes")
 
-from mgear.core import attribute, primitive, transform
+from mgear.core import attribute, vector, primitive, transform
 from mgear.shifter import component
 
 import ymt_shifter_utility as ymt_util
@@ -25,7 +26,16 @@ import ymt_shifter_utility as ymt_util
 from . import detail_config
 
 if TYPE_CHECKING:
-    from ymt_shifter_utility.type_protocols import PymelNode, VectorLike
+    from typing import Protocol
+
+    from ymt_shifter_utility.type_protocols import MatrixLike, PymelNode, VectorLike, WorldPoint
+
+    class BladeLike(Protocol):
+        z: VectorLike
+
+    class ParentWingGuideLike(Protocol):
+        apos: list[VectorLike]
+        blades: dict[str, BladeLike]
 
 
 MAYA_2025_API_VERSION = 20250000
@@ -162,20 +172,34 @@ class Component(component.Main):
             anchor_ctls = []
             for layer_index, _offset in enumerate(self.anchor_offsets):
                 matrix = transform.getTransformFromPos(self._anchor_layer_position(layer_index, anchor_index))
+
                 npo = primitive.addTransform(parent, self.getName("feather_%s_%02d_npo" % (name, layer_index)), matrix)
-                ctl = self.addCtl(
-                    npo,
-                    "feather_%s_%02d_ctl" % (name, layer_index),
-                    matrix,
-                    self.color_fk,
-                    "cube",
-                    w=self.ctl_size * 1.6,
-                    h=self.ctl_size,
-                    d=self.ctl_size,
-                    tp=tag_parent,
-                )
-                attribute.setKeyableAttributes(ctl)
-                attribute.setInvertMirror(ctl, ["tx", "ty", "tz"])
+                if layer_index < len(self.anchor_offsets) - 1:
+                    length = vector.getDistance(
+                        self._anchor_layer_position(layer_index, anchor_index),
+                        self._anchor_layer_position(layer_index + 1, anchor_index),
+                    )
+                    ctl = self.addCtl(
+                        npo,
+                        "feather_%s_%02d_ctl" % (name, layer_index),
+                        matrix,
+                        self.color_fk,
+                        "cube",
+                        w=self.ctl_size * 0.3,
+                        h=self.ctl_size * 0.05,
+                        d=length * 0.8,
+                        po=datatypes.Vector(0.0, self.ctl_size, length * -0.45),
+                        tp=tag_parent,
+                    )
+                    attribute.setKeyableAttributes(ctl)
+                    attribute.setInvertMirror(ctl, ["tx", "ty", "tz"])
+                else:
+                    ctl = primitive.addTransform(
+                        npo,
+                        "feather_%s_%02d_ctl" % (name, layer_index),
+                        matrix,
+                    )
+
                 anchor_npos.append(npo)
                 anchor_ctls.append(ctl)
                 parent = ctl
@@ -217,8 +241,9 @@ class Component(component.Main):
                 "%s_ctl" % detail_name,
                 matrix,
                 self.color_fk,
-                "sphere",
-                w=self.ctl_size,
+                "circle",
+                w=self.ctl_size * 0.5,
+                ro=datatypes.Vector(math.radians(90), 0.0, 0.0),
                 tp=self.curl_ctls[min(spec["span"], len(self.curl_ctls) - 1)],
             )
             attribute.setKeyableAttributes(ctl)
@@ -474,7 +499,7 @@ class Component(component.Main):
         for segment_index, npo in enumerate(self.curl_npos):
             self._connect_curl_translate_matrix(segment_index, npo)
 
-    def _connect_curl_rotations(self, refs: dict[str, object]) -> None:
+    def _connect_curl_rotations(self, refs: dict[str, PymelNode]) -> None:
         for segment_index, npo in enumerate(self.curl_npos):
             start_name = self.anchor_names[segment_index]
             end_name = self.anchor_names[segment_index + 1]
@@ -520,14 +545,14 @@ class Component(component.Main):
         self,
         segment_index: int,
         npo: PymelNode,
-        start_ref: object,
-        end_ref: object,
+        start_ref: PymelNode,
+        end_ref: PymelNode,
     ) -> None:
         constraint = cmds.orientConstraint(
             self._node_name(start_ref),
             self._node_name(end_ref),
             self._node_name(npo),
-            maintainOffset=False,
+            maintainOffset=True,
             name=self.getName("curl%s_rotate_orientCns" % segment_index),
         )[0]
         cmds.setAttr(constraint + ".interpType", 0)  # no-flip
@@ -630,7 +655,7 @@ class Component(component.Main):
             return "multDL"
         return "multDoubleLinear"
 
-    def _node_name(self, node: object) -> str:
+    def _node_name(self, node: Union[PymelNode, str]) -> str:  # noqa: UP007
         name_method = getattr(node, "name", None)
         if callable(name_method):
             return name_method()
@@ -644,9 +669,7 @@ class Component(component.Main):
     def _point_tuple(self, point: VectorLike) -> tuple[float, float, float]:
         return (point[0], point[1], point[2])
 
-    def _to_vector(self, value: object) -> VectorLike:
-        if hasattr(value, "length") and hasattr(value, "normal"):
-            return value
+    def _to_vector(self, value: WorldPoint) -> VectorLike:
         return datatypes.Vector(value)
 
     def _collect_detail_specs(self) -> list[DetailSpec]:
@@ -779,33 +802,55 @@ class Component(component.Main):
     def _curl_ctl_position(self, index: int) -> VectorLike:
         guide_matrix = self.guide.tra.get("curl%s" % index)
         if guide_matrix is not None:
-            return transform.getPositionFromMatrix(guide_matrix)
+            return self._to_vector(transform.getPositionFromMatrix(guide_matrix))
         return self._curl_position(index)
 
-    def _curl_offset_matrix(self, index: int) -> object:
-        return transform.setMatrixPosition(self._curl_basis_matrix(index), self._curl_ctl_position(index))
+    def _curl_offset_matrix(self, index: int) -> MatrixLike:
+        curl_position = self._curl_ctl_position(index)
+        return transform.setMatrixPosition(
+            self._curl_orientation_matrix(index, curl_position),
+            curl_position,
+        )
 
-    def _curl_basis_matrix(self, index: int) -> object:
+    def _curl_basis_matrix(self, index: int) -> MatrixLike:
         lower_midpoint = self._midpoint(
             self._anchor_layer_position(len(self.anchor_offsets) - 1, index),
             self._anchor_layer_position(len(self.anchor_offsets) - 1, index + 1),
         )
-        matrix = transform.getTransformLookingAt(
-            lower_midpoint,
-            lower_midpoint + self.span_axis,
+        return transform.setMatrixPosition(self._curl_orientation_matrix(index), lower_midpoint)
+
+    def _curl_orientation_matrix(self, index: int, tip_position: Optional[VectorLike] = None) -> MatrixLike:  # noqa: UP045
+        root_position = self._curl_root_position(index)
+        if tip_position is None:
+            tip_position = self._curl_ctl_position(index)
+        else:
+            tip_position = self._to_vector(tip_position)
+
+        root_to_tip = tip_position - root_position
+        if root_to_tip.length() < 0.001:
+            raise RuntimeError("ymt_feather_ribbon_01 requires curl tip position away from the feather root.")
+
+        return transform.getTransformLookingAt(
+            tip_position,
+            root_position,
             self.wing_normal,
-            axis="xy",
+            axis="-zy",
             negate=False,
         )
-        return transform.setMatrixPosition(matrix, lower_midpoint)
+
+    def _curl_root_position(self, index: int) -> VectorLike:
+        return self._base_position_from_u(self._curl_u(index))
 
     def _midpoint(self, a: VectorLike, b: VectorLike) -> VectorLike:
         return a + ((b - a) * 0.5)
 
     def _curl_position(self, index: int) -> VectorLike:
-        u = (index + 0.5) / max(len(self.anchor_positions) - 1, 1)
+        u = self._curl_u(index)
         offset = self._max_lower_edge_offset_at_u(u)
         return self._position_from_u_and_offset(u, offset)
+
+    def _curl_u(self, index: int) -> float:
+        return (index + 0.5) / max(len(self.anchor_positions) - 1, 1)
 
     def _surface_u_values(self) -> list[float]:
         subdivisions = max(int(self.surface_segment_subdivisions), 1)
@@ -917,7 +962,7 @@ class Component(component.Main):
             return None
         return list(guide_positions[: len(self.anchor_names)])
 
-    def _get_parent_wing_guide(self) -> Optional[object]:  # noqa: UP045
+    def _get_parent_wing_guide(self) -> Optional[ParentWingGuideLike]:  # noqa: UP045
         parent_guide = getattr(self.guide, "parentComponent", None)
         if parent_guide is not None and getattr(parent_guide, "compType", None) == PARENT_COMPONENT_TYPE:
             return parent_guide
