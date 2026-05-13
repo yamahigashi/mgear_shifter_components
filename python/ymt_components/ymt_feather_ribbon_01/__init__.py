@@ -94,6 +94,9 @@ class Component(component.Main):
         self.wing_normal = self._get_parent_blade_normal()
         self.lower_axis = self._get_parent_blade_lower_axis()
         self.anchor_offsets = self._collect_anchor_offsets()
+        self.anchor_control_offset_segments = self._collect_anchor_control_offset_segments()
+        self.deepest_anchor_offset = self._deepest_anchor_offset()
+        self.deepest_anchor_positions = self._deepest_anchor_line_positions()
 
         self.driver_root = primitive.addTransform(self.root, self.getName("drivers"), transform.getTransform(self.root))
         self.detail_root = primitive.addTransform(self.root, self.getName("details"), transform.getTransform(self.root))
@@ -106,6 +109,7 @@ class Component(component.Main):
 
         self.anchor_npos = []
         self.anchor_ctls = []
+        self.anchor_endpoint_refs = []
         self._add_anchor_controls()
 
         self.curl_npos = []
@@ -179,42 +183,45 @@ class Component(component.Main):
             tag_parent = self.parentCtlTag
             anchor_npos = []
             anchor_ctls = []
-            for layer_index, _offset in enumerate(self.anchor_offsets):
-                matrix = transform.getTransformFromPos(self._anchor_layer_position(layer_index, anchor_index))
+            for layer_index, (start_offset, end_offset) in enumerate(self.anchor_control_offset_segments):
+                start_position = self._anchor_position_from_offset(anchor_index, start_offset)
+                end_position = self._anchor_position_from_offset(anchor_index, end_offset)
+                matrix = self._anchor_control_matrix(start_position, end_position)
 
                 npo = primitive.addTransform(parent, self.getName("feather_%s_%02d_npo" % (name, layer_index)), matrix)
-                if layer_index < len(self.anchor_offsets) - 1:
-                    length = vector.getDistance(
-                        self._anchor_layer_position(layer_index, anchor_index),
-                        self._anchor_layer_position(layer_index + 1, anchor_index),
-                    )
-                    ctl = self.addCtl(
-                        npo,
-                        "feather_%s_%02d_ctl" % (name, layer_index),
-                        matrix,
-                        self.color_fk,
-                        "cube",
-                        w=self.ctl_size * 0.3,
-                        h=self.ctl_size * 0.05,
-                        d=length * 0.8,
-                        po=datatypes.Vector(0.0, self.ctl_size, length * -0.45),
-                        tp=tag_parent,
-                    )
-                    attribute.setKeyableAttributes(ctl)
-                    attribute.setInvertMirror(ctl, ["tx", "ty", "tz"])
-                else:
-                    ctl = primitive.addTransform(
-                        npo,
-                        "feather_%s_%02d_ctl" % (name, layer_index),
-                        matrix,
-                    )
+                length = vector.getDistance(start_position, end_position)
+                ctl = self.addCtl(
+                    npo,
+                    "feather_%s_%02d_ctl" % (name, layer_index),
+                    matrix,
+                    self.color_fk,
+                    "cube",
+                    w=self.ctl_size * 0.3,
+                    h=self.ctl_size * 0.05,
+                    d=length * 0.8,
+                    po=datatypes.Vector(0.0, self.ctl_size, length * -0.45),
+                    tp=tag_parent,
+                )
+                attribute.setKeyableAttributes(ctl)
+                attribute.setInvertMirror(ctl, ["tx", "ty", "tz"])
 
                 anchor_npos.append(npo)
                 anchor_ctls.append(ctl)
                 parent = ctl
                 tag_parent = ctl
+            endpoint_offset = self.anchor_control_offset_segments[-1][1]
+            endpoint_matrix = transform.getTransformFromPos(
+                self._anchor_position_from_offset(anchor_index, endpoint_offset)
+            )
+            endpoint_ref = primitive.addTransform(
+                parent,
+                self.getName("feather_%s_endpoint_ref" % name),
+                endpoint_matrix,
+            )
+            ymt_util.setKeyableAttributesDontLockVisibility(endpoint_ref, [])
             self.anchor_npos.append(anchor_npos)
             self.anchor_ctls.append(anchor_ctls)
+            self.anchor_endpoint_refs.append(endpoint_ref)
 
     def _add_curl_controls(self) -> None:
         for index in range(3):
@@ -312,7 +319,6 @@ class Component(component.Main):
                 )
         self.sliding_surface = pm.PyNode(surface)
         pm.parent(self.sliding_surface, self.no_transform)
-        # self.sliding_surface.attr("visibility").set(False)
         ymt_util.setKeyableAttributesDontLockVisibility(self.sliding_surface, [])
 
         self._add_surface_skin_joints()
@@ -517,16 +523,7 @@ class Component(component.Main):
         return [(start_anchor, 1.0 - local), (end_anchor, local)]
 
     def _anchor_layer_weight_entries_for_offset(self, offset: float) -> list[tuple[int, float]]:
-        if len(self.anchor_offsets) == 1:
-            return [(0, 1.0)]
-        if offset <= self.anchor_offsets[0]:
-            return [(0, 1.0)]
-        for index, start in enumerate(self.anchor_offsets[:-1]):
-            end = self.anchor_offsets[index + 1]
-            if start <= offset <= end:
-                ratio = (offset - start) / max(end - start, 0.001)
-                return [(index, 1.0 - ratio), (index + 1, ratio)]
-        return [(len(self.anchor_offsets) - 1, 1.0)]
+        return [(self._anchor_layer_from_offset(offset), 1.0)]
 
     def _connect_surface_rivets(self) -> None:
         for npo in self.detail_driver_npos:
@@ -557,8 +554,8 @@ class Component(component.Main):
 
     def _connect_curl_translate_matrix(self, segment_index: int, npo: PymelNode) -> None:
         lower_midpoint = self._create_midpoint_translate_node(
-            self.anchor_ctls[segment_index][-1],
-            self.anchor_ctls[segment_index + 1][-1],
+            self.anchor_endpoint_refs[segment_index],
+            self.anchor_endpoint_refs[segment_index + 1],
             "curl%sLowerMid" % segment_index,
         )
         translate_matrix = self._create_compose_translate_node(
@@ -841,7 +838,10 @@ class Component(component.Main):
         }
 
     def _position_from_u_and_offset(self, u: float, offset: float) -> VectorLike:
-        return self._base_position_from_u(u) + (self.lower_axis * offset * self.size)
+        span, local = self._span_local_from_u(u)
+        start = self._anchor_position_from_offset(span, offset)
+        end = self._anchor_position_from_offset(span + 1, offset)
+        return start + ((end - start) * local)
 
     def _base_position_from_u(self, u: float) -> VectorLike:
         span, local = self._span_local_from_u(u)
@@ -873,6 +873,16 @@ class Component(component.Main):
             raise RuntimeError("ymt_feather_ribbon_01 requires at least one lower edge offset.")
         return sorted({0.0}.union(lower_offsets).union(self._collect_detail_guide_offsets()))
 
+    def _collect_anchor_control_offset_segments(self) -> list[tuple[float, float]]:
+        lower_offsets = sorted({offset for profile in self.lower_edge_profiles for offset in profile})
+        if not lower_offsets:
+            raise RuntimeError("ymt_feather_ribbon_01 requires at least one lower edge offset.")
+        boundaries = sorted({0.0}.union(lower_offsets))
+        segments = [(start, end) for start, end in zip(boundaries[:-1], boundaries[1:]) if end > start]
+        if not segments:
+            raise RuntimeError("ymt_feather_ribbon_01 requires lower edge offsets greater than 0 for anchor controls.")
+        return segments
+
     def _collect_detail_guide_offsets(self) -> set[float]:
         offsets = set()
         for local_name, matrix in self.guide.tra.items():
@@ -884,9 +894,14 @@ class Component(component.Main):
         return offsets
 
     def _anchor_layer_from_offset(self, offset: float) -> int:
-        if not self.anchor_offsets:
-            raise RuntimeError("ymt_feather_ribbon_01 requires at least one anchor offset layer.")
-        return min(range(len(self.anchor_offsets)), key=lambda index: abs(self.anchor_offsets[index] - offset))
+        if not self.anchor_control_offset_segments:
+            raise RuntimeError("ymt_feather_ribbon_01 requires at least one anchor control offset segment.")
+        for index, (start, end) in enumerate(self.anchor_control_offset_segments):
+            if start <= offset <= end:
+                return index
+        if offset < self.anchor_control_offset_segments[0][0]:
+            return 0
+        return len(self.anchor_control_offset_segments) - 1
 
     def _anchor_layer_from_position(self, position: VectorLike, base_position: VectorLike) -> int:
         return self._anchor_layer_from_offset(self._offset_from_position(position, base_position))
@@ -894,15 +909,53 @@ class Component(component.Main):
     def _offset_from_position(self, position: VectorLike, base_position: VectorLike) -> float:
         return ((position - base_position) * self.lower_axis) / self.size
 
-    def _anchor_layer_position(self, layer_index: int, anchor_index: int) -> VectorLike:
-        offset = self.anchor_offsets[layer_index]
+    def _anchor_control_matrix(self, start_position: VectorLike, end_position: VectorLike) -> MatrixLike:
+        if vector.getDistance(start_position, end_position) < 0.001:
+            raise RuntimeError("ymt_feather_ribbon_01 requires non-zero anchor control offset length.")
+        return transform.getTransformLookingAt(
+            start_position,
+            end_position,
+            self.wing_normal,
+            axis="-zy",
+            negate=False,
+        )
+
+    def _anchor_position_from_offset(self, anchor_index: int, offset: float) -> VectorLike:
+        deepest_offset = self.deepest_anchor_offset
+        if abs(deepest_offset) < 0.001:
+            return self._default_anchor_position_from_offset(anchor_index, offset)
+        ratio = offset / deepest_offset
+        base_position = self.anchor_positions[anchor_index]
+        deepest_position = self.deepest_anchor_positions[anchor_index]
+        return base_position + ((deepest_position - base_position) * ratio)
+
+    def _deepest_anchor_offset(self) -> float:
+        if not self.anchor_offsets:
+            raise RuntimeError("ymt_feather_ribbon_01 requires at least one anchor offset layer.")
+        return max(self.anchor_offsets, key=abs)
+
+    def _deepest_anchor_line_positions(self) -> list[VectorLike]:
+        deepest_offset = self.deepest_anchor_offset
+        if abs(deepest_offset) < 0.001:
+            return list(self.anchor_positions)
+
+        positions = [self._default_anchor_position_from_offset(0, deepest_offset)]
+        for span in range(len(self.anchor_segment_lengths)):
+            midpoint = self._curl_guide_position(span)
+            positions.append((midpoint * 2.0) - positions[-1])
+        return positions
+
+    def _curl_guide_position(self, index: int) -> VectorLike:
+        guide_matrix = self.guide.tra.get("curl%s" % index)
+        if guide_matrix is None:
+            raise RuntimeError("ymt_feather_ribbon_01 requires the curl%s guide locator." % index)
+        return self._to_vector(transform.getPositionFromMatrix(guide_matrix))
+
+    def _default_anchor_position_from_offset(self, anchor_index: int, offset: float) -> VectorLike:
         return self.anchor_positions[anchor_index] + (self.lower_axis * offset * self.size)
 
     def _curl_ctl_position(self, index: int) -> VectorLike:
-        guide_matrix = self.guide.tra.get("curl%s" % index)
-        if guide_matrix is not None:
-            return self._to_vector(transform.getPositionFromMatrix(guide_matrix))
-        return self._curl_position(index)
+        return self._curl_guide_position(index)
 
     def _curl_offset_matrix(self, index: int) -> MatrixLike:
         curl_position = self._curl_ctl_position(index)
@@ -913,8 +966,8 @@ class Component(component.Main):
 
     def _curl_basis_matrix(self, index: int) -> MatrixLike:
         lower_midpoint = self._midpoint(
-            self._anchor_layer_position(len(self.anchor_offsets) - 1, index),
-            self._anchor_layer_position(len(self.anchor_offsets) - 1, index + 1),
+            self._anchor_position_from_offset(index, self.deepest_anchor_offset),
+            self._anchor_position_from_offset(index + 1, self.deepest_anchor_offset),
         )
         return transform.setMatrixPosition(self._curl_orientation_matrix(index), lower_midpoint)
 
@@ -942,11 +995,6 @@ class Component(component.Main):
 
     def _midpoint(self, a: VectorLike, b: VectorLike) -> VectorLike:
         return a + ((b - a) * 0.5)
-
-    def _curl_position(self, index: int) -> VectorLike:
-        u = self._curl_u(index)
-        offset = self._max_lower_edge_offset_at_u(u)
-        return self._position_from_u_and_offset(u, offset)
 
     def _curl_u(self, index: int) -> float:
         return (index + 0.5) / max(len(self.anchor_positions) - 1, 1)
