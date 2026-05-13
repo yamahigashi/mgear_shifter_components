@@ -40,6 +40,7 @@ if TYPE_CHECKING:
 
 MAYA_2025_API_VERSION = 20250000
 PARENT_COMPONENT_TYPE = "ymt_birdwing_3jnt_01"
+ROTATE_ORDER_XYZ = 0
 
 
 class DetailSpec(TypedDict):
@@ -57,6 +58,11 @@ class DetailSpec(TypedDict):
 class DriverEntry(TypedDict):
     kind: str
     index: int
+    weight: float
+
+
+class WeightedRotationSource(TypedDict):
+    decomposer: str
     weight: float
 
 
@@ -162,8 +168,9 @@ class Component(component.Main):
         pm.pointConstraint(refs["root"], self.anchor_npos[0][0], mo=True)
         cns = pm.orientConstraint(refs["root_ctl"], self.anchor_npos[0][0], mo=True)
         pm.setAttr(cns.attr("interpType"), 0)  # no-flip
-        for anchor_name, anchor_npos in zip(self.anchor_names[1:], self.anchor_npos[1:]):
-            pm.parentConstraint(refs[anchor_name], anchor_npos[0], mo=True)
+        self._connect_anchor_root_space(refs, "elbow", self.anchor_npos[1][0])
+        self._connect_anchor_root_space(refs, "wrist", self.anchor_npos[2][0])
+        pm.parentConstraint(refs["hand"], self.anchor_npos[3][0], mo=True)
         self._connect_curl_rotations(refs)
 
     def _add_anchor_controls(self) -> None:
@@ -647,6 +654,39 @@ class Component(component.Main):
                 worldUpVector=(0, 1, 0),
             )
 
+    def _connect_anchor_root_space(self, refs: dict[str, PymelNode], anchor_name: str, npo: PymelNode) -> None:
+        self._ensure_rotation_driver_plugin()
+        pm.pointConstraint(refs[anchor_name], npo, mo=True)
+        entries = self._anchor_root_space_entries(anchor_name)
+        sources: list[WeightedRotationSource] = []
+        for source_name, weight in entries:
+            proxy = primitive.addTransform(
+                self.driver_root,
+                self.getName("feather_%s_%s_rotProxy" % (anchor_name, source_name)),
+                transform.getTransform(npo),
+            )
+            constraint = pm.orientConstraint(refs[source_name], proxy, mo=True)
+            pm.setAttr(constraint.attr("interpType"), 0)  # no-flip
+            ymt_util.setKeyableAttributesDontLockVisibility(proxy, [])
+            sources.append(
+                {
+                    "decomposer": self._create_decompose_rotate(
+                        proxy,
+                        self.getName("feather_%s_%s_decomposeRotate" % (anchor_name, source_name)),
+                    ),
+                    "weight": weight,
+                }
+            )
+        compose = self._compose_weighted_rotation_sources(sources, include_bend_v=False)
+        cmds.connectAttr(compose + ".outRotate", self._node_name(npo) + ".rotate", force=True)
+
+    def _anchor_root_space_entries(self, anchor_name: str) -> list[tuple[str, float]]:
+        if anchor_name == "elbow":
+            return [("root_ctl", 0.25), ("elbow", 0.5), ("wrist", 0.25)]
+        if anchor_name == "wrist":
+            return [("elbow", 0.25), ("wrist", 0.5), ("hand", 0.25)]
+        raise RuntimeError("ymt_feather_ribbon_01 unsupported anchor root-space blend: %s." % anchor_name)
+
     def _driver_entries_for_spec(self, spec: DetailSpec) -> list[DriverEntry]:
         span = int(spec["span"])
         local = float(spec["local"])
@@ -661,26 +701,46 @@ class Component(component.Main):
         entries: list[DriverEntry],
         anchor_decomposers: list[str],
     ) -> str:
+        return self._compose_weighted_rotation_sources(
+            [
+                {
+                    "decomposer": anchor_decomposers[entry["index"]],
+                    "weight": float(entry["weight"]),
+                }
+                for entry in entries
+            ]
+        )
+
+    def _compose_weighted_rotation_sources(
+        self,
+        sources: list[WeightedRotationSource],
+        include_bend_v: bool = True,
+    ) -> str:
         sum_attrs = []
-        for output_attr in ["outRoll", "outBendH", "outBendV"]:
+        output_attrs = ["outRoll", "outBendH"]
+        if include_bend_v:
+            output_attrs.append("outBendV")
+        for output_attr in output_attrs:
             add_node = cmds.createNode("plusMinusAverage")
             cmds.setAttr(add_node + ".operation", 1)
-            for index, entry in enumerate(entries):
-                source = anchor_decomposers[entry["index"]]
+            for index, source in enumerate(sources):
                 mult = cmds.createNode(self._multiply_node_type())
-                cmds.connectAttr(source + "." + output_attr, mult + ".input1")
-                cmds.setAttr(mult + ".input2", float(entry["weight"]))
+                cmds.connectAttr(source["decomposer"] + "." + output_attr, mult + ".input1")
+                cmds.setAttr(mult + ".input2", source["weight"])
                 cmds.connectAttr(mult + ".output", add_node + ".input1D[%s]" % index)
             sum_attrs.append(add_node + ".output1D")
 
         compose = cmds.createNode("composeRotate")
+        cmds.setAttr(compose + ".rotateOrder", ROTATE_ORDER_XYZ)
         cmds.connectAttr(sum_attrs[0], compose + ".roll")
         cmds.connectAttr(sum_attrs[1], compose + ".bendH")
-        cmds.connectAttr(sum_attrs[2], compose + ".bendV")
+        if include_bend_v:
+            cmds.connectAttr(sum_attrs[2], compose + ".bendV")
         return compose
 
     def _create_decompose_rotate(self, source: PymelNode, name: str) -> str:
         node = cmds.createNode("decomposeRotate", name=name)
+        cmds.setAttr(node + ".rotateOrder", ROTATE_ORDER_XYZ)
         cmds.connectAttr(self._node_name(source) + ".rotate", node + ".rotate", force=True)
         return node
 
