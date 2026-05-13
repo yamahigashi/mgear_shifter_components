@@ -389,7 +389,7 @@ class Component(component.Main):
         surface_offsets: list[float],
         influence_by_node: dict[str, str],
     ) -> None:
-        v_index = max(v_count - 1, 0)
+        v_index = max(range(v_count), key=lambda index: abs(surface_offsets[index]))
         offset = surface_offsets[v_index]
         for segment_index, joint in enumerate(self.curl_surface_skin_joints):
             u = self._u_from_span_local(segment_index, 0.5)
@@ -488,13 +488,16 @@ class Component(component.Main):
         return self.curl_surface_skin_joints[segment_index], self._surface_curl_weight_for_u(u, offset)
 
     def _surface_curl_weight_for_u(self, u: float, offset: float) -> float:
-        max_offset = max(self.anchor_offsets)
+        max_offset = self._max_abs_anchor_offset()
         if max_offset <= 0.0:
             return 0.0
         _span, local = self._span_local_from_u(u)
         segment_weight = 1.0 - abs((local * 2.0) - 1.0)
-        offset_weight = max(0.0, min(1.0, offset / max_offset))
+        offset_weight = max(0.0, min(1.0, abs(offset) / max_offset))
         return max(0.0, min(1.0, offset_weight * segment_weight * 0.65))
+
+    def _max_abs_anchor_offset(self) -> float:
+        return max(abs(offset) for offset in self.anchor_offsets)
 
     def _anchor_weight_entries_for_u(self, u: float) -> list[tuple[int, float]]:
         span, local = self._span_local_from_u(u)
@@ -808,7 +811,17 @@ class Component(component.Main):
         lower_offsets = {offset for profile in self.lower_edge_profiles for offset in profile}
         if not lower_offsets:
             raise RuntimeError("ymt_feather_ribbon_01 requires at least one lower edge offset.")
-        return sorted({0.0}.union(lower_offsets))
+        return sorted({0.0}.union(lower_offsets).union(self._collect_detail_guide_offsets()))
+
+    def _collect_detail_guide_offsets(self) -> set[float]:
+        offsets = set()
+        for local_name, matrix in self.guide.tra.items():
+            if self._parse_detail_guide_name(local_name) is None:
+                continue
+            position = self._to_vector(transform.getPositionFromMatrix(matrix))
+            _span, _local, base_position = self._closest_span_local_from_position(position)
+            offsets.add(self._offset_from_position(position, base_position))
+        return offsets
 
     def _anchor_layer_from_offset(self, offset: float) -> int:
         if not self.anchor_offsets:
@@ -819,12 +832,7 @@ class Component(component.Main):
         return self._anchor_layer_from_offset(self._offset_from_position(position, base_position))
 
     def _offset_from_position(self, position: VectorLike, base_position: VectorLike) -> float:
-        offset = ((position - base_position) * self.lower_axis) / self.size
-        if offset < -0.001:
-            raise RuntimeError(
-                "ymt_feather_ribbon_01 detail guide locator is on the opposite side of the parent wing blade."
-            )
-        return offset
+        return ((position - base_position) * self.lower_axis) / self.size
 
     def _anchor_layer_position(self, layer_index: int, anchor_index: int) -> VectorLike:
         offset = self.anchor_offsets[layer_index]
@@ -907,7 +915,7 @@ class Component(component.Main):
                 offsets.extend(profile)
         if not offsets:
             raise RuntimeError("ymt_feather_ribbon_01 requires at least one lower edge offset profile.")
-        return max(offsets)
+        return max(offsets, key=abs)
 
     def _closest_span_local_from_position(self, position: VectorLike) -> tuple[int, float, VectorLike]:
         best_span = 0
