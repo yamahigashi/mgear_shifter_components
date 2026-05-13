@@ -5,6 +5,7 @@ import os
 import re
 from functools import partial
 from logging import DEBUG, INFO, WARN, StreamHandler, getLogger
+from typing import cast
 
 import maya.cmds as cmds
 from mgear.core import transform
@@ -95,7 +96,7 @@ class ShifterMarkingMenu(rmbmenu.ShifterMarkingMenu):
 
         ik = None
         upv = None
-        palm = None
+        ik_rot = None
         hand_ik = None
         fks = []
 
@@ -106,8 +107,8 @@ class ShifterMarkingMenu(rmbmenu.ShifterMarkingMenu):
             if "hand_ik_ctl" in c:
                 hand_ik = c
 
-            elif "palm_ctl" in c:
-                palm = c
+            elif "ikRot_ctl" in c:
+                ik_rot = c
 
             elif "ik_ctl" in c:
                 ik = c
@@ -116,8 +117,27 @@ class ShifterMarkingMenu(rmbmenu.ShifterMarkingMenu):
                 upv = c
 
         fks.sort()
+        missing = [
+            name
+            for name, value in [
+                ("ik_ctl", ik),
+                ("upv_ctl", upv),
+                ("ikRot_ctl", ik_rot),
+                ("hand_ik_ctl", hand_ik),
+                ("ui host", uiHost_name),
+                ("fk controls", fks),
+            ]
+            if not value
+        ]
+        if missing:
+            raise ValueError("Missing required ymt_birdwing_3jnt_01 controls: {}".format(", ".join(missing)))
+        ik = cast("str", ik)
+        upv = cast("str", upv)
+        ik_rot = cast("str", ik_rot)
+        hand_ik = cast("str", hand_ik)
+        uiHost_name = cast("str", uiHost_name)
 
         if transfer:
-            control.IkFkTransfer.showUI(None, ikfk_attr, uiHost_name, fks, ik, upv, hand_ik, palm)
+            control.IkFkTransfer.showUI(None, ikfk_attr, uiHost_name, fks, ik, upv, hand_ik, ik_rot)
         else:
-            control.ikFkMatch(current_namespace, ikfk_attr, uiHost_name, fks, ik, upv, hand_ik, palm)
+            control.ikFkMatch(current_namespace, ikfk_attr, uiHost_name, fks, ik, upv, hand_ik, ik_rot)
