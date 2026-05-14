@@ -570,8 +570,21 @@ class Component(component.Main):
         return max(0.0, min(1.0, offset_weight * segment_weight * 0.65))
 
     def _surface_curl_raw_weights_for_u(self, u: float) -> list[float]:
-        centers = [self._curl_u(index) for index in range(len(self.curl_surface_skin_joints))]
+        return self._curl_raw_weights_for_u(u, len(self.curl_surface_skin_joints))
+
+    def _curl_raw_weights_for_u(self, u: float, count: int) -> list[float]:
+        centers = [self._curl_u(index) for index in range(count)]
         return [self._surface_curl_raw_weight_for_center(u, center, centers, index) for index, center in enumerate(centers)]
+
+    def _curl_weight_entries_for_u(self, u: float, count: int) -> list[tuple[int, float]]:
+        raw_weights = self._curl_raw_weights_for_u(u, count)
+        total = sum(raw_weights)
+        if total <= 0.0:
+            if count <= 0:
+                return []
+            nearest = min(range(count), key=lambda index: abs(u - self._curl_u(index)))
+            return [(nearest, 1.0)]
+        return [(index, weight / total) for index, weight in enumerate(raw_weights) if weight > 0.0]
 
     def _surface_curl_raw_weight_for_center(
         self,
@@ -716,6 +729,28 @@ class Component(component.Main):
         cmds.connectAttr(decompose_b + ".outputTranslate", midpoint + ".input3D[1]", force=True)
         return midpoint
 
+    def _create_weighted_world_translate_node(
+        self,
+        entries: list[tuple[PymelNode, float]],
+        name: str,
+    ) -> str:
+        if not entries:
+            raise RuntimeError("ymt_feather_ribbon_01 requires at least one weighted translate source.")
+        add_node = cmds.createNode("plusMinusAverage", name=self.getName(name + "_pma"))
+        cmds.setAttr(add_node + ".operation", 1)
+        for index, (source, weight) in enumerate(entries):
+            decompose = self._create_decompose_matrix(
+                self._node_name(source) + ".worldMatrix[0]",
+                self.getName("%s_%02d_dm" % (name, index)),
+            )
+            mult = cmds.createNode("multiplyDivide", name=self.getName("%s_%02d_md" % (name, index)))
+            cmds.connectAttr(decompose + ".outputTranslate", mult + ".input1", force=True)
+            cmds.setAttr(mult + ".input2X", weight)
+            cmds.setAttr(mult + ".input2Y", weight)
+            cmds.setAttr(mult + ".input2Z", weight)
+            cmds.connectAttr(mult + ".output", add_node + ".input3D[%s]" % index, force=True)
+        return add_node + ".output3D"
+
     def _create_compose_translate_node(self, translate_attr: str, name: str) -> str:
         compose = cmds.createNode("composeMatrix", name=self.getName(name + "_cm"))
         cmds.connectAttr(translate_attr, compose + ".inputTranslate", force=True)
@@ -753,19 +788,66 @@ class Component(component.Main):
             cmds.connectAttr(rotate_attr, self._node_name(npo) + ".rotate", force=True)
 
     def _connect_curl_aims(self) -> None:
+        aim_up = self._create_detail_chain_aim_up()
+        specs_by_key = self._detail_specs_by_key(self.detail_specs)
+        targets_by_chain: dict[tuple[str, int], PymelNode] = {}
         for spec, aim_npo in zip(self.detail_driver_specs, self.detail_aim_npos):
-            curl_ctl = self.curl_ctls[min(int(spec["span"]), len(self.curl_ctls) - 1)]
-            curl_npo = self.curl_npos[min(int(spec["span"]), len(self.curl_npos) - 1)]
+            chain_key = (str(spec["row"]), int(spec["section"]))
+            if chain_key not in targets_by_chain:
+                aim_u = self._detail_chain_aim_u(spec, specs_by_key)
+                curl_entries = self._curl_weight_entries_for_u(aim_u, len(self.curl_ctls))
+                targets_by_chain[chain_key] = self._create_detail_chain_aim_target(spec, aim_npo, curl_entries)
             cmds.aimConstraint(
-                self._node_name(curl_ctl),
+                self._node_name(targets_by_chain[chain_key]),
                 self._node_name(aim_npo),
                 maintainOffset=True,
                 aimVector=(1, 0, 0),
                 upVector=(0, 1, 0),
                 worldUpType="objectrotation",
-                worldUpObject=self._node_name(curl_npo),
+                worldUpObject=self._node_name(aim_up),
                 worldUpVector=(0, 1, 0),
             )
+
+    def _create_detail_chain_aim_target(
+        self,
+        spec: DetailSpec,
+        aim_npo: PymelNode,
+        curl_entries: list[tuple[int, float]],
+    ) -> PymelNode:
+        aim_target = primitive.addTransform(
+            self.no_transform,
+            self.getName("%s_chainAimTarget" % self._detail_name(spec)),
+            transform.getTransform(aim_npo),
+        )
+        translate_attr = self._create_weighted_world_translate_node(
+            [(self.curl_ctls[index], weight) for index, weight in curl_entries],
+            self._detail_name(spec) + "_chainAimTargetTranslate",
+        )
+        cmds.connectAttr(translate_attr, self._node_name(aim_target) + ".translate", force=True)
+        ymt_util.setKeyableAttributesDontLockVisibility(aim_target, [])
+        return aim_target
+
+    def _create_detail_chain_aim_up(self) -> PymelNode:
+        aim_up = primitive.addTransform(
+            self.no_transform,
+            self.getName("detailChainAimUp"),
+            transform.getTransform(self.detail_root),
+        )
+        ymt_util.setKeyableAttributesDontLockVisibility(aim_up, [])
+        return aim_up
+
+    def _detail_chain_aim_u(
+        self,
+        spec: DetailSpec,
+        specs_by_key: dict[tuple[str, int, int], DetailSpec],
+    ) -> float:
+        row = str(spec["row"])
+        section = int(spec["section"])
+        col = int(spec["col"])
+        next_spec = specs_by_key.get((row, section, col + 1))
+        if next_spec is None:
+            return float(spec["u"])
+        return (float(spec["u"]) + float(next_spec["u"])) * 0.5
 
     def _connect_anchor_root_space(self, refs: dict[str, PymelNode], anchor_name: str, npo: PymelNode) -> None:
         self._ensure_rotation_driver_plugin()
