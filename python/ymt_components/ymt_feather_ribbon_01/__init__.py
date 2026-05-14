@@ -95,6 +95,7 @@ class Component(component.Main):
         self.lower_axis = self._get_parent_blade_lower_axis()
         self.anchor_offsets = self._collect_anchor_offsets()
         self.anchor_control_offset_segments = self._collect_anchor_control_offset_segments()
+        self.surface_offsets = self._collect_surface_offsets()
         self.deepest_anchor_offset = self._deepest_anchor_offset()
         self.deepest_anchor_positions = self._deepest_anchor_line_positions()
 
@@ -501,7 +502,7 @@ class Component(component.Main):
         return self.curl_surface_skin_joints[segment_index], self._surface_curl_weight_for_u(u, offset)
 
     def _surface_curl_weight_for_u(self, u: float, offset: float) -> float:
-        max_offset = self._max_abs_anchor_offset()
+        max_offset = self._max_abs_surface_offset()
         if max_offset <= 0.0:
             return 0.0
         _span, local = self._span_local_from_u(u)
@@ -509,8 +510,8 @@ class Component(component.Main):
         offset_weight = max(0.0, min(1.0, abs(offset) / max_offset))
         return max(0.0, min(1.0, offset_weight * segment_weight * 0.65))
 
-    def _max_abs_anchor_offset(self) -> float:
-        return max(abs(offset) for offset in self.anchor_offsets)
+    def _max_abs_surface_offset(self) -> float:
+        return max(abs(offset) for offset in self.surface_offsets)
 
     def _anchor_weight_entries_for_u(self, u: float) -> list[tuple[int, float]]:
         span, local = self._span_local_from_u(u)
@@ -905,6 +906,26 @@ class Component(component.Main):
             raise RuntimeError("ymt_feather_ribbon_01 requires lower edge offsets greater than 0 for anchor controls.")
         return segments
 
+    def _collect_surface_offsets(self) -> list[float]:
+        if not self.anchor_control_offset_segments:
+            raise RuntimeError("ymt_feather_ribbon_01 ribbon surface requires at least one anchor control segment.")
+        base_subdivisions = max(int(self.surface_segment_subdivisions), 1)
+        segment_widths = [abs(end - start) for start, end in self.anchor_control_offset_segments]
+        average_width = sum(segment_widths) / float(len(segment_widths))
+        target_step = average_width / float(base_subdivisions)
+        if target_step <= 0.0:
+            raise RuntimeError("ymt_feather_ribbon_01 ribbon surface requires non-zero anchor offset segment width.")
+
+        offsets = [self.anchor_control_offset_segments[0][0]]
+        for start, end in self.anchor_control_offset_segments:
+            subdivisions = max(1, math.ceil(abs(end - start) / target_step))
+            for step in range(1, subdivisions + 1):
+                ratio = step / float(subdivisions)
+                offsets.append(start + ((end - start) * ratio))
+        if len(offsets) < 2:
+            raise RuntimeError("ymt_feather_ribbon_01 ribbon surface requires at least two V offset rows.")
+        return offsets
+
     def _collect_detail_guide_offsets(self) -> set[float]:
         offsets = set()
         for local_name, matrix in self.guide.tra.items():
@@ -1022,18 +1043,23 @@ class Component(component.Main):
         return (index + 0.5) / max(len(self.anchor_positions) - 1, 1)
 
     def _surface_u_values(self) -> list[float]:
-        subdivisions = max(int(self.surface_segment_subdivisions), 1)
+        base_subdivisions = max(int(self.surface_segment_subdivisions), 1)
+        average_length = self.anchor_total_length / max(len(self.anchor_segment_lengths), 1)
+        target_step = average_length / float(base_subdivisions)
+        if target_step <= 0.0:
+            raise RuntimeError("ymt_feather_ribbon_01 ribbon surface requires non-zero anchor segment length.")
         values = []
-        for span in range(len(self.anchor_segment_lengths)):
+        for span, segment_length in enumerate(self.anchor_segment_lengths):
+            subdivisions = max(1, math.ceil(segment_length / target_step))
             for step in range(subdivisions):
                 values.append(self._u_from_span_local(span, step / float(subdivisions)))
         values.append(1.0)
         return values
 
     def _surface_offsets(self) -> list[float]:
-        if len(self.anchor_offsets) < 2:
+        if len(self.surface_offsets) < 2:
             raise RuntimeError("ymt_feather_ribbon_01 ribbon surface requires at least two V offset rows.")
-        return list(self.anchor_offsets)
+        return list(self.surface_offsets)
 
     def _max_lower_edge_offset_at_u(self, u: float) -> float:
         offsets = []
