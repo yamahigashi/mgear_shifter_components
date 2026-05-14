@@ -48,6 +48,7 @@ class DetailSpec(TypedDict):
     section: int
     col: int
     anchor_layer: int
+    offset: float
     u: float
     v: float
     span: int
@@ -568,16 +569,18 @@ class Component(component.Main):
         centers = self.anchor_control_offset_centers
         if not centers:
             raise RuntimeError("ymt_feather_ribbon_01 requires at least one anchor control offset center.")
-        if len(centers) == 1 or offset <= centers[0]:
+        offset_depth = self._offset_depth(offset)
+        center_depths = [self._offset_depth(center) for center in centers]
+        if len(center_depths) == 1 or offset_depth <= center_depths[0]:
             return [(0, 1.0)]
-        if offset >= centers[-1]:
-            return [(len(centers) - 1, 1.0)]
-        for index, (start, end) in enumerate(zip(centers[:-1], centers[1:])):
-            if start <= offset <= end:
+        if offset_depth >= center_depths[-1]:
+            return [(len(center_depths) - 1, 1.0)]
+        for index, (start, end) in enumerate(zip(center_depths[:-1], center_depths[1:])):
+            if start <= offset_depth <= end:
                 width = end - start
                 if width <= 0.0:
                     return [(index, 1.0)]
-                weight = (offset - start) / width
+                weight = (offset_depth - start) / width
                 return [(index, 1.0 - weight), (index + 1, weight)]
         return [(self._anchor_layer_from_offset(offset), 1.0)]
 
@@ -861,6 +864,7 @@ class Component(component.Main):
                         section,
                         col,
                         self._anchor_layer_from_offset(offset),
+                        offset,
                         u,
                         v,
                         position,
@@ -877,6 +881,7 @@ class Component(component.Main):
             row, section, col = parsed
             position = self._to_vector(transform.getPositionFromMatrix(matrix))
             span, local, base_position = self._closest_span_local_from_position(position)
+            offset = self._offset_from_position(position, base_position)
             u = self._u_from_span_local(span, local)
             v = self._v_from_row_name(row)
             specs.append(
@@ -884,7 +889,8 @@ class Component(component.Main):
                     row,
                     section,
                     col,
-                    self._anchor_layer_from_position(position, base_position),
+                    self._anchor_layer_from_offset(offset),
+                    offset,
                     u,
                     v,
                     position,
@@ -898,6 +904,7 @@ class Component(component.Main):
         section: int,
         col: int,
         anchor_layer: int,
+        offset: float,
         u: float,
         v: float,
         position: VectorLike,
@@ -908,6 +915,7 @@ class Component(component.Main):
             "section": section,
             "col": col,
             "anchor_layer": anchor_layer,
+            "offset": offset,
             "u": max(0.0, min(1.0, u)),
             "v": max(0.0, min(1.0, v)),
             "span": min(span, len(self.anchor_names) - 2),
@@ -963,11 +971,19 @@ class Component(component.Main):
         return sorted({0.0}.union(lower_offsets).union(self._collect_detail_guide_offsets()))
 
     def _collect_anchor_control_offset_segments(self) -> list[tuple[float, float]]:
-        lower_offsets = sorted({offset for profile in self.lower_edge_profiles for offset in profile})
+        lower_offsets = {offset for profile in self.lower_edge_profiles for offset in profile}
         if not lower_offsets:
             raise RuntimeError("ymt_feather_ribbon_01 requires at least one lower edge offset.")
-        boundaries = sorted({0.0}.union(lower_offsets))
-        segments = [(start, end) for start, end in zip(boundaries[:-1], boundaries[1:]) if end > start]
+        nonzero_offsets = [offset for offset in lower_offsets if abs(offset) > 0.001]
+        if not nonzero_offsets:
+            raise RuntimeError("ymt_feather_ribbon_01 requires non-zero lower edge offsets for anchor controls.")
+        signs = {1 if offset > 0.0 else -1 for offset in nonzero_offsets}
+        if len(signs) != 1:
+            raise RuntimeError("ymt_feather_ribbon_01 lower edge offsets must all use the same sign.")
+        sign = signs.pop()
+        boundaries = sorted({0.0}.union(lower_offsets), key=lambda offset: abs(offset))
+        boundaries = [offset for offset in boundaries if abs(offset) <= 0.001 or offset * sign > 0.0]
+        segments = [(start, end) for start, end in zip(boundaries[:-1], boundaries[1:]) if abs(end - start) > 0.001]
         if not segments:
             raise RuntimeError("ymt_feather_ribbon_01 requires lower edge offsets greater than 0 for anchor controls.")
         return segments
@@ -1011,17 +1027,18 @@ class Component(component.Main):
         if not self.anchor_control_offset_segments:
             raise RuntimeError("ymt_feather_ribbon_01 requires at least one anchor control offset segment.")
         for index, (start, end) in enumerate(self.anchor_control_offset_segments):
-            if start <= offset <= end:
+            if min(start, end) <= offset <= max(start, end):
                 return index
-        if offset < self.anchor_control_offset_segments[0][0]:
+        if self._offset_depth(offset) < self._offset_depth(self.anchor_control_offset_segments[0][0]):
             return 0
         return len(self.anchor_control_offset_segments) - 1
 
-    def _anchor_layer_from_position(self, position: VectorLike, base_position: VectorLike) -> int:
-        return self._anchor_layer_from_offset(self._offset_from_position(position, base_position))
-
     def _offset_from_position(self, position: VectorLike, base_position: VectorLike) -> float:
         return ((position - base_position) * self.lower_axis) / self.size
+
+    def _offset_depth(self, offset: float) -> float:
+        sign = 1.0 if self.deepest_anchor_offset >= 0.0 else -1.0
+        return offset * sign
 
     def _anchor_control_matrix(self, start_position: VectorLike, end_position: VectorLike) -> MatrixLike:
         if vector.getDistance(start_position, end_position) < 0.001:
@@ -1044,9 +1061,9 @@ class Component(component.Main):
         return base_position + ((deepest_position - base_position) * ratio)
 
     def _deepest_anchor_offset(self) -> float:
-        if not self.anchor_offsets:
-            raise RuntimeError("ymt_feather_ribbon_01 requires at least one anchor offset layer.")
-        return max(self.anchor_offsets, key=abs)
+        if not self.anchor_control_offset_segments:
+            raise RuntimeError("ymt_feather_ribbon_01 requires at least one anchor control offset segment.")
+        return self.anchor_control_offset_segments[-1][1]
 
     def _deepest_anchor_line_positions(self) -> list[VectorLike]:
         return list(self.anchor_end_positions)
