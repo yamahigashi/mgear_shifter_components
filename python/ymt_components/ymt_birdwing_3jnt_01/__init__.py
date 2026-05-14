@@ -418,6 +418,14 @@ class Component(component.Main):
         attribute.setInvertMirror(self.hand_ik_ctl, ["tx"])
         attribute.lockAttribute(self.hand_ik_ctl, ["rx", "ry", "rz", "sx", "sy", "sz", "v"])
 
+        self.handIkRot_ik_basis_ref = primitive.addTransform(
+            self.hand_ik_ctl, self.getName("handIkRot_ik_basis_ref"), hand_t
+        )
+        self.handIkRot_ik_basis_ref.attr("visibility").set(False)
+        self.handIkRot_chain_basis_ref = primitive.addTransform(
+            self.root, self.getName("handIkRot_chain_basis_ref"), hand_t
+        )
+        self.handIkRot_chain_basis_ref.attr("visibility").set(False)
         self.handIkRot_npo = primitive.addTransform(self.hand_ik_ctl, self.getName("handIkRot_npo"), hand_t)
         self.handIkRot_ctl = self.addCtl(
             self.handIkRot_npo,
@@ -748,9 +756,25 @@ class Component(component.Main):
         self._connect_enum_condition(self.wristControlMode_att, 1, hand_parent_cns + ".target[1].targetWeight")
 
     def _connect_hand_ik_rot_mode(self) -> None:
+        chain_initial = self.handChain[0].attr("worldMatrix[0]").get()
+        basis_initial = self.handIkRot_npo.attr("worldMatrix[0]").get()
+        chain_offset = basis_initial * chain_initial.inverse()
+        chain_offset_values = [chain_offset[index] for index in range(16)]
+
+        chain_basis_mult = pm.createNode("multMatrix")
+        pm.setAttr(chain_basis_mult + ".matrixIn[0]", *chain_offset_values, type="matrix")
+        pm.connectAttr(self.handChain[0] + ".worldMatrix[0]", chain_basis_mult + ".matrixIn[1]")
+        pm.connectAttr(self.root + ".worldInverseMatrix[0]", chain_basis_mult + ".matrixIn[2]")
+
+        chain_basis_decomp = pm.createNode("decomposeMatrix")
+        pm.connectAttr(chain_basis_mult + ".matrixSum", chain_basis_decomp + ".inputMatrix")
+        pm.connectAttr(chain_basis_decomp + ".outputTranslate", self.handIkRot_chain_basis_ref.attr("translate"))
+        pm.connectAttr(chain_basis_decomp + ".outputRotate", self.handIkRot_chain_basis_ref.attr("rotate"))
+        pm.connectAttr(chain_basis_decomp + ".outputScale", self.handIkRot_chain_basis_ref.attr("scale"))
+
         hand_ik_rot_cns = pm.orientConstraint(
-            self.hand_ik_ctl,
-            self.handChain[0],
+            self.handIkRot_ik_basis_ref,
+            self.handIkRot_chain_basis_ref,
             self.handIkRot_npo,
             maintainOffset=False,
         )
