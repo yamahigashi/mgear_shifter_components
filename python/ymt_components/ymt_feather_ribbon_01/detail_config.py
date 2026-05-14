@@ -28,7 +28,7 @@ from typing import Optional
 #
 # Each row is a feather row such as primary/secondary/tertial. Section picks
 # which feather along the wing span, and col picks a part on that feather from
-# its root toward its tip. The number of col parts comes from lowerEdgeOffsets.
+# its root toward its tip. The number of col parts comes from lowerEdgeDepths.
 #
 # Feather view:
 #
@@ -124,12 +124,12 @@ def parse_row_u_ranges(value: str, row_names: list[str]) -> list[tuple[float, fl
     return ranges
 
 
-def parse_lower_edge_profiles(value: str, row_names: list[str]) -> list[list[float]]:
+def parse_lower_edge_depth_profiles(value: str, row_names: list[str]) -> list[list[float]]:
     if not value.strip():
-        raise RuntimeError("ymt_feather_ribbon_01 lowerEdgeOffsets cannot be empty.")
+        raise RuntimeError("ymt_feather_ribbon_01 lowerEdgeDepths cannot be empty.")
 
-    named_profiles, unnamed_profiles = collect_lower_edge_profiles(value)
-    validate_lower_edge_profile_rows(named_profiles, unnamed_profiles, row_names)
+    named_profiles, unnamed_profiles = collect_lower_edge_depth_profiles(value)
+    validate_lower_edge_depth_profile_rows(named_profiles, unnamed_profiles, row_names)
 
     profiles = []
     for index, row_name in enumerate(row_names):
@@ -138,48 +138,48 @@ def parse_lower_edge_profiles(value: str, row_names: list[str]) -> list[list[flo
         elif index < len(unnamed_profiles):
             profile = unnamed_profiles[index]
         else:
-            raise RuntimeError("ymt_feather_ribbon_01 lowerEdgeOffsets is missing a profile for row '%s'." % row_name)
+            raise RuntimeError("ymt_feather_ribbon_01 lowerEdgeDepths is missing a profile for row '%s'." % row_name)
         profiles.append(profile)
     return profiles
 
 
-def collect_lower_edge_profiles(value: str) -> tuple[dict[str, list[float]], list[list[float]]]:
+def collect_lower_edge_depth_profiles(value: str) -> tuple[dict[str, list[float]], list[list[float]]]:
     named_profiles = {}
     unnamed_profiles = []
-    for item in split_lower_edge_profile_rows(value):
+    for item in split_lower_edge_depth_profile_rows(value):
         name, _, raw_profile = item.partition(":")
         if raw_profile:
             row_name = name.strip()
             if row_name in named_profiles:
-                raise RuntimeError("ymt_feather_ribbon_01 lowerEdgeOffsets row '%s' is duplicated." % row_name)
-            profile = parse_float_list(raw_profile)
+                raise RuntimeError("ymt_feather_ribbon_01 lowerEdgeDepths row '%s' is duplicated." % row_name)
+            profile = parse_depth_list(raw_profile)
             if not profile:
-                raise RuntimeError("ymt_feather_ribbon_01 lowerEdgeOffsets row '%s' has no numeric values." % name)
+                raise RuntimeError("ymt_feather_ribbon_01 lowerEdgeDepths row '%s' has no numeric values." % name)
             named_profiles[row_name] = profile
         else:
-            profile = parse_float_list(name)
+            profile = parse_depth_list(name)
             if not profile:
-                raise RuntimeError("ymt_feather_ribbon_01 lowerEdgeOffsets contains a row with no numeric values.")
+                raise RuntimeError("ymt_feather_ribbon_01 lowerEdgeDepths contains a row with no numeric values.")
             unnamed_profiles.append(profile)
     return named_profiles, unnamed_profiles
 
 
-def validate_lower_edge_profile_rows(
+def validate_lower_edge_depth_profile_rows(
     named_profiles: dict[str, list[float]],
     unnamed_profiles: list[list[float]],
     row_names: list[str],
 ) -> None:
     unknown_rows = sorted(set(named_profiles).difference(row_names))
     if unknown_rows:
-        raise RuntimeError("ymt_feather_ribbon_01 lowerEdgeOffsets has unknown rows: %s." % ", ".join(unknown_rows))
+        raise RuntimeError("ymt_feather_ribbon_01 lowerEdgeDepths has unknown rows: %s." % ", ".join(unknown_rows))
     if len(unnamed_profiles) > len(row_names):
         raise RuntimeError(
-            "ymt_feather_ribbon_01 lowerEdgeOffsets has too many unnamed rows: %s for %s rowNames."
+            "ymt_feather_ribbon_01 lowerEdgeDepths has too many unnamed rows: %s for %s rowNames."
             % (len(unnamed_profiles), len(row_names))
         )
 
 
-def split_lower_edge_profile_rows(value: str) -> list[str]:
+def split_lower_edge_depth_profile_rows(value: str) -> list[str]:
     rows = []
     for line in value.replace(";", "\n").splitlines():
         item = line.strip()
@@ -188,22 +188,22 @@ def split_lower_edge_profile_rows(value: str) -> list[str]:
     return rows
 
 
-def parse_float_list(value: str) -> list[float]:
+def parse_depth_list(value: str) -> list[float]:
     values = []
     for item in [part.strip() for part in value.split(",") if part.strip()]:
         try:
             parsed = float(item)
         except ValueError as exc:
             raise RuntimeError(
-                "ymt_feather_ribbon_01 lowerEdgeOffsets contains a non-numeric value: %s." % item
+                "ymt_feather_ribbon_01 lowerEdgeDepths contains a non-numeric value: %s." % item
             ) from exc
-        if parsed < 0.0:
-            raise RuntimeError("ymt_feather_ribbon_01 lowerEdgeOffsets cannot contain negative values: %s." % item)
+        if not 0.0 <= parsed <= 1.0:
+            raise RuntimeError("ymt_feather_ribbon_01 lowerEdgeDepths values must be between 0 and 1: %s." % item)
         values.append(parsed)
     return values
 
 
-def format_lower_edge_profiles(row_names: list[str], profiles: list[list[float]]) -> str:
+def format_lower_edge_depth_profiles(row_names: list[str], profiles: list[list[float]]) -> str:
     rows = []
     for row_name, profile in zip(row_names, profiles):
         rows.append("%s: %s" % (row_name, ", ".join(format_float(value) for value in profile)))

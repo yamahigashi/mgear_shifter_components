@@ -40,7 +40,7 @@ class Ui_Form(object):
         self.rowLayout = QtWidgets.QVBoxLayout(self.row_groupBox)
         self.rowTableWidget = QtWidgets.QTableWidget(self.row_groupBox)
         self.rowTableWidget.setColumnCount(5)
-        self.rowTableWidget.setHorizontalHeaderLabels(["Row", "Count", "U Start", "U End", "Offsets"])
+        self.rowTableWidget.setHorizontalHeaderLabels(["Row", "Count", "U Start", "U End", "Depths"])
         self.rowTableWidget.verticalHeader().setVisible(False)
         self.rowTableWidget.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         self.rowTableWidget.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)

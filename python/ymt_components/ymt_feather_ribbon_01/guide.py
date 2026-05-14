@@ -82,8 +82,8 @@ class Guide(guide.ComponentGuide):
         self.pRowNames = self.addParam("rowNames", "string", "primary,secondary,tertial")
         self.pRowCounts = self.addParam("rowCounts", "string", "10,13,3")
         self.pRowURanges = self.addParam("rowURanges", "string", "0.55:1.0,0.1:0.85,0.0:0.25")
-        self.pLowerEdgeOffsets = self.addParam(
-            "lowerEdgeOffsets",
+        self.pLowerEdgeDepths = self.addParam(
+            "lowerEdgeDepths",
             "string",
             "primary: 0.2\nsecondary: 0.375\ntertial: 0.55",
         )
@@ -219,13 +219,13 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
         table.blockSignals(True)
         table.setRowCount(0)
         try:
-            row_names, row_counts, row_u_ranges, lower_edge_profiles = self._detail_settings_from_root()
+            row_names, row_counts, row_u_ranges, lower_edge_depth_profiles = self._detail_settings_from_root()
         except RuntimeError as exc:
             pm.displayWarning(str(exc))
             table.blockSignals(False)
             return
-        for row_name, count, u_range, offsets in zip(row_names, row_counts, row_u_ranges, lower_edge_profiles):
-            self._append_row_table_item(row_name, count, u_range[0], u_range[1], offsets)
+        for row_name, count, u_range, depths in zip(row_names, row_counts, row_u_ranges, lower_edge_depth_profiles):
+            self._append_row_table_item(row_name, count, u_range[0], u_range[1], depths)
         table.blockSignals(False)
 
     def add_row_table_item(self) -> None:
@@ -251,7 +251,7 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
         count: int,
         u_start: float,
         u_end: float,
-        offsets: list[float],
+        depths: list[float],
     ) -> None:
         table = self.settingsTab.rowTableWidget
         row = table.rowCount()
@@ -261,14 +261,14 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
             str(count),
             detail_config.format_float(u_start),
             detail_config.format_float(u_end),
-            ", ".join(detail_config.format_float(offset) for offset in offsets),
+            ", ".join(detail_config.format_float(depth) for depth in depths),
         ]
         for column, value in enumerate(values):
             table.setItem(row, column, QtWidgets.QTableWidgetItem(value))
 
     def update_row_table_settings(self, *_args: object) -> None:
         try:
-            row_names, row_counts, row_u_ranges, lower_edge_profiles = self._detail_settings_from_table()
+            row_names, row_counts, row_u_ranges, lower_edge_depth_profiles = self._detail_settings_from_table()
         except RuntimeError as exc:
             pm.displayWarning(str(exc))
             return
@@ -280,25 +280,27 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
                 for u_start, u_end in row_u_ranges
             )
         )
-        self.root.attr("lowerEdgeOffsets").set(detail_config.format_lower_edge_profiles(row_names, lower_edge_profiles))
+        self.root.attr("lowerEdgeDepths").set(
+            detail_config.format_lower_edge_depth_profiles(row_names, lower_edge_depth_profiles)
+        )
 
     def _detail_settings_from_root(self) -> tuple[list[str], list[int], list[tuple[float, float]], list[list[float]]]:
         row_names = detail_config.parse_row_names(self.root.attr("rowNames").get())
         row_counts = detail_config.parse_row_counts(self.root.attr("rowCounts").get(), row_names)
         row_u_ranges = detail_config.parse_row_u_ranges(self.root.attr("rowURanges").get(), row_names)
-        if not self.root.hasAttr("lowerEdgeOffsets"):
-            raise RuntimeError("ymt_feather_ribbon_01 requires the lowerEdgeOffsets setting.")
-        lower_edge_profiles = detail_config.parse_lower_edge_profiles(
-            self.root.attr("lowerEdgeOffsets").get(), row_names
+        if not self.root.hasAttr("lowerEdgeDepths"):
+            raise RuntimeError("ymt_feather_ribbon_01 requires the lowerEdgeDepths setting.")
+        lower_edge_depth_profiles = detail_config.parse_lower_edge_depth_profiles(
+            self.root.attr("lowerEdgeDepths").get(), row_names
         )
-        return row_names, row_counts, row_u_ranges, lower_edge_profiles
+        return row_names, row_counts, row_u_ranges, lower_edge_depth_profiles
 
     def _detail_settings_from_table(self) -> tuple[list[str], list[int], list[tuple[float, float]], list[list[float]]]:
         table = self.settingsTab.rowTableWidget
         row_names = []
         row_counts = []
         row_u_ranges = []
-        lower_edge_profiles = []
+        lower_edge_depth_profiles = []
         for row in range(table.rowCount()):
             row_name = self._table_text(row, 0)
             if not row_name:
@@ -309,7 +311,7 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
                 row_u_ranges.append((float(self._table_text(row, 2)), float(self._table_text(row, 3))))
             except ValueError as exc:
                 raise RuntimeError("ymt_feather_ribbon_01 row table contains a non-numeric count or U range.") from exc
-            lower_edge_profiles.append(detail_config.parse_float_list(self._table_text(row, 4)))
+            lower_edge_depth_profiles.append(detail_config.parse_depth_list(self._table_text(row, 4)))
         row_names = detail_config.parse_row_names(",".join(row_names))
         detail_config.validate_detail_row_names(row_names)
         detail_config.parse_row_counts(",".join(str(count) for count in row_counts), row_names)
@@ -317,10 +319,10 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
             ",".join("%s:%s" % (u_start, u_end) for u_start, u_end in row_u_ranges),
             row_names,
         )
-        detail_config.parse_lower_edge_profiles(
-            detail_config.format_lower_edge_profiles(row_names, lower_edge_profiles), row_names
+        detail_config.parse_lower_edge_depth_profiles(
+            detail_config.format_lower_edge_depth_profiles(row_names, lower_edge_depth_profiles), row_names
         )
-        return row_names, row_counts, row_u_ranges, lower_edge_profiles
+        return row_names, row_counts, row_u_ranges, lower_edge_depth_profiles
 
     def _table_text(self, row: int, column: int) -> str:
         item = self.settingsTab.rowTableWidget.item(row, column)
@@ -330,11 +332,10 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
 
     def rebuild_detail_locators(self) -> None:
         try:
-            row_names, row_counts, row_u_ranges, lower_edge_profiles = self._detail_settings_from_table()
+            row_names, row_counts, row_u_ranges, lower_edge_depth_profiles = self._detail_settings_from_table()
             parent_root = self._find_parent_wing_root()
             anchor_positions = self._parent_anchor_positions(parent_root)
-            lower_axis = self._parent_lower_axis(parent_root, anchor_positions)
-            component_size = self._component_size(anchor_positions)
+            anchor_end_positions = self._anchor_end_positions()
         except RuntimeError as exc:
             pm.displayWarning(str(exc))
             return
@@ -347,10 +348,12 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
             for section in range(section_count):
                 ratio = (section + 0.5) / max(section_count, 1)
                 u = u_start + ((u_end - u_start) * ratio)
-                base_position = self._position_from_u(anchor_positions, u)
-                for col, offset in enumerate(lower_edge_profiles[row_index]):
+                span, local = self._span_local_from_u(anchor_positions, u)
+                base_position = self._position_from_span_local(anchor_positions, span, local)
+                end_position = self._position_from_span_local(anchor_end_positions, span, local)
+                for col, depth in enumerate(lower_edge_depth_profiles[row_index]):
                     local_name = "%s_%d_%d_loc" % (row_name, section, col)
-                    position = base_position + (lower_axis * offset * component_size)
+                    position = base_position + ((end_position - base_position) * depth)
                     created.append(self._create_detail_locator(local_name, position))
         pm.select(created or self.root)
         pm.displayInfo("Rebuilt %s ymt_feather_ribbon_01 detail locators." % len(created))
@@ -382,39 +385,18 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
             positions.append(datatypes.Vector(pm.xform(node, q=True, ws=True, t=True)))
         return positions
 
-    def _parent_lower_axis(self, parent_root: Any, anchor_positions: list[Any]) -> Any:
-        prefix = parent_root.name().replace("_root", "")
-        blade_name = "%s_blade" % prefix
-        if not pm.objExists(blade_name):
-            raise RuntimeError("ymt_feather_ribbon_01 parent wing guide is missing blade.")
-        blade = pm.PyNode(blade_name)
-        matrix = pm.xform(blade, q=True, ws=True, matrix=True)
-        wing_normal = datatypes.Vector(matrix[8], matrix[9], matrix[10]) * -1
-        if wing_normal.length() < 0.001:
-            raise RuntimeError("ymt_feather_ribbon_01 requires a valid parent wing blade normal.")
-        span_axis = anchor_positions[-1] - anchor_positions[0]
-        if span_axis.length() < 0.001:
-            raise RuntimeError("ymt_feather_ribbon_01 requires a valid parent wing root-to-eff guide axis.")
-        lower_axis = wing_normal.normal() ^ span_axis.normal()
-        if lower_axis.length() < 0.001:
-            raise RuntimeError(
-                "ymt_feather_ribbon_01 parent wing blade normal cannot be parallel to the root-to-eff axis."
-            )
-        return lower_axis.normal()
+    def _anchor_end_positions(self) -> list[Any]:
+        prefix = self.root.name().replace("_root", "")
+        positions = []
+        for name in ("rootEnd", "elbowEnd", "wristEnd", "handEnd"):
+            node_name = "%s_%s" % (prefix, name)
+            if not pm.objExists(node_name):
+                raise RuntimeError("ymt_feather_ribbon_01 guide is missing %s." % name)
+            node = pm.PyNode(node_name)
+            positions.append(datatypes.Vector(pm.xform(node, q=True, ws=True, t=True)))
+        return positions
 
-    def _component_size(self, anchor_positions: list[Any]) -> float:
-        root_position = datatypes.Vector(pm.xform(self.root, q=True, ws=True, t=True))
-        distances = []
-        for name in ("curl0", "curl1", "curl2"):
-            node_name = "%s_%s" % (self.root.name().replace("_root", ""), name)
-            if pm.objExists(node_name):
-                position = datatypes.Vector(pm.xform(node_name, q=True, ws=True, t=True))
-                distances.append((position - root_position).length())
-        if not distances:
-            distances = [(position - root_position).length() for position in anchor_positions]
-        return max([0.01, *distances])
-
-    def _position_from_u(self, anchor_positions: list[Any], u: float) -> Any:
+    def _span_local_from_u(self, anchor_positions: list[Any], u: float) -> tuple[int, float]:
         segment_lengths = [(end - start).length() for start, end in zip(anchor_positions[:-1], anchor_positions[1:])]
         total_length = sum(segment_lengths)
         if total_length < 0.001:
@@ -424,9 +406,12 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
         for index, segment_length in enumerate(segment_lengths):
             if distance <= traversed + segment_length or index == len(segment_lengths) - 1:
                 local = (distance - traversed) / segment_length
-                return anchor_positions[index] + ((anchor_positions[index + 1] - anchor_positions[index]) * local)
+                return index, max(0.0, min(1.0, local))
             traversed += segment_length
-        return anchor_positions[-1]
+        return len(segment_lengths) - 1, 1.0
+
+    def _position_from_span_local(self, positions: list[Any], span: int, local: float) -> Any:
+        return positions[span] + ((positions[span + 1] - positions[span]) * local)
 
     def _delete_existing_detail_locators(self) -> None:
         prefix = self.root.name().replace("_root", "")

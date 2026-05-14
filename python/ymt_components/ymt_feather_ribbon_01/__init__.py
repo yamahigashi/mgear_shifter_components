@@ -48,7 +48,7 @@ class DetailSpec(TypedDict):
     section: int
     col: int
     anchor_layer: int
-    offset: float
+    depth: float
     u: float
     v: float
     span: int
@@ -83,25 +83,21 @@ class Component(component.Main):
         self.row_names = self._parse_row_names(self.settings["rowNames"])
         self.row_counts = self._parse_row_counts(self.settings["rowCounts"], self.row_names)
         self.row_u_ranges = self._parse_row_u_ranges(self.settings["rowURanges"], self.row_names)
-        if "lowerEdgeOffsets" not in self.settings:
-            raise RuntimeError("ymt_feather_ribbon_01 requires the lowerEdgeOffsets setting.")
-        self.lower_edge_profiles = self._parse_lower_edge_profiles(
-            self.settings["lowerEdgeOffsets"],
+        if "lowerEdgeDepths" not in self.settings:
+            raise RuntimeError("ymt_feather_ribbon_01 requires the lowerEdgeDepths setting.")
+        self.lower_edge_depth_profiles = self._parse_lower_edge_depth_profiles(
+            self.settings["lowerEdgeDepths"],
             self.row_names,
         )
         self.anchor_positions = self._get_anchor_positions()
+        self.anchor_end_positions = self._get_anchor_end_positions()
         self.anchor_segment_lengths = self._get_anchor_segment_lengths()
         self.anchor_total_length = sum(self.anchor_segment_lengths)
         self.span_axis = self._get_parent_span_axis()
         self.wing_normal = self._get_parent_blade_normal()
-        self.lower_axis = self._get_parent_blade_lower_axis()
-        self.anchor_offsets = self._collect_anchor_offsets()
-        self.anchor_control_offset_segments = self._collect_anchor_control_offset_segments()
-        self.anchor_control_offset_centers = self._collect_anchor_control_offset_centers()
-        self.surface_offsets = self._collect_surface_offsets()
-        self.deepest_anchor_offset = self._deepest_anchor_offset()
-        self.anchor_end_positions = self._get_anchor_end_positions()
-        self.deepest_anchor_positions = self._deepest_anchor_line_positions()
+        self.anchor_control_depth_segments = self._collect_anchor_control_depth_segments()
+        self.anchor_control_depth_centers = self._collect_anchor_control_depth_centers()
+        self.surface_depths = self._collect_surface_depths()
 
         self.driver_root = primitive.addTransform(self.root, self.getName("drivers"), transform.getTransform(self.root))
         self.detail_root = primitive.addTransform(self.root, self.getName("details"), transform.getTransform(self.root))
@@ -188,9 +184,9 @@ class Component(component.Main):
             tag_parent = self.parentCtlTag
             anchor_npos = []
             anchor_ctls = []
-            for layer_index, (start_offset, end_offset) in enumerate(self.anchor_control_offset_segments):
-                start_position = self._anchor_position_from_offset(anchor_index, start_offset)
-                end_position = self._anchor_position_from_offset(anchor_index, end_offset)
+            for layer_index, (start_depth, end_depth) in enumerate(self.anchor_control_depth_segments):
+                start_position = self._anchor_position_from_depth(anchor_index, start_depth)
+                end_position = self._anchor_position_from_depth(anchor_index, end_depth)
                 matrix = self._anchor_control_matrix(start_position, end_position)
 
                 npo = primitive.addTransform(parent, self.getName("feather_%s_%02d_npo" % (name, layer_index)), matrix)
@@ -214,9 +210,8 @@ class Component(component.Main):
                 anchor_ctls.append(ctl)
                 parent = ctl
                 tag_parent = ctl
-            endpoint_offset = self.anchor_control_offset_segments[-1][1]
             endpoint_matrix = transform.getTransformFromPos(
-                self._anchor_position_from_offset(anchor_index, endpoint_offset)
+                self._anchor_position_from_depth(anchor_index, 1.0)
             )
             endpoint_ref = primitive.addTransform(
                 parent,
@@ -352,21 +347,21 @@ class Component(component.Main):
 
     def _add_surface(self) -> None:
         surface_u_values = self._surface_u_values()
-        surface_offsets = self._surface_offsets()
+        surface_depths = self._surface_depths()
         surface = cmds.nurbsPlane(
             n=self.getName("ribbonSurface"),
             ch=False,
             d=1,
             u=len(surface_u_values) - 1,
-            v=len(surface_offsets) - 1,
+            v=len(surface_depths) - 1,
         )[0]
         surface_shape = self._surface_shape_name(surface)
         for u_index, u in enumerate(surface_u_values):
-            for v_index, offset in enumerate(surface_offsets):
+            for v_index, depth in enumerate(surface_depths):
                 cmds.xform(
                     "%s.cv[%s][%s]" % (surface_shape, u_index, v_index),
                     ws=True,
-                    t=self._point_tuple(self._position_from_u_and_offset(u, offset)),
+                    t=self._point_tuple(self._position_from_u_and_depth(u, depth)),
                 )
         self.sliding_surface = pm.PyNode(surface)
         pm.parent(self.sliding_surface, self.no_transform)
@@ -414,8 +409,8 @@ class Component(component.Main):
         surface_shape = self._surface_shape_name(surface)
         u_count, v_count = self._surface_cv_counts(surface)
         surface_u_values = self._surface_u_values()
-        surface_offsets = self._surface_offsets()
-        self._validate_surface_topology(u_count, v_count, surface_u_values, surface_offsets)
+        surface_depths = self._surface_depths()
+        self._validate_surface_topology(u_count, v_count, surface_u_values, surface_depths)
         influence_names = self._skin_influence_names(skin)
         influence_by_node = self._skin_influence_names_by_node(skin)
         with suppress(RuntimeError):
@@ -424,12 +419,12 @@ class Component(component.Main):
         for u_index in range(u_count):
             u = surface_u_values[u_index]
             for v_index in range(v_count):
-                offset = surface_offsets[v_index]
+                depth = surface_depths[v_index]
                 component = "%s.cv[%s][%s]" % (surface_shape, u_index, v_index)
                 weights = dict.fromkeys(influence_names, 0.0)
-                for joint, weight in self._surface_anchor_weight_entries(offset, u):
+                for joint, weight in self._surface_anchor_weight_entries(depth, u):
                     weights[influence_by_node[self._node_name(joint)]] = weight
-                for curl_joint, curl_weight in self._surface_curl_weight_entries(u, offset):
+                for curl_joint, curl_weight in self._surface_curl_weight_entries(u, depth):
                     weights[influence_by_node[self._node_name(curl_joint)]] = curl_weight
                 total = sum(weights.values())
                 if total <= 0.0:
@@ -441,7 +436,7 @@ class Component(component.Main):
             cmds.setAttr(skin + ".normalizeWeights", 1)
             cmds.skinCluster(skin, edit=True, forceNormalizeWeights=True)
         self._validate_surface_skin_weights(
-            skin, surface_shape, surface_u_values, v_count, surface_offsets, influence_by_node
+            skin, surface_shape, surface_u_values, v_count, surface_depths, influence_by_node
         )
 
     def _validate_surface_skin_weights(
@@ -450,18 +445,18 @@ class Component(component.Main):
         surface_shape: str,
         surface_u_values: list[float],
         v_count: int,
-        surface_offsets: list[float],
+        surface_depths: list[float],
         influence_by_node: dict[str, str],
     ) -> None:
-        v_index = max(range(v_count), key=lambda index: abs(surface_offsets[index]))
-        offset = surface_offsets[v_index]
+        v_index = max(range(v_count), key=lambda index: abs(surface_depths[index]))
+        depth = surface_depths[v_index]
         for index, joint in enumerate(self.curl_surface_skin_joints):
             u = self._curl_u(index)
             u_index = min(
                 range(len(surface_u_values)),
                 key=lambda index: abs(surface_u_values[index] - u),
             )
-            expected_entries = dict(self._surface_curl_weight_entries(surface_u_values[u_index], offset))
+            expected_entries = dict(self._surface_curl_weight_entries(surface_u_values[u_index], depth))
             expected = expected_entries.get(joint, 0.0)
             if expected <= 0.05:
                 continue
@@ -488,17 +483,17 @@ class Component(component.Main):
         u_count: int,
         v_count: int,
         surface_u_values: list[float],
-        surface_offsets: list[float],
+        surface_depths: list[float],
     ) -> None:
         if u_count != len(surface_u_values):
             raise RuntimeError(
                 "ymt_feather_ribbon_01 ribbon surface requires %s U CVs for fixed anchor/curl columns, got %s."
                 % (len(surface_u_values), u_count)
             )
-        if v_count != len(surface_offsets):
+        if v_count != len(surface_depths):
             raise RuntimeError(
-                "ymt_feather_ribbon_01 ribbon surface requires %s V CVs for fixed offset rows, got %s."
-                % (len(surface_offsets), v_count)
+                "ymt_feather_ribbon_01 ribbon surface requires %s V CVs for fixed depth rows, got %s."
+                % (len(surface_depths), v_count)
             )
 
     def _surface_shape_name(self, surface: str) -> str:
@@ -533,10 +528,10 @@ class Component(component.Main):
                 raise RuntimeError("ymt_feather_ribbon_01 could not resolve skin influence for '%s'." % joint_name)
         return mapping
 
-    def _surface_anchor_weight_entries(self, offset: float, u: float) -> list[tuple[PymelNode, float]]:
+    def _surface_anchor_weight_entries(self, depth: float, u: float) -> list[tuple[PymelNode, float]]:
         anchor_entries = self._anchor_weight_entries_for_u(u)
-        layer_entries = self._anchor_layer_weight_entries_for_offset(offset)
-        curl_weight = self._surface_curl_weight_for_u(u, offset)
+        layer_entries = self._anchor_layer_weight_entries_for_depth(depth)
+        curl_weight = self._surface_curl_weight_for_u(u, depth)
         anchor_weight = max(0.0, 1.0 - curl_weight)
         entries = []
         for anchor_index, anchor_value in anchor_entries:
@@ -545,10 +540,10 @@ class Component(component.Main):
                 entries.append((joint, anchor_value * layer_value * anchor_weight))
         return entries
 
-    def _surface_curl_weight_entries(self, u: float, offset: float) -> list[tuple[PymelNode, float]]:
+    def _surface_curl_weight_entries(self, u: float, depth: float) -> list[tuple[PymelNode, float]]:
         if not self.curl_surface_skin_joints:
             raise RuntimeError("ymt_feather_ribbon_01 curl surface skin joints were not properly initialized.")
-        curl_weight = self._surface_curl_weight_for_u(u, offset)
+        curl_weight = self._surface_curl_weight_for_u(u, depth)
         if curl_weight <= 0.0:
             return []
         raw_weights = self._surface_curl_raw_weights_for_u(u)
@@ -561,13 +556,13 @@ class Component(component.Main):
             if raw_weight > 0.0
         ]
 
-    def _surface_curl_weight_for_u(self, u: float, offset: float) -> float:
-        max_offset = self._max_abs_surface_offset()
-        if max_offset <= 0.0:
+    def _surface_curl_weight_for_u(self, u: float, depth: float) -> float:
+        max_depth = self._max_surface_depth()
+        if max_depth <= 0.0:
             return 0.0
         segment_weight = min(1.0, sum(self._surface_curl_raw_weights_for_u(u)))
-        offset_weight = max(0.0, min(1.0, abs(offset) / max_offset))
-        return max(0.0, min(1.0, offset_weight * segment_weight * 0.65))
+        depth_weight = max(0.0, min(1.0, depth / max_depth))
+        return max(0.0, min(1.0, depth_weight * segment_weight * 0.65))
 
     def _surface_curl_raw_weights_for_u(self, u: float) -> list[float]:
         return self._curl_raw_weights_for_u(u, len(self.curl_surface_skin_joints))
@@ -611,8 +606,8 @@ class Component(component.Main):
         t = max(0.0, min(1.0, value))
         return t * t * t * (t * ((t * 6.0) - 15.0) + 10.0)
 
-    def _max_abs_surface_offset(self) -> float:
-        return max(abs(offset) for offset in self.surface_offsets)
+    def _max_surface_depth(self) -> float:
+        return max(self.surface_depths)
 
     def _anchor_weight_entries_for_u(self, u: float) -> list[tuple[int, float]]:
         span, local = self._span_local_from_u(u)
@@ -624,24 +619,22 @@ class Component(component.Main):
             return [(end_anchor, 1.0)]
         return [(start_anchor, 1.0 - local), (end_anchor, local)]
 
-    def _anchor_layer_weight_entries_for_offset(self, offset: float) -> list[tuple[int, float]]:
-        centers = self.anchor_control_offset_centers
+    def _anchor_layer_weight_entries_for_depth(self, depth: float) -> list[tuple[int, float]]:
+        centers = self.anchor_control_depth_centers
         if not centers:
-            raise RuntimeError("ymt_feather_ribbon_01 requires at least one anchor control offset center.")
-        offset_depth = self._offset_depth(offset)
-        center_depths = [self._offset_depth(center) for center in centers]
-        if len(center_depths) == 1 or offset_depth <= center_depths[0]:
+            raise RuntimeError("ymt_feather_ribbon_01 requires at least one anchor control depth center.")
+        if len(centers) == 1 or depth <= centers[0]:
             return [(0, 1.0)]
-        if offset_depth >= center_depths[-1]:
-            return [(len(center_depths) - 1, 1.0)]
-        for index, (start, end) in enumerate(zip(center_depths[:-1], center_depths[1:])):
-            if start <= offset_depth <= end:
+        if depth >= centers[-1]:
+            return [(len(centers) - 1, 1.0)]
+        for index, (start, end) in enumerate(zip(centers[:-1], centers[1:])):
+            if start <= depth <= end:
                 width = end - start
                 if width <= 0.0:
                     return [(index, 1.0)]
-                weight = (offset_depth - start) / width
+                weight = (depth - start) / width
                 return [(index, 1.0 - weight), (index + 1, weight)]
-        return [(self._anchor_layer_from_offset(offset), 1.0)]
+        return [(self._anchor_layer_from_depth(depth), 1.0)]
 
     def _connect_surface_rivets(self) -> None:
         for npo in self.detail_driver_npos:
@@ -769,7 +762,7 @@ class Component(component.Main):
 
         for spec, npo in zip(self.detail_driver_specs, self.detail_driver_npos):
             entries = self._driver_entries_for_spec(spec)
-            layer_entries = self._anchor_layer_weight_entries_for_offset(spec["offset"])
+            layer_entries = self._anchor_layer_weight_entries_for_depth(spec["depth"])
             compose = self._compose_weighted_rotation_sources(
                 [
                     {
@@ -1002,14 +995,14 @@ class Component(component.Main):
             for section in range(section_count):
                 ratio = (section + 0.5) / max(section_count, 1)
                 u = u_start + ((u_end - u_start) * ratio)
-                for col, offset in enumerate(self.lower_edge_profiles[row_index]):
-                    position = self._position_from_u_and_offset(u, offset)
+                for col, depth in enumerate(self.lower_edge_depth_profiles[row_index]):
+                    position = self._position_from_u_and_depth(u, depth)
                     spec = self._detail_spec(
                         row_name,
                         section,
                         col,
-                        self._anchor_layer_from_offset(offset),
-                        offset,
+                        self._anchor_layer_from_depth(depth),
+                        depth,
                         u,
                         v,
                         position,
@@ -1026,7 +1019,8 @@ class Component(component.Main):
             row, section, col = parsed
             position = self._to_vector(transform.getPositionFromMatrix(matrix))
             span, local, base_position = self._closest_span_local_from_position(position)
-            offset = self._offset_from_position(position, base_position)
+            end_position = self._position_from_anchor_end_span_local(span, local)
+            depth = self._depth_from_position(position, base_position, end_position)
             u = self._u_from_span_local(span, local)
             v = self._v_from_row_name(row)
             specs.append(
@@ -1034,8 +1028,8 @@ class Component(component.Main):
                     row,
                     section,
                     col,
-                    self._anchor_layer_from_offset(offset),
-                    offset,
+                    self._anchor_layer_from_depth(depth),
+                    depth,
                     u,
                     v,
                     position,
@@ -1049,7 +1043,7 @@ class Component(component.Main):
         section: int,
         col: int,
         anchor_layer: int,
-        offset: float,
+        depth: float,
         u: float,
         v: float,
         position: VectorLike,
@@ -1060,7 +1054,7 @@ class Component(component.Main):
             "section": section,
             "col": col,
             "anchor_layer": anchor_layer,
-            "offset": offset,
+            "depth": depth,
             "u": max(0.0, min(1.0, u)),
             "v": max(0.0, min(1.0, v)),
             "span": min(span, len(self.anchor_names) - 2),
@@ -1068,10 +1062,10 @@ class Component(component.Main):
             "position": position,
         }
 
-    def _position_from_u_and_offset(self, u: float, offset: float) -> VectorLike:
+    def _position_from_u_and_depth(self, u: float, depth: float) -> VectorLike:
         span, local = self._span_local_from_u(u)
-        start = self._anchor_position_from_offset(span, offset)
-        end = self._anchor_position_from_offset(span + 1, offset)
+        start = self._anchor_position_from_depth(span, depth)
+        end = self._anchor_position_from_depth(span + 1, depth)
         return start + ((end - start) * local)
 
     def _base_position_from_u(self, u: float) -> VectorLike:
@@ -1098,6 +1092,11 @@ class Component(component.Main):
         end = self.anchor_positions[span + 1]
         return start + ((end - start) * local)
 
+    def _position_from_anchor_end_span_local(self, span: int, local: float) -> VectorLike:
+        start = self.anchor_end_positions[span]
+        end = self.anchor_end_positions[span + 1]
+        return start + ((end - start) * local)
+
     def _get_anchor_end_positions(self) -> list[VectorLike]:
         positions = []
         for name in self.anchor_end_names:
@@ -1109,85 +1108,71 @@ class Component(component.Main):
             raise RuntimeError("ymt_feather_ribbon_01 requires one anchor end locator per anchor.")
         return positions
 
-    def _collect_anchor_offsets(self) -> list[float]:
-        lower_offsets = {offset for profile in self.lower_edge_profiles for offset in profile}
-        if not lower_offsets:
-            raise RuntimeError("ymt_feather_ribbon_01 requires at least one lower edge offset.")
-        return sorted({0.0}.union(lower_offsets).union(self._collect_detail_guide_offsets()))
-
-    def _collect_anchor_control_offset_segments(self) -> list[tuple[float, float]]:
-        lower_offsets = {offset for profile in self.lower_edge_profiles for offset in profile}
-        if not lower_offsets:
-            raise RuntimeError("ymt_feather_ribbon_01 requires at least one lower edge offset.")
-        nonzero_offsets = [offset for offset in lower_offsets if abs(offset) > 0.001]
-        if not nonzero_offsets:
-            raise RuntimeError("ymt_feather_ribbon_01 requires non-zero lower edge offsets for anchor controls.")
-        signs = {1 if offset > 0.0 else -1 for offset in nonzero_offsets}
-        if len(signs) != 1:
-            raise RuntimeError("ymt_feather_ribbon_01 lower edge offsets must all use the same sign.")
-        sign = signs.pop()
-        boundaries = sorted({0.0}.union(lower_offsets), key=lambda offset: abs(offset))
-        boundaries = [offset for offset in boundaries if abs(offset) <= 0.001 or offset * sign > 0.0]
-        segments = [(start, end) for start, end in zip(boundaries[:-1], boundaries[1:]) if abs(end - start) > 0.001]
+    def _collect_anchor_control_depth_segments(self) -> list[tuple[float, float]]:
+        lower_depths = {depth for profile in self.lower_edge_depth_profiles for depth in profile}
+        if not lower_depths:
+            raise RuntimeError("ymt_feather_ribbon_01 requires at least one lower edge depth.")
+        boundaries = sorted({0.0, 1.0}.union(lower_depths))
+        segments = [(start, end) for start, end in zip(boundaries[:-1], boundaries[1:]) if end - start > 0.001]
         if not segments:
-            raise RuntimeError("ymt_feather_ribbon_01 requires lower edge offsets greater than 0 for anchor controls.")
+            raise RuntimeError("ymt_feather_ribbon_01 requires a non-zero lower edge depth range for anchor controls.")
         return segments
 
-    def _collect_surface_offsets(self) -> list[float]:
-        if not self.anchor_control_offset_segments:
-            raise RuntimeError("ymt_feather_ribbon_01 ribbon surface requires at least one anchor control segment.")
+    def _collect_surface_depths(self) -> list[float]:
+        if not self.anchor_control_depth_segments:
+            raise RuntimeError("ymt_feather_ribbon_01 ribbon surface requires at least one anchor control depth segment.")
         base_subdivisions = max(int(self.surface_segment_subdivisions), 1)
-        segment_widths = [abs(end - start) for start, end in self.anchor_control_offset_segments]
+        segment_widths = [end - start for start, end in self.anchor_control_depth_segments]
         average_width = sum(segment_widths) / float(len(segment_widths))
         target_step = average_width / float(base_subdivisions)
         if target_step <= 0.0:
-            raise RuntimeError("ymt_feather_ribbon_01 ribbon surface requires non-zero anchor offset segment width.")
+            raise RuntimeError("ymt_feather_ribbon_01 ribbon surface requires non-zero anchor depth segment width.")
 
-        offsets = [self.anchor_control_offset_segments[0][0]]
-        for start, end in self.anchor_control_offset_segments:
-            subdivisions = max(1, math.ceil(abs(end - start) / target_step))
+        depths = [self.anchor_control_depth_segments[0][0]]
+        for start, end in self.anchor_control_depth_segments:
+            subdivisions = max(1, math.ceil((end - start) / target_step))
             for step in range(1, subdivisions + 1):
                 ratio = step / float(subdivisions)
-                offsets.append(start + ((end - start) * ratio))
-        if len(offsets) < 2:
-            raise RuntimeError("ymt_feather_ribbon_01 ribbon surface requires at least two V offset rows.")
-        return offsets
+                depths.append(start + ((end - start) * ratio))
+        if len(depths) < 2:
+            raise RuntimeError("ymt_feather_ribbon_01 ribbon surface requires at least two V depth rows.")
+        return depths
 
-    def _collect_anchor_control_offset_centers(self) -> list[float]:
-        if not self.anchor_control_offset_segments:
-            raise RuntimeError("ymt_feather_ribbon_01 requires at least one anchor control offset segment.")
-        return [(start + end) * 0.5 for start, end in self.anchor_control_offset_segments]
+    def _collect_anchor_control_depth_centers(self) -> list[float]:
+        if not self.anchor_control_depth_segments:
+            raise RuntimeError("ymt_feather_ribbon_01 requires at least one anchor control depth segment.")
+        return [(start + end) * 0.5 for start, end in self.anchor_control_depth_segments]
 
-    def _collect_detail_guide_offsets(self) -> set[float]:
-        offsets = set()
-        for local_name, matrix in self.guide.tra.items():
-            if self._parse_detail_guide_name(local_name) is None:
-                continue
-            position = self._to_vector(transform.getPositionFromMatrix(matrix))
-            _span, _local, base_position = self._closest_span_local_from_position(position)
-            offsets.add(self._offset_from_position(position, base_position))
-        return offsets
-
-    def _anchor_layer_from_offset(self, offset: float) -> int:
-        if not self.anchor_control_offset_segments:
-            raise RuntimeError("ymt_feather_ribbon_01 requires at least one anchor control offset segment.")
-        for index, (start, end) in enumerate(self.anchor_control_offset_segments):
-            if min(start, end) <= offset <= max(start, end):
+    def _anchor_layer_from_depth(self, depth: float) -> int:
+        if not self.anchor_control_depth_segments:
+            raise RuntimeError("ymt_feather_ribbon_01 requires at least one anchor control depth segment.")
+        for index, (start, end) in enumerate(self.anchor_control_depth_segments):
+            if start <= depth <= end:
                 return index
-        if self._offset_depth(offset) < self._offset_depth(self.anchor_control_offset_segments[0][0]):
+        if depth < self.anchor_control_depth_segments[0][0]:
             return 0
-        return len(self.anchor_control_offset_segments) - 1
+        return len(self.anchor_control_depth_segments) - 1
 
-    def _offset_from_position(self, position: VectorLike, base_position: VectorLike) -> float:
-        return ((position - base_position) * self.lower_axis) / self.size
-
-    def _offset_depth(self, offset: float) -> float:
-        sign = 1.0 if self.deepest_anchor_offset >= 0.0 else -1.0
-        return offset * sign
+    def _depth_from_position(
+        self,
+        position: VectorLike,
+        base_position: VectorLike,
+        end_position: VectorLike,
+    ) -> float:
+        depth_axis = end_position - base_position
+        length_squared = depth_axis * depth_axis
+        if length_squared < 0.000001:
+            raise RuntimeError("ymt_feather_ribbon_01 requires non-zero anchorEnd depth length.")
+        depth = ((position - base_position) * depth_axis) / length_squared
+        if not -0.001 <= depth <= 1.001:
+            raise RuntimeError(
+                "ymt_feather_ribbon_01 detail guide is outside the lowerEdgeDepths 0-1 range: %.3f." % depth
+            )
+        return max(0.0, min(1.0, depth))
 
     def _anchor_control_matrix(self, start_position: VectorLike, end_position: VectorLike) -> MatrixLike:
         if vector.getDistance(start_position, end_position) < 0.001:
-            raise RuntimeError("ymt_feather_ribbon_01 requires non-zero anchor control offset length.")
+            raise RuntimeError("ymt_feather_ribbon_01 requires non-zero anchor control depth length.")
         return transform.getTransformLookingAt(
             start_position,
             end_position,
@@ -1196,31 +1181,18 @@ class Component(component.Main):
             negate=False,
         )
 
-    def _anchor_position_from_offset(self, anchor_index: int, offset: float) -> VectorLike:
-        deepest_offset = self.deepest_anchor_offset
-        if abs(deepest_offset) < 0.001:
-            return self._default_anchor_position_from_offset(anchor_index, offset)
-        ratio = offset / deepest_offset
+    def _anchor_position_from_depth(self, anchor_index: int, depth: float) -> VectorLike:
+        if not 0.0 <= depth <= 1.0:
+            raise RuntimeError("ymt_feather_ribbon_01 lower edge depth must be between 0 and 1: %.3f." % depth)
         base_position = self.anchor_positions[anchor_index]
-        deepest_position = self.deepest_anchor_positions[anchor_index]
-        return base_position + ((deepest_position - base_position) * ratio)
-
-    def _deepest_anchor_offset(self) -> float:
-        if not self.anchor_control_offset_segments:
-            raise RuntimeError("ymt_feather_ribbon_01 requires at least one anchor control offset segment.")
-        return self.anchor_control_offset_segments[-1][1]
-
-    def _deepest_anchor_line_positions(self) -> list[VectorLike]:
-        return list(self.anchor_end_positions)
+        end_position = self.anchor_end_positions[anchor_index]
+        return base_position + ((end_position - base_position) * depth)
 
     def _curl_guide_position(self, index: int) -> VectorLike:
         guide_matrix = self.guide.tra.get("curl%s" % index)
         if guide_matrix is None:
             raise RuntimeError("ymt_feather_ribbon_01 requires the curl%s guide locator." % index)
         return self._to_vector(transform.getPositionFromMatrix(guide_matrix))
-
-    def _default_anchor_position_from_offset(self, anchor_index: int, offset: float) -> VectorLike:
-        return self.anchor_positions[anchor_index] + (self.lower_axis * offset * self.size)
 
     def _curl_ctl_position(self, index: int) -> VectorLike:
         return self._curl_guide_position(index)
@@ -1234,8 +1206,8 @@ class Component(component.Main):
 
     def _curl_basis_matrix(self, index: int) -> MatrixLike:
         lower_midpoint = self._midpoint(
-            self._anchor_position_from_offset(index, self.deepest_anchor_offset),
-            self._anchor_position_from_offset(index + 1, self.deepest_anchor_offset),
+            self._anchor_position_from_depth(index, 1.0),
+            self._anchor_position_from_depth(index + 1, 1.0),
         )
         return transform.setMatrixPosition(self._curl_orientation_matrix(index), lower_midpoint)
 
@@ -1281,22 +1253,10 @@ class Component(component.Main):
         values.append(1.0)
         return values
 
-    def _surface_offsets(self) -> list[float]:
-        if len(self.surface_offsets) < 2:
-            raise RuntimeError("ymt_feather_ribbon_01 ribbon surface requires at least two V offset rows.")
-        return list(self.surface_offsets)
-
-    def _max_lower_edge_offset_at_u(self, u: float) -> float:
-        offsets = []
-        for row_index, (u_start, u_end) in enumerate(self.row_u_ranges):
-            if min(u_start, u_end) <= u <= max(u_start, u_end):
-                offsets.extend(self.lower_edge_profiles[row_index])
-        if not offsets:
-            for profile in self.lower_edge_profiles:
-                offsets.extend(profile)
-        if not offsets:
-            raise RuntimeError("ymt_feather_ribbon_01 requires at least one lower edge offset profile.")
-        return max(offsets, key=abs)
+    def _surface_depths(self) -> list[float]:
+        if len(self.surface_depths) < 2:
+            raise RuntimeError("ymt_feather_ribbon_01 ribbon surface requires at least two V depth rows.")
+        return list(self.surface_depths)
 
     def _closest_span_local_from_position(self, position: VectorLike) -> tuple[int, float, VectorLike]:
         best_span = 0
@@ -1367,14 +1327,6 @@ class Component(component.Main):
             raise RuntimeError("ymt_feather_ribbon_01 requires a valid parent wing blade normal.")
         return normal.normal()
 
-    def _get_parent_blade_lower_axis(self) -> VectorLike:
-        lower_axis = self.wing_normal ^ self.span_axis
-        if lower_axis.length() < 0.001:
-            raise RuntimeError(
-                "ymt_feather_ribbon_01 parent wing blade normal cannot be parallel to the root-to-eff axis."
-            )
-        return lower_axis.normal()
-
     def _get_parent_guide_anchor_positions(self) -> Optional[list[VectorLike]]:  # noqa: UP045
         parent_guide = self._get_parent_wing_guide()
         guide_positions = getattr(parent_guide, "apos", None)
@@ -1434,22 +1386,5 @@ class Component(component.Main):
     def _parse_row_u_ranges(self, value: str, row_names: list[str]) -> list[tuple[float, float]]:
         return detail_config.parse_row_u_ranges(value, row_names)
 
-    def _parse_lower_edge_profiles(self, value: str, row_names: list[str]) -> list[list[float]]:
-        return detail_config.parse_lower_edge_profiles(value, row_names)
-
-    def _collect_lower_edge_profiles(self, value: str) -> tuple[dict[str, list[float]], list[list[float]]]:
-        return detail_config.collect_lower_edge_profiles(value)
-
-    def _validate_lower_edge_profile_rows(
-        self,
-        named_profiles: dict[str, list[float]],
-        unnamed_profiles: list[list[float]],
-        row_names: list[str],
-    ) -> None:
-        detail_config.validate_lower_edge_profile_rows(named_profiles, unnamed_profiles, row_names)
-
-    def _split_lower_edge_profile_rows(self, value: str) -> list[str]:
-        return detail_config.split_lower_edge_profile_rows(value)
-
-    def _parse_float_list(self, value: str) -> list[float]:
-        return detail_config.parse_float_list(value)
+    def _parse_lower_edge_depth_profiles(self, value: str, row_names: list[str]) -> list[list[float]]:
+        return detail_config.parse_lower_edge_depth_profiles(value, row_names)
