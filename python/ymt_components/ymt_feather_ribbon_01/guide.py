@@ -53,6 +53,10 @@ class Guide(guide.ComponentGuide):
     def postInit(self) -> None:
         self.save_transform = [
             "root",
+            "rootEnd",
+            "elbowEnd",
+            "wristEnd",
+            "handEnd",
             "curl0",
             "curl1",
             "curl2",
@@ -60,6 +64,10 @@ class Guide(guide.ComponentGuide):
 
     def addObjects(self) -> None:
         self.root = self.addRoot()
+        self.rootEnd = self.addLoc("rootEnd", self.root, transform.getOffsetPosition(self.root, [0.0, 0.0, -5.0]))
+        self.elbowEnd = self.addLoc("elbowEnd", self.root, transform.getOffsetPosition(self.root, [3.0, 0.0, -5.0]))
+        self.wristEnd = self.addLoc("wristEnd", self.root, transform.getOffsetPosition(self.root, [6.0, 0.0, -5.0]))
+        self.handEnd = self.addLoc("handEnd", self.root, transform.getOffsetPosition(self.root, [8.0, 0.0, -5.0]))
         self.curl0 = self.addLoc("curl0", self.root, transform.getOffsetPosition(self.root, [1.5, 0.0, -5.0]))
         self.curl1 = self.addLoc("curl1", self.root, transform.getOffsetPosition(self.root, [4.5, 0.0, -5.0]))
         self.curl2 = self.addLoc("curl2", self.root, transform.getOffsetPosition(self.root, [7.0, 0.0, -5.0]))
@@ -67,6 +75,7 @@ class Guide(guide.ComponentGuide):
 
         centers = [self.root, self.curl0, self.curl1, self.curl2]
         self.dispcrv = self.addDispCurve("crv", centers)
+        self.end_dispcrv = self.addDispCurve("endCrv", [self.rootEnd, self.elbowEnd, self.wristEnd, self.handEnd])
 
     def addParameters(self) -> None:
         self.pPlacementMode = self.addEnumParam("placementMode", ["surface", "fixed"], 0)

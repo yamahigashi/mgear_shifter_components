@@ -71,6 +71,7 @@ class Component(component.Main):
 
     placement_modes = ("surface", "fixed")
     anchor_names = ("root", "elbow", "wrist", "hand")
+    anchor_end_names = ("rootEnd", "elbowEnd", "wristEnd", "handEnd")
     surface_segment_subdivisions = 4
 
     def addObjects(self) -> None:
@@ -98,6 +99,7 @@ class Component(component.Main):
         self.anchor_control_offset_centers = self._collect_anchor_control_offset_centers()
         self.surface_offsets = self._collect_surface_offsets()
         self.deepest_anchor_offset = self._deepest_anchor_offset()
+        self.anchor_end_positions = self._get_anchor_end_positions()
         self.deepest_anchor_positions = self._deepest_anchor_line_positions()
 
         self.driver_root = primitive.addTransform(self.root, self.getName("drivers"), transform.getTransform(self.root))
@@ -943,6 +945,17 @@ class Component(component.Main):
         end = self.anchor_positions[span + 1]
         return start + ((end - start) * local)
 
+    def _get_anchor_end_positions(self) -> list[VectorLike]:
+        positions = []
+        for name in self.anchor_end_names:
+            matrix = self.guide.tra.get(name)
+            if matrix is None:
+                raise RuntimeError("ymt_feather_ribbon_01 requires the %s guide locator." % name)
+            positions.append(self._to_vector(transform.getPositionFromMatrix(matrix)))
+        if len(positions) != len(self.anchor_names):
+            raise RuntimeError("ymt_feather_ribbon_01 requires one anchor end locator per anchor.")
+        return positions
+
     def _collect_anchor_offsets(self) -> list[float]:
         lower_offsets = {offset for profile in self.lower_edge_profiles for offset in profile}
         if not lower_offsets:
@@ -1036,15 +1049,7 @@ class Component(component.Main):
         return max(self.anchor_offsets, key=abs)
 
     def _deepest_anchor_line_positions(self) -> list[VectorLike]:
-        deepest_offset = self.deepest_anchor_offset
-        if abs(deepest_offset) < 0.001:
-            return list(self.anchor_positions)
-
-        positions = [self._default_anchor_position_from_offset(0, deepest_offset)]
-        for span in range(len(self.anchor_segment_lengths)):
-            midpoint = self._curl_guide_position(span)
-            positions.append((midpoint * 2.0) - positions[-1])
-        return positions
+        return list(self.anchor_end_positions)
 
     def _curl_guide_position(self, index: int) -> VectorLike:
         guide_matrix = self.guide.tra.get("curl%s" % index)
