@@ -67,10 +67,10 @@ class Guide(guide.ComponentGuide):
         self.rootEnd = self.addLoc("rootEnd", self.root, transform.getOffsetPosition(self.root, [0.0, 0.0, -5.0]))
         self.elbowEnd = self.addLoc("elbowEnd", self.root, transform.getOffsetPosition(self.root, [3.0, 0.0, -5.0]))
         self.wristEnd = self.addLoc("wristEnd", self.root, transform.getOffsetPosition(self.root, [6.0, 0.0, -5.0]))
-        self.handEnd = self.addLoc("handEnd", self.root, transform.getOffsetPosition(self.root, [8.0, 0.0, -5.0]))
+        self.handEnd = self.addLoc("handEnd", self.root, transform.getOffsetPosition(self.root, [10.0, 0.0, -3.0]))
         self.curl0 = self.addLoc("curl0", self.root, transform.getOffsetPosition(self.root, [1.5, 0.0, -5.0]))
         self.curl1 = self.addLoc("curl1", self.root, transform.getOffsetPosition(self.root, [4.5, 0.0, -5.0]))
-        self.curl2 = self.addLoc("curl2", self.root, transform.getOffsetPosition(self.root, [7.0, 0.0, -5.0]))
+        self.curl2 = self.addLoc("curl2", self.root, transform.getOffsetPosition(self.root, [8.0, 0.0, -4.0]))
         self.detail_locs = self._add_detail_locators_from_template()
 
         centers = [self.root, self.curl0, self.curl1, self.curl2]

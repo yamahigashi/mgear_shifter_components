@@ -204,7 +204,7 @@ class Component(component.Main):
                     w=self.ctl_size * 0.3,
                     h=self.ctl_size * 0.05,
                     d=length * 0.8,
-                    po=datatypes.Vector(0.0, self.ctl_size, length * -0.45),
+                    po=datatypes.Vector(0.0, self.ctl_size * 0.3, length * -0.45),
                     tp=tag_parent,
                 )
                 attribute.setKeyableAttributes(ctl)
@@ -240,7 +240,7 @@ class Component(component.Main):
                 offset_matrix,
                 self.color_ik,
                 "sphere",
-                w=self.ctl_size,
+                w=self.ctl_size * 0.4,
                 tp=self.anchor_ctls[min(index + 1, len(self.anchor_ctls) - 1)][0],
             )
             deform = primitive.addTransform(offset_npo, self.getName("curl%s_deform" % index), offset_matrix)
@@ -290,7 +290,7 @@ class Component(component.Main):
                 self.color_fk,
                 "circle",
                 w=self.ctl_size * 0.5,
-                ro=datatypes.Vector(math.radians(90), 0.0, 0.0),
+                ro=datatypes.Vector(math.radians(90), math.radians(90.0), 0.0),
                 tp=tag_parent,
             )
             attribute.setKeyableAttributes(ctl)
