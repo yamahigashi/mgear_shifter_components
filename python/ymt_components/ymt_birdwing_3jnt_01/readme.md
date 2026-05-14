@@ -5,6 +5,8 @@ Three-section wing component for bird and dragon style rigs.
 The component provides:
 
 - FK controls for root, elbow, and wrist/hand sections.
+- Separate guide points for `hand` and `eff`: `hand` is the structural bone/deformation anchor,
+  while `eff` is the animator-facing hand IK control position.
 - IK A: a root to wrist 2-bone IK with up-vector, roll, soft IK, and stretch.
 - Soft IK range and speed initial values can be set from the guide settings.
 - The initial up-vector control position is derived from the guide blade and root-to-wrist direction,

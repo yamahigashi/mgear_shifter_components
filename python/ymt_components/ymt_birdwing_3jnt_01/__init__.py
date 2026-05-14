@@ -109,7 +109,7 @@ class Component(component.Main):
         self.handUpvRefChain = yu.add3DChain(
             self.root,
             self.getName("handUpvRef%s_jnt"),
-            [self.guide.apos[2], self.guide.apos[3]],
+            [self.guide.pos["wrist"], self.guide.pos["hand"]],
             self.normal,
             False,
             self.WIP,
@@ -117,7 +117,7 @@ class Component(component.Main):
 
         hand_upv_t = transform.setMatrixPosition(
             transform.getTransform(self.handUpvRefChain[0]),
-            self._get_hand_upv_position(self.guide.apos[2], pole_dir),
+            self._get_hand_upv_position(self.guide.pos["wrist"], pole_dir),
         )
         self.hand_effective_upv_npo = primitive.addTransform(
             self.handUpvRefChain[0], self.getName("handEffectiveUpv_npo"), hand_upv_t
@@ -144,14 +144,20 @@ class Component(component.Main):
         self.normal = self.guide.blades["blade"].z * -1
         self.binormal = self.guide.blades["blade"].x
 
-        self.length0 = vector.getDistance(self.guide.apos[0], self.guide.apos[1])
-        self.length1 = vector.getDistance(self.guide.apos[1], self.guide.apos[2])
-        self.length2 = vector.getDistance(self.guide.apos[2], self.guide.apos[3])
+        self.bone_positions = [
+            self.guide.pos["root"],
+            self.guide.pos["elbow"],
+            self.guide.pos["wrist"],
+            self.guide.pos["hand"],
+        ]
+        self.length0 = vector.getDistance(self.bone_positions[0], self.bone_positions[1])
+        self.length1 = vector.getDistance(self.bone_positions[1], self.bone_positions[2])
+        self.length2 = vector.getDistance(self.bone_positions[2], self.bone_positions[3])
 
         self.chain2bones = yu.add3DChain(
             self.setup,
             self.getName("chain2bones%s_jnt"),
-            self.guide.apos[0:3],
+            self.bone_positions[0:3],
             self.normal,
             False,
             self.WIP,
@@ -159,7 +165,7 @@ class Component(component.Main):
         self.handChain = yu.add3DChain(
             self.setup,
             self.getName("handChain%s_jnt"),
-            self.guide.apos[2:4],
+            self.bone_positions[2:4],
             self.normal,
             False,
             self.WIP,
@@ -167,7 +173,7 @@ class Component(component.Main):
         self.wingBones = yu.add3DChain(
             self.root,
             self.getName("wingBones%s_jnt"),
-            self.guide.apos[0:4],
+            self.bone_positions,
             self.normal,
             False,
             self.WIP,
@@ -175,7 +181,7 @@ class Component(component.Main):
         self.wingBonesFK = yu.add3DChain(
             self.root,
             self.getName("wingFK%s_jnt"),
-            self.guide.apos[0:4],
+            self.bone_positions,
             self.normal,
             False,
             self.WIP,
@@ -183,7 +189,7 @@ class Component(component.Main):
         self.wingBonesIK = yu.add3DChain(
             self.root,
             self.getName("wingIK%s_jnt"),
-            self.guide.apos[0:4],
+            self.bone_positions,
             self.normal,
             False,
             self.WIP,
@@ -224,7 +230,9 @@ class Component(component.Main):
             t,
             self.color_fk,
             "circle",
-            w=self.size * 0.18,
+            w=self.size * 0.4,
+            po=datatypes.Vector(0, 0, self.size * -0.25),
+            ro=datatypes.Vector(math.radians(90), math.radians(90), 0),
             tp=self.parentCtlTag,
         )
         attribute.lockAttribute(self.root_ctl, ["sx", "sy", "sz", "v"])
@@ -235,9 +243,9 @@ class Component(component.Main):
         tag_parent = self.root_ctl
         for index, (start, end, length) in enumerate(
             [
-                (self.guide.apos[0], self.guide.apos[1], self.length0),
-                (self.guide.apos[1], self.guide.apos[2], self.length1),
-                (self.guide.apos[2], self.guide.apos[3], self.length2),
+                (self.bone_positions[0], self.bone_positions[1], self.length0),
+                (self.bone_positions[1], self.bone_positions[2], self.length1),
+                (self.bone_positions[2], self.bone_positions[3], self.length2),
             ]
         ):
             t = transform.getTransformLookingAt(start, end, self.normal, "xz", self.negate)
@@ -272,7 +280,7 @@ class Component(component.Main):
             transform.getTransform(self.elbow_mid_jnt),
             self.color_ik,
             "sphere",
-            w=self.size * 0.18,
+            w=self.size * 0.13,
             tp=self.root_ctl,
         )
         attribute.setInvertMirror(self.elbow_ctl, ["tx", "ty", "tz"])
@@ -287,7 +295,7 @@ class Component(component.Main):
             transform.getTransform(self.wrist_mid_jnt),
             self.color_ik,
             "sphere",
-            w=self.size * 0.18,
+            w=self.size * 0.13,
             tp=self.elbow_ctl,
         )
         attribute.setInvertMirror(self.wrist_ctl, ["tx", "ty", "tz"])
@@ -302,9 +310,9 @@ class Component(component.Main):
             t,
             self.color_ik,
             "cube",
-            w=self.size * 0.22,
-            h=self.size * 0.22,
-            d=self.size * 0.22,
+            w=self.size * 0.16,
+            h=self.size * 0.16,
+            d=self.size * 0.16,
             tp=self.root_ctl,
         )
         attribute.setKeyableAttributes(self.ik_ctl)
@@ -357,7 +365,9 @@ class Component(component.Main):
         # IK B: wrist/hand look-at target.
         wrist_t = transform.getTransformFromPos(self.guide.pos["wrist"])
         self._add_hand_upv_refs(wrist_t, blade_pole_dir)
-        hand_t = transform.getTransformLookingAt(self.guide.apos[2], self.guide.apos[3], self.root_normal, "zx", False)
+        hand_t = transform.getTransformLookingAt(
+            self.guide.pos["wrist"], self.guide.pos["hand"], self.root_normal, "zx", False
+        )
         hand_t = transform.setMatrixPosition(hand_t, self.guide.pos["eff"])
         self.hand_ik_parent_cns = primitive.addTransform(self.root, self.getName("hand_ik_parent_cns"), wrist_t)
         self.hand_ik_parent_ik_ref = primitive.addTransform(
@@ -372,18 +382,18 @@ class Component(component.Main):
         self.hand_ik_parent_chain_ref = primitive.addTransform(
             self.hand_ik_parent_chain_pos, self.getName("hand_ik_parent_chain_ref"), wrist_t
         )
-        length = vector.getDistance(self.guide.apos[3], self.guide.apos[2])
+        length = vector.getDistance(self.guide.pos["eff"], self.guide.pos["wrist"])
         self.ikRot_npo = primitive.addTransform(self.hand_ik_parent_cns, self.getName("ikRot_npo"), wrist_t)
         self.ikRot_ctl = self.addCtl(
             self.ikRot_npo,
             "ikRot_ctl",
             wrist_t,
-            self.color_ik,
+            self.color_fk,
             "cube",
-            d=self.size * 0.16,
-            h=self.size * 0.16,
-            w=length * 0.5,
-            po=datatypes.Vector(0.25 * length, 0, 0),
+            d=self.size * 0.08,
+            h=self.size * 0.08,
+            w=length * 0.8,
+            po=datatypes.Vector(0.45 * length, 0, 0),
             tp=self.ik_ctl,
         )
         attribute.setRotOrder(self.ikRot_ctl, "XZY")
@@ -459,7 +469,7 @@ class Component(component.Main):
             ("root", self.wingBones[0]),
             ("elbow", self.wingBones[1]),
             ("wrist", self.wingBones[2]),
-            ("eff", self.wingBones[3]),
+            ("hand", self.wingBones[3]),
         ]:
             ref = primitive.addTransform(
                 self.root_ctl,
@@ -506,8 +516,8 @@ class Component(component.Main):
                 div_index += 1
                 joint_index += 1
 
-        self.joint_indices["eff"] = joint_index
-        self.jnt_pos.append([self.deform_anchor_drivers["eff"], "eff"])
+        self.joint_indices["hand"] = joint_index
+        self.jnt_pos.append([self.deform_anchor_drivers["hand"], "hand"])
         joint_index += 1
         self.end_ref = primitive.addTransform(
             self.tws3_rot, self.getName("end_ref"), transform.getTransform(self.wingBones[3])
@@ -954,19 +964,20 @@ class Component(component.Main):
         self.relatives["root"] = self.root
         self.relatives["elbow"] = self.deform_anchor_drivers["elbow"]
         self.relatives["wrist"] = self.deform_anchor_drivers["wrist"]
-        self.relatives["eff"] = self.deform_anchor_drivers["eff"]
+        self.relatives["hand"] = self.deform_anchor_drivers["hand"]
+        self.relatives["eff"] = self.hand_ik_ctl
 
         self.controlRelatives["root"] = self.fk0_ctl
         self.controlRelatives["elbow"] = self.fk1_ctl
         self.controlRelatives["wrist"] = self.ik_ctl
+        self.controlRelatives["hand"] = self.hand_ik_ctl
         self.controlRelatives["eff"] = self.hand_ik_ctl
 
         self.jointRelatives["root"] = self.joint_indices["root"]
         self.jointRelatives["elbow"] = self.joint_indices["elbow"]
         self.jointRelatives["wrist"] = self.joint_indices["wrist"]
+        self.jointRelatives["hand"] = self.joint_indices["hand"]
         self.jointRelatives["eff"] = self.joint_indices["end"]
-
-        self.aliasRelatives["eff"] = "hand"
 
     def addConnection(self) -> None:
         self.connections["standard"] = self.connect_standard
@@ -976,12 +987,9 @@ class Component(component.Main):
         """Return stable driver objects used by feather ribbon child components."""
         return {
             "root": self.root,
-            # "elbow": self.deform_anchor_drivers["elbow"],
-            # "wrist": self.deform_anchor_drivers["wrist"],
-            # "hand": self.deform_anchor_drivers["eff"],
             "elbow": self.support_anchor_drivers["elbow_mid"],
             "wrist": self.support_anchor_drivers["wrist_mid"],
-            "hand": self.deform_anchor_drivers["eff"],
+            "hand": self.deform_anchor_drivers["hand"],
             "root_ctl": self.root_ctl,
             "normal": self.normal,
             "binormal": self.binormal,

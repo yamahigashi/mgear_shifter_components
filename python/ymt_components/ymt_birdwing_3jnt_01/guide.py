@@ -43,7 +43,7 @@ class Guide(guide.ComponentGuide):
     connectors: ClassVar[list[str]] = ["ymt_shoulder_01"]
 
     def postInit(self) -> None:
-        self.save_transform = ["root", "elbow", "wrist", "eff"]
+        self.save_transform = ["root", "elbow", "wrist", "hand", "eff"]
         self.save_blade = ["blade"]
 
     def addObjects(self) -> None:
@@ -52,12 +52,14 @@ class Guide(guide.ComponentGuide):
         self.elbow = self.addLoc("elbow", self.root, elbow_pos)
         wrist_pos = transform.getOffsetPosition(self.root, [6, 0, 0])
         self.wrist = self.addLoc("wrist", self.elbow, wrist_pos)
-        eff_pos = transform.getOffsetPosition(self.root, [7.5, 0, 0.6])
-        self.eff = self.addLoc("eff", self.wrist, eff_pos)
+        hand_pos = transform.getOffsetPosition(self.root, [7.5, 0, 0])
+        self.hand = self.addLoc("hand", self.wrist, hand_pos)
+        eff_pos = transform.getOffsetPosition(self.root, [10.0, 0, 0.0])
+        self.eff = self.addLoc("eff", self.hand, eff_pos)
         self.blade = self.addBlade("blade", self.root, self.elbow)
         cmds.setAttr(self.blade + ".bladeRollOffset", 90.0)
         attribute.unlockAttribute(self.blade, ["rx"])
-        self.dispcrv = self.addDispCurve("crv", [self.root, self.elbow, self.wrist, self.eff])
+        self.dispcrv = self.addDispCurve("crv", [self.root, self.elbow, self.wrist, self.hand, self.eff])
 
     def addParameters(self) -> None:
         self.pBlend = self.addParam("blend", "double", 1, 0, 1)
