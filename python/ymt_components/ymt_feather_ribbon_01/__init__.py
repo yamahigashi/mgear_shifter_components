@@ -95,6 +95,7 @@ class Component(component.Main):
         self.lower_axis = self._get_parent_blade_lower_axis()
         self.anchor_offsets = self._collect_anchor_offsets()
         self.anchor_control_offset_segments = self._collect_anchor_control_offset_segments()
+        self.anchor_control_offset_centers = self._collect_anchor_control_offset_centers()
         self.surface_offsets = self._collect_surface_offsets()
         self.deepest_anchor_offset = self._deepest_anchor_offset()
         self.deepest_anchor_positions = self._deepest_anchor_line_positions()
@@ -379,8 +380,8 @@ class Component(component.Main):
                 weights = dict.fromkeys(influence_names, 0.0)
                 for joint, weight in self._surface_anchor_weight_entries(offset, u):
                     weights[influence_by_node[self._node_name(joint)]] = weight
-                curl_joint, curl_weight = self._surface_curl_weight_entry(u, offset)
-                weights[influence_by_node[self._node_name(curl_joint)]] = curl_weight
+                for curl_joint, curl_weight in self._surface_curl_weight_entries(u, offset):
+                    weights[influence_by_node[self._node_name(curl_joint)]] = curl_weight
                 total = sum(weights.values())
                 if total <= 0.0:
                     raise RuntimeError("ymt_feather_ribbon_01 generated zero total skin weight for %s." % component)
@@ -405,13 +406,14 @@ class Component(component.Main):
     ) -> None:
         v_index = max(range(v_count), key=lambda index: abs(surface_offsets[index]))
         offset = surface_offsets[v_index]
-        for segment_index, joint in enumerate(self.curl_surface_skin_joints):
-            u = self._u_from_span_local(segment_index, 0.5)
+        for index, joint in enumerate(self.curl_surface_skin_joints):
+            u = self._curl_u(index)
             u_index = min(
                 range(len(surface_u_values)),
                 key=lambda index: abs(surface_u_values[index] - u),
             )
-            expected = self._surface_curl_weight_for_u(surface_u_values[u_index], offset)
+            expected_entries = dict(self._surface_curl_weight_entries(surface_u_values[u_index], offset))
+            expected = expected_entries.get(joint, 0.0)
             if expected <= 0.05:
                 continue
             component = "%s.cv[%s][%s]" % (surface_shape, u_index, v_index)
@@ -494,21 +496,58 @@ class Component(component.Main):
                 entries.append((joint, anchor_value * layer_value * anchor_weight))
         return entries
 
-    def _surface_curl_weight_entry(self, u: float, offset: float) -> tuple[PymelNode, float]:
+    def _surface_curl_weight_entries(self, u: float, offset: float) -> list[tuple[PymelNode, float]]:
         if not self.curl_surface_skin_joints:
             raise RuntimeError("ymt_feather_ribbon_01 curl surface skin joints were not properly initialized.")
-        span, _local = self._span_local_from_u(u)
-        segment_index = min(max(span, 0), len(self.curl_surface_skin_joints) - 1)
-        return self.curl_surface_skin_joints[segment_index], self._surface_curl_weight_for_u(u, offset)
+        curl_weight = self._surface_curl_weight_for_u(u, offset)
+        if curl_weight <= 0.0:
+            return []
+        raw_weights = self._surface_curl_raw_weights_for_u(u)
+        raw_total = sum(raw_weights)
+        if raw_total <= 0.0:
+            return []
+        return [
+            (joint, curl_weight * (raw_weight / raw_total))
+            for joint, raw_weight in zip(self.curl_surface_skin_joints, raw_weights)
+            if raw_weight > 0.0
+        ]
 
     def _surface_curl_weight_for_u(self, u: float, offset: float) -> float:
         max_offset = self._max_abs_surface_offset()
         if max_offset <= 0.0:
             return 0.0
-        _span, local = self._span_local_from_u(u)
-        segment_weight = 1.0 - abs((local * 2.0) - 1.0)
+        segment_weight = min(1.0, sum(self._surface_curl_raw_weights_for_u(u)))
         offset_weight = max(0.0, min(1.0, abs(offset) / max_offset))
         return max(0.0, min(1.0, offset_weight * segment_weight * 0.65))
+
+    def _surface_curl_raw_weights_for_u(self, u: float) -> list[float]:
+        centers = [self._curl_u(index) for index in range(len(self.curl_surface_skin_joints))]
+        return [self._surface_curl_raw_weight_for_center(u, center, centers, index) for index, center in enumerate(centers)]
+
+    def _surface_curl_raw_weight_for_center(
+        self,
+        u: float,
+        center: float,
+        centers: list[float],
+        index: int,
+    ) -> float:
+        radius = self._surface_curl_weight_radius(centers, index)
+        if radius <= 0.0:
+            return 1.0 if abs(u - center) <= 0.001 else 0.0
+        t = max(0.0, min(1.0, abs(u - center) / radius))
+        return 1.0 - self._smootherstep(t)
+
+    def _surface_curl_weight_radius(self, centers: list[float], index: int) -> float:
+        distances = []
+        if index > 0:
+            distances.append(abs(centers[index] - centers[index - 1]))
+        if index < len(centers) - 1:
+            distances.append(abs(centers[index + 1] - centers[index]))
+        return max(distances) if distances else 0.0
+
+    def _smootherstep(self, value: float) -> float:
+        t = max(0.0, min(1.0, value))
+        return t * t * t * (t * ((t * 6.0) - 15.0) + 10.0)
 
     def _max_abs_surface_offset(self) -> float:
         return max(abs(offset) for offset in self.surface_offsets)
@@ -524,6 +563,20 @@ class Component(component.Main):
         return [(start_anchor, 1.0 - local), (end_anchor, local)]
 
     def _anchor_layer_weight_entries_for_offset(self, offset: float) -> list[tuple[int, float]]:
+        centers = self.anchor_control_offset_centers
+        if not centers:
+            raise RuntimeError("ymt_feather_ribbon_01 requires at least one anchor control offset center.")
+        if len(centers) == 1 or offset <= centers[0]:
+            return [(0, 1.0)]
+        if offset >= centers[-1]:
+            return [(len(centers) - 1, 1.0)]
+        for index, (start, end) in enumerate(zip(centers[:-1], centers[1:])):
+            if start <= offset <= end:
+                width = end - start
+                if width <= 0.0:
+                    return [(index, 1.0)]
+                weight = (offset - start) / width
+                return [(index, 1.0 - weight), (index + 1, weight)]
         return [(self._anchor_layer_from_offset(offset), 1.0)]
 
     def _connect_surface_rivets(self) -> None:
@@ -925,6 +978,11 @@ class Component(component.Main):
         if len(offsets) < 2:
             raise RuntimeError("ymt_feather_ribbon_01 ribbon surface requires at least two V offset rows.")
         return offsets
+
+    def _collect_anchor_control_offset_centers(self) -> list[float]:
+        if not self.anchor_control_offset_segments:
+            raise RuntimeError("ymt_feather_ribbon_01 requires at least one anchor control offset segment.")
+        return [(start + end) * 0.5 for start, end in self.anchor_control_offset_segments]
 
     def _collect_detail_guide_offsets(self) -> set[float]:
         offsets = set()
