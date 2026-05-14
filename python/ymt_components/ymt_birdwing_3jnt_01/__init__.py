@@ -413,19 +413,36 @@ class Component(component.Main):
             d=max(self.length2, self.size * 0.1) * 0.18,
             tp=self.ikRot_ctl,
         )
-        attribute.setKeyableAttributes(self.hand_ik_ctl)
         attribute.setRotOrder(self.hand_ik_ctl, "XZY")
-        attribute.setInvertMirror(self.hand_ik_ctl, ["tx", "ry", "rz"])
-        attribute.lockAttribute(self.hand_ik_ctl, ["sx", "sy", "sz", "v"])
+        attribute.setKeyableAttributes(self.hand_ik_ctl, ["tx", "ty", "tz"])
+        attribute.setInvertMirror(self.hand_ik_ctl, ["tx"])
+        attribute.lockAttribute(self.hand_ik_ctl, ["rx", "ry", "rz", "sx", "sy", "sz", "v"])
+
+        self.handIkRot_npo = primitive.addTransform(self.hand_ik_ctl, self.getName("handIkRot_npo"), hand_t)
+        self.handIkRot_ctl = self.addCtl(
+            self.handIkRot_npo,
+            "handIkRot_ctl",
+            hand_t,
+            self.color_fk,
+            "cube",
+            w=self.size * 0.16,
+            h=self.size * 0.08,
+            d=max(self.length2, self.size * 0.1) * 0.16,
+            tp=self.hand_ik_ctl,
+        )
+        attribute.setRotOrder(self.handIkRot_ctl, "XZY")
+        attribute.setKeyableAttributes(self.handIkRot_ctl, ["rx", "ry", "rz"])
+        attribute.setInvertMirror(self.handIkRot_ctl, ["ry", "rz"])
+        attribute.lockAttribute(self.handIkRot_ctl, ["tx", "ty", "tz", "sx", "sy", "sz", "v"])
 
         self.hand_ik_ref = primitive.addTransform(
-            self.hand_ik_ctl, self.getName("hand_ik_ref"), transform.getTransform(self.hand_ik_ctl)
+            self.handIkRot_ctl, self.getName("hand_ik_ref"), transform.getTransform(self.handIkRot_ctl)
         )
         self.hand_roll_ref = primitive.addTransform(
-            self.hand_ik_ref, self.getName("hand_roll_ref"), transform.getTransform(self.hand_ik_ctl)
+            self.hand_ik_ref, self.getName("hand_roll_ref"), transform.getTransform(self.handIkRot_ctl)
         )
         self.fk_ref = primitive.addTransform(
-            self.fk_ctl[2], self.getName("fk_ref"), transform.getTransform(self.hand_ik_ctl)
+            self.fk_ctl[2], self.getName("fk_ref"), transform.getTransform(self.handIkRot_ctl)
         )
 
         # Twist references and deformation drivers.
@@ -544,6 +561,9 @@ class Component(component.Main):
 
         self.match_ik = self._add_match_ref_from(self.ik_ctl, self.wingBones[2], self.root, "ik_mth")
         self.match_hand_ik = self._add_match_ref_from(self.hand_ik_ctl, self.wingBones[3], self.root, "handIk_mth")
+        self.match_hand_ik_rot = self._add_match_ref_from(
+            self.handIkRot_ctl, self.wingBones[3], self.root, "handIkRot_mth"
+        )
         self.match_ikUpv = self.add_match_ref(self.upv_ctl, self.fk0_ctl, "upv_mth")
 
         self.line_ref = icon.connection_display_curve(self.getName("visalRef"), [self.upv_ctl, self.elbow_ctl])
@@ -613,11 +633,19 @@ class Component(component.Main):
                     self.roundnessElbow_att,
                     self.roundnessWrist_att,
                 ],
-                [self.fk0_ctl, self.fk1_ctl, self.fk2_ctl, self.ik_ctl, self.hand_ik_ctl, self.upv_ctl],
+                [
+                    self.fk0_ctl,
+                    self.fk1_ctl,
+                    self.fk2_ctl,
+                    self.ik_ctl,
+                    self.hand_ik_ctl,
+                    self.handIkRot_ctl,
+                    self.upv_ctl,
+                ],
             )
             attribute.addProxyAttribute(
                 [self.roll_att, self.handRoll_att, self.wristControlMode_att],
-                [self.ik_ctl, self.ikRot_ctl, self.hand_ik_ctl, self.upv_ctl],
+                [self.ik_ctl, self.ikRot_ctl, self.hand_ik_ctl, self.handIkRot_ctl, self.upv_ctl],
             )
 
         self.division_percents = self._get_division_percents()
@@ -718,6 +746,16 @@ class Component(component.Main):
         )
         self._connect_enum_condition(self.wristControlMode_att, 0, hand_parent_cns + ".target[0].targetWeight")
         self._connect_enum_condition(self.wristControlMode_att, 1, hand_parent_cns + ".target[1].targetWeight")
+
+    def _connect_hand_ik_rot_mode(self) -> None:
+        hand_ik_rot_cns = pm.orientConstraint(
+            self.hand_ik_ctl,
+            self.handChain[0],
+            self.handIkRot_npo,
+            maintainOffset=False,
+        )
+        self._connect_enum_condition(self.wristControlMode_att, 0, hand_ik_rot_cns + ".target[0].targetWeight")
+        self._connect_enum_condition(self.wristControlMode_att, 1, hand_ik_rot_cns + ".target[1].targetWeight")
 
     def _connect_hand_ik_cns_offset(self) -> None:
         down, _, up = yu.findPathAtoB(self.ik_ctl, self.ikRot_ctl)
@@ -866,7 +904,15 @@ class Component(component.Main):
         for ctrl in self.fk_ctl:
             for shp in ctrl.getShapes():
                 pm.connectAttr(fkvis_node + ".outputX", shp.attr("visibility"))
-        for ctrl in [self.ik_ctl, self.ikRot_ctl, self.hand_ik_ctl, self.upv_ctl, self.line_ref, self.hand_line_ref]:
+        for ctrl in [
+            self.ik_ctl,
+            self.ikRot_ctl,
+            self.hand_ik_ctl,
+            self.handIkRot_ctl,
+            self.upv_ctl,
+            self.line_ref,
+            self.hand_line_ref,
+        ]:
             for shp in ctrl.getShapes():
                 pm.connectAttr(self.blend_att, shp.attr("visibility"))
 
@@ -880,6 +926,7 @@ class Component(component.Main):
             pm.parentConstraint(wing_bone, match_off, mo=False)
         pm.parentConstraint(self.wingBones[2], self.match_ik, mo=True)
         pm.parentConstraint(self.wingBones[3], self.match_hand_ik, mo=True)
+        pm.parentConstraint(self.wingBones[3], self.match_hand_ik_rot, mo=True)
 
     def _offset_ik_ctl_for_initial_soft_ik(self) -> None:
         soft_ik_range = float(self._softIKRange_initial_value)
@@ -925,6 +972,7 @@ class Component(component.Main):
         self._connect_upv_ref_operator()
         self._connect_ik_handles()
         self._connect_hand_parent_mode()
+        self._connect_hand_ik_rot_mode()
         self._connect_hand_ik_cns_offset()
         self._connect_twist_and_aim()
         self._connect_soft_ik_and_stretch(multJnt1_node, multJnt2_node)

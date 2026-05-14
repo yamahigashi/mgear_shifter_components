@@ -1,5 +1,6 @@
 """Controller helpers for ymt_birdwing_3jnt_01."""
 
+import math
 import traceback
 from typing import Any, ClassVar, Optional, cast
 
@@ -22,7 +23,7 @@ from ymt_shifter_utility.type_protocols import PymelNode, SettablePlug, VectorLi
 QtGui, QtCore, QtWidgets, wrapInstance = gqt.qt_import()
 
 Matrix = list[float]
-TransferFrameData = tuple[Matrix, list[float], Matrix]
+TransferFrameData = tuple[Matrix, list[float], list[float], Matrix]
 
 
 class ikfkMatchAllButton(AbstractControllerButton):
@@ -40,6 +41,7 @@ class ikfkMatchAllButton(AbstractControllerButton):
             self.lookupControllers()
             self.hand_ik = self.ik.replace("_ik_", "_hand_ik_")
             self.ik_rot = self.ik.replace("_ik_", "_ikRot_")
+            self.hand_ik_rot = self.ik.replace("_ik_", "_handIkRot_")
 
         if event.button() == QtCore.Qt.RightButton:
             IkFkTransfer.showUI(
@@ -51,6 +53,7 @@ class ikfkMatchAllButton(AbstractControllerButton):
                 self.upv,
                 self.hand_ik,
                 self.ik_rot,
+                self.hand_ik_rot,
             )
             return
 
@@ -63,6 +66,7 @@ class ikfkMatchAllButton(AbstractControllerButton):
             self.upv,
             self.hand_ik,
             self.ik_rot,
+            self.hand_ik_rot,
         )
 
 
@@ -73,7 +77,7 @@ class ikfkMatchButton(ikfkMatchAllButton):
 class IkFkTransfer(syn_uti.IkFkTransfer):
     """Small transfer wrapper for the wing-specific control set."""
 
-    def setCtrls(self, fks: list[str], ik: str, upv: str, hand_ik: str, ik_rot: str) -> None:
+    def setCtrls(self, fks: list[str], ik: str, upv: str, hand_ik: str, ik_rot: str, hand_ik_rot: str) -> None:
         self.fkCtrls = [self._getNode(x) for x in fks]
         self.fkTargets = [self._getMth(x) for x in fks]
         self.ikCtrl = self._getNode(ik)
@@ -83,6 +87,8 @@ class IkFkTransfer(syn_uti.IkFkTransfer):
         self.handIkCtrl = self._getNode(hand_ik)
         self.handIkTarget = self._getNode(hand_ik.replace("_hand_ik_ctl", "_handIk_mth"))
         self.ikRotCtrl = self._getNode(ik_rot)
+        self.handIkRotCtrl = self._getNode(hand_ik_rot)
+        self.handIkRotTarget = self._getNode(hand_ik_rot.replace("_handIkRot_ctl", "_handIkRot_mth"))
 
     def transfer(
         self,
@@ -97,6 +103,7 @@ class IkFkTransfer(syn_uti.IkFkTransfer):
             val_src_nodes = self.fkTargets
             key_src_nodes = [self.ikCtrl, self.upvCtrl, self.handIkCtrl]
             key_src_nodes.append(self.ikRotCtrl)
+            key_src_nodes.append(self.handIkRotCtrl)
             key_dst_nodes = self.fkCtrls
             self.bakeAnimation(
                 self.getChangeAttrName(),
@@ -112,7 +119,7 @@ class IkFkTransfer(syn_uti.IkFkTransfer):
         self._transfer_to_ik(startFrame, endFrame, onlyKeyframes)
 
     def _get_transfer_to_ik_dst_nodes(self) -> list[PymelNode]:
-        return [self.ikCtrl, self.upvCtrl, self.handIkCtrl, self.ikRotCtrl]
+        return [self.ikCtrl, self.upvCtrl, self.handIkCtrl, self.ikRotCtrl, self.handIkRotCtrl]
 
     def _collect_transfer_to_ik_data(
         self, startFrame: int, endFrame: int, onlyKeyframes: bool
@@ -130,7 +137,8 @@ class IkFkTransfer(syn_uti.IkFkTransfer):
                 (
                     getMatrix(self.ikTarget),
                     _calculate_effective_upv_translate(self.upvCtrl, self.fkTargets),
-                    getMatrix(self.handIkTarget),
+                    getTranslation(self.handIkTarget),
+                    getMatrix(self.handIkRotTarget),
                 )
             )
         return frame_data
@@ -159,11 +167,13 @@ class IkFkTransfer(syn_uti.IkFkTransfer):
         data: TransferFrameData,
     ) -> None:
         self.changeAttrToBoundValue()
-        ik_matrix, upv_translate, hand_ik_matrix = data
+        ik_matrix, upv_translate, hand_ik_translate, hand_ik_rot_matrix = data
         setMatrix(self.ikCtrl, ik_matrix)
         _set_upv_translate(self.upvCtrl, upv_translate)
         _reset_attrs(self.ikRotCtrl, ["rx", "ry", "rz"])
-        setMatrix(self.handIkCtrl, hand_ik_matrix)
+        setTranslation(self.handIkCtrl, hand_ik_translate)
+        _reset_attrs(self.handIkCtrl, ["rx", "ry", "rz"])
+        setRotationFromMatrix(self.handIkRotCtrl, hand_ik_rot_matrix)
         _set_attrs_zero(roll_attrs)
         pm.setKeyframe(key_dst_nodes, at=channels)
         pm.setKeyframe(switch_attr_name)
@@ -197,6 +207,7 @@ class IkFkTransfer(syn_uti.IkFkTransfer):
         upv: str,
         hand_ik: str,
         ik_rot: str,
+        hand_ik_rot: str,
     ) -> None:
         try:
             for child in gqt.maya_main_window().children():
@@ -210,7 +221,7 @@ class IkFkTransfer(syn_uti.IkFkTransfer):
             ui.setModel(model)
             ui.setUiHost(uihost)
             ui.setSwitchedAttrShortName(ikfk_attr)
-            ui.setCtrls(fks, ik, upv, hand_ik, ik_rot)
+            ui.setCtrls(fks, ik, upv, hand_ik, ik_rot, hand_ik_rot)
             ui.setComboObj(None)
             ui.setComboBoxItemsFormList(["IK", "FK"])
             ui.createUI(gqt.maya_main_window())
@@ -229,6 +240,7 @@ class IkFkTransfer(syn_uti.IkFkTransfer):
         upv: str,
         hand_ik: str,
         ik_rot: str,
+        hand_ik_rot: str,
         startFrame: Optional[int] = None,
         endFrame: Optional[int] = None,
         onlyKeyframes: Optional[bool] = None,
@@ -247,7 +259,7 @@ class IkFkTransfer(syn_uti.IkFkTransfer):
         ui.setModel(model)
         ui.setUiHost(uihost)
         ui.setSwitchedAttrShortName(ikfk_attr)
-        ui.setCtrls(fks, ik, upv, hand_ik, ik_rot)
+        ui.setCtrls(fks, ik, upv, hand_ik, ik_rot, hand_ik_rot)
         ui.setComboObj(None)
         ui.setComboBoxItemsFormList(["IK", "FK"])
         ui.getValue = lambda: 0.0 if "fk" in switchTo.lower() else 1.0
@@ -263,10 +275,13 @@ class IkFkTransfer(syn_uti.IkFkTransfer):
         upv: str,
         hand_ik: str,
         ik_rot: str,
+        hand_ik_rot: str,
         **kwargs: Any,
     ) -> None:
         kwargs.update({"switchTo": "ik"})
-        IkFkTransfer.execute(model, ikfk_attr, uihost, fks, ik, upv, hand_ik, ik_rot=ik_rot, **kwargs)
+        IkFkTransfer.execute(
+            model, ikfk_attr, uihost, fks, ik, upv, hand_ik, ik_rot=ik_rot, hand_ik_rot=hand_ik_rot, **kwargs
+        )
 
     @staticmethod
     def toFK(
@@ -278,10 +293,13 @@ class IkFkTransfer(syn_uti.IkFkTransfer):
         upv: str,
         hand_ik: str,
         ik_rot: str,
+        hand_ik_rot: str,
         **kwargs: Any,
     ) -> None:
         kwargs.update({"switchTo": "fk"})
-        IkFkTransfer.execute(model, ikfk_attr, uihost, fks, ik, upv, hand_ik, ik_rot=ik_rot, **kwargs)
+        IkFkTransfer.execute(
+            model, ikfk_attr, uihost, fks, ik, upv, hand_ik, ik_rot=ik_rot, hand_ik_rot=hand_ik_rot, **kwargs
+        )
 
 
 def getMatrix(obj: PymelNode) -> Matrix:
@@ -290,6 +308,23 @@ def getMatrix(obj: PymelNode) -> Matrix:
 
 def setMatrix(obj: PymelNode, mat: Matrix) -> None:
     cmds.xform(obj.name(), ws=True, matrix=mat)
+
+
+def getTranslation(obj: PymelNode) -> list[float]:
+    return cmds.xform(obj.name(), q=True, ws=True, translation=True)
+
+
+def setTranslation(obj: PymelNode, values: list[float]) -> None:
+    cmds.xform(obj.name(), ws=True, translation=values)
+
+
+def setRotationFromMatrix(obj: PymelNode, mat: Matrix) -> None:
+    rotation = om2.MTransformationMatrix(om2.MMatrix(mat)).rotation()
+    cmds.xform(
+        obj.name(),
+        ws=True,
+        rotation=[math.degrees(rotation.x), math.degrees(rotation.y), math.degrees(rotation.z)],
+    )
 
 
 def _set_upv_translate(upv_ctrl: PymelNode, values: list[float]) -> None:
@@ -333,6 +368,12 @@ def _get_node(namespace: str, name: str) -> PymelNode:
 
 
 def _get_mth(namespace: str, name: str) -> PymelNode:
+    if "_handIkRot_ctl" in name:
+        query = name.replace("_handIkRot_ctl", "_handIkRot_mth")
+        node = _get_node(namespace, query)
+        if node:
+            return node
+
     if "_hand_ik_ctl" in name:
         query = name.replace("_hand_ik_ctl", "_handIk_mth")
         node = _get_node(namespace, query)
@@ -434,15 +475,20 @@ def _match_to_ik(
     hand_ik_ctrl: PymelNode,
     hand_ik_goal: PymelNode,
     ik_rot_ctrl: PymelNode,
+    hand_ik_rot_ctrl: PymelNode,
+    hand_ik_rot_goal: PymelNode,
 ) -> None:
     ik_mat = getMatrix(ik_goal)
-    hand_mat = getMatrix(hand_ik_goal)
+    hand_translate = getTranslation(hand_ik_goal)
+    hand_rot_mat = getMatrix(hand_ik_rot_goal)
     upv_translate = _calculate_effective_upv_translate(upv_ctrl, fk_goals)
     root_mat = getMatrix(fk_goals[0])
     ui_node.attr(ikfk_attr).set(1.0)
     setMatrix(ik_ctrl, ik_mat)
     _reset_attrs(ik_rot_ctrl, ["rx", "ry", "rz"])
-    setMatrix(hand_ik_ctrl, hand_mat)
+    setTranslation(hand_ik_ctrl, hand_translate)
+    _reset_attrs(hand_ik_ctrl, ["rx", "ry", "rz"])
+    setRotationFromMatrix(hand_ik_rot_ctrl, hand_rot_mat)
     _set_upv_translate(upv_ctrl, upv_translate)
     for _ in range(10):
         cmds.xform(fk_ctrls[0].name(), ws=True, matrix=root_mat)
@@ -461,6 +507,7 @@ def ikFkMatch(
     upv: str,
     hand_ik: str,
     ik_rot: str,
+    hand_ik_rot: str,
     key: Optional[bool] = None,
 ) -> None:
     """Switch IK/FK while matching the visible controls."""
@@ -476,12 +523,15 @@ def ikFkMatch(
     hand_ik_ctrl = _get_node(namespace, hand_ik)
     hand_ik_goal = _get_mth(namespace, hand_ik)
     ik_rot_ctrl = _get_node(namespace, ik_rot)
+    hand_ik_rot_ctrl = _get_node(namespace, hand_ik_rot)
+    hand_ik_rot_goal = _get_mth(namespace, hand_ik_rot)
     ui_node = _get_node(namespace, ui_host)
     blend_attr = ui_node.attr(ikfk_attr)
 
     all_controls = [*list(fk_ctrls), ik_ctrl, upv_ctrl, ui_node]
     all_controls.append(ik_rot_ctrl)
     all_controls.append(hand_ik_ctrl)
+    all_controls.append(hand_ik_rot_ctrl)
     if key:
         _key_controls(all_controls, cmds.currentTime(query=True) - 1.0)
 
@@ -500,6 +550,8 @@ def ikFkMatch(
             hand_ik_ctrl,
             hand_ik_goal,
             ik_rot_ctrl,
+            hand_ik_rot_ctrl,
+            hand_ik_rot_goal,
         )
 
     if key:

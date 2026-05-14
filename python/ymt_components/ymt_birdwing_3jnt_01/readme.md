@@ -13,6 +13,7 @@ The component provides:
   not from a free guide locator.
 - IK B: a wrist to hand IK target with hand roll.
 - IK rotation control at the wrist rotates the hand IK target around the wrist in both wrist control modes.
+- A second hand IK rotation control under the hand IK target owns the final hand bone orientation.
 - Wrist Control Mode for the hand IK target: `IK` keeps the legacy main IK rotation parent,
   while `Chain` follows the solved upper/lower wing extension from the up-vector instead.
   Its initial value can be set from the guide settings.
