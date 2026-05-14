@@ -312,7 +312,7 @@ class Component(component.Main):
             elif previous_spec is not None:
                 matrices[key] = self._detail_chain_matrix(previous_spec["position"], spec["position"], spec["position"])
             else:
-                matrices[key] = self._detail_span_matrix(spec)
+                matrices[key] = self._single_detail_chain_matrix(spec)
         return matrices
 
     def _detail_specs_by_key(self, specs: list[DetailSpec]) -> dict[tuple[str, int, int], DetailSpec]:
@@ -339,11 +339,17 @@ class Component(component.Main):
         )
         return transform.setMatrixPosition(matrix, position)
 
-    def _detail_span_matrix(self, spec: DetailSpec) -> MatrixLike:
+    def _single_detail_chain_matrix(self, spec: DetailSpec) -> MatrixLike:
         span = min(int(spec["span"]), len(self.anchor_segment_lengths) - 1)
-        start = spec["position"]
-        end = start + (self.anchor_positions[span + 1] - self.anchor_positions[span]).normal()
-        return self._detail_chain_matrix(start, end)
+        local = float(spec["local"])
+        start = self._position_from_span_local(span, local)
+        end = self._position_from_anchor_end_span_local(span, local)
+        if vector.getDistance(start, end) < 0.001:
+            raise RuntimeError(
+                "ymt_feather_ribbon_01 requires non-zero lower edge depth length for detail chain: %s."
+                % self._detail_name(spec)
+            )
+        return self._detail_chain_matrix(start, end, spec["position"])
 
     def _add_surface(self) -> None:
         surface_u_values = self._surface_u_values()
