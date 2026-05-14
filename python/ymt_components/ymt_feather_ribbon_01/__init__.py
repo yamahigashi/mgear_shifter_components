@@ -83,10 +83,10 @@ class Component(component.Main):
         self.row_names = self._parse_row_names(self.settings["rowNames"])
         self.row_counts = self._parse_row_counts(self.settings["rowCounts"], self.row_names)
         self.row_u_ranges = self._parse_row_u_ranges(self.settings["rowURanges"], self.row_names)
-        if "lowerEdgeDepths" not in self.settings:
-            raise RuntimeError("ymt_feather_ribbon_01 requires the lowerEdgeDepths setting.")
-        self.lower_edge_depth_profiles = self._parse_lower_edge_depth_profiles(
-            self.settings["lowerEdgeDepths"],
+        if "detailColumnDepths" not in self.settings:
+            raise RuntimeError("ymt_feather_ribbon_01 requires the detailColumnDepths setting.")
+        self.detail_column_depths_by_row = self._parse_detail_column_depths_by_row(
+            self.settings["detailColumnDepths"],
             self.row_names,
         )
         self.anchor_positions = self._get_anchor_positions()
@@ -95,8 +95,8 @@ class Component(component.Main):
         self.anchor_total_length = sum(self.anchor_segment_lengths)
         self.span_axis = self._get_parent_span_axis()
         self.wing_normal = self._get_parent_blade_normal()
-        self.anchor_control_depth_segments = self._collect_anchor_control_depth_segments()
-        self.anchor_control_depth_centers = self._collect_anchor_control_depth_centers()
+        self.depth_segments = self._collect_depth_segments()
+        self.depth_segment_centers = self._collect_depth_segment_centers()
         self.surface_depths = self._collect_surface_depths()
 
         self.driver_root = primitive.addTransform(self.root, self.getName("drivers"), transform.getTransform(self.root))
@@ -184,7 +184,7 @@ class Component(component.Main):
             tag_parent = self.parentCtlTag
             anchor_npos = []
             anchor_ctls = []
-            for layer_index, (start_depth, end_depth) in enumerate(self.anchor_control_depth_segments):
+            for layer_index, (start_depth, end_depth) in enumerate(self.depth_segments):
                 start_position = self._anchor_position_from_depth(anchor_index, start_depth)
                 end_position = self._anchor_position_from_depth(anchor_index, end_depth)
                 matrix = self._anchor_control_matrix(start_position, end_position)
@@ -346,7 +346,7 @@ class Component(component.Main):
         end = self._position_from_anchor_end_span_local(span, local)
         if vector.getDistance(start, end) < 0.001:
             raise RuntimeError(
-                "ymt_feather_ribbon_01 requires non-zero lower edge depth length for detail chain: %s."
+                "ymt_feather_ribbon_01 requires non-zero detail column depth length for detail chain: %s."
                 % self._detail_name(spec)
             )
         return self._detail_chain_matrix(start, end, spec["position"])
@@ -626,9 +626,9 @@ class Component(component.Main):
         return [(start_anchor, 1.0 - local), (end_anchor, local)]
 
     def _anchor_layer_weight_entries_for_depth(self, depth: float) -> list[tuple[int, float]]:
-        centers = self.anchor_control_depth_centers
+        centers = self.depth_segment_centers
         if not centers:
-            raise RuntimeError("ymt_feather_ribbon_01 requires at least one anchor control depth center.")
+            raise RuntimeError("ymt_feather_ribbon_01 requires at least one depth segment center.")
         if len(centers) == 1 or depth <= centers[0]:
             return [(0, 1.0)]
         if depth >= centers[-1]:
@@ -1001,7 +1001,7 @@ class Component(component.Main):
             for section in range(section_count):
                 ratio = (section + 0.5) / max(section_count, 1)
                 u = u_start + ((u_end - u_start) * ratio)
-                for col, depth in enumerate(self.lower_edge_depth_profiles[row_index]):
+                for col, depth in enumerate(self.detail_column_depths_by_row[row_index]):
                     position = self._position_from_u_and_depth(u, depth)
                     spec = self._detail_spec(
                         row_name,
@@ -1026,7 +1026,7 @@ class Component(component.Main):
             position = self._to_vector(transform.getPositionFromMatrix(matrix))
             span, local, base_position = self._closest_span_local_from_position(position)
             end_position = self._position_from_anchor_end_span_local(span, local)
-            depth = self._depth_from_position(position, base_position, end_position)
+            depth = self._depth_from_position_in_anchor_depth_space(position, base_position, end_position)
             u = self._u_from_span_local(span, local)
             v = self._v_from_row_name(row)
             specs.append(
@@ -1114,28 +1114,28 @@ class Component(component.Main):
             raise RuntimeError("ymt_feather_ribbon_01 requires one anchor end locator per anchor.")
         return positions
 
-    def _collect_anchor_control_depth_segments(self) -> list[tuple[float, float]]:
-        lower_depths = {depth for profile in self.lower_edge_depth_profiles for depth in profile}
-        if not lower_depths:
-            raise RuntimeError("ymt_feather_ribbon_01 requires at least one lower edge depth.")
-        boundaries = sorted({0.0, 1.0}.union(lower_depths))
+    def _collect_depth_segments(self) -> list[tuple[float, float]]:
+        detail_column_depths = {depth for depths in self.detail_column_depths_by_row for depth in depths}
+        if not detail_column_depths:
+            raise RuntimeError("ymt_feather_ribbon_01 requires at least one detail column depth.")
+        boundaries = sorted({0.0, 1.0}.union(detail_column_depths))
         segments = [(start, end) for start, end in zip(boundaries[:-1], boundaries[1:]) if end - start > 0.001]
         if not segments:
-            raise RuntimeError("ymt_feather_ribbon_01 requires a non-zero lower edge depth range for anchor controls.")
+            raise RuntimeError("ymt_feather_ribbon_01 requires a non-zero detail column depth range.")
         return segments
 
     def _collect_surface_depths(self) -> list[float]:
-        if not self.anchor_control_depth_segments:
-            raise RuntimeError("ymt_feather_ribbon_01 ribbon surface requires at least one anchor control depth segment.")
+        if not self.depth_segments:
+            raise RuntimeError("ymt_feather_ribbon_01 ribbon surface requires at least one depth segment.")
         base_subdivisions = max(int(self.surface_segment_subdivisions), 1)
-        segment_widths = [end - start for start, end in self.anchor_control_depth_segments]
+        segment_widths = [end - start for start, end in self.depth_segments]
         average_width = sum(segment_widths) / float(len(segment_widths))
         target_step = average_width / float(base_subdivisions)
         if target_step <= 0.0:
             raise RuntimeError("ymt_feather_ribbon_01 ribbon surface requires non-zero anchor depth segment width.")
 
-        depths = [self.anchor_control_depth_segments[0][0]]
-        for start, end in self.anchor_control_depth_segments:
+        depths = [self.depth_segments[0][0]]
+        for start, end in self.depth_segments:
             subdivisions = max(1, math.ceil((end - start) / target_step))
             for step in range(1, subdivisions + 1):
                 ratio = step / float(subdivisions)
@@ -1144,27 +1144,29 @@ class Component(component.Main):
             raise RuntimeError("ymt_feather_ribbon_01 ribbon surface requires at least two V depth rows.")
         return depths
 
-    def _collect_anchor_control_depth_centers(self) -> list[float]:
-        if not self.anchor_control_depth_segments:
-            raise RuntimeError("ymt_feather_ribbon_01 requires at least one anchor control depth segment.")
-        return [(start + end) * 0.5 for start, end in self.anchor_control_depth_segments]
+    def _collect_depth_segment_centers(self) -> list[float]:
+        if not self.depth_segments:
+            raise RuntimeError("ymt_feather_ribbon_01 requires at least one depth segment.")
+        return [(start + end) * 0.5 for start, end in self.depth_segments]
 
     def _anchor_layer_from_depth(self, depth: float) -> int:
-        if not self.anchor_control_depth_segments:
-            raise RuntimeError("ymt_feather_ribbon_01 requires at least one anchor control depth segment.")
-        for index, (start, end) in enumerate(self.anchor_control_depth_segments):
+        if not self.depth_segments:
+            raise RuntimeError("ymt_feather_ribbon_01 requires at least one depth segment.")
+        for index, (start, end) in enumerate(self.depth_segments):
             if start <= depth <= end:
                 return index
-        if depth < self.anchor_control_depth_segments[0][0]:
+        if depth < self.depth_segments[0][0]:
             return 0
-        return len(self.anchor_control_depth_segments) - 1
+        return len(self.depth_segments) - 1
 
-    def _depth_from_position(
+    def _depth_from_position_in_anchor_depth_space(
         self,
         position: VectorLike,
         base_position: VectorLike,
         end_position: VectorLike,
     ) -> float:
+        # Depth values are measured in the anchor -> anchorEnd basis.
+        # 0.0 is the anchor line, and 1.0 is the anchorEnd reference line.
         depth_axis = end_position - base_position
         length_squared = depth_axis * depth_axis
         if length_squared < 0.000001:
@@ -1172,7 +1174,7 @@ class Component(component.Main):
         depth = ((position - base_position) * depth_axis) / length_squared
         if not -0.001 <= depth <= 1.001:
             raise RuntimeError(
-                "ymt_feather_ribbon_01 detail guide is outside the lowerEdgeDepths 0-1 range: %.3f." % depth
+                "ymt_feather_ribbon_01 detail guide is outside the anchor -> anchorEnd depth range: %.3f." % depth
             )
         return max(0.0, min(1.0, depth))
 
@@ -1188,8 +1190,9 @@ class Component(component.Main):
         )
 
     def _anchor_position_from_depth(self, anchor_index: int, depth: float) -> VectorLike:
+        # detailColumnDepths uses this same anchor -> anchorEnd basis.
         if not 0.0 <= depth <= 1.0:
-            raise RuntimeError("ymt_feather_ribbon_01 lower edge depth must be between 0 and 1: %.3f." % depth)
+            raise RuntimeError("ymt_feather_ribbon_01 detail column depth must be between 0 and 1: %.3f." % depth)
         base_position = self.anchor_positions[anchor_index]
         end_position = self.anchor_end_positions[anchor_index]
         return base_position + ((end_position - base_position) * depth)
@@ -1392,5 +1395,5 @@ class Component(component.Main):
     def _parse_row_u_ranges(self, value: str, row_names: list[str]) -> list[tuple[float, float]]:
         return detail_config.parse_row_u_ranges(value, row_names)
 
-    def _parse_lower_edge_depth_profiles(self, value: str, row_names: list[str]) -> list[list[float]]:
-        return detail_config.parse_lower_edge_depth_profiles(value, row_names)
+    def _parse_detail_column_depths_by_row(self, value: str, row_names: list[str]) -> list[list[float]]:
+        return detail_config.parse_detail_column_depths_by_row(value, row_names)

@@ -82,8 +82,8 @@ class Guide(guide.ComponentGuide):
         self.pRowNames = self.addParam("rowNames", "string", "primary,secondary,tertial")
         self.pRowCounts = self.addParam("rowCounts", "string", "10,13,3")
         self.pRowURanges = self.addParam("rowURanges", "string", "0.55:1.0,0.1:0.85,0.0:0.25")
-        self.pLowerEdgeDepths = self.addParam(
-            "lowerEdgeDepths",
+        self.pDetailColumnDepths = self.addParam(
+            "detailColumnDepths",
             "string",
             "primary: 0.2\nsecondary: 0.375\ntertial: 0.55",
         )
@@ -219,12 +219,12 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
         table.blockSignals(True)
         table.setRowCount(0)
         try:
-            row_names, row_counts, row_u_ranges, lower_edge_depth_profiles = self._detail_settings_from_root()
+            row_names, row_counts, row_u_ranges, detail_column_depths_by_row = self._detail_settings_from_root()
         except RuntimeError as exc:
             pm.displayWarning(str(exc))
             table.blockSignals(False)
             return
-        for row_name, count, u_range, depths in zip(row_names, row_counts, row_u_ranges, lower_edge_depth_profiles):
+        for row_name, count, u_range, depths in zip(row_names, row_counts, row_u_ranges, detail_column_depths_by_row):
             self._append_row_table_item(row_name, count, u_range[0], u_range[1], depths)
         table.blockSignals(False)
 
@@ -268,7 +268,7 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
 
     def update_row_table_settings(self, *_args: object) -> None:
         try:
-            row_names, row_counts, row_u_ranges, lower_edge_depth_profiles = self._detail_settings_from_table()
+            row_names, row_counts, row_u_ranges, detail_column_depths_by_row = self._detail_settings_from_table()
         except RuntimeError as exc:
             pm.displayWarning(str(exc))
             return
@@ -280,27 +280,27 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
                 for u_start, u_end in row_u_ranges
             )
         )
-        self.root.attr("lowerEdgeDepths").set(
-            detail_config.format_lower_edge_depth_profiles(row_names, lower_edge_depth_profiles)
+        self.root.attr("detailColumnDepths").set(
+            detail_config.format_detail_column_depths_by_row(row_names, detail_column_depths_by_row)
         )
 
     def _detail_settings_from_root(self) -> tuple[list[str], list[int], list[tuple[float, float]], list[list[float]]]:
         row_names = detail_config.parse_row_names(self.root.attr("rowNames").get())
         row_counts = detail_config.parse_row_counts(self.root.attr("rowCounts").get(), row_names)
         row_u_ranges = detail_config.parse_row_u_ranges(self.root.attr("rowURanges").get(), row_names)
-        if not self.root.hasAttr("lowerEdgeDepths"):
-            raise RuntimeError("ymt_feather_ribbon_01 requires the lowerEdgeDepths setting.")
-        lower_edge_depth_profiles = detail_config.parse_lower_edge_depth_profiles(
-            self.root.attr("lowerEdgeDepths").get(), row_names
+        if not self.root.hasAttr("detailColumnDepths"):
+            raise RuntimeError("ymt_feather_ribbon_01 requires the detailColumnDepths setting.")
+        detail_column_depths_by_row = detail_config.parse_detail_column_depths_by_row(
+            self.root.attr("detailColumnDepths").get(), row_names
         )
-        return row_names, row_counts, row_u_ranges, lower_edge_depth_profiles
+        return row_names, row_counts, row_u_ranges, detail_column_depths_by_row
 
     def _detail_settings_from_table(self) -> tuple[list[str], list[int], list[tuple[float, float]], list[list[float]]]:
         table = self.settingsTab.rowTableWidget
         row_names = []
         row_counts = []
         row_u_ranges = []
-        lower_edge_depth_profiles = []
+        detail_column_depths_by_row = []
         for row in range(table.rowCount()):
             row_name = self._table_text(row, 0)
             if not row_name:
@@ -311,7 +311,7 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
                 row_u_ranges.append((float(self._table_text(row, 2)), float(self._table_text(row, 3))))
             except ValueError as exc:
                 raise RuntimeError("ymt_feather_ribbon_01 row table contains a non-numeric count or U range.") from exc
-            lower_edge_depth_profiles.append(detail_config.parse_depth_list(self._table_text(row, 4)))
+            detail_column_depths_by_row.append(detail_config.parse_detail_column_depth_list(self._table_text(row, 4)))
         row_names = detail_config.parse_row_names(",".join(row_names))
         detail_config.validate_detail_row_names(row_names)
         detail_config.parse_row_counts(",".join(str(count) for count in row_counts), row_names)
@@ -319,10 +319,10 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
             ",".join("%s:%s" % (u_start, u_end) for u_start, u_end in row_u_ranges),
             row_names,
         )
-        detail_config.parse_lower_edge_depth_profiles(
-            detail_config.format_lower_edge_depth_profiles(row_names, lower_edge_depth_profiles), row_names
+        detail_config.parse_detail_column_depths_by_row(
+            detail_config.format_detail_column_depths_by_row(row_names, detail_column_depths_by_row), row_names
         )
-        return row_names, row_counts, row_u_ranges, lower_edge_depth_profiles
+        return row_names, row_counts, row_u_ranges, detail_column_depths_by_row
 
     def _table_text(self, row: int, column: int) -> str:
         item = self.settingsTab.rowTableWidget.item(row, column)
@@ -332,7 +332,7 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
 
     def rebuild_detail_locators(self) -> None:
         try:
-            row_names, row_counts, row_u_ranges, lower_edge_depth_profiles = self._detail_settings_from_table()
+            row_names, row_counts, row_u_ranges, detail_column_depths_by_row = self._detail_settings_from_table()
             parent_root = self._find_parent_wing_root()
             anchor_positions = self._parent_anchor_positions(parent_root)
             anchor_end_positions = self._anchor_end_positions()
@@ -351,7 +351,7 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
                 span, local = self._span_local_from_u(anchor_positions, u)
                 base_position = self._position_from_span_local(anchor_positions, span, local)
                 end_position = self._position_from_span_local(anchor_end_positions, span, local)
-                for col, depth in enumerate(lower_edge_depth_profiles[row_index]):
+                for col, depth in enumerate(detail_column_depths_by_row[row_index]):
                     local_name = "%s_%d_%d_loc" % (row_name, section, col)
                     position = base_position + ((end_position - base_position) * depth)
                     created.append(self._create_detail_locator(local_name, position))

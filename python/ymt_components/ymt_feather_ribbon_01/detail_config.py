@@ -28,7 +28,9 @@ from typing import Optional
 #
 # Each row is a feather row such as primary/secondary/tertial. Section picks
 # which feather along the wing span, and col picks a part on that feather from
-# its root toward its tip. The number of col parts comes from lowerEdgeDepths.
+# its root toward its tip. The number of col parts comes from detailColumnDepths.
+# detailColumnDepths places cols on the anchor -> anchorEnd depth axis:
+# 0.0 is the anchor line, and 1.0 is the anchorEnd reference line.
 #
 # Feather view:
 #
@@ -124,62 +126,62 @@ def parse_row_u_ranges(value: str, row_names: list[str]) -> list[tuple[float, fl
     return ranges
 
 
-def parse_lower_edge_depth_profiles(value: str, row_names: list[str]) -> list[list[float]]:
+def parse_detail_column_depths_by_row(value: str, row_names: list[str]) -> list[list[float]]:
     if not value.strip():
-        raise RuntimeError("ymt_feather_ribbon_01 lowerEdgeDepths cannot be empty.")
+        raise RuntimeError("ymt_feather_ribbon_01 detailColumnDepths cannot be empty.")
 
-    named_profiles, unnamed_profiles = collect_lower_edge_depth_profiles(value)
-    validate_lower_edge_depth_profile_rows(named_profiles, unnamed_profiles, row_names)
+    named_depths_by_row, unnamed_depth_rows = collect_detail_column_depths_by_row(value)
+    validate_detail_column_depth_rows(named_depths_by_row, unnamed_depth_rows, row_names)
 
-    profiles = []
+    depths_by_row = []
     for index, row_name in enumerate(row_names):
-        if row_name in named_profiles:
-            profile = named_profiles[row_name]
-        elif index < len(unnamed_profiles):
-            profile = unnamed_profiles[index]
+        if row_name in named_depths_by_row:
+            depths = named_depths_by_row[row_name]
+        elif index < len(unnamed_depth_rows):
+            depths = unnamed_depth_rows[index]
         else:
-            raise RuntimeError("ymt_feather_ribbon_01 lowerEdgeDepths is missing a profile for row '%s'." % row_name)
-        profiles.append(profile)
-    return profiles
+            raise RuntimeError("ymt_feather_ribbon_01 detailColumnDepths is missing a depth row for '%s'." % row_name)
+        depths_by_row.append(depths)
+    return depths_by_row
 
 
-def collect_lower_edge_depth_profiles(value: str) -> tuple[dict[str, list[float]], list[list[float]]]:
-    named_profiles = {}
-    unnamed_profiles = []
-    for item in split_lower_edge_depth_profile_rows(value):
-        name, _, raw_profile = item.partition(":")
-        if raw_profile:
+def collect_detail_column_depths_by_row(value: str) -> tuple[dict[str, list[float]], list[list[float]]]:
+    named_depths_by_row = {}
+    unnamed_depth_rows = []
+    for item in split_detail_column_depth_rows(value):
+        name, _, raw_depths = item.partition(":")
+        if raw_depths:
             row_name = name.strip()
-            if row_name in named_profiles:
-                raise RuntimeError("ymt_feather_ribbon_01 lowerEdgeDepths row '%s' is duplicated." % row_name)
-            profile = parse_depth_list(raw_profile)
-            if not profile:
-                raise RuntimeError("ymt_feather_ribbon_01 lowerEdgeDepths row '%s' has no numeric values." % name)
-            named_profiles[row_name] = profile
+            if row_name in named_depths_by_row:
+                raise RuntimeError("ymt_feather_ribbon_01 detailColumnDepths row '%s' is duplicated." % row_name)
+            depths = parse_detail_column_depth_list(raw_depths)
+            if not depths:
+                raise RuntimeError("ymt_feather_ribbon_01 detailColumnDepths row '%s' has no numeric values." % name)
+            named_depths_by_row[row_name] = depths
         else:
-            profile = parse_depth_list(name)
-            if not profile:
-                raise RuntimeError("ymt_feather_ribbon_01 lowerEdgeDepths contains a row with no numeric values.")
-            unnamed_profiles.append(profile)
-    return named_profiles, unnamed_profiles
+            depths = parse_detail_column_depth_list(name)
+            if not depths:
+                raise RuntimeError("ymt_feather_ribbon_01 detailColumnDepths contains a row with no numeric values.")
+            unnamed_depth_rows.append(depths)
+    return named_depths_by_row, unnamed_depth_rows
 
 
-def validate_lower_edge_depth_profile_rows(
-    named_profiles: dict[str, list[float]],
-    unnamed_profiles: list[list[float]],
+def validate_detail_column_depth_rows(
+    named_depths_by_row: dict[str, list[float]],
+    unnamed_depth_rows: list[list[float]],
     row_names: list[str],
 ) -> None:
-    unknown_rows = sorted(set(named_profiles).difference(row_names))
+    unknown_rows = sorted(set(named_depths_by_row).difference(row_names))
     if unknown_rows:
-        raise RuntimeError("ymt_feather_ribbon_01 lowerEdgeDepths has unknown rows: %s." % ", ".join(unknown_rows))
-    if len(unnamed_profiles) > len(row_names):
+        raise RuntimeError("ymt_feather_ribbon_01 detailColumnDepths has unknown rows: %s." % ", ".join(unknown_rows))
+    if len(unnamed_depth_rows) > len(row_names):
         raise RuntimeError(
-            "ymt_feather_ribbon_01 lowerEdgeDepths has too many unnamed rows: %s for %s rowNames."
-            % (len(unnamed_profiles), len(row_names))
+            "ymt_feather_ribbon_01 detailColumnDepths has too many unnamed rows: %s for %s rowNames."
+            % (len(unnamed_depth_rows), len(row_names))
         )
 
 
-def split_lower_edge_depth_profile_rows(value: str) -> list[str]:
+def split_detail_column_depth_rows(value: str) -> list[str]:
     rows = []
     for line in value.replace(";", "\n").splitlines():
         item = line.strip()
@@ -188,25 +190,25 @@ def split_lower_edge_depth_profile_rows(value: str) -> list[str]:
     return rows
 
 
-def parse_depth_list(value: str) -> list[float]:
+def parse_detail_column_depth_list(value: str) -> list[float]:
     values = []
     for item in [part.strip() for part in value.split(",") if part.strip()]:
         try:
             parsed = float(item)
         except ValueError as exc:
             raise RuntimeError(
-                "ymt_feather_ribbon_01 lowerEdgeDepths contains a non-numeric value: %s." % item
+                "ymt_feather_ribbon_01 detailColumnDepths contains a non-numeric value: %s." % item
             ) from exc
         if not 0.0 <= parsed <= 1.0:
-            raise RuntimeError("ymt_feather_ribbon_01 lowerEdgeDepths values must be between 0 and 1: %s." % item)
+            raise RuntimeError("ymt_feather_ribbon_01 detailColumnDepths values must be between 0 and 1: %s." % item)
         values.append(parsed)
     return values
 
 
-def format_lower_edge_depth_profiles(row_names: list[str], profiles: list[list[float]]) -> str:
+def format_detail_column_depths_by_row(row_names: list[str], depths_by_row: list[list[float]]) -> str:
     rows = []
-    for row_name, profile in zip(row_names, profiles):
-        rows.append("%s: %s" % (row_name, ", ".join(format_float(value) for value in profile)))
+    for row_name, depths in zip(row_names, depths_by_row):
+        rows.append("%s: %s" % (row_name, ", ".join(format_float(value) for value in depths)))
     return "\n".join(rows)
 
 
