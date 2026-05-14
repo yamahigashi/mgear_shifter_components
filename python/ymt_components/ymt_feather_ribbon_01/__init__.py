@@ -253,11 +253,12 @@ class Component(component.Main):
 
     def _add_detail_controls(self) -> None:
         controls_by_feather_part: dict[tuple[str, int, int], PymelNode] = {}
+        matrices_by_feather_part = self._detail_chain_matrices(self.detail_specs)
         for spec in self.detail_specs:
             detail_name = self._detail_name(spec)
-            matrix = transform.getTransformFromPos(spec["position"])
             section = int(spec["section"])
             col = int(spec["col"])
+            matrix = matrices_by_feather_part[(str(spec["row"]), section, col)]
             if col == 0:
                 parent = self.detail_root
                 tag_parent = self.curl_ctls[min(spec["span"], len(self.curl_ctls) - 1)]
@@ -303,6 +304,51 @@ class Component(component.Main):
             self.detail_ctls.append(ctl)
             if self.settings["addJoints"]:
                 self.jnt_pos.append([ctl, detail_name])
+
+    def _detail_chain_matrices(self, specs: list[DetailSpec]) -> dict[tuple[str, int, int], MatrixLike]:
+        specs_by_key = self._detail_specs_by_key(specs)
+        matrices = {}
+        for key, spec in specs_by_key.items():
+            row, section, col = key
+            next_spec = specs_by_key.get((row, section, col + 1))
+            previous_spec = specs_by_key.get((row, section, col - 1))
+            if next_spec is not None:
+                matrices[key] = self._detail_chain_matrix(spec["position"], next_spec["position"])
+            elif previous_spec is not None:
+                matrices[key] = self._detail_chain_matrix(previous_spec["position"], spec["position"], spec["position"])
+            else:
+                matrices[key] = self._detail_span_matrix(spec)
+        return matrices
+
+    def _detail_specs_by_key(self, specs: list[DetailSpec]) -> dict[tuple[str, int, int], DetailSpec]:
+        return {
+            (str(spec["row"]), int(spec["section"]), int(spec["col"])): spec
+            for spec in specs
+        }
+
+    def _detail_chain_matrix(
+        self,
+        start_position: VectorLike,
+        end_position: VectorLike,
+        matrix_position: Optional[VectorLike] = None,  # noqa: UP045
+    ) -> MatrixLike:
+        position = matrix_position if matrix_position is not None else start_position
+        if vector.getDistance(start_position, end_position) < 0.001:
+            return transform.getTransformFromPos(position)
+        matrix = transform.getTransformLookingAt(
+            start_position,
+            end_position,
+            self.wing_normal,
+            axis="xy",
+            negate=False,
+        )
+        return transform.setMatrixPosition(matrix, position)
+
+    def _detail_span_matrix(self, spec: DetailSpec) -> MatrixLike:
+        span = min(int(spec["span"]), len(self.anchor_segment_lengths) - 1)
+        start = spec["position"]
+        end = start + (self.anchor_positions[span + 1] - self.anchor_positions[span]).normal()
+        return self._detail_chain_matrix(start, end)
 
     def _add_surface(self) -> None:
         surface_u_values = self._surface_u_values()
@@ -688,12 +734,23 @@ class Component(component.Main):
 
         for spec, npo in zip(self.detail_driver_specs, self.detail_driver_npos):
             entries = self._driver_entries_for_spec(spec)
-            anchor_decomposers = [
-                decomposers_by_anchor[anchor_index][spec["anchor_layer"]]
-                for anchor_index in range(len(self.anchor_names))
-            ]
-            compose = self._compose_weighted_rotation(entries, anchor_decomposers)
-            cmds.connectAttr(compose + ".outRotate", self._node_name(npo) + ".rotate", force=True)
+            layer_entries = self._anchor_layer_weight_entries_for_offset(spec["offset"])
+            compose = self._compose_weighted_rotation_sources(
+                [
+                    {
+                        "decomposer": decomposers_by_anchor[entry["index"]][layer_index],
+                        "weight": float(entry["weight"]) * layer_weight,
+                    }
+                    for entry in entries
+                    for layer_index, layer_weight in layer_entries
+                ]
+            )
+            rotate_attr = self._create_initial_offset_rotate_node(
+                npo,
+                compose + ".outRotate",
+                "%s_detailRotate" % self._detail_name(spec),
+            )
+            cmds.connectAttr(rotate_attr, self._node_name(npo) + ".rotate", force=True)
 
     def _connect_curl_aims(self) -> None:
         for spec, aim_npo in zip(self.detail_driver_specs, self.detail_aim_npos):
@@ -774,21 +831,6 @@ class Component(component.Main):
         ]
         return entries
 
-    def _compose_weighted_rotation(
-        self,
-        entries: list[DriverEntry],
-        anchor_decomposers: list[str],
-    ) -> str:
-        return self._compose_weighted_rotation_sources(
-            [
-                {
-                    "decomposer": anchor_decomposers[entry["index"]],
-                    "weight": float(entry["weight"]),
-                }
-                for entry in entries
-            ]
-        )
-
     def _compose_weighted_rotation_sources(
         self,
         sources: list[WeightedRotationSource],
@@ -821,6 +863,27 @@ class Component(component.Main):
         cmds.setAttr(node + ".rotateOrder", ROTATE_ORDER_XYZ)
         cmds.connectAttr(self._node_name(source) + ".rotate", node + ".rotate", force=True)
         return node
+
+    def _create_initial_offset_rotate_node(self, npo: PymelNode, driver_rotate_attr: str, name: str) -> str:
+        npo_name = self._node_name(npo)
+        initial_rotate = cmds.getAttr(npo_name + ".rotate")[0]
+
+        initial_compose = cmds.createNode("composeMatrix", name=self.getName(name + "_initial_cm"))
+        cmds.setAttr(initial_compose + ".inputRotate", *initial_rotate)
+        cmds.setAttr(initial_compose + ".inputRotateOrder", ROTATE_ORDER_XYZ)
+
+        driver_compose = cmds.createNode("composeMatrix", name=self.getName(name + "_driver_cm"))
+        cmds.connectAttr(driver_rotate_attr, driver_compose + ".inputRotate", force=True)
+        cmds.setAttr(driver_compose + ".inputRotateOrder", ROTATE_ORDER_XYZ)
+
+        mult = cmds.createNode("multMatrix", name=self.getName(name + "_mm"))
+        cmds.connectAttr(driver_compose + ".outputMatrix", mult + ".matrixIn[0]", force=True)
+        cmds.connectAttr(initial_compose + ".outputMatrix", mult + ".matrixIn[1]", force=True)
+
+        decompose = cmds.createNode("decomposeMatrix", name=self.getName(name + "_dm"))
+        cmds.connectAttr(mult + ".matrixSum", decompose + ".inputMatrix", force=True)
+        cmds.setAttr(decompose + ".inputRotateOrder", ROTATE_ORDER_XYZ)
+        return decompose + ".outputRotate"
 
     def _multiply_node_type(self) -> str:
         if int(cmds.about(apiVersion=True)) >= MAYA_2025_API_VERSION:
