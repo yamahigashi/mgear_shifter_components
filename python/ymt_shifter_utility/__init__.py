@@ -51,6 +51,82 @@ from logging import (
 logger = getLogger(__name__)
 logger.setLevel(INFO)
 
+
+def get_normalized_direction(start_pos: VectorLike, end_pos: VectorLike, label: str) -> dt.Vector:
+    direction = dt.Vector(end_pos) - dt.Vector(start_pos)
+    if direction.length() <= 0.000001:
+        raise ValueError("{} positions must not overlap.".format(label))
+    direction.normalize()
+    return direction
+
+
+def project_direction_to_axis_plane(direction: VectorLike, axis: VectorLike, label: str) -> dt.Vector:
+    axis_dir = dt.Vector(axis)
+    if axis_dir.length() <= 0.000001:
+        raise ValueError("{} axis must not be zero length.".format(label))
+    axis_dir.normalize()
+
+    direction = dt.Vector(direction)
+    projected = direction - (axis_dir * (direction * axis_dir))
+    if projected.length() <= 0.000001:
+        raise ValueError("{} direction must not be parallel to the chain axis.".format(label))
+    projected.normalize()
+    return projected
+
+
+def get_chain_normal_from_bend_direction(axis: VectorLike, bend_direction: VectorLike, label: str) -> dt.Vector:
+    axis_dir = dt.Vector(axis)
+    if axis_dir.length() <= 0.000001:
+        raise ValueError("{} axis must not be zero length.".format(label))
+    axis_dir.normalize()
+
+    bend_dir = project_direction_to_axis_plane(
+        bend_direction,
+        axis_dir,
+        "{} bend direction".format(label),
+    )
+    normal = axis_dir ^ bend_dir
+    if normal.length() <= 0.000001:
+        raise ValueError("{} bend direction must not be parallel to the chain axis.".format(label))
+    normal.normalize()
+    return normal
+
+
+def get_node_world_position(node_obj: object) -> dt.Vector:
+    node = node_obj if hasattr(node_obj, "getTranslation") else pm.PyNode(node_obj)
+    return dt.Vector(node.getTranslation(space="world"))
+
+
+def get_explicit_bend_direction(component_obj: object, chain_start: VectorLike, chain_end: VectorLike) -> dt.Vector:
+    chain_dir = get_normalized_direction(
+        chain_start,
+        chain_end,
+        "{} bend chain".format(component_obj.fullName),
+    )
+
+    blades = getattr(component_obj.guide, "blades", {})
+    if "blade" in blades:
+        bend_hint = dt.Vector(blades["blade"].y) * -1
+        return project_direction_to_axis_plane(
+            bend_hint,
+            chain_dir,
+            "{} blade.y bend direction".format(component_obj.fullName),
+        )
+
+    for attr_name in ("upv_ctl", "upv_cns"):
+        upv_node = getattr(component_obj, attr_name, None)
+        if upv_node is None:
+            continue
+        bend_hint = get_node_world_position(upv_node) - dt.Vector(chain_start)
+        return project_direction_to_axis_plane(
+            bend_hint,
+            chain_dir,
+            "{} {} bend direction".format(component_obj.fullName, attr_name),
+        )
+
+    raise ValueError("{} must provide a blade or UPV object for bend direction.".format(component_obj.fullName))
+
+
 if sys.version_info > (3, 0):
     unicode = str
     from typing import TYPE_CHECKING
