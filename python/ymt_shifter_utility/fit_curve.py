@@ -10,16 +10,29 @@ This module intentionally keeps the scope narrow:
 from __future__ import annotations
 
 import math
+from collections.abc import Iterable, Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from logging import DEBUG, INFO, StreamHandler, getLogger
-from collections.abc import Iterator, Sequence
+from typing import Literal, Union
 
 
 import maya.api.OpenMaya as om2
 import maya.cmds as cmds
 
 from . import curve
+from .type_protocols import PymelNode
+
+
+CurveLike = Union[str, PymelNode, om2.MObject, om2.MDagPath, om2.MFnNurbsCurve]
+SparseBasis = tuple[int, float]
+Basis = list[SparseBasis]
+BasisSequence = Sequence[SparseBasis]
+PointSequence = Sequence[om2.MPoint]
+VectorSequence = Sequence[om2.MVector]
+SourceSampleMode = Literal["parameter", "length"]
+OptimizerName = Literal["adam", "lion"]
+SymmetryAxis = Literal["X", "Y", "Z", "x", "y", "z"]
 
 
 handler = StreamHandler()
@@ -60,9 +73,9 @@ class FitContext:
     """Precomputed fitting data for scene-free optimization."""
 
     source: NurbsCurveSnapshot
-    source_sample_mode: str
+    source_sample_mode: SourceSampleMode
     sample_params: list[float]
-    sample_basis: list[list[tuple[int, float]]]
+    sample_basis: list[Basis]
     target_points: list[om2.MPoint]
 
 
@@ -100,9 +113,11 @@ class EvaluatorValidation:
     num_samples: int
 
 
-def _as_mfn_curve(curve_like: om2.MFnNurbsCurve | str | object) -> om2.MFnNurbsCurve:
+def _as_mfn_curve(curve_like: CurveLike) -> om2.MFnNurbsCurve:
     if isinstance(curve_like, om2.MFnNurbsCurve):
         return curve_like
+    if isinstance(curve_like, (om2.MObject, om2.MDagPath)):
+        return om2.MFnNurbsCurve(curve_like)
     return curve.getMFnNurbsCurve(curve_like)
 
 
@@ -163,7 +178,7 @@ def _full_knot_vector(mfn_curve: om2.MFnNurbsCurve, degree: int, num_cvs: int, f
     )
 
 
-def snapshot_curve(curve_like: om2.MFnNurbsCurve | str | object) -> NurbsCurveSnapshot:
+def snapshot_curve(curve_like: CurveLike) -> NurbsCurveSnapshot:
     """Capture curve data needed by the scene-free evaluator."""
     mfn_curve = _as_mfn_curve(curve_like)
     mfn_curve.updateCurve()
@@ -283,7 +298,7 @@ def _basis_funs(span: int, u: float, degree: int, knots: Sequence[float]) -> lis
     return values
 
 
-def basis_at_param(snapshot: NurbsCurveSnapshot, u: float) -> list[tuple[int, float]]:
+def basis_at_param(snapshot: NurbsCurveSnapshot, u: float) -> Basis:
     """Return non-zero basis weights as ``(cv_index, weight)`` pairs."""
     span = _find_span(snapshot.num_cvs, snapshot.degree, u, snapshot.knots)
     weights = _basis_funs(span, u, snapshot.degree, snapshot.knots)
@@ -301,7 +316,7 @@ def _master_cv_index(snapshot: NurbsCurveSnapshot, cv_index: int) -> int:
     return cv_index
 
 
-def _sync_periodic_bound_cvs(snapshot: NurbsCurveSnapshot, cvs_world: Sequence[om2.MPoint]) -> list[om2.MPoint]:
+def _sync_periodic_bound_cvs(snapshot: NurbsCurveSnapshot, cvs_world: PointSequence) -> list[om2.MPoint]:
     synced = [om2.MPoint(point) for point in cvs_world]
     if not snapshot.is_periodic:
         return synced
@@ -384,7 +399,7 @@ def _symmetry_pairs_and_centers_for_count(count: int, closed: bool) -> tuple[lis
     return pairs, centers
 
 
-def _symmetry_score(points: Sequence[om2.MPoint], pairs: Sequence[tuple[int, int]], centers: Sequence[int], axis_index: int) -> float:
+def _symmetry_score(points: PointSequence, pairs: Sequence[tuple[int, int]], centers: Sequence[int], axis_index: int) -> float:
     score = 0.0
     for center_index in centers:
         score += abs(points[center_index][axis_index]) * 2.0
@@ -400,7 +415,7 @@ def _symmetry_score(points: Sequence[om2.MPoint], pairs: Sequence[tuple[int, int
     return score
 
 
-def _auto_symmetry_pairs_and_centers_for_points(points: Sequence[om2.MPoint], closed: bool, axis_index: int) -> tuple[list[tuple[int, int]], list[int]]:
+def _auto_symmetry_pairs_and_centers_for_points(points: PointSequence, closed: bool, axis_index: int) -> tuple[list[tuple[int, int]], list[int]]:
     count = len(points)
     if count <= 0:
         return [], []
@@ -424,7 +439,7 @@ def _auto_symmetry_pairs_and_centers_for_points(points: Sequence[om2.MPoint], cl
     return best_pairs, best_centers
 
 
-def _symmetry_pairs_and_centers(snapshot: NurbsCurveSnapshot, points: Sequence[om2.MPoint], axis_index: int) -> tuple[list[tuple[int, int]], list[int]]:
+def _symmetry_pairs_and_centers(snapshot: NurbsCurveSnapshot, points: PointSequence, axis_index: int) -> tuple[list[tuple[int, int]], list[int]]:
     count = _independent_cv_count(snapshot)
     return _auto_symmetry_pairs_and_centers_for_points(
         points[:count],
@@ -460,7 +475,7 @@ def _symmetrized_pair_points(left_point: om2.MPoint, right_point: om2.MPoint, ax
     return average, mirrored
 
 
-def apply_symmetry_projection(snapshot: NurbsCurveSnapshot, cvs_world: Sequence[om2.MPoint], axis: str = "X") -> list[om2.MPoint]:
+def apply_symmetry_projection(snapshot: NurbsCurveSnapshot, cvs_world: PointSequence, axis: SymmetryAxis = "X") -> list[om2.MPoint]:
     """Project CV positions onto the configured symmetry constraint."""
     axis_index = _axis_index(axis)
     projected_local = [_to_symmetry_space(snapshot, point) for point in cvs_world]
@@ -482,7 +497,7 @@ def apply_symmetry_projection(snapshot: NurbsCurveSnapshot, cvs_world: Sequence[
     return _sync_periodic_bound_cvs(snapshot, projected)
 
 
-def evaluate_point(cvs_world: Sequence[om2.MPoint], basis: Iterable[tuple[int, float]]) -> om2.MPoint:
+def evaluate_point(cvs_world: PointSequence, basis: Iterable[SparseBasis]) -> om2.MPoint:
     """Evaluate one point from precomputed sparse basis weights."""
     x = 0.0
     y = 0.0
@@ -495,12 +510,12 @@ def evaluate_point(cvs_world: Sequence[om2.MPoint], basis: Iterable[tuple[int, f
     return om2.MPoint(x, y, z)
 
 
-def evaluate_points(cvs_world: Sequence[om2.MPoint], basis_list: Sequence[Sequence[tuple[int, float]]]) -> list[om2.MPoint]:
+def evaluate_points(cvs_world: PointSequence, basis_list: Sequence[BasisSequence]) -> list[om2.MPoint]:
     """Evaluate multiple points from precomputed sparse basis weights."""
     return [evaluate_point(cvs_world, basis) for basis in basis_list]
 
 
-def validate_snapshot_evaluator(curve_like: om2.MFnNurbsCurve | str | object, num_samples: int = 100) -> EvaluatorValidation:
+def validate_snapshot_evaluator(curve_like: CurveLike, num_samples: int = 100) -> EvaluatorValidation:
     """Compare the local evaluator with Maya's curve evaluation at fixed params."""
     mfn_curve = _as_mfn_curve(curve_like)
     snapshot = snapshot_curve(mfn_curve)
@@ -523,10 +538,10 @@ def validate_snapshot_evaluator(curve_like: om2.MFnNurbsCurve | str | object, nu
 
 
 def build_fit_context(
-    curve_a: om2.MFnNurbsCurve | str | object,
-    curve_b: om2.MFnNurbsCurve | str | object,
+    curve_a: CurveLike,
+    curve_b: CurveLike,
     num_samples: int = 100,
-    source_sample_mode: str = "parameter",
+    source_sample_mode: SourceSampleMode = "parameter",
 ) -> FitContext:
     """Precompute fixed source bases and target points.
 
@@ -567,7 +582,7 @@ def build_fit_context(
     )
 
 
-def compute_distance_loss(cvs_world: Sequence[om2.MPoint], context: FitContext) -> float:
+def compute_distance_loss(cvs_world: PointSequence, context: FitContext) -> float:
     """Compute mean squared distance loss without touching the scene."""
     source_points = evaluate_points(cvs_world, context.sample_basis)
     loss = 0.0
@@ -577,7 +592,7 @@ def compute_distance_loss(cvs_world: Sequence[om2.MPoint], context: FitContext) 
     return loss / float(len(context.target_points))
 
 
-def compute_distance_gradients(cvs_world: Sequence[om2.MPoint], context: FitContext, cv_indices: Sequence[int] | None = None) -> list[om2.MVector]:
+def compute_distance_gradients(cvs_world: PointSequence, context: FitContext, cv_indices: Sequence[int] | None = None) -> list[om2.MVector]:
     """Compute analytic gradients for the fixed-basis distance loss."""
     gradients = [om2.MVector(0.0, 0.0, 0.0) for _ in range(context.source.num_cvs)]
     active = None if cv_indices is None else set(_normalized_cv_indices(context.source, cv_indices))
@@ -605,7 +620,7 @@ def _clamp(value: float, minimum: float, maximum: float) -> float:
     return max(minimum, min(maximum, value))
 
 
-def _average_segment_length(points: Sequence[om2.MPoint], closed: bool) -> float:
+def _average_segment_length(points: PointSequence, closed: bool) -> float:
     if len(points) < 2:
         return 0.0
 
@@ -619,7 +634,7 @@ def _average_segment_length(points: Sequence[om2.MPoint], closed: bool) -> float
     return total / float(count)
 
 
-def compute_target_complexity(target_points: Sequence[om2.MPoint], closed: bool) -> float:
+def compute_target_complexity(target_points: PointSequence, closed: bool) -> float:
     """Return normalized target second-difference complexity."""
     if len(target_points) < 3:
         return 0.0
@@ -690,7 +705,7 @@ def _smoothness_indices(snapshot: NurbsCurveSnapshot) -> list[tuple[int, int, in
     ]
 
 
-def _second_difference(cvs_world: Sequence[om2.MPoint], prev_index: int, cv_index: int, next_index: int) -> om2.MVector:
+def _second_difference(cvs_world: PointSequence, prev_index: int, cv_index: int, next_index: int) -> om2.MVector:
     prev_point = cvs_world[prev_index]
     point = cvs_world[cv_index]
     next_point = cvs_world[next_index]
@@ -701,7 +716,7 @@ def _second_difference(cvs_world: Sequence[om2.MPoint], prev_index: int, cv_inde
     )
 
 
-def compute_smoothness_loss(cvs_world: Sequence[om2.MPoint], context: FitContext) -> float:
+def compute_smoothness_loss(cvs_world: PointSequence, context: FitContext) -> float:
     """Compute mean squared second-difference loss for CV smoothness."""
     triples = _smoothness_indices(context.source)
     if not triples:
@@ -714,7 +729,7 @@ def compute_smoothness_loss(cvs_world: Sequence[om2.MPoint], context: FitContext
     return loss / float(len(triples))
 
 
-def compute_smoothness_gradients(cvs_world: Sequence[om2.MPoint], context: FitContext, cv_indices: Sequence[int] | None = None) -> list[om2.MVector]:
+def compute_smoothness_gradients(cvs_world: PointSequence, context: FitContext, cv_indices: Sequence[int] | None = None) -> list[om2.MVector]:
     """Compute gradients for the second-difference smoothness loss."""
     gradients = [om2.MVector(0.0, 0.0, 0.0) for _ in range(context.source.num_cvs)]
     triples = _smoothness_indices(context.source)
@@ -740,7 +755,7 @@ def compute_smoothness_gradients(cvs_world: Sequence[om2.MPoint], context: FitCo
     return gradients
 
 
-def compute_objective_loss(cvs_world: Sequence[om2.MPoint], context: FitContext, smoothness_weight: float) -> tuple[float, float, float]:
+def compute_objective_loss(cvs_world: PointSequence, context: FitContext, smoothness_weight: float) -> tuple[float, float, float]:
     """Return ``(objective, distance, smoothness)`` for the current CV positions."""
     distance_loss = compute_distance_loss(cvs_world, context)
     smoothness_loss = compute_smoothness_loss(cvs_world, context)
@@ -751,7 +766,7 @@ def compute_objective_loss(cvs_world: Sequence[om2.MPoint], context: FitContext,
     )
 
 
-def compute_objective_gradients(cvs_world: Sequence[om2.MPoint], context: FitContext, cv_indices: Sequence[int] | None = None, smoothness_weight: float = 0.2) -> list[om2.MVector]:
+def compute_objective_gradients(cvs_world: PointSequence, context: FitContext, cv_indices: Sequence[int] | None = None, smoothness_weight: float = 0.2) -> list[om2.MVector]:
     """Combine distance and smoothness gradients."""
     gradients = compute_distance_gradients(cvs_world, context, cv_indices)
     if smoothness_weight == 0.0:
@@ -772,9 +787,9 @@ def _sign_vector(vector: om2.MVector) -> om2.MVector:
 
 
 def _lion_update_positions(
-    cvs_world: Sequence[om2.MPoint],
+    cvs_world: PointSequence,
     momentum: list[om2.MVector],
-    gradients: Sequence[om2.MVector],
+    gradients: VectorSequence,
     cv_indices: Sequence[int],
     beta: float,
     learning_rate: float,
@@ -787,10 +802,10 @@ def _lion_update_positions(
 
 
 def _adam_update_positions(
-    cvs_world: Sequence[om2.MPoint],
+    cvs_world: PointSequence,
     first_moment: list[om2.MVector],
     second_moment: list[om2.MVector],
-    gradients: Sequence[om2.MVector],
+    gradients: VectorSequence,
     cv_indices: Sequence[int],
     learning_rate: float,
     beta1: float,
@@ -841,7 +856,7 @@ def _editable_cv_count(mfn_curve: om2.MFnNurbsCurve) -> int:
     return int(mfn_curve.numCVs)
 
 
-def _set_scene_cv_positions_api(mfn_curve: om2.MFnNurbsCurve, positions_world: Sequence[om2.MPoint]) -> None:
+def _set_scene_cv_positions_api(mfn_curve: om2.MFnNurbsCurve, positions_world: PointSequence) -> None:
     positions_world = [om2.MPoint(point) for point in positions_world]
     if _is_periodic_form(int(mfn_curve.form)):
         # Periodic curves bind the trailing degree CVs to the first degree CVs.
@@ -857,7 +872,7 @@ def _set_scene_cv_positions_api(mfn_curve: om2.MFnNurbsCurve, positions_world: S
     mfn_curve.updateCurve()
 
 
-def _set_scene_cv_positions_undoable(mfn_curve: om2.MFnNurbsCurve, positions_world: Sequence[om2.MPoint], undo_name: str) -> None:
+def _set_scene_cv_positions_undoable(mfn_curve: om2.MFnNurbsCurve, positions_world: PointSequence, undo_name: str) -> None:
     shape_name = mfn_curve.getPath().fullPathName()
     with _undo_chunk(undo_name):
         for cv_index in range(_editable_cv_count(mfn_curve)):
@@ -871,7 +886,7 @@ def _set_scene_cv_positions_undoable(mfn_curve: om2.MFnNurbsCurve, positions_wor
         mfn_curve.updateCurve()
 
 
-def set_scene_cv_positions(mfn_curve: om2.MFnNurbsCurve, positions_world: Sequence[om2.MPoint], undoable: bool = True, undo_name: str = "fit_curve") -> None:
+def set_scene_cv_positions(mfn_curve: om2.MFnNurbsCurve, positions_world: PointSequence, undoable: bool = True, undo_name: str = "fit_curve") -> None:
     """Write final world-space CV positions back to the scene once."""
     if len(positions_world) != mfn_curve.numCVs:
         raise ValueError("positions_world length does not match curve CV count.")
@@ -883,7 +898,7 @@ def set_scene_cv_positions(mfn_curve: om2.MFnNurbsCurve, positions_world: Sequen
     _set_scene_cv_positions_api(mfn_curve, positions_world)
 
 
-def symmetry_curve(curve_like: om2.MFnNurbsCurve | str | object, axis: str = "X", undoable: bool = True) -> list[om2.MPoint]:
+def symmetry_curve(curve_like: CurveLike, axis: SymmetryAxis = "X", undoable: bool = True) -> list[om2.MPoint]:
     """Apply the symmetry projection to a scene curve and write it back."""
     mfn_curve = _as_mfn_curve(curve_like)
     snapshot = snapshot_curve(mfn_curve)
@@ -900,7 +915,7 @@ def symmetry_curve(curve_like: om2.MFnNurbsCurve | str | object, axis: str = "X"
     return positions[:_independent_cv_count(snapshot)]
 
 
-def _max_position_error(points_a: Sequence[om2.MPoint], points_b: Sequence[om2.MPoint]) -> float:
+def _max_position_error(points_a: PointSequence, points_b: PointSequence) -> float:
     max_error = 0.0
     for point_a, point_b in zip(points_a, points_b):
         max_error = max(max_error, (point_a - point_b).length())
@@ -913,7 +928,7 @@ def optimize_context(
     num_iterations: int = 30,
     learning_rate: float = 0.01,
     beta: float = 0.9,
-    optimizer: str = "adam",
+    optimizer: OptimizerName = "adam",
     smoothness_weight: float = 0.2,
     smoothness_auto_scale: bool = True,
     smoothness_complexity_gain: float = 1.0,
@@ -921,7 +936,7 @@ def optimize_context(
     adam_beta2: float = 0.999,
     adam_epsilon: float = 1e-8,
     symmetry: bool = False,
-    symmetry_axis: str = "X",
+    symmetry_axis: SymmetryAxis = "X",
 ) -> FitResult:
     """Optimize the snapshot CV array without updating any scene curve."""
     cv_indices = _normalized_cv_indices(context.source, cv_indices)
@@ -1008,15 +1023,15 @@ def optimize_context(
 
 
 def fit_curve_on_curve(
-    curve_a: om2.MFnNurbsCurve | str | object,
-    curve_b: om2.MFnNurbsCurve | str | object,
+    curve_a: CurveLike,
+    curve_b: CurveLike,
     cv_indices: Sequence[int] | None = None,
     num_samples: int = 100,
     num_iterations: int = 30,
     learning_rate: float = 0.01,
     beta: float = 0.9,
-    source_sample_mode: str = "parameter",
-    optimizer: str = "adam",
+    source_sample_mode: SourceSampleMode = "parameter",
+    optimizer: OptimizerName = "adam",
     smoothness_weight: float = 0.2,
     smoothness_auto_scale: bool = True,
     smoothness_complexity_gain: float = 1.0,
@@ -1024,7 +1039,7 @@ def fit_curve_on_curve(
     adam_beta2: float = 0.999,
     adam_epsilon: float = 1e-8,
     symmetry: bool = False,
-    symmetry_axis: str = "X",
+    symmetry_axis: SymmetryAxis = "X",
     write_back: bool = True,
     undoable: bool = True,
 ) -> FitResult:
