@@ -26,6 +26,7 @@ import mgear.core.primitive as pri
 import mgear.core.transform as tra
 
 import mgear.core.vector as vec
+import ymt_shifter_utility as ymt_util
 
 if False:
     from typing import List, Tuple, Any
@@ -112,14 +113,33 @@ class Component(MainComponent):
         self.parent.addChild(self.root)
         self.connect_standardWithRotRef(self.settings["refArray"], self.orbit_cns)
 
+    def _get_dummy_arm_chain_data(self, arm_comp: object) -> tuple[list[dt.Vector], dt.Vector]:
+        root_pos = dt.Vector(self.guide.apos[0])
+        wrist_pos = dt.Vector(arm_comp.guide.apos[2])
+        chain_dir = ymt_util.get_normalized_direction(
+            root_pos, wrist_pos, "{} dummy root/wrist".format(arm_comp.fullName)
+        )
+        dummy_bend_dir = ymt_util.get_explicit_bend_direction(
+            arm_comp, root_pos, wrist_pos
+        )
+        normal = ymt_util.get_chain_normal_from_bend_direction(
+            chain_dir, dummy_bend_dir, "{} dummy root/wrist".format(arm_comp.fullName)
+        )
+
+        chain_length = vec.getDistance(root_pos, wrist_pos)
+        elbow_pos = root_pos + (chain_dir * (chain_length * 0.5)) + (dummy_bend_dir * (chain_length * 0.25))
+        return [root_pos, elbow_pos, wrist_pos], normal
+
     def insert_dummy_arm(self, arm_comp: object) -> None:
         # IK dummy Chain -----------------------------------------
-        chain_pos = [
-            self.guide.apos[0],
-            arm_comp.guide.apos[1],
-            arm_comp.guide.apos[2]
-        ]
-        arm_comp.dummy_chain = pri.add2DChain(arm_comp.root, arm_comp.getName("dummy_chain"), chain_pos, arm_comp.normal, arm_comp.negate)
+        chain_pos, chain_normal = self._get_dummy_arm_chain_data(arm_comp)
+        arm_comp.dummy_chain = pri.add2DChain(
+            arm_comp.root,
+            arm_comp.getName("dummy_chain"),
+            chain_pos,
+            chain_normal,
+            arm_comp.negate,
+        )
         arm_comp.dummy_chain[0].attr("visibility").set(arm_comp.WIP)
         arm_comp.dummy_ikh = pri.addIkHandle(arm_comp.root, arm_comp.getName("dummy_ikh"), arm_comp.dummy_chain)
         arm_comp.dummy_ikh.attr("visibility").set(False)
