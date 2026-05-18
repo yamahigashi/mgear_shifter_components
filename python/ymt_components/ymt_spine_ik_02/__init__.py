@@ -185,6 +185,7 @@ class Component(component.Main):
             global_t = self._getTransformWithRollByBlade(t)
 
         global_t = setMatrixPosition(global_t, pos)
+        global_t = transform.setMatrixScale(global_t, datatypes.Vector([1, 1, 1]))
         local_t = global_t
 
         # global input
@@ -454,6 +455,17 @@ class Component(component.Main):
                 self.settings["softness"],
                 0,
                 1)
+
+            if self.validProxyChannels:
+                attribute.addProxyAttribute(
+                    [
+                        self.maxstretch_att,
+                        self.maxsquash_att,
+                        self.volume_att,
+                        self.softness_att,
+                    ],
+                    self.ik_ctl,
+                )
 
         self.lock_ori0_att = self.addAnimParam(
             "lock_ori0",

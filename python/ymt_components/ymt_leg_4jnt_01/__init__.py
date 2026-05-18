@@ -895,8 +895,24 @@ class Component(component.Main):
                 self.upvref_att = self.addAnimEnumParam("upvref", "UpV Ref", 0, ref_names)
         if self.validProxyChannels:
             attribute.addProxyAttribute(
-                [self.blend_att, self.roundnessAnkle_att, self.roundnessKnee_att, self.roundnessFoot_att],
-                [self.fk0_ctl, self.fk1_ctl, self.fk2_ctl, self.ik_ctl, self.upv_ctl],
+                [
+                    self.blend_att,
+                    self.ikEndpoint_att,
+                    self.soft_attr,
+                    self.softSpeed_attr,
+                    self.stretch_attr,
+                    self.volume_att,
+                    self.roundnessAnkle_att,
+                    self.roundnessKnee_att,
+                    self.roundnessFoot_att
+                ],
+                [
+                    self.fk0_ctl,
+                    self.fk1_ctl,
+                    self.fk2_ctl,
+                    self.ik_ctl,
+                    self.upv_ctl
+                ],
             )
             attribute.addProxyAttribute(self.roll_att, [self.ik_ctl, self.upv_ctl])
 
