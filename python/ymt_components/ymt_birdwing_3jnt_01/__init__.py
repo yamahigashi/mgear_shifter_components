@@ -105,12 +105,33 @@ class Component(component.Main):
         distance = max(self.size * 0.5, self.length2 * 0.25, 0.001)
         return wrist_pos + (pole_dir * distance)
 
+    def _get_chain2bones_positions(self) -> list[datatypes.Vector]:
+        root_pos = datatypes.Vector(self.guide.pos["root"])
+        wrist_pos = datatypes.Vector(self.guide.pos["wrist"])
+        chain_dir = yu.get_normalized_direction(
+            root_pos, wrist_pos, "{} chain2bones root/wrist".format(self.fullName)
+        )
+        chain_length = vector.getDistance(root_pos, wrist_pos)
+        min_length = abs(self.length0 - self.length1)
+        max_length = self.length0 + self.length1
+        if chain_length < min_length - 0.000001 or chain_length > max_length + 0.000001:
+            raise ValueError("{} chain2bones lengths cannot reach the wrist guide position.".format(self.fullName))
+
+        distance_on_chain = (self.length0**2 + chain_length**2 - self.length1**2) / (2.0 * chain_length)
+        bend_height_squared = self.length0**2 - distance_on_chain**2
+        if bend_height_squared < -0.000001:
+            raise ValueError("{} chain2bones guide lengths cannot form a valid solve triangle.".format(self.fullName))
+
+        bend_height = math.sqrt(max(0.0, bend_height_squared))
+        elbow_pos = root_pos + (chain_dir * distance_on_chain) + (self.bend_dir * bend_height)
+        return [root_pos, elbow_pos, wrist_pos]
+
     def _add_hand_upv_refs(self, wrist_t: datatypes.Matrix, pole_dir: datatypes.Vector) -> None:
         self.handUpvRefChain = yu.add3DChain(
             self.root,
             self.getName("handUpvRef%s_jnt"),
             [self.guide.pos["wrist"], self.guide.pos["hand"]],
-            self.normal,
+            self.hand_normal,
             False,
             self.WIP,
         )
@@ -141,7 +162,25 @@ class Component(component.Main):
         self.WIP = self.options["mode"]
         root_matrix = om2.MMatrix(self.guide.tra["root"])
         self.root_normal = datatypes.Vector(root_matrix[1], root_matrix[5], root_matrix[9]).normal()
-        self.normal = self.guide.blades["blade"].z * -1
+        chain_dir = yu.get_normalized_direction(
+            self.guide.pos["root"], self.guide.pos["wrist"], "{} root/wrist".format(self.fullName)
+        )
+        blade_bend_dir = yu.get_explicit_bend_direction(
+            self, self.guide.pos["root"], self.guide.pos["wrist"]
+        )
+        self.normal = yu.get_chain_normal_from_bend_direction(
+            chain_dir, blade_bend_dir, "{} root/wrist".format(self.fullName)
+        )
+        self.bend_dir = self.normal ^ chain_dir
+        self.bend_dir.normalize()
+        hand_chain_dir = yu.get_normalized_direction(
+            self.guide.pos["wrist"], self.guide.pos["hand"], "{} wrist/hand".format(self.fullName)
+        )
+        self.hand_normal = yu.get_chain_normal_from_bend_direction(
+            hand_chain_dir, self.bend_dir, "{} wrist/hand".format(self.fullName)
+        )
+        self.hand_bend_dir = self.hand_normal ^ hand_chain_dir
+        self.hand_bend_dir.normalize()
         self.binormal = self.guide.blades["blade"].x
 
         self.bone_positions = [
@@ -153,11 +192,12 @@ class Component(component.Main):
         self.length0 = vector.getDistance(self.bone_positions[0], self.bone_positions[1])
         self.length1 = vector.getDistance(self.bone_positions[1], self.bone_positions[2])
         self.length2 = vector.getDistance(self.bone_positions[2], self.bone_positions[3])
+        self.chain2bones_positions = self._get_chain2bones_positions()
 
         self.chain2bones = yu.add3DChain(
             self.setup,
             self.getName("chain2bones%s_jnt"),
-            self.bone_positions[0:3],
+            self.chain2bones_positions,
             self.normal,
             False,
             self.WIP,
@@ -166,7 +206,7 @@ class Component(component.Main):
             self.setup,
             self.getName("handChain%s_jnt"),
             self.bone_positions[2:4],
-            self.normal,
+            self.hand_normal,
             False,
             self.WIP,
         )
@@ -322,17 +362,9 @@ class Component(component.Main):
 
         self.ik_ref = primitive.addTransform(self.ik_ctl, self.getName("ik_ref"), transform.getTransform(self.ik_ctl))
 
-        blade_pole_dir = self.guide.apos[2] - self.guide.apos[0]
-        blade_pole_dir = blade_pole_dir ^ self.normal
-        blade_pole_dir.normalize()
-        blade_pole_pos = self.guide.apos[1] + (blade_pole_dir * self.size)
-        blade_plane_normal = vector.getPlaneNormal(self.guide.apos[0], self.guide.apos[2], blade_pole_pos)
-        blade_target_basis = transform.getTransformLookingAt(
-            self.guide.apos[0], self.guide.apos[2], blade_plane_normal, "xz", False
-        )
-        upv_t = transform.setMatrixPosition(blade_target_basis, blade_pole_pos)
-        self.upv_lvl = primitive.addTransform(self.root, self.getName("upv_lvl"), upv_t)
-        self.upv_cns = primitive.addTransform(self.upv_lvl, self.getName("upv_cns"), upv_t)
+        upv_pos = self.guide.apos[1] + (self.bend_dir * self.size * 0.5)
+        self.upv_lvl = primitive.addTransformFromPos(self.root, self.getName("upv_lvl"), upv_pos)
+        self.upv_cns = primitive.addTransformFromPos(self.upv_lvl, self.getName("upv_cns"), upv_pos)
         self.upv_ctl = self.addCtl(
             self.upv_cns,
             "upv_ctl",
@@ -345,8 +377,11 @@ class Component(component.Main):
         attribute.setInvertMirror(self.upv_ctl, ["tx"])
         attribute.setKeyableAttributes(self.upv_ctl, ["tx", "ty", "tz"])
 
-        blade_pole_t = transform.setMatrixPosition(blade_target_basis, blade_pole_pos)
-        self.effective_upv_npo = primitive.addTransform(self.upv_cns, self.getName("effectiveUpv_npo"), blade_pole_t)
+        self.effective_upv_npo = primitive.addTransform(
+            self.upv_cns,
+            self.getName("effectiveUpv_npo"),
+            transform.getTransform(self.upv_cns),
+        )
         self.effective_upv_ref = primitive.addTransform(
             self.effective_upv_npo,
             self.getName("effectiveUpv_ref"),
@@ -364,7 +399,7 @@ class Component(component.Main):
 
         # IK B: wrist/hand look-at target.
         wrist_t = transform.getTransformFromPos(self.guide.pos["wrist"])
-        self._add_hand_upv_refs(wrist_t, blade_pole_dir)
+        self._add_hand_upv_refs(wrist_t, self.hand_bend_dir)
         hand_t = transform.getTransformLookingAt(
             self.guide.pos["wrist"], self.guide.pos["hand"], self.root_normal, "zx", False
         )
