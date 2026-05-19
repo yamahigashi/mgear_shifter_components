@@ -23,6 +23,7 @@ Detail controls will separate surface targets, aim extraction, FK propagation, a
 - The FK chain root follows the first rivet reference in translation.
 - Aim references provide local rotation to an aim-apply parent inside the FK chain through their local matrix plus the initial offset; curl controls then add local rotation offset below that aim parent.
 - Curl controls no longer provide aim targets. Their local rotations are blended from nearby curl controls and applied only as curl offsets.
+- Curl-to-detail rotation offsets are scaled by animator-facing column multiplier attributes, initialized to `1.0`, after curl-neighborhood blending and before the local curl offset is applied.
 - Curl-to-detail rotation propagation converts only the local axis convention: curl `+Z` forward maps to detail `+X` forward, curl `+Y` up maps to detail `-Y` up, and curl `+X` side maps to detail `+Z` side.
 
 ## Considered Options
@@ -39,7 +40,7 @@ Detail controls will separate surface targets, aim extraction, FK propagation, a
 
 ## Consequences
 
-Detail controls preserve their FK chain inheritance while the first point follows the surface and aim references extract surface-derived segment orientation from rivet references. Aim references are children of rivet references, so the rivet provides the stable surface position and initial orientation while the aim reference local matrix carries only the aim delta needed by the aim-apply parent. Aim and curl rotations are applied inside the FK chain, but neither curl nor animator offsets feed back into the rivet or aim extraction layers. Curl controls now expose rotation channels and propagate local rotation offsets based on nearby curl weights. The curl rotation offset uses the same curl-neighborhood falloff as surface weighting, but it normalizes curl weights independently and does not reserve influence for anchors.
+Detail controls preserve their FK chain inheritance while the first point follows the surface and aim references extract surface-derived segment orientation from rivet references. Aim references are children of rivet references, so the rivet provides the stable surface position and initial orientation while the aim reference local matrix carries only the aim delta needed by the aim-apply parent. Aim and curl rotations are applied inside the FK chain, but neither curl nor animator offsets feed back into the rivet or aim extraction layers. Curl controls now expose rotation channels and propagate local rotation offsets based on nearby curl weights. The curl rotation offset uses the same curl-neighborhood falloff as surface weighting, but it normalizes curl weights independently and does not reserve influence for anchors. Column multipliers tune how strongly each detail column receives the blended curl rotation without changing the distribution weights themselves.
 
 Maya runtime validation is required for strongly curved chains and for the final point orientation, which inherits from the chain when there is no next rivet target.
 

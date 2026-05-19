@@ -138,6 +138,7 @@ class Component(component.Main):
         self.detail_curl_npos_by_key = {}
         self.detail_ctls = []
         self.detail_ctls_by_key = {}
+        self.detail_curl_rot_mult_attrs = []
         self._add_detail_controls()
 
         self.sliding_surface = None
@@ -158,6 +159,19 @@ class Component(component.Main):
         self._connect_detail_chain_roots()
         self._connect_detail_aim_apply_rotations()
         self._connect_detail_curl_rotations()
+
+    def addAttributes(self) -> None:
+        """Add animator-facing detail curl rotation tuning attributes."""
+        self.detail_curl_rot_mult_attrs = [
+            self.addAnimParam(
+                "detailCurlRotMult%s" % col,
+                "Detail Curl Rot Mult %s" % col,
+                "double",
+                1.0,
+                0.0,
+            )
+            for col in range(self._detail_column_count())
+        ]
 
     def setRelation(self) -> None:
         """Set guide-to-rig relations."""
@@ -363,6 +377,9 @@ class Component(component.Main):
             (str(spec["row"]), int(spec["section"]), int(spec["col"])): spec
             for spec in specs
         }
+
+    def _detail_column_count(self) -> int:
+        return max(len(depths) for depths in self.detail_column_depths_by_row)
 
     def _detail_chain_matrix(
         self,
@@ -981,9 +998,14 @@ class Component(component.Main):
                     for index, weight in curl_entries
                 ]
             )
+            scaled_rotate_attr = self._create_scaled_rotate_node(
+                compose + ".outRotate",
+                self.detail_curl_rot_mult_attrs[int(spec["col"])],
+                "%s_detailCurlRotateMult" % self._detail_name(spec),
+            )
             rotate_attr = self._create_initial_offset_rotate_node(
                 curl_npo,
-                compose + ".outRotate",
+                scaled_rotate_attr,
                 "%s_detailCurlRotate" % self._detail_name(spec),
             )
             cmds.connectAttr(rotate_attr, self._node_name(curl_npo) + ".rotate", force=True)
@@ -1104,6 +1126,14 @@ class Component(component.Main):
         cmds.setAttr(node + ".rotateOrder", ROTATE_ORDER_XYZ)
         cmds.connectAttr(self._node_name(source) + ".rotate", node + ".rotate", force=True)
         return node
+
+    def _create_scaled_rotate_node(self, rotate_attr: str, multiplier_attr: object, name: str) -> str:
+        multiply = cmds.createNode("multiplyDivide", name=self.getName(name + "_md"))
+        cmds.setAttr(multiply + ".operation", 1)
+        cmds.connectAttr(rotate_attr, multiply + ".input1", force=True)
+        for axis in "XYZ":
+            cmds.connectAttr(str(multiplier_attr), multiply + ".input2" + axis, force=True)
+        return multiply + ".output"
 
     def _create_local_offset_rotation_node(
         self,
