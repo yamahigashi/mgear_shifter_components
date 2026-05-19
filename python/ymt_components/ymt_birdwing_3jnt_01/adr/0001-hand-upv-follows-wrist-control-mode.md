@@ -14,12 +14,12 @@ The previous hidden hand up-vector chain copied `upv_ctl.translate` into a diffe
 
 ## Decision
 
-The hand section will not build a separate hidden hand up-vector chain or aim reference. The visible `upv_ctl` affects the hand section only through `wristControlMode`:
+The hand section will not build a separate hidden hand up-vector chain or aim reference. The visible `upv_ctl` affects the hand IK target only through `wristControlMode`:
 
-- `IK`: the hand IK target and hand rotation basis stay on the IK control basis, so moving `upv_ctl` does not move the hand IK target.
-- `Chain`: the hand IK target and hand rotation basis follow the solved wrist chain, so moving `upv_ctl` affects them through the root/elbow/wrist IK plane.
+- `IK`: the hand IK target stays on the IK control basis, so moving `upv_ctl` does not move the hand IK target.
+- `Chain`: the hand IK target follows the solved wrist chain, so moving `upv_ctl` affects it through the root/elbow/wrist IK plane.
 
-Final hand orientation remains owned by `handIkRot_ctl` and `handRoll`.
+Final hand orientation remains owned by `handIkRot_ctl` and `handRoll`. `handIkRot_npo` remains a stable zero parent under `hand_ik_ctl`; it is not constrained by `wristControlMode`.
 
 ## Considered Options
 
@@ -35,7 +35,7 @@ Final hand orientation remains owned by `handIkRot_ctl` and `handRoll`.
 
 ## Consequences
 
-The hand solve has fewer hidden dependencies and no longer copies `upv_ctl.translate` into a mismatched local space. Existing rigs that expected hidden hand up-vector twist in `IK` mode will behave differently: in `IK` mode, hand target position and hand rotation basis are independent of `upv_ctl`; in `Chain` mode, they continue to follow the solved wrist basis.
+The hand solve has fewer hidden dependencies and no longer copies `upv_ctl.translate` into a mismatched local space. Existing rigs that expected hidden hand up-vector twist in `IK` mode will behave differently: in `IK` mode, hand target position is independent of `upv_ctl`; in `Chain` mode, it continues to follow the solved wrist basis. The final hand rotation control no longer receives an extra orientation switch on its NPO.
 
 ## Confidence and Revisit Trigger
 

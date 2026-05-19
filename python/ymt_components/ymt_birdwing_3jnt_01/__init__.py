@@ -383,6 +383,10 @@ class Component(component.Main):
         self.hand_ik_parent_chain_ref = primitive.addTransform(
             self.hand_ik_parent_chain_pos, self.getName("hand_ik_parent_chain_ref"), wrist_t
         )
+        self.wrist_mode_basis_ref = primitive.addTransform(
+            self.root, self.getName("wristModeBasis_ref"), wrist_t
+        )
+        self.wrist_mode_basis_ref.attr("visibility").set(False)
         length = vector.getDistance(self.guide.pos["eff"], self.guide.pos["wrist"])
         self.ikRot_npo = primitive.addTransform(self.hand_ik_parent_cns, self.getName("ikRot_npo"), wrist_t)
         self.ikRot_ctl = self.addCtl(
@@ -419,14 +423,6 @@ class Component(component.Main):
         attribute.setInvertMirror(self.hand_ik_ctl, ["tx"])
         attribute.lockAttribute(self.hand_ik_ctl, ["rx", "ry", "rz", "sx", "sy", "sz", "v"])
 
-        self.handIkRot_ik_basis_ref = primitive.addTransform(
-            self.hand_ik_ctl, self.getName("handIkRot_ik_basis_ref"), hand_t
-        )
-        self.handIkRot_ik_basis_ref.attr("visibility").set(False)
-        self.handIkRot_chain_basis_ref = primitive.addTransform(
-            self.root, self.getName("handIkRot_chain_basis_ref"), hand_t
-        )
-        self.handIkRot_chain_basis_ref.attr("visibility").set(False)
         self.handIkRot_npo = primitive.addTransform(self.hand_ik_ctl, self.getName("handIkRot_npo"), hand_t)
         self.handIkRot_ctl = self.addCtl(
             self.handIkRot_npo,
@@ -744,26 +740,19 @@ class Component(component.Main):
             skipTranslate=["x", "y", "z"],
             maintainOffset=True,
         )
-        hand_parent_cns = pm.parentConstraint(
+        wrist_mode_basis_cns = pm.parentConstraint(
             self.hand_ik_parent_ik_ref,
             self.hand_ik_parent_chain_ref,
-            self.hand_ik_parent_cns,
+            self.wrist_mode_basis_ref,
             maintainOffset=False,
         )
-        self._connect_enum_condition(self.wristControlMode_att, 0, hand_parent_cns + ".target[0].targetWeight")
-        self._connect_enum_condition(self.wristControlMode_att, 1, hand_parent_cns + ".target[1].targetWeight")
+        self._connect_enum_condition(self.wristControlMode_att, 0, wrist_mode_basis_cns + ".target[0].targetWeight")
+        self._connect_enum_condition(self.wristControlMode_att, 1, wrist_mode_basis_cns + ".target[1].targetWeight")
+        pm.parentConstraint(self.wrist_mode_basis_ref, self.hand_ik_parent_cns, maintainOffset=False)
 
     def _connect_wrist_anchor_mode(self) -> None:
         pm.parentConstraint(self.wingBonesFK[2], self.wrist_anchor_fk_ref, maintainOffset=False)
-
-        wrist_ik_mode_cns = pm.parentConstraint(
-            self.hand_ik_parent_ik_ref,
-            self.hand_ik_parent_chain_ref,
-            self.wrist_anchor_ik_mode_ref,
-            maintainOffset=False,
-        )
-        self._connect_enum_condition(self.wristControlMode_att, 0, wrist_ik_mode_cns + ".target[0].targetWeight")
-        self._connect_enum_condition(self.wristControlMode_att, 1, wrist_ik_mode_cns + ".target[1].targetWeight")
+        pm.parentConstraint(self.wrist_mode_basis_ref, self.wrist_anchor_ik_mode_ref, maintainOffset=False)
 
         wrist_anchor_cns = pm.parentConstraint(
             self.wrist_anchor_fk_ref,
@@ -773,32 +762,6 @@ class Component(component.Main):
         )
         node.createReverseNode(self.blend_att, wrist_anchor_cns + ".target[0].targetWeight")
         pm.connectAttr(self.blend_att, wrist_anchor_cns + ".target[1].targetWeight", f=True)
-
-    def _connect_hand_ik_rot_mode(self) -> None:
-        chain_initial = self.handChain[0].attr("worldMatrix[0]").get()
-        basis_initial = self.handIkRot_npo.attr("worldMatrix[0]").get()
-        chain_offset = basis_initial * chain_initial.inverse()
-        chain_offset_values = [chain_offset[index] for index in range(16)]
-
-        chain_basis_mult = pm.createNode("multMatrix")
-        pm.setAttr(chain_basis_mult + ".matrixIn[0]", *chain_offset_values, type="matrix")
-        pm.connectAttr(self.handChain[0] + ".worldMatrix[0]", chain_basis_mult + ".matrixIn[1]")
-        pm.connectAttr(self.root + ".worldInverseMatrix[0]", chain_basis_mult + ".matrixIn[2]")
-
-        chain_basis_decomp = pm.createNode("decomposeMatrix")
-        pm.connectAttr(chain_basis_mult + ".matrixSum", chain_basis_decomp + ".inputMatrix")
-        pm.connectAttr(chain_basis_decomp + ".outputTranslate", self.handIkRot_chain_basis_ref.attr("translate"))
-        pm.connectAttr(chain_basis_decomp + ".outputRotate", self.handIkRot_chain_basis_ref.attr("rotate"))
-        pm.connectAttr(chain_basis_decomp + ".outputScale", self.handIkRot_chain_basis_ref.attr("scale"))
-
-        hand_ik_rot_cns = pm.orientConstraint(
-            self.handIkRot_ik_basis_ref,
-            self.handIkRot_chain_basis_ref,
-            self.handIkRot_npo,
-            maintainOffset=False,
-        )
-        self._connect_enum_condition(self.wristControlMode_att, 0, hand_ik_rot_cns + ".target[0].targetWeight")
-        self._connect_enum_condition(self.wristControlMode_att, 1, hand_ik_rot_cns + ".target[1].targetWeight")
 
     def _connect_twist_and_aim(self) -> None:
         chain_pos = [x.getTranslation(space="world") for x in self.chain2bones]
@@ -872,7 +835,8 @@ class Component(component.Main):
         # IK result chain. A solves root/elbow/wrist. B solves wrist/hand.
         for i, src in enumerate([self.chain2bones[0], self.chain2bones[1]]):
             pm.parentConstraint(src, self.wingBonesIK[i], mo=True)
-        pm.parentConstraint(self.handChain[0], self.wingBonesIK[2], mo=True)
+        pm.pointConstraint(self.handChain[0], self.wingBonesIK[2], mo=True)
+        pm.orientConstraint(self.wrist_mode_basis_ref, self.wingBonesIK[2], mo=True)
         pm.connectAttr(multJnt3_node + ".outputX", self.wingBonesIK[3] + ".tx")
         pm.connectAttr(self.handRoll_att, self.hand_roll_ref.attr("rx"))
         pm.orientConstraint(self.hand_roll_ref, self.wingBonesIK[-1], mo=True)
@@ -999,7 +963,6 @@ class Component(component.Main):
         self._connect_ik_handles()
         self._connect_hand_parent_mode()
         self._connect_wrist_anchor_mode()
-        self._connect_hand_ik_rot_mode()
         self._connect_twist_and_aim()
         self._connect_soft_ik_and_stretch(multJnt1_node, multJnt2_node)
         self._connect_result_chains(multJnt3_node)
@@ -1060,14 +1023,18 @@ class Component(component.Main):
     def get_feather_ribbon_refs(self) -> dict[str, object]:
         """Return stable driver objects used by feather ribbon child components."""
         return {
-            "root": self.root,
-            "elbow": self.support_anchor_drivers["elbow_mid"],
-            "wrist": self.support_anchor_drivers["wrist_mid"],
-            "hand": self.deform_anchor_drivers["hand"],
-            "root_ctl": self.root_ctl,
-            "normal": self.normal,
-            "binormal": self.binormal,
-            "size": self.size,
+            "refs": {
+                "root": self.root,
+                "root_ctl": self.root_ctl,
+                "elbow": self.support_anchor_drivers["elbow_mid"],
+                "wrist": self.support_anchor_drivers["wrist_mid"],
+                "hand": self.deform_anchor_drivers["hand"],
+            },
+            "metadata": {
+                "normal": self.normal,
+                "binormal": self.binormal,
+                "size": self.size,
+            },
         }
 
     def connect_standard(self) -> None:

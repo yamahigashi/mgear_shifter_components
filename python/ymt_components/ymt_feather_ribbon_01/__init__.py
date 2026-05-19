@@ -170,13 +170,14 @@ class Component(component.Main):
             raise RuntimeError("ymt_feather_ribbon_01 requires a ymt_birdwing_3jnt_01 parent component.")
 
         refs = parent_comp.get_feather_ribbon_refs()
-        pm.pointConstraint(refs["root"], self.anchor_npos[0][0], mo=True)
-        cns = pm.orientConstraint(refs["root_ctl"], self.anchor_npos[0][0], mo=True)
+        source_refs = refs["refs"]
+        pm.pointConstraint(source_refs["root"], self.anchor_npos[0][0], mo=True)
+        cns = pm.orientConstraint(source_refs["root_ctl"], self.anchor_npos[0][0], mo=True)
         pm.setAttr(cns.attr("interpType"), 0)  # no-flip
-        self._connect_anchor_root_space(refs, "elbow", self.anchor_npos[1][0])
-        self._connect_anchor_root_space(refs, "wrist", self.anchor_npos[2][0])
-        pm.parentConstraint(refs["hand"], self.anchor_npos[3][0], mo=True)
-        self._connect_curl_rotations(refs)
+        self._connect_anchor_root_space(source_refs, "elbow", self.anchor_npos[1][0])
+        self._connect_anchor_root_space(source_refs, "wrist", self.anchor_npos[2][0])
+        pm.parentConstraint(source_refs["hand"], self.anchor_npos[3][0], mo=True)
+        self._connect_curl_rotations(source_refs)
 
     def _add_anchor_controls(self) -> None:
         for anchor_index, name in enumerate(self.anchor_names):
