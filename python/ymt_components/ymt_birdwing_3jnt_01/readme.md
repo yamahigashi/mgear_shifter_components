@@ -17,6 +17,15 @@ The component provides:
 - Wrist Control Mode for the hand IK target: `IK` keeps the legacy main IK rotation parent,
   while `Chain` follows the solved upper/lower wing extension from the up-vector instead.
   Its initial value can be set from the guide settings.
+- The hand section has no separate animator-facing up-vector. In `IK` wrist control mode,
+  moving the up-vector does not move the hand IK target or its rotation basis. In `Chain`
+  wrist control mode, the hand IK target and rotation basis inherit the solved wrist basis,
+  so they follow the visible up-vector through the root/elbow/wrist IK plane.
+- The wrist deformation anchor is separate from the final hand segment basis. It follows
+  FK in FK mode, and in IK mode follows the same `wristControlMode` basis as the hand IK target.
 - Shoulder Smooth Step affects shoulder connection interpolation when connected to `ymt_shoulder_01`.
 - FK/IK blending with match references for FK, wrist IK, hand IK, and up-vector.
 - Separate deformation anchors and in-span division drivers, following the structure used in `ymt_leg_4jnt_01`.
+
+Architecture notes: see `adr/0001-hand-upv-follows-wrist-control-mode.md` and
+`adr/0002-wrist-anchor-follows-fk-ik-and-wrist-mode.md`.

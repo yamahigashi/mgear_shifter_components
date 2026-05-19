@@ -101,10 +101,6 @@ class Component(component.Main):
             pm.connectAttr(match.message, ctl.match_ref)
         return match
 
-    def _get_hand_upv_position(self, wrist_pos: datatypes.Vector, pole_dir: datatypes.Vector) -> datatypes.Vector:
-        distance = max(self.size * 0.5, self.length2 * 0.25, 0.001)
-        return wrist_pos + (pole_dir * distance)
-
     def _get_chain2bones_positions(self) -> list[datatypes.Vector]:
         root_pos = datatypes.Vector(self.guide.pos["root"])
         wrist_pos = datatypes.Vector(self.guide.pos["wrist"])
@@ -125,33 +121,6 @@ class Component(component.Main):
         bend_height = math.sqrt(max(0.0, bend_height_squared))
         elbow_pos = root_pos + (chain_dir * distance_on_chain) + (self.bend_dir * bend_height)
         return [root_pos, elbow_pos, wrist_pos]
-
-    def _add_hand_upv_refs(self, wrist_t: datatypes.Matrix, pole_dir: datatypes.Vector) -> None:
-        self.handUpvRefChain = yu.add3DChain(
-            self.root,
-            self.getName("handUpvRef%s_jnt"),
-            [self.guide.pos["wrist"], self.guide.pos["hand"]],
-            self.hand_normal,
-            False,
-            self.WIP,
-        )
-
-        hand_upv_t = transform.setMatrixPosition(
-            transform.getTransform(self.handUpvRefChain[0]),
-            self._get_hand_upv_position(self.guide.pos["wrist"], pole_dir),
-        )
-        self.hand_effective_upv_npo = primitive.addTransform(
-            self.handUpvRefChain[0], self.getName("handEffectiveUpv_npo"), hand_upv_t
-        )
-        self.hand_effective_upv_ref = primitive.addTransform(
-            self.hand_effective_upv_npo,
-            self.getName("handEffectiveUpv_ref"),
-            transform.getTransform(self.hand_effective_upv_npo),
-        )
-        self.hand_effective_upv_npo.attr("visibility").set(False)
-
-        self.hand_upv_aim_ref = primitive.addTransform(self.root, self.getName("handUpvAim_ref"), wrist_t)
-        self.hand_upv_aim_ref.attr("visibility").set(False)
 
     def addObjects(self) -> None:
         """Add all objects needed to create the component."""
@@ -179,8 +148,6 @@ class Component(component.Main):
         self.hand_normal = yu.get_chain_normal_from_bend_direction(
             hand_chain_dir, self.bend_dir, "{} wrist/hand".format(self.fullName)
         )
-        self.hand_bend_dir = self.hand_normal ^ hand_chain_dir
-        self.hand_bend_dir.normalize()
         self.binormal = self.guide.blades["blade"].x
 
         self.bone_positions = [
@@ -399,7 +366,6 @@ class Component(component.Main):
 
         # IK B: wrist/hand look-at target.
         wrist_t = transform.getTransformFromPos(self.guide.pos["wrist"])
-        self._add_hand_upv_refs(wrist_t, self.hand_bend_dir)
         hand_t = transform.getTransformLookingAt(
             self.guide.pos["wrist"], self.guide.pos["hand"], self.root_normal, "zx", False
         )
@@ -537,8 +503,22 @@ class Component(component.Main):
                 transform.getTransform(wing_bone),
             )
             self.deform_anchor_refs[name] = ref
-            pm.parentConstraint(wing_bone, ref, mo=False)
+            if name != "wrist":
+                pm.parentConstraint(wing_bone, ref, mo=False)
             self.deform_anchor_drivers[name] = ref
+
+        self.wrist_anchor_fk_ref = primitive.addTransform(
+            self.root_ctl,
+            self.getName("wristAnchorFk_ref"),
+            transform.getTransform(self.wingBones[2]),
+        )
+        self.wrist_anchor_ik_mode_ref = primitive.addTransform(
+            self.root_ctl,
+            self.getName("wristAnchorIkMode_ref"),
+            transform.getTransform(self.wingBones[2]),
+        )
+        self.wrist_anchor_fk_ref.attr("visibility").set(False)
+        self.wrist_anchor_ik_mode_ref.attr("visibility").set(False)
 
         self.support_anchor_drivers = {}
         for name, correction_ctl in [
@@ -745,27 +725,10 @@ class Component(component.Main):
 
         pm.pointConstraint(self.root_ctl, self.chain2bones[0], maintainOffset=True)
         pm.connectAttr(self.upv_ctl.attr("translate"), self.effective_upv_ref.attr("translate"), f=True)
-        pm.connectAttr(self.upv_ctl.attr("translate"), self.hand_effective_upv_ref.attr("translate"), f=True)
         pm.pointConstraint(self.chain2bones[2], self.handChain[0], maintainOffset=False)
 
         self.ikHandleHand = primitive.addIkHandle(self.root, self.getName("ikHandHandle"), self.handChain, "ikSCsolver")
         pm.pointConstraint(self.hand_ik_ctl, self.ikHandleHand, maintainOffset=False)
-        self.ikHandleHandUpvRef = primitive.addIkHandle(
-            self.root, self.getName("ikHandleHandUpvRef"), self.handUpvRefChain, "ikSCsolver"
-        )
-        pm.pointConstraint(self.handChain[0], self.handUpvRefChain[0], maintainOffset=False)
-        pm.pointConstraint(self.hand_ik_ctl, self.ikHandleHandUpvRef, maintainOffset=False)
-        pm.pointConstraint(self.handChain[0], self.hand_upv_aim_ref, maintainOffset=False)
-        applyop.aimCns(
-            self.hand_upv_aim_ref,
-            self.hand_ik_ctl,
-            axis="xz",
-            wupType="object",
-            wupVector=[0, 0, 1],
-            wupObject=self.hand_effective_upv_ref,
-            maintainOffset=False,
-        )
-        pm.orientConstraint(self.hand_upv_aim_ref, self.ikHandleHand, maintainOffset=False)
 
     def _connect_hand_parent_mode(self) -> None:
         pm.parentConstraint(self.ik_ctl, self.softblendLoc, skipTranslate=["x", "y", "z"], maintainOffset=False)
@@ -789,6 +752,27 @@ class Component(component.Main):
         )
         self._connect_enum_condition(self.wristControlMode_att, 0, hand_parent_cns + ".target[0].targetWeight")
         self._connect_enum_condition(self.wristControlMode_att, 1, hand_parent_cns + ".target[1].targetWeight")
+
+    def _connect_wrist_anchor_mode(self) -> None:
+        pm.parentConstraint(self.wingBonesFK[2], self.wrist_anchor_fk_ref, maintainOffset=False)
+
+        wrist_ik_mode_cns = pm.parentConstraint(
+            self.hand_ik_parent_ik_ref,
+            self.hand_ik_parent_chain_ref,
+            self.wrist_anchor_ik_mode_ref,
+            maintainOffset=False,
+        )
+        self._connect_enum_condition(self.wristControlMode_att, 0, wrist_ik_mode_cns + ".target[0].targetWeight")
+        self._connect_enum_condition(self.wristControlMode_att, 1, wrist_ik_mode_cns + ".target[1].targetWeight")
+
+        wrist_anchor_cns = pm.parentConstraint(
+            self.wrist_anchor_fk_ref,
+            self.wrist_anchor_ik_mode_ref,
+            self.deform_anchor_refs["wrist"],
+            maintainOffset=False,
+        )
+        node.createReverseNode(self.blend_att, wrist_anchor_cns + ".target[0].targetWeight")
+        pm.connectAttr(self.blend_att, wrist_anchor_cns + ".target[1].targetWeight", f=True)
 
     def _connect_hand_ik_rot_mode(self) -> None:
         chain_initial = self.handChain[0].attr("worldMatrix[0]").get()
@@ -815,23 +799,6 @@ class Component(component.Main):
         )
         self._connect_enum_condition(self.wristControlMode_att, 0, hand_ik_rot_cns + ".target[0].targetWeight")
         self._connect_enum_condition(self.wristControlMode_att, 1, hand_ik_rot_cns + ".target[1].targetWeight")
-
-    def _connect_hand_ik_cns_offset(self) -> None:
-        down, _, up = yu.findPathAtoB(self.ik_ctl, self.ikRot_ctl)
-        mult = pm.createNode("multMatrix")
-        compose = pm.createNode("composeMatrix")
-        pm.setAttr(compose + ".inputTranslate", self.hand_ik_cns.attr("translate").get())
-
-        for i, d in enumerate(down):
-            pm.connectAttr("{}.matrix".format(d), "{}.matrixIn[{}]".format(mult, i))
-
-        for j, u in enumerate(up):
-            pm.connectAttr("{}.inverseMatrix".format(u), "{}.matrixIn[{}]".format(mult, i + j + 1))
-
-        pm.connectAttr(compose + ".outputMatrix", mult + ".matrixIn[{}]".format(i + j + 2))
-        decomp = pm.createNode("decomposeMatrix")
-        pm.connectAttr(mult + ".matrixSum", decomp + ".inputMatrix")
-        pm.connectAttr(decomp + ".outputTranslate", self.hand_ik_cns.attr("translate"))
 
     def _connect_twist_and_aim(self) -> None:
         chain_pos = [x.getTranslation(space="world") for x in self.chain2bones]
@@ -1031,8 +998,8 @@ class Component(component.Main):
         self._connect_upv_ref_operator()
         self._connect_ik_handles()
         self._connect_hand_parent_mode()
+        self._connect_wrist_anchor_mode()
         self._connect_hand_ik_rot_mode()
-        self._connect_hand_ik_cns_offset()
         self._connect_twist_and_aim()
         self._connect_soft_ik_and_stretch(multJnt1_node, multJnt2_node)
         self._connect_result_chains(multJnt3_node)
