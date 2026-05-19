@@ -1251,17 +1251,29 @@ class Component(component.Main):
 
     def _surface_u_values(self) -> list[float]:
         base_subdivisions = max(int(self.surface_segment_subdivisions), 1)
-        average_length = self.anchor_total_length / max(len(self.anchor_segment_lengths), 1)
+        surface_segment_lengths = self._surface_segment_lengths()
+        average_length = sum(surface_segment_lengths) / max(len(surface_segment_lengths), 1)
         target_step = average_length / float(base_subdivisions)
         if target_step <= 0.0:
             raise RuntimeError("ymt_feather_ribbon_01 ribbon surface requires non-zero anchor segment length.")
         values = []
-        for span, segment_length in enumerate(self.anchor_segment_lengths):
+        for span, segment_length in enumerate(surface_segment_lengths):
             subdivisions = max(1, math.ceil(segment_length / target_step))
             for step in range(subdivisions):
                 values.append(self._u_from_span_local(span, step / float(subdivisions)))
         values.append(1.0)
         return values
+
+    def _surface_segment_lengths(self) -> list[float]:
+        lengths = []
+        for span, upper_length in enumerate(self.anchor_segment_lengths):
+            lower_start = self.anchor_end_positions[span]
+            lower_end = self.anchor_end_positions[span + 1]
+            lower_length = (lower_end - lower_start).length()
+            if lower_length < 0.001:
+                raise RuntimeError("ymt_feather_ribbon_01 requires non-zero lower surface segment %s." % span)
+            lengths.append(max(upper_length, lower_length))
+        return lengths
 
     def _surface_depths(self) -> list[float]:
         if len(self.surface_depths) < 2:
