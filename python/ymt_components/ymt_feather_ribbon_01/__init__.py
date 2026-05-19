@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 import importlib
 from contextlib import suppress
-from typing import TYPE_CHECKING, Optional, TypedDict, Union
+from typing import TYPE_CHECKING, Optional, TypedDict, Union, cast
 
 import maya.cmds as cmds
 
@@ -26,6 +26,7 @@ import ymt_shifter_utility as ymt_util
 from . import detail_config
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
     from typing import Protocol
 
     from ymt_shifter_utility.type_protocols import MatrixLike, PymelNode, VectorLike, WorldPoint
@@ -54,12 +55,6 @@ class DetailSpec(TypedDict):
     span: int
     local: float
     position: VectorLike
-
-
-class DriverEntry(TypedDict):
-    kind: str
-    index: int
-    weight: float
 
 
 class SurfaceSample(TypedDict):
@@ -131,11 +126,18 @@ class Component(component.Main):
         self._add_curl_controls()
 
         self.detail_specs = self._collect_detail_specs()
-        self.detail_npos = []
-        self.detail_driver_specs = []
-        self.detail_driver_npos = []
+        self.detail_rivet_refs = []
+        self.detail_rivet_refs_by_key = {}
+        self.detail_aim_refs = []
+        self.detail_aim_refs_by_key = {}
+        self.detail_chain_npos = []
+        self.detail_chain_npos_by_key = {}
         self.detail_aim_npos = []
+        self.detail_aim_npos_by_key = {}
+        self.detail_curl_npos = []
+        self.detail_curl_npos_by_key = {}
         self.detail_ctls = []
+        self.detail_ctls_by_key = {}
         self._add_detail_controls()
 
         self.sliding_surface = None
@@ -150,10 +152,12 @@ class Component(component.Main):
         self._ensure_rotation_driver_plugin()
         self._connect_curl_spaces()
         self._connect_curl_deforms()
-        self._connect_detail_rotations()
-        self._connect_curl_aims()
         if self.placement_mode == "surface":
             self._connect_surface_rivets()
+        self._connect_detail_aim_refs()
+        self._connect_detail_chain_roots()
+        self._connect_detail_aim_apply_rotations()
+        self._connect_detail_curl_rotations()
 
     def setRelation(self) -> None:
         """Set guide-to-rig relations."""
@@ -251,47 +255,50 @@ class Component(component.Main):
                 tp=self.anchor_ctls[min(index + 1, len(self.anchor_ctls) - 1)][0],
             )
             deform = primitive.addTransform(offset_npo, self.getName("curl%s_deform" % index), offset_matrix)
-            attribute.setKeyableAttributes(ctl, ["tx", "ty", "tz"])
-            attribute.setInvertMirror(ctl, ["tx", "ty", "tz"])
+            attribute.setKeyableAttributes(ctl, ["tx", "ty", "tz", "rx", "ry", "rz"])
+            attribute.setInvertMirror(ctl, ["tx", "ry", "rz"])
             self.curl_npos.append(npo)
             self.curl_offset_npos.append(offset_npo)
             self.curl_ctls.append(ctl)
             self.curl_deforms.append(deform)
 
     def _add_detail_controls(self) -> None:
-        controls_by_feather_part: dict[tuple[str, int, int], PymelNode] = {}
         matrices_by_feather_part = self._detail_chain_matrices(self.detail_specs)
+        self._add_detail_rivet_refs(matrices_by_feather_part)
         for spec in self.detail_specs:
             detail_name = self._detail_name(spec)
             section = int(spec["section"])
             col = int(spec["col"])
+            key = (str(spec["row"]), section, col)
             matrix = matrices_by_feather_part[(str(spec["row"]), section, col)]
             if col == 0:
-                parent = self.detail_root
                 tag_parent = self.curl_ctls[min(spec["span"], len(self.curl_ctls) - 1)]
             else:
                 previous_key = (str(spec["row"]), section, col - 1)
-                if previous_key not in controls_by_feather_part:
+                if previous_key not in self.detail_ctls_by_key:
                     raise RuntimeError(
                         "ymt_feather_ribbon_01 detail FK chain is missing previous feather part: %s_%s_%s."
                         % previous_key
                     )
-                parent = controls_by_feather_part[previous_key]
-                tag_parent = parent
-            npo = primitive.addTransform(
-                parent,
+                tag_parent = self.detail_ctls_by_key[previous_key]
+            chain_parent = self.detail_root if col == 0 else self.detail_ctls_by_key[previous_key]
+            chain_npo = primitive.addTransform(
+                chain_parent,
                 self.getName("%s_npo" % detail_name),
-                matrix
+                matrix,
             )
-            ctl_parent = npo
-            if col == 0:
-                ctl_parent = primitive.addTransform(
-                    npo,
-                    self.getName("%s_aim_npo" % detail_name),
-                    matrix
-                )
+            aim_npo = primitive.addTransform(
+                chain_npo,
+                self.getName("%s_aim_npo" % detail_name),
+                matrix,
+            )
+            curl_npo = primitive.addTransform(
+                aim_npo,
+                self.getName("%s_curl_npo" % detail_name),
+                matrix,
+            )
             ctl = self.addCtl(
-                ctl_parent,
+                curl_npo,
                 "%s_ctl" % detail_name,
                 matrix,
                 self.color_fk,
@@ -302,15 +309,39 @@ class Component(component.Main):
             )
             attribute.setKeyableAttributes(ctl)
             attribute.setInvertMirror(ctl, ["tx", "ty", "tz"])
-            self.detail_npos.append(npo)
-            controls_by_feather_part[(str(spec["row"]), section, col)] = ctl
-            if col == 0:
-                self.detail_driver_specs.append(spec)
-                self.detail_driver_npos.append(npo)
-                self.detail_aim_npos.append(ctl_parent)
+            self.detail_chain_npos.append(chain_npo)
+            self.detail_chain_npos_by_key[key] = chain_npo
+            self.detail_aim_npos.append(aim_npo)
+            self.detail_aim_npos_by_key[key] = aim_npo
+            self.detail_curl_npos.append(curl_npo)
+            self.detail_curl_npos_by_key[key] = curl_npo
+            self.detail_ctls_by_key[key] = ctl
             self.detail_ctls.append(ctl)
             if self.settings["addJoints"]:
                 self.jnt_pos.append([ctl, detail_name])
+
+    def _add_detail_rivet_refs(self, matrices_by_feather_part: dict[tuple[str, int, int], MatrixLike]) -> None:
+        parent = self.no_transform if self.placement_mode == "surface" else self.detail_root
+        for spec in self.detail_specs:
+            key = (str(spec["row"]), int(spec["section"]), int(spec["col"]))
+            detail_name = self._detail_name(spec)
+            matrix = matrices_by_feather_part[key]
+            ref = primitive.addTransform(
+                parent,
+                self.getName("%s_rivet_ref" % detail_name),
+                matrix,
+            )
+            ymt_util.setKeyableAttributesDontLockVisibility(ref, ["tx", "ty", "tz"])
+            aim_ref = primitive.addTransform(
+                ref,
+                self.getName("%s_aim_ref" % detail_name),
+                matrix,
+            )
+            ymt_util.setKeyableAttributesDontLockVisibility(aim_ref, ["tx", "ty", "tz", "rx", "ry", "rz"])
+            self.detail_rivet_refs.append(ref)
+            self.detail_rivet_refs_by_key[key] = ref
+            self.detail_aim_refs.append(aim_ref)
+            self.detail_aim_refs_by_key[key] = aim_ref
 
     def _detail_chain_matrices(self, specs: list[DetailSpec]) -> dict[tuple[str, int, int], MatrixLike]:
         specs_by_key = self._detail_specs_by_key(specs)
@@ -643,6 +674,16 @@ class Component(component.Main):
     ) -> list[tuple[PymelNode, float]]:
         if not self.curl_surface_skin_joints:
             raise RuntimeError("ymt_feather_ribbon_01 curl surface skin joints were not properly initialized.")
+        return [
+            (self.curl_surface_skin_joints[index], weight)
+            for index, weight in self._surface_curl_index_weight_entries(sample, curl_weight)
+        ]
+
+    def _surface_curl_index_weight_entries(
+        self,
+        sample: SurfaceSample,
+        curl_weight: Optional[float] = None,  # noqa: UP045
+    ) -> list[tuple[int, float]]:
         if curl_weight is None:
             curl_weight = self._surface_curl_weight_for_sample(sample)
         if curl_weight <= 0.0:
@@ -652,8 +693,8 @@ class Component(component.Main):
         if raw_total <= 0.0:
             return []
         return [
-            (joint, curl_weight * (raw_weight / raw_total))
-            for joint, raw_weight in zip(self.curl_surface_skin_joints, raw_weights)
+            (index, curl_weight * (raw_weight / raw_total))
+            for index, raw_weight in enumerate(raw_weights)
             if raw_weight > 0.0
         ]
 
@@ -665,8 +706,19 @@ class Component(component.Main):
         depth_weight = max(0.0, min(1.0, sample["depth"] / max_depth))
         return max(0.0, min(1.0, depth_weight * segment_weight * self.surface_curl_max_weight))
 
+    def _detail_curl_rotation_index_weight_entries(self, sample: SurfaceSample) -> list[tuple[int, float]]:
+        raw_weights = self._surface_curl_raw_weights_for_sample(sample)
+        raw_total = sum(raw_weights)
+        if raw_total <= 0.0:
+            return []
+        return [
+            (index, raw_weight / raw_total)
+            for index, raw_weight in enumerate(raw_weights)
+            if raw_weight > 0.0
+        ]
+
     def _surface_curl_raw_weights_for_sample(self, sample: SurfaceSample) -> list[float]:
-        count = len(self.curl_surface_skin_joints)
+        count = len(self.curl_surface_skin_joints) if self.curl_surface_skin_joints else len(self.curl_npos)
         centers = [
             sample["anchor_distances"][index] + (sample["span_lengths"][index] * 0.5)
             for index in range(count)
@@ -675,20 +727,6 @@ class Component(component.Main):
             self._surface_curl_raw_weight_for_center(sample["distance"], center, centers, index)
             for index, center in enumerate(centers)
         ]
-
-    def _curl_raw_weights_for_u(self, u: float, count: int) -> list[float]:
-        centers = [self._curl_u(index) for index in range(count)]
-        return [self._surface_curl_raw_weight_for_center(u, center, centers, index) for index, center in enumerate(centers)]
-
-    def _curl_weight_entries_for_u(self, u: float, count: int) -> list[tuple[int, float]]:
-        raw_weights = self._curl_raw_weights_for_u(u, count)
-        total = sum(raw_weights)
-        if total <= 0.0:
-            if count <= 0:
-                return []
-            nearest = min(range(count), key=lambda index: abs(u - self._curl_u(index)))
-            return [(nearest, 1.0)]
-        return [(index, weight / total) for index, weight in enumerate(raw_weights) if weight > 0.0]
 
     def _surface_curl_raw_weight_for_center(
         self,
@@ -778,11 +816,11 @@ class Component(component.Main):
         return [(self._anchor_layer_from_depth(depth), 1.0)]
 
     def _connect_surface_rivets(self) -> None:
-        for npo in self.detail_driver_npos:
-            rivets = ymt_util.apply_rivet_constrain_to_selected(self.sliding_surface, npo)
+        for ref in self.detail_rivet_refs:
+            rivets = ymt_util.apply_rivet_constrain_to_selected(self.sliding_surface, ref)
             rivet = pm.PyNode(rivets[0])
             pm.parent(rivet, self.no_transform, relative=True)
-            pm.pointConstraint(rivet, npo, mo=True)
+            pm.pointConstraint(rivet, ref, mo=True)
             ymt_util.setKeyableAttributesDontLockVisibility(rivet, [])
 
     def _connect_curl_spaces(self) -> None:
@@ -863,28 +901,6 @@ class Component(component.Main):
         cmds.connectAttr(decompose_b + ".outputTranslate", midpoint + ".input3D[1]", force=True)
         return midpoint
 
-    def _create_weighted_world_translate_node(
-        self,
-        entries: list[tuple[PymelNode, float]],
-        name: str,
-    ) -> str:
-        if not entries:
-            raise RuntimeError("ymt_feather_ribbon_01 requires at least one weighted translate source.")
-        add_node = cmds.createNode("plusMinusAverage", name=self.getName(name + "_pma"))
-        cmds.setAttr(add_node + ".operation", 1)
-        for index, (source, weight) in enumerate(entries):
-            decompose = self._create_decompose_matrix(
-                self._node_name(source) + ".worldMatrix[0]",
-                self.getName("%s_%02d_dm" % (name, index)),
-            )
-            mult = cmds.createNode("multiplyDivide", name=self.getName("%s_%02d_md" % (name, index)))
-            cmds.connectAttr(decompose + ".outputTranslate", mult + ".input1", force=True)
-            cmds.setAttr(mult + ".input2X", weight)
-            cmds.setAttr(mult + ".input2Y", weight)
-            cmds.setAttr(mult + ".input2Z", weight)
-            cmds.connectAttr(mult + ".output", add_node + ".input3D[%s]" % index, force=True)
-        return add_node + ".output3D"
-
     def _create_compose_translate_node(self, translate_attr: str, name: str) -> str:
         compose = cmds.createNode("composeMatrix", name=self.getName(name + "_cm"))
         cmds.connectAttr(translate_attr, compose + ".inputTranslate", force=True)
@@ -895,45 +911,37 @@ class Component(component.Main):
         cmds.connectAttr(matrix_attr, decompose + ".inputMatrix", force=True)
         return decompose
 
-    def _connect_detail_rotations(self) -> None:
-        decomposers_by_anchor = [
-            [self._create_decompose_rotate(ctl, self._node_name(ctl) + "_decomposeRotate") for ctl in anchor_ctls]
-            for anchor_ctls in self.anchor_ctls
-        ]
-
-        for spec, npo in zip(self.detail_driver_specs, self.detail_driver_npos):
-            entries = self._driver_entries_for_spec(spec)
-            layer_entries = self._anchor_layer_weight_entries_for_depth(spec["depth"])
-            compose = self._compose_weighted_rotation_sources(
-                [
-                    {
-                        "decomposer": decomposers_by_anchor[entry["index"]][layer_index],
-                        "weight": float(entry["weight"]) * layer_weight,
-                    }
-                    for entry in entries
-                    for layer_index, layer_weight in layer_entries
-                ]
+    def _connect_detail_chain_roots(self) -> None:
+        for spec in self.detail_specs:
+            if int(spec["col"]) != 0:
+                continue
+            key = (str(spec["row"]), int(spec["section"]), int(spec["col"]))
+            pm.pointConstraint(
+                self.detail_rivet_refs_by_key[key],
+                self.detail_chain_npos_by_key[key],
+                mo=True,
             )
-            rotate_attr = self._create_initial_offset_rotate_node(
-                npo,
-                compose + ".outRotate",
-                "%s_detailRotate" % self._detail_name(spec),
-            )
-            cmds.connectAttr(rotate_attr, self._node_name(npo) + ".rotate", force=True)
 
-    def _connect_curl_aims(self) -> None:
+    def _connect_detail_aim_refs(self) -> None:
         aim_up = self._create_detail_chain_aim_up()
-        specs_by_key = self._detail_specs_by_key(self.detail_specs)
-        targets_by_chain: dict[tuple[str, int], PymelNode] = {}
-        for spec, aim_npo in zip(self.detail_driver_specs, self.detail_aim_npos):
-            chain_key = (str(spec["row"]), int(spec["section"]))
-            if chain_key not in targets_by_chain:
-                aim_u = self._detail_chain_aim_u(spec, specs_by_key)
-                curl_entries = self._curl_weight_entries_for_u(aim_u, len(self.curl_ctls))
-                targets_by_chain[chain_key] = self._create_detail_chain_aim_target(spec, aim_npo, curl_entries)
+        for spec in self.detail_specs:
+            key = (str(spec["row"]), int(spec["section"]), int(spec["col"]))
+            next_key = (key[0], key[1], key[2] + 1)
+            next_ref = self.detail_rivet_refs_by_key.get(next_key)
+            if next_ref is None:
+                previous_key = (key[0], key[1], key[2] - 1)
+                previous_aim_ref = self.detail_aim_refs_by_key.get(previous_key)
+                if previous_aim_ref is not None:
+                    constraint = pm.orientConstraint(
+                        previous_aim_ref,
+                        self.detail_aim_refs_by_key[key],
+                        mo=False,
+                    )
+                    pm.setAttr(constraint.attr("interpType"), 0)  # no-flip
+                continue
             cmds.aimConstraint(
-                self._node_name(targets_by_chain[chain_key]),
-                self._node_name(aim_npo),
+                self._node_name(next_ref),
+                self._node_name(self.detail_aim_refs_by_key[key]),
                 maintainOffset=True,
                 aimVector=(1, 0, 0),
                 upVector=(0, 1, 0),
@@ -942,24 +950,43 @@ class Component(component.Main):
                 worldUpVector=(0, 1, 0),
             )
 
-    def _create_detail_chain_aim_target(
-        self,
-        spec: DetailSpec,
-        aim_npo: PymelNode,
-        curl_entries: list[tuple[int, float]],
-    ) -> PymelNode:
-        aim_target = primitive.addTransform(
-            self.no_transform,
-            self.getName("%s_chainAimTarget" % self._detail_name(spec)),
-            transform.getTransform(aim_npo),
-        )
-        translate_attr = self._create_weighted_world_translate_node(
-            [(self.curl_ctls[index], weight) for index, weight in curl_entries],
-            self._detail_name(spec) + "_chainAimTargetTranslate",
-        )
-        cmds.connectAttr(translate_attr, self._node_name(aim_target) + ".translate", force=True)
-        ymt_util.setKeyableAttributesDontLockVisibility(aim_target, [])
-        return aim_target
+    def _connect_detail_aim_apply_rotations(self) -> None:
+        for spec in self.detail_specs:
+            key = (str(spec["row"]), int(spec["section"]), int(spec["col"]))
+            rotate_attr = self._create_local_offset_rotation_node(
+                self.detail_aim_refs_by_key[key],
+                self.detail_aim_npos_by_key[key],
+                "%s_detailAimApply" % self._detail_name(spec),
+            )
+            cmds.connectAttr(rotate_attr, self._node_name(self.detail_aim_npos_by_key[key]) + ".rotate", force=True)
+
+    def _connect_detail_curl_rotations(self) -> None:
+        decomposers = [
+            self._create_decompose_rotate(ctl, self.getName("curl%s_detailDecomposeRotate" % index))
+            for index, ctl in enumerate(self.curl_ctls)
+        ]
+        for spec in self.detail_specs:
+            key = (str(spec["row"]), int(spec["section"]), int(spec["col"]))
+            curl_npo = self.detail_curl_npos_by_key[key]
+            sample = self._surface_sample_from_position(spec["position"])
+            curl_entries = self._detail_curl_rotation_index_weight_entries(sample)
+            if not curl_entries:
+                continue
+            compose = self._compose_weighted_detail_curl_rotation_sources(
+                [
+                    {
+                        "decomposer": decomposers[index],
+                        "weight": weight,
+                    }
+                    for index, weight in curl_entries
+                ]
+            )
+            rotate_attr = self._create_initial_offset_rotate_node(
+                curl_npo,
+                compose + ".outRotate",
+                "%s_detailCurlRotate" % self._detail_name(spec),
+            )
+            cmds.connectAttr(rotate_attr, self._node_name(curl_npo) + ".rotate", force=True)
 
     def _create_detail_chain_aim_up(self) -> PymelNode:
         aim_up = primitive.addTransform(
@@ -969,19 +996,6 @@ class Component(component.Main):
         )
         ymt_util.setKeyableAttributesDontLockVisibility(aim_up, [])
         return aim_up
-
-    def _detail_chain_aim_u(
-        self,
-        spec: DetailSpec,
-        specs_by_key: dict[tuple[str, int, int], DetailSpec],
-    ) -> float:
-        row = str(spec["row"])
-        section = int(spec["section"])
-        col = int(spec["col"])
-        next_spec = specs_by_key.get((row, section, col + 1))
-        if next_spec is None:
-            return float(spec["u"])
-        return (float(spec["u"]) + float(next_spec["u"])) * 0.5
 
     def _connect_anchor_root_space(self, refs: dict[str, PymelNode], anchor_name: str, npo: PymelNode) -> None:
         self._ensure_rotation_driver_plugin()
@@ -1038,31 +1052,42 @@ class Component(component.Main):
             return [("elbow", 0.25), ("wrist", 0.5), ("hand", 0.25)]
         raise RuntimeError("ymt_feather_ribbon_01 unsupported anchor root-space blend: %s." % anchor_name)
 
-    def _driver_entries_for_spec(self, spec: DetailSpec) -> list[DriverEntry]:
-        span = int(spec["span"])
-        local = float(spec["local"])
-        entries: list[DriverEntry] = [
-            {"kind": "anchor", "index": span, "weight": 1.0 - local},
-            {"kind": "anchor", "index": min(span + 1, len(self.anchor_names) - 1), "weight": local},
-        ]
-        return entries
-
     def _compose_weighted_rotation_sources(
         self,
         sources: list[WeightedRotationSource],
         include_bend_v: bool = True,
     ) -> str:
-        sum_attrs = []
         output_attrs = ["outRoll", "outBendH"]
         if include_bend_v:
             output_attrs.append("outBendV")
-        for output_attr in output_attrs:
+        return self._compose_weighted_rotation_sources_with_attrs(
+            sources,
+            [(output_attr, 1.0) for output_attr in output_attrs],
+        )
+
+    def _compose_weighted_detail_curl_rotation_sources(self, sources: list[WeightedRotationSource]) -> str:
+        return self._compose_weighted_rotation_sources_with_attrs(
+            sources,
+            [
+                ("outBendV", -1.0),
+                ("outBendH", -1.0),
+                ("outRoll", -1.0),
+            ],
+        )
+
+    def _compose_weighted_rotation_sources_with_attrs(
+        self,
+        sources: list[WeightedRotationSource],
+        output_attrs: list[tuple[str, float]],
+    ) -> str:
+        sum_attrs = []
+        for output_attr, sign in output_attrs:
             add_node = cmds.createNode("plusMinusAverage")
             cmds.setAttr(add_node + ".operation", 1)
             for index, source in enumerate(sources):
                 mult = cmds.createNode(self._multiply_node_type())
                 cmds.connectAttr(source["decomposer"] + "." + output_attr, mult + ".input1")
-                cmds.setAttr(mult + ".input2", source["weight"])
+                cmds.setAttr(mult + ".input2", source["weight"] * sign)
                 cmds.connectAttr(mult + ".output", add_node + ".input1D[%s]" % index)
             sum_attrs.append(add_node + ".output1D")
 
@@ -1070,7 +1095,7 @@ class Component(component.Main):
         cmds.setAttr(compose + ".rotateOrder", ROTATE_ORDER_XYZ)
         cmds.connectAttr(sum_attrs[0], compose + ".roll")
         cmds.connectAttr(sum_attrs[1], compose + ".bendH")
-        if include_bend_v:
+        if len(sum_attrs) > 2:
             cmds.connectAttr(sum_attrs[2], compose + ".bendV")
         return compose
 
@@ -1079,6 +1104,25 @@ class Component(component.Main):
         cmds.setAttr(node + ".rotateOrder", ROTATE_ORDER_XYZ)
         cmds.connectAttr(self._node_name(source) + ".rotate", node + ".rotate", force=True)
         return node
+
+    def _create_local_offset_rotation_node(
+        self,
+        source: PymelNode,
+        driven: PymelNode,
+        name: str,
+    ) -> str:
+        source_initial_matrix = source.getMatrix()
+        driven_initial_matrix = driven.getMatrix()
+        offset_matrix = cast("MatrixLike", source_initial_matrix.inverse() * driven_initial_matrix)
+
+        mult = cmds.createNode("multMatrix", name=self.getName(name + "_mm"))
+        cmds.connectAttr(self._node_name(source) + ".matrix", mult + ".matrixIn[0]", force=True)
+        cmds.setAttr(mult + ".matrixIn[1]", *self._matrix_values(offset_matrix), type="matrix")
+
+        decompose = cmds.createNode("decomposeMatrix", name=self.getName(name + "_dm"))
+        cmds.connectAttr(mult + ".matrixSum", decompose + ".inputMatrix", force=True)
+        cmds.setAttr(decompose + ".inputRotateOrder", ROTATE_ORDER_XYZ)
+        return decompose + ".outputRotate"
 
     def _create_initial_offset_rotate_node(self, npo: PymelNode, driver_rotate_attr: str, name: str) -> str:
         npo_name = self._node_name(npo)
@@ -1100,6 +1144,18 @@ class Component(component.Main):
         cmds.connectAttr(mult + ".matrixSum", decompose + ".inputMatrix", force=True)
         cmds.setAttr(decompose + ".inputRotateOrder", ROTATE_ORDER_XYZ)
         return decompose + ".outputRotate"
+
+    def _matrix_values(self, matrix: MatrixLike) -> tuple[float, ...]:
+        matrix_get = getattr(matrix, "get", None)
+        values = matrix_get() if callable(matrix_get) else matrix
+        first_value = values[0]
+        if isinstance(first_value, (int, float)):
+            return tuple(float(cast("Sequence[float]", values)[index]) for index in range(16))
+        return tuple(
+            float(cast("Sequence[float]", values[row])[column])
+            for row in range(4)
+            for column in range(4)
+        )
 
     def _multiply_node_type(self) -> str:
         if int(cmds.about(apiVersion=True)) >= MAYA_2025_API_VERSION:
