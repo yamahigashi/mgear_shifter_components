@@ -62,6 +62,16 @@ class DriverEntry(TypedDict):
     weight: float
 
 
+class SurfaceSample(TypedDict):
+    position: VectorLike
+    span: int
+    local: float
+    depth: float
+    distance: float
+    anchor_distances: list[float]
+    span_lengths: list[float]
+
+
 class WeightedRotationSource(TypedDict):
     decomposer: str
     weight: float
@@ -73,6 +83,7 @@ class Component(component.Main):
     placement_modes = ("surface", "fixed")
     anchor_names = ("root", "elbow", "wrist", "hand")
     anchor_end_names = ("rootEnd", "elbowEnd", "wristEnd", "handEnd")
+    surface_curl_max_weight = 0.65
     surface_segment_subdivisions = 4
 
     def addObjects(self) -> None:
@@ -424,15 +435,13 @@ class Component(component.Main):
             cmds.setAttr(skin + ".normalizeWeights", 0)
 
         for u_index in range(u_count):
-            u = surface_u_values[u_index]
             for v_index in range(v_count):
-                depth = surface_depths[v_index]
                 component = "%s.cv[%s][%s]" % (surface_shape, u_index, v_index)
+                sample = self._surface_sample_from_component(component)
                 weights = dict.fromkeys(influence_names, 0.0)
-                for joint, weight in self._surface_anchor_weight_entries(depth, u):
-                    weights[influence_by_node[self._node_name(joint)]] = weight
-                for curl_joint, curl_weight in self._surface_curl_weight_entries(u, depth):
-                    weights[influence_by_node[self._node_name(curl_joint)]] = curl_weight
+                for joint, weight in self._surface_weight_entries(sample):
+                    influence = influence_by_node[self._node_name(joint)]
+                    weights[influence] += weight
                 total = sum(weights.values())
                 if total <= 0.0:
                     raise RuntimeError("ymt_feather_ribbon_01 generated zero total skin weight for %s." % component)
@@ -456,18 +465,18 @@ class Component(component.Main):
         influence_by_node: dict[str, str],
     ) -> None:
         v_index = max(range(v_count), key=lambda index: abs(surface_depths[index]))
-        depth = surface_depths[v_index]
         for index, joint in enumerate(self.curl_surface_skin_joints):
             u = self._curl_u(index)
             u_index = min(
                 range(len(surface_u_values)),
                 key=lambda index: abs(surface_u_values[index] - u),
             )
-            expected_entries = dict(self._surface_curl_weight_entries(surface_u_values[u_index], depth))
+            component = "%s.cv[%s][%s]" % (surface_shape, u_index, v_index)
+            sample = self._surface_sample_from_component(component)
+            expected_entries = dict(self._surface_curl_weight_entries(sample))
             expected = expected_entries.get(joint, 0.0)
             if expected <= 0.05:
                 continue
-            component = "%s.cv[%s][%s]" % (surface_shape, u_index, v_index)
             influence = influence_by_node[self._node_name(joint)]
             actual = cmds.skinPercent(skin, component, query=True, transform=influence)
             if isinstance(actual, (list, tuple)):
@@ -509,6 +518,81 @@ class Component(component.Main):
             raise RuntimeError("ymt_feather_ribbon_01 could not find the ribbon surface shape.")
         return shapes[0]
 
+    def _surface_sample_from_component(self, component: str) -> SurfaceSample:
+        position = self._to_vector(cmds.xform(component, query=True, worldSpace=True, translation=True))
+        return self._surface_sample_from_position(position)
+
+    def _surface_sample_from_position(self, position: VectorLike) -> SurfaceSample:
+        best_sample = None
+        best_distance = None
+        for span in range(len(self.anchor_segment_lengths)):
+            sample = self._surface_sample_from_position_on_span(position, span)
+            distance = (position - sample["position"]).length()
+            if best_distance is None or distance < best_distance:
+                best_sample = sample
+                best_distance = distance
+        if best_sample is None:
+            raise RuntimeError("ymt_feather_ribbon_01 could not resolve a surface sample from CV position.")
+        return best_sample
+
+    def _surface_sample_from_position_on_span(self, position: VectorLike, span: int) -> SurfaceSample:
+        low = 0.0
+        high = 1.0
+        for _ in range(12):
+            first = low + ((high - low) / 3.0)
+            second = high - ((high - low) / 3.0)
+            first_distance = self._surface_projection_distance_on_span(position, span, first)
+            second_distance = self._surface_projection_distance_on_span(position, span, second)
+            if first_distance < second_distance:
+                high = second
+            else:
+                low = first
+        local = (low + high) * 0.5
+        base_position = self._position_from_span_local(span, local)
+        end_position = self._position_from_anchor_end_span_local(span, local)
+        depth = self._clamped_depth_from_position(position, base_position, end_position)
+        sample_position = base_position + ((end_position - base_position) * depth)
+        span_lengths = self._surface_span_lengths_from_sample_depth(depth)
+        anchor_distances = self._anchor_distances_from_span_lengths(span_lengths)
+        distance = anchor_distances[span] + (span_lengths[span] * local)
+        return {
+            "position": sample_position,
+            "span": span,
+            "local": local,
+            "depth": depth,
+            "distance": distance,
+            "anchor_distances": anchor_distances,
+            "span_lengths": span_lengths,
+        }
+
+    def _surface_projection_distance_on_span(self, position: VectorLike, span: int, local: float) -> float:
+        base_position = self._position_from_span_local(span, local)
+        end_position = self._position_from_anchor_end_span_local(span, local)
+        depth = self._clamped_depth_from_position(position, base_position, end_position)
+        projected = base_position + ((end_position - base_position) * depth)
+        return (position - projected).length()
+
+    def _surface_span_lengths_from_sample_depth(self, depth: float) -> list[float]:
+        lengths = []
+        for span in range(len(self.anchor_segment_lengths)):
+            start = self._anchor_position_from_depth(span, depth)
+            end = self._anchor_position_from_depth(span + 1, depth)
+            length = (end - start).length()
+            if length < 0.001:
+                raise RuntimeError(
+                    "ymt_feather_ribbon_01 requires non-zero surface segment %s at depth %.3f." % (span, depth)
+                )
+            lengths.append(length)
+        return lengths
+
+    def _anchor_distances_from_span_lengths(self, span_lengths: list[float]) -> list[float]:
+        distances = [0.0]
+        total = 0.0
+        for length in span_lengths:
+            total += length
+            distances.append(total)
+        return distances
+
     def _skin_influence_names(self, skin: str) -> list[str]:
         return [self._node_name(influence) for influence in cmds.skinCluster(skin, query=True, influence=True)]
 
@@ -535,25 +619,35 @@ class Component(component.Main):
                 raise RuntimeError("ymt_feather_ribbon_01 could not resolve skin influence for '%s'." % joint_name)
         return mapping
 
-    def _surface_anchor_weight_entries(self, depth: float, u: float) -> list[tuple[PymelNode, float]]:
-        anchor_entries = self._anchor_weight_entries_for_u(u)
-        layer_entries = self._anchor_layer_weight_entries_for_depth(depth)
-        curl_weight = self._surface_curl_weight_for_u(u, depth)
-        anchor_weight = max(0.0, 1.0 - curl_weight)
+    def _surface_weight_entries(self, sample: SurfaceSample) -> list[tuple[PymelNode, float]]:
+        curl_strength = self._surface_curl_weight_for_sample(sample)
+        anchor_weight = max(0.0, 1.0 - curl_strength)
+        entries = [(joint, weight * anchor_weight) for joint, weight in self._surface_anchor_weight_entries(sample)]
+        entries.extend(self._surface_curl_weight_entries(sample, curl_strength))
+        return entries
+
+    def _surface_anchor_weight_entries(self, sample: SurfaceSample) -> list[tuple[PymelNode, float]]:
+        anchor_entries = self._anchor_weight_entries_for_surface_sample(sample)
+        layer_entries = self._anchor_layer_weight_entries_for_depth(sample["depth"])
         entries = []
         for anchor_index, anchor_value in anchor_entries:
             for layer_index, layer_value in layer_entries:
                 joint = self.anchor_surface_skin_joints[anchor_index][layer_index]
-                entries.append((joint, anchor_value * layer_value * anchor_weight))
+                entries.append((joint, anchor_value * layer_value))
         return entries
 
-    def _surface_curl_weight_entries(self, u: float, depth: float) -> list[tuple[PymelNode, float]]:
+    def _surface_curl_weight_entries(
+        self,
+        sample: SurfaceSample,
+        curl_weight: Optional[float] = None,  # noqa: UP045
+    ) -> list[tuple[PymelNode, float]]:
         if not self.curl_surface_skin_joints:
             raise RuntimeError("ymt_feather_ribbon_01 curl surface skin joints were not properly initialized.")
-        curl_weight = self._surface_curl_weight_for_u(u, depth)
+        if curl_weight is None:
+            curl_weight = self._surface_curl_weight_for_sample(sample)
         if curl_weight <= 0.0:
             return []
-        raw_weights = self._surface_curl_raw_weights_for_u(u)
+        raw_weights = self._surface_curl_raw_weights_for_sample(sample)
         raw_total = sum(raw_weights)
         if raw_total <= 0.0:
             return []
@@ -563,16 +657,24 @@ class Component(component.Main):
             if raw_weight > 0.0
         ]
 
-    def _surface_curl_weight_for_u(self, u: float, depth: float) -> float:
+    def _surface_curl_weight_for_sample(self, sample: SurfaceSample) -> float:
         max_depth = self._max_surface_depth()
         if max_depth <= 0.0:
             return 0.0
-        segment_weight = min(1.0, sum(self._surface_curl_raw_weights_for_u(u)))
-        depth_weight = max(0.0, min(1.0, depth / max_depth))
-        return max(0.0, min(1.0, depth_weight * segment_weight * 0.65))
+        segment_weight = min(1.0, sum(self._surface_curl_raw_weights_for_sample(sample)))
+        depth_weight = max(0.0, min(1.0, sample["depth"] / max_depth))
+        return max(0.0, min(1.0, depth_weight * segment_weight * self.surface_curl_max_weight))
 
-    def _surface_curl_raw_weights_for_u(self, u: float) -> list[float]:
-        return self._curl_raw_weights_for_u(u, len(self.curl_surface_skin_joints))
+    def _surface_curl_raw_weights_for_sample(self, sample: SurfaceSample) -> list[float]:
+        count = len(self.curl_surface_skin_joints)
+        centers = [
+            sample["anchor_distances"][index] + (sample["span_lengths"][index] * 0.5)
+            for index in range(count)
+        ]
+        return [
+            self._surface_curl_raw_weight_for_center(sample["distance"], center, centers, index)
+            for index, center in enumerate(centers)
+        ]
 
     def _curl_raw_weights_for_u(self, u: float, count: int) -> list[float]:
         centers = [self._curl_u(index) for index in range(count)]
@@ -618,6 +720,38 @@ class Component(component.Main):
 
     def _anchor_weight_entries_for_u(self, u: float) -> list[tuple[int, float]]:
         span, local = self._span_local_from_u(u)
+        return self._anchor_weight_entries_from_span_local(span, local)
+
+    def _anchor_weight_entries_for_surface_sample(self, sample: SurfaceSample) -> list[tuple[int, float]]:
+        anchor_distances = sample["anchor_distances"]
+        distance = sample["distance"]
+        nearest = min(range(len(anchor_distances)), key=lambda index: abs(anchor_distances[index] - distance))
+        start = max(0, nearest - 1)
+        end = min(len(anchor_distances) - 1, nearest + 1)
+        raw_entries = []
+        for index in range(start, end + 1):
+            radius = self._anchor_weight_radius(anchor_distances, index)
+            if radius <= 0.0:
+                weight = 1.0 if abs(distance - anchor_distances[index]) <= 0.001 else 0.0
+            else:
+                normalized_distance = abs(distance - anchor_distances[index]) / radius
+                weight = max(0.0, 1.0 - self._smootherstep(normalized_distance))
+            if weight > 0.0:
+                raw_entries.append((index, weight))
+        total = sum(weight for _, weight in raw_entries)
+        if total <= 0.0:
+            return [(nearest, 1.0)]
+        return [(index, weight / total) for index, weight in raw_entries]
+
+    def _anchor_weight_radius(self, anchor_distances: list[float], index: int) -> float:
+        distances = []
+        if index > 0:
+            distances.append(anchor_distances[index] - anchor_distances[index - 1])
+        if index < len(anchor_distances) - 1:
+            distances.append(anchor_distances[index + 1] - anchor_distances[index])
+        return max(distances) if distances else 0.0
+
+    def _anchor_weight_entries_from_span_local(self, span: int, local: float) -> list[tuple[int, float]]:
         start_anchor = min(span, len(self.anchor_names) - 1)
         end_anchor = min(span + 1, len(self.anchor_names) - 1)
         if local <= 0.001 or start_anchor == end_anchor:
@@ -1168,16 +1302,32 @@ class Component(component.Main):
     ) -> float:
         # Depth values are measured in the anchor -> anchorEnd basis.
         # 0.0 is the anchor line, and 1.0 is the anchorEnd reference line.
-        depth_axis = end_position - base_position
-        length_squared = depth_axis * depth_axis
-        if length_squared < 0.000001:
-            raise RuntimeError("ymt_feather_ribbon_01 requires non-zero anchorEnd depth length.")
-        depth = ((position - base_position) * depth_axis) / length_squared
+        depth = self._depth_ratio_from_position(position, base_position, end_position)
         if not -0.001 <= depth <= 1.001:
             raise RuntimeError(
                 "ymt_feather_ribbon_01 detail guide is outside the anchor -> anchorEnd depth range: %.3f." % depth
             )
         return max(0.0, min(1.0, depth))
+
+    def _clamped_depth_from_position(
+        self,
+        position: VectorLike,
+        base_position: VectorLike,
+        end_position: VectorLike,
+    ) -> float:
+        return max(0.0, min(1.0, self._depth_ratio_from_position(position, base_position, end_position)))
+
+    def _depth_ratio_from_position(
+        self,
+        position: VectorLike,
+        base_position: VectorLike,
+        end_position: VectorLike,
+    ) -> float:
+        depth_axis = end_position - base_position
+        length_squared = depth_axis * depth_axis
+        if length_squared < 0.000001:
+            raise RuntimeError("ymt_feather_ribbon_01 requires non-zero anchorEnd depth length.")
+        return ((position - base_position) * depth_axis) / length_squared
 
     def _anchor_control_matrix(self, start_position: VectorLike, end_position: VectorLike) -> MatrixLike:
         if vector.getDistance(start_position, end_position) < 0.001:
