@@ -755,8 +755,8 @@ class Component(component.Main):
             self.hand_aim_ref,
             self.hand_ik_ctl,
             axis="zx",
-            wupType=4,
-            wupVector=[1, 0, 0],
+            wupType="objectrotation",
+            wupVector=[0, 1, 0],
             wupObject=self.ikRot_ctl,
             maintainOffset=False,
         )
