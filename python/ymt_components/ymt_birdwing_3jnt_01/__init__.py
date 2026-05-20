@@ -406,6 +406,9 @@ class Component(component.Main):
         attribute.setInvertMirror(self.ikRot_ctl, ["ry", "rz"])
         attribute.lockAttribute(self.ikRot_ctl, ["tx", "ty", "tz", "sx", "sy", "sz", "v"])
 
+        self.hand_aim_ref = primitive.addTransform(self.root, self.getName("hand_aim_ref"), wrist_t)
+        self.hand_aim_ref.attr("visibility").set(False)
+
         self.hand_ik_cns = primitive.addTransform(self.ikRot_ctl, self.getName("hand_ik_cns"), hand_t)
         self.hand_ik_ctl = self.addCtl(
             self.hand_ik_cns,
@@ -440,11 +443,8 @@ class Component(component.Main):
         attribute.setInvertMirror(self.handIkRot_ctl, ["ry", "rz"])
         attribute.lockAttribute(self.handIkRot_ctl, ["tx", "ty", "tz", "sx", "sy", "sz", "v"])
 
-        self.hand_ik_ref = primitive.addTransform(
-            self.handIkRot_ctl, self.getName("hand_ik_ref"), transform.getTransform(self.handIkRot_ctl)
-        )
-        self.hand_roll_ref = primitive.addTransform(
-            self.hand_ik_ref, self.getName("hand_roll_ref"), transform.getTransform(self.handIkRot_ctl)
+        self.hand_final_ref = primitive.addTransform(
+            self.handIkRot_ctl, self.getName("hand_final_ref"), transform.getTransform(self.handIkRot_ctl)
         )
         self.fk_ref = primitive.addTransform(
             self.fk_ctl[2], self.getName("fk_ref"), transform.getTransform(self.handIkRot_ctl)
@@ -596,7 +596,6 @@ class Component(component.Main):
         self.blend_att = self.addAnimParam("blend", "Fk/Ik Blend", "double", self.settings["blend"], 0, 1)
         self.volume_att = self.addAnimParam("volume", "Volume", "double", 1, 0, 1)
         self.roll_att = self.addAnimParam("roll", "Roll", "double", 0, -180, 180)
-        self.handRoll_att = self.addAnimParam("handRoll", "Hand Roll", "double", 0, -180, 180)
         self.wristControlMode_att = self.addAnimEnumParam(
             "wristControlMode",
             "Wrist Control Mode",
@@ -663,7 +662,7 @@ class Component(component.Main):
                 ],
             )
             attribute.addProxyAttribute(
-                [self.roll_att, self.handRoll_att, self.wristControlMode_att],
+                [self.roll_att, self.wristControlMode_att],
                 [self.ik_ctl, self.ikRot_ctl, self.hand_ik_ctl, self.handIkRot_ctl, self.upv_ctl],
             )
 
@@ -749,6 +748,19 @@ class Component(component.Main):
         self._connect_enum_condition(self.wristControlMode_att, 0, wrist_mode_basis_cns + ".target[0].targetWeight")
         self._connect_enum_condition(self.wristControlMode_att, 1, wrist_mode_basis_cns + ".target[1].targetWeight")
         pm.parentConstraint(self.wrist_mode_basis_ref, self.hand_ik_parent_cns, maintainOffset=False)
+
+    def _connect_hand_aim_ref(self) -> None:
+        pm.pointConstraint(self.handChain[0], self.hand_aim_ref, maintainOffset=False)
+        applyop.aimCns(
+            self.hand_aim_ref,
+            self.hand_ik_ctl,
+            axis="zx",
+            wupType=4,
+            wupVector=[1, 0, 0],
+            wupObject=self.ikRot_ctl,
+            maintainOffset=False,
+        )
+        pm.orientConstraint(self.hand_aim_ref, self.handIkRot_npo, maintainOffset=False)
 
     def _connect_wrist_anchor_mode(self) -> None:
         pm.parentConstraint(self.wingBonesFK[2], self.wrist_anchor_fk_ref, maintainOffset=False)
@@ -838,8 +850,7 @@ class Component(component.Main):
         pm.pointConstraint(self.handChain[0], self.wingBonesIK[2], mo=True)
         pm.orientConstraint(self.wrist_mode_basis_ref, self.wingBonesIK[2], mo=True)
         pm.connectAttr(multJnt3_node + ".outputX", self.wingBonesIK[3] + ".tx")
-        pm.connectAttr(self.handRoll_att, self.hand_roll_ref.attr("rx"))
-        pm.orientConstraint(self.hand_roll_ref, self.wingBonesIK[-1], mo=True)
+        pm.orientConstraint(self.hand_final_ref, self.wingBonesIK[-1], mo=True)
 
         for i, wing_bone in enumerate(self.wingBones):
             node.createPairBlend(self.wingBonesFK[i], self.wingBonesIK[i], self.blend_att, 1, wing_bone)
@@ -962,6 +973,7 @@ class Component(component.Main):
         self._connect_upv_ref_operator()
         self._connect_ik_handles()
         self._connect_hand_parent_mode()
+        self._connect_hand_aim_ref()
         self._connect_wrist_anchor_mode()
         self._connect_twist_and_aim()
         self._connect_soft_ik_and_stretch(multJnt1_node, multJnt2_node)

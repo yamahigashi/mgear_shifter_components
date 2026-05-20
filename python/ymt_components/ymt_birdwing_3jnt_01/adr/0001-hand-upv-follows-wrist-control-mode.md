@@ -19,7 +19,7 @@ The hand section will not build a separate hidden hand up-vector chain or aim re
 - `IK`: the hand IK target stays on the IK control basis, so moving `upv_ctl` does not move the hand IK target.
 - `Chain`: the hand IK target follows the solved wrist chain, so moving `upv_ctl` affects it through the root/elbow/wrist IK plane.
 
-Final hand orientation remains owned by `handIkRot_ctl` and `handRoll`. `handIkRot_npo` remains a stable zero parent under `hand_ik_ctl`; it is not constrained by `wristControlMode`.
+Final hand orientation remains owned by `handIkRot_ctl`. `hand_ik_ctl` provides the hand target position, not animator-facing rotation channels. The hand target point is converted into a wrist-to-hand aim basis by `hand_aim_ref`, with `ikRot_ctl` providing the intermediate up/basis correction. `handIkRot_ctl` then provides additive local rotation under that corrected basis. `handIkRot_npo` remains a zero parent under `hand_ik_ctl` for placement, but its orientation follows `hand_aim_ref`.
 
 ## Considered Options
 
@@ -35,7 +35,7 @@ Final hand orientation remains owned by `handIkRot_ctl` and `handRoll`. `handIkR
 
 ## Consequences
 
-The hand solve has fewer hidden dependencies and no longer copies `upv_ctl.translate` into a mismatched local space. Existing rigs that expected hidden hand up-vector twist in `IK` mode will behave differently: in `IK` mode, hand target position is independent of `upv_ctl`; in `Chain` mode, it continues to follow the solved wrist basis. The final hand rotation control no longer receives an extra orientation switch on its NPO.
+The hand solve has fewer hidden dependencies and no longer copies `upv_ctl.translate` into a mismatched local space. Existing rigs that expected hidden hand up-vector twist in `IK` mode will behave differently: in `IK` mode, hand target position is independent of `upv_ctl`; in `Chain` mode, it continues to follow the solved wrist basis. The final hand rotation control no longer receives an extra orientation switch on its NPO. The separate `handRoll` attribute is removed because `handIkRot_ctl` now owns all additive final hand rotation.
 
 ## Confidence and Revisit Trigger
 

@@ -343,7 +343,7 @@ def _reset_attrs(obj: PymelNode, attrs: list[str]) -> None:
 
 
 def _get_roll_attrs_from_switch(switch_attr_name: str) -> list[str]:
-    return _get_attrs_from_switch(switch_attr_name, ("roll", "handRoll"))
+    return _get_attrs_from_switch(switch_attr_name, ("roll",))
 
 
 def _get_attrs_from_switch(switch_attr_name: str, attr_names: tuple[str, ...]) -> list[str]:
@@ -492,7 +492,7 @@ def _match_to_ik(
     _set_upv_translate(upv_ctrl, upv_translate)
     for _ in range(10):
         cmds.xform(fk_ctrls[0].name(), ws=True, matrix=root_mat)
-    for attr_name in ("roll", "handRoll"):
+    for attr_name in ("roll",):
         attr = ikfk_attr.replace("blend", attr_name)
         if ui_node.hasAttr(attr):
             ui_node.attr(attr).set(0.0)
