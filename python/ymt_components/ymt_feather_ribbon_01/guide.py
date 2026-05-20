@@ -87,6 +87,7 @@ class Guide(guide.ComponentGuide):
             "string",
             "primary: 0.2\nsecondary: 0.375\ntertial: 0.55",
         )
+        self.pDetailCurlRotMults = self.addParam("detailCurlRotMults", "string", "1")
         self.pCtlSize = self.addParam("ctlSize", "double", 1, 0.001, None)
         self.pAddJoints = self.addParam("addJoints", "bool", True)
         self.pUseIndex = self.addParam("useIndex", "bool", False)
@@ -173,6 +174,7 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
         self.tabs.insertTab(1, self.settingsTab, "Component Settings")
         self.settingsTab.placementMode_comboBox.setCurrentIndex(self.root.attr("placementMode").get())
         self.populate_row_table()
+        self._sync_detail_curl_rot_mult_count(self._detail_column_count_from_root())
         self.settingsTab.ctlSize_doubleSpinBox.setValue(self.root.attr("ctlSize").get())
         self.populateCheck(self.settingsTab.addJoints_checkBox, "addJoints")
 
@@ -201,6 +203,7 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
         self.settingsTab.addRow_pushButton.clicked.connect(self.add_row_table_item)
         self.settingsTab.removeRow_pushButton.clicked.connect(self.remove_selected_row_table_item)
         self.settingsTab.generateLocators_pushButton.clicked.connect(self.rebuild_detail_locators)
+        self.settingsTab.detailCurlRotMults_lineEdit.editingFinished.connect(self.update_detail_curl_rot_mults_setting)
         self.settingsTab.ctlSize_doubleSpinBox.valueChanged.connect(
             partial(self.updateSpinBox, self.settingsTab.ctlSize_doubleSpinBox, "ctlSize")
         )
@@ -283,6 +286,47 @@ class componentSettings(MayaQWidgetDockableMixin, guide.componentMainSettings):
         self.root.attr("detailColumnDepths").set(
             detail_config.format_detail_column_depths_by_row(row_names, detail_column_depths_by_row)
         )
+        self._sync_detail_curl_rot_mult_count(max(len(depths) for depths in detail_column_depths_by_row))
+
+    def update_detail_curl_rot_mults_setting(self) -> None:
+        try:
+            _, _, _, detail_column_depths_by_row = self._detail_settings_from_table()
+            values = detail_config.parse_detail_curl_rot_multipliers(
+                self.settingsTab.detailCurlRotMults_lineEdit.text(),
+                max(len(depths) for depths in detail_column_depths_by_row),
+            )
+        except RuntimeError as exc:
+            pm.displayWarning(str(exc))
+            self.settingsTab.detailCurlRotMults_lineEdit.setText(self._detail_curl_rot_mults_setting())
+            return
+        self._set_detail_curl_rot_mults_setting(detail_config.format_detail_curl_rot_multipliers(values))
+        self.settingsTab.detailCurlRotMults_lineEdit.setText(self._detail_curl_rot_mults_setting())
+
+    def _sync_detail_curl_rot_mult_count(self, column_count: int) -> None:
+        values = detail_config.normalize_detail_curl_rot_multipliers(
+            self._detail_curl_rot_mults_setting(),
+            column_count,
+        )
+        formatted = detail_config.format_detail_curl_rot_multipliers(values)
+        self._set_detail_curl_rot_mults_setting(formatted)
+        self.settingsTab.detailCurlRotMults_lineEdit.setText(formatted)
+
+    def _detail_curl_rot_mults_setting(self) -> str:
+        if self.root.hasAttr("detailCurlRotMults"):
+            return self.root.attr("detailCurlRotMults").get()
+        return ""
+
+    def _set_detail_curl_rot_mults_setting(self, value: str) -> None:
+        if not self.root.hasAttr("detailCurlRotMults"):
+            self.root.addAttr("detailCurlRotMults", dataType="string")
+        self.root.attr("detailCurlRotMults").set(value)
+
+    def _detail_column_count_from_root(self) -> int:
+        try:
+            _, _, _, detail_column_depths_by_row = self._detail_settings_from_root()
+        except RuntimeError:
+            return 1
+        return max(len(depths) for depths in detail_column_depths_by_row)
 
     def _detail_settings_from_root(self) -> tuple[list[str], list[int], list[tuple[float, float]], list[list[float]]]:
         row_names = detail_config.parse_row_names(self.root.attr("rowNames").get())

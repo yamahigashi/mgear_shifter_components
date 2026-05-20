@@ -35,6 +35,11 @@ class Ui_Form(object):
         self.addJoints_checkBox = QtWidgets.QCheckBox(self.groupBox)
         self.formLayout.setWidget(2, QtWidgets.QFormLayout.FieldRole, self.addJoints_checkBox)
 
+        self.detailCurlRotMults_label = QtWidgets.QLabel(self.groupBox)
+        self.detailCurlRotMults_lineEdit = QtWidgets.QLineEdit(self.groupBox)
+        self.formLayout.setWidget(3, QtWidgets.QFormLayout.LabelRole, self.detailCurlRotMults_label)
+        self.formLayout.setWidget(3, QtWidgets.QFormLayout.FieldRole, self.detailCurlRotMults_lineEdit)
+
         self.row_groupBox = QtWidgets.QGroupBox(self.groupBox)
         self.row_groupBox.setTitle("")
         self.rowLayout = QtWidgets.QVBoxLayout(self.row_groupBox)
@@ -72,6 +77,7 @@ class Ui_Form(object):
         self.placementMode_comboBox.setItemText(1, gqt.fakeTranslate("Form", "Fixed", None, -1))
         self.ctlSize_label.setText(gqt.fakeTranslate("Form", "Ctl Size", None, -1))
         self.addJoints_checkBox.setText(gqt.fakeTranslate("Form", "Add Joints", None, -1))
+        self.detailCurlRotMults_label.setText(gqt.fakeTranslate("Form", "Detail Curl Rot Mults", None, -1))
         self.row_groupBox.setTitle(gqt.fakeTranslate("Form", "Feather Rows", None, -1))
         self.addRow_pushButton.setText(gqt.fakeTranslate("Form", "Add Row", None, -1))
         self.removeRow_pushButton.setText(gqt.fakeTranslate("Form", "Remove Row", None, -1))

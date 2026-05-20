@@ -95,6 +95,13 @@ class Component(component.Main):
             self.settings["detailColumnDepths"],
             self.row_names,
         )
+        self.detail_column_count = max(len(depths) for depths in self.detail_column_depths_by_row)
+        if "detailCurlRotMults" not in self.settings:
+            raise RuntimeError("ymt_feather_ribbon_01 requires the detailCurlRotMults setting.")
+        self.detail_curl_rot_multipliers = detail_config.normalize_detail_curl_rot_multipliers(
+            self.settings["detailCurlRotMults"],
+            self.detail_column_count,
+        )
         self.anchor_positions = self._get_anchor_positions()
         self.anchor_end_positions = self._get_anchor_end_positions()
         self.anchor_segment_lengths = self._get_anchor_segment_lengths()
@@ -167,8 +174,9 @@ class Component(component.Main):
                 "detailCurlRotMult%s" % col,
                 "Detail Curl Rot Mult %s" % col,
                 "double",
-                1.0,
+                self.detail_curl_rot_multipliers[col],
                 0.0,
+                2.0,
             )
             for col in range(self._detail_column_count())
         ]
@@ -379,7 +387,7 @@ class Component(component.Main):
         }
 
     def _detail_column_count(self) -> int:
-        return max(len(depths) for depths in self.detail_column_depths_by_row)
+        return self.detail_column_count
 
     def _detail_chain_matrix(
         self,

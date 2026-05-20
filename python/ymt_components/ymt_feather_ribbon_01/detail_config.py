@@ -205,11 +205,47 @@ def parse_detail_column_depth_list(value: str) -> list[float]:
     return values
 
 
+def parse_detail_curl_rot_multipliers(value: str, column_count: int) -> list[float]:
+    raw_values = split_detail_curl_rot_multipliers(value)
+    if len(raw_values) != column_count:
+        raise RuntimeError(
+            "ymt_feather_ribbon_01 detailCurlRotMults requires exactly %s values, got %s."
+            % (column_count, len(raw_values))
+        )
+    return parse_detail_curl_rot_multiplier_values(raw_values)
+
+
+def normalize_detail_curl_rot_multipliers(value: str, column_count: int) -> list[float]:
+    raw_values = split_detail_curl_rot_multipliers(value)
+    values = parse_detail_curl_rot_multiplier_values(raw_values)[:column_count]
+    while len(values) < column_count:
+        values.append(1.0)
+    return values
+
+
+def split_detail_curl_rot_multipliers(value: str) -> list[str]:
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def parse_detail_curl_rot_multiplier_values(raw_values: list[str]) -> list[float]:
+    values = []
+    for item in raw_values:
+        try:
+            values.append(float(item))
+        except ValueError as exc:
+            raise RuntimeError("ymt_feather_ribbon_01 detailCurlRotMults contains a non-numeric value: %s." % item) from exc
+    return values
+
+
 def format_detail_column_depths_by_row(row_names: list[str], depths_by_row: list[list[float]]) -> str:
     rows = []
     for row_name, depths in zip(row_names, depths_by_row):
         rows.append("%s: %s" % (row_name, ", ".join(format_float(value) for value in depths)))
     return "\n".join(rows)
+
+
+def format_detail_curl_rot_multipliers(values: list[float]) -> str:
+    return ", ".join(format_float(value) for value in values)
 
 
 def format_float(value: float) -> str:
