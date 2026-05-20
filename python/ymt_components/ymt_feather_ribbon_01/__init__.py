@@ -110,7 +110,7 @@ class Component(component.Main):
         self.no_transform = primitive.addTransform(
             self.root, self.getName("noTransform"), transform.getTransform(self.root)
         )
-        self.no_transform.attr("inheritsTransform").set(False)
+        self.no_transform.attr("inheritsTransform").set(True)
         ymt_util.setKeyableAttributesDontLockVisibility([self.driver_root, self.detail_root, self.no_transform], [])
         self.no_transform.attr("visibility").set(False)
 
@@ -442,6 +442,7 @@ class Component(component.Main):
             n=self.getName("ribbonSurface_skinCluster"),
         )[0]
         self.surface_skin_cluster = pm.PyNode(skin)
+        self._set_local_relative_space_mode(skin)
         self._set_surface_skin_weights(skin)
 
     def _add_surface_skin_joints(self) -> None:
@@ -836,9 +837,25 @@ class Component(component.Main):
         for ref in self.detail_rivet_refs:
             rivets = ymt_util.apply_rivet_constrain_to_selected(self.sliding_surface, ref)
             rivet = pm.PyNode(rivets[0])
+            self._set_rivet_uv_pin_local_relative_space_mode(rivet)
             pm.parent(rivet, self.no_transform, relative=True)
             pm.pointConstraint(rivet, ref, mo=True)
             ymt_util.setKeyableAttributesDontLockVisibility(rivet, [])
+
+    def _set_rivet_uv_pin_local_relative_space_mode(self, rivet: PymelNode) -> None:
+        rivet_name = self._node_name(rivet)
+        pins = cmds.listConnections(rivet_name + ".offsetParentMatrix", source=True, destination=False, type="uvPin") or []
+        if not pins:
+            raise RuntimeError("ymt_feather_ribbon_01 could not find uvPin driving rivet: %s." % rivet_name)
+        for pin in pins:
+            self._set_local_relative_space_mode(pin)
+
+    def _set_local_relative_space_mode(self, node: Union[PymelNode, str]) -> None:  # noqa: UP007
+        node_name = self._node_name(node)
+        attr = node_name + ".relativeSpaceMode"
+        if not cmds.objExists(attr):
+            raise RuntimeError("ymt_feather_ribbon_01 node does not support relativeSpaceMode: %s." % node_name)
+        cmds.setAttr(attr, 1)
 
     def _connect_curl_spaces(self) -> None:
         for segment_index, npo in enumerate(self.curl_npos):
