@@ -970,10 +970,12 @@ class Component(component.Main):
     def _connect_detail_aim_apply_rotations(self) -> None:
         for spec in self.detail_specs:
             key = (str(spec["row"]), int(spec["section"]), int(spec["col"]))
+            previous_key = (key[0], key[1], key[2] - 1)
             rotate_attr = self._create_local_offset_rotation_node(
                 self.detail_aim_refs_by_key[key],
                 self.detail_aim_npos_by_key[key],
                 "%s_detailAimApply" % self._detail_name(spec),
+                previous_source=self.detail_aim_refs_by_key.get(previous_key),
             )
             cmds.connectAttr(rotate_attr, self._node_name(self.detail_aim_npos_by_key[key]) + ".rotate", force=True)
 
@@ -1140,14 +1142,23 @@ class Component(component.Main):
         source: PymelNode,
         driven: PymelNode,
         name: str,
+        previous_source: Optional[PymelNode] = None,  # noqa: UP045
     ) -> str:
         source_initial_matrix = source.getMatrix()
         driven_initial_matrix = driven.getMatrix()
-        offset_matrix = cast("MatrixLike", source_initial_matrix.inverse() * driven_initial_matrix)
+        driver_initial_matrix = source_initial_matrix
+        if previous_source is not None:
+            previous_initial_matrix = previous_source.getMatrix()
+            driver_initial_matrix = cast("MatrixLike", source_initial_matrix * previous_initial_matrix.inverse())
+        offset_matrix = cast("MatrixLike", driver_initial_matrix.inverse() * driven_initial_matrix)
 
         mult = cmds.createNode("multMatrix", name=self.getName(name + "_mm"))
         cmds.connectAttr(self._node_name(source) + ".matrix", mult + ".matrixIn[0]", force=True)
-        cmds.setAttr(mult + ".matrixIn[1]", *self._matrix_values(offset_matrix), type="matrix")
+        offset_index = 1
+        if previous_source is not None:
+            cmds.connectAttr(self._node_name(previous_source) + ".inverseMatrix", mult + ".matrixIn[1]", force=True)
+            offset_index = 2
+        cmds.setAttr(mult + ".matrixIn[%s]" % offset_index, *self._matrix_values(offset_matrix), type="matrix")
 
         decompose = cmds.createNode("decomposeMatrix", name=self.getName(name + "_dm"))
         cmds.connectAttr(mult + ".matrixSum", decompose + ".inputMatrix", force=True)
