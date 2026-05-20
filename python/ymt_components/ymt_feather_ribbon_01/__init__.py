@@ -339,8 +339,31 @@ class Component(component.Main):
             self.detail_curl_npos_by_key[key] = curl_npo
             self.detail_ctls_by_key[key] = ctl
             self.detail_ctls.append(ctl)
-            if self.settings["addJoints"]:
-                self.jnt_pos.append([ctl, detail_name])
+        if self.settings["addJoints"]:
+            self._add_detail_joint_positions()
+
+    def _add_detail_joint_positions(self) -> None:
+        for segment in self._detail_joint_segments():
+            for index, spec in enumerate(segment):
+                key = (str(spec["row"]), int(spec["section"]), int(spec["col"]))
+                joint_entry = [self.detail_ctls_by_key[key], self._detail_name(spec)]
+                if index == 0:
+                    joint_entry.append("parent_relative_jnt")
+                self.jnt_pos.append(joint_entry)
+
+    def _detail_joint_segments(self) -> list[list[DetailSpec]]:
+        specs_by_row_section: dict[tuple[str, int], list[DetailSpec]] = {}
+        for spec in self.detail_specs:
+            key = (str(spec["row"]), int(spec["section"]))
+            specs_by_row_section.setdefault(key, []).append(spec)
+
+        segments = []
+        for row_name in self.row_names:
+            row_sections = sorted(section for row, section in specs_by_row_section if row == row_name)
+            for section in row_sections:
+                segment = specs_by_row_section[(row_name, section)]
+                segments.append(sorted(segment, key=lambda item: int(item["col"])))
+        return segments
 
     def _add_detail_rivet_refs(self, matrices_by_feather_part: dict[tuple[str, int, int], MatrixLike]) -> None:
         parent = self.no_transform if self.placement_mode == "surface" else self.detail_root
