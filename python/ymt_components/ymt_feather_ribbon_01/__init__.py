@@ -452,6 +452,12 @@ class Component(component.Main):
             u=len(surface_u_values) - 1,
             v=len(surface_depths) - 1,
         )[0]
+        cmds.xform(
+            surface,
+            ws=True,
+            t=self._point_tuple(self._position_from_span_local(0, 0)),
+        )
+
         surface_shape = self._surface_shape_name(surface)
         for u_index, u in enumerate(surface_u_values):
             for v_index, depth in enumerate(surface_depths):
@@ -868,6 +874,19 @@ class Component(component.Main):
         for ref in self.detail_rivet_refs:
             rivets = ymt_util.apply_rivet_constrain_to_selected(self.sliding_surface, ref)
             rivet = pm.PyNode(rivets[0])
+            for r in rivets:
+                uv_pins = cmds.listConnections(r + ".offsetParentMatrix", source=True, destination=False, type="uvPin") or []
+                if not uv_pins:
+                    raise RuntimeError("ymt_feather_ribbon_01 could not find uvPin driving rivet: %s." % r)
+
+                if len(uv_pins) > 1:
+                    raise RuntimeError(
+                        "ymt_feather_ribbon_01 found multiple uvPins driving rivet: %s, uvPins: %s." % (r, uv_pins)
+                    )
+
+                cmds.setAttr(uv_pins[0] + ".normalAxis", 1)  # Y-up
+                cmds.setAttr(uv_pins[0] + ".tangentAxis", 0)  # X-forward
+
             self._set_rivet_uv_pin_local_relative_space_mode(rivet)
             pm.parent(rivet, self.no_transform, relative=True)
             pm.pointConstraint(rivet, ref, mo=True)
@@ -988,8 +1007,8 @@ class Component(component.Main):
             )
 
     def _connect_detail_aim_refs(self) -> None:
-        aim_up = self._create_detail_chain_aim_up()
         for spec in self.detail_specs:
+            aim_up = self._select_anchor_point_for_detail(spec)
             key = (str(spec["row"]), int(spec["section"]), int(spec["col"]))
             next_key = (key[0], key[1], key[2] + 1)
             next_ref = self.detail_rivet_refs_by_key.get(next_key)
@@ -1004,6 +1023,7 @@ class Component(component.Main):
                     )
                     pm.setAttr(constraint.attr("interpType"), 0)  # no-flip
                 continue
+
             cmds.aimConstraint(
                 self._node_name(next_ref),
                 self._node_name(self.detail_aim_refs_by_key[key]),
@@ -1060,14 +1080,21 @@ class Component(component.Main):
             )
             cmds.connectAttr(rotate_attr, self._node_name(curl_npo) + ".rotate", force=True)
 
-    def _create_detail_chain_aim_up(self) -> PymelNode:
-        aim_up = primitive.addTransform(
-            self.no_transform,
-            self.getName("detailChainAimUp"),
-            transform.getTransform(self.detail_root),
-        )
-        ymt_util.setKeyableAttributesDontLockVisibility(aim_up, [])
-        return aim_up
+    def _select_anchor_point_for_detail(self, spec: DetailSpec) -> PymelNode:
+        anchor_entries = self._anchor_weight_entries_from_span_local(int(spec["span"]), float(spec["local"]))
+        if not anchor_entries:
+            raise RuntimeError("ymt_feather_ribbon_01 could not resolve detail anchor for: %s." % self._detail_name(spec))
+
+        anchor_index = max(anchor_entries, key=lambda item: item[1])[0]
+        if not 0 <= anchor_index < len(self.anchor_ctls):
+            raise RuntimeError("ymt_feather_ribbon_01 unsupported detail anchor index: %s." % anchor_index)
+
+        anchor_layer = int(spec["anchor_layer"])
+        anchor_layer_ctls = self.anchor_ctls[anchor_index]
+        if not 0 <= anchor_layer < len(anchor_layer_ctls):
+            raise RuntimeError("ymt_feather_ribbon_01 unsupported detail anchor layer: %s." % anchor_layer)
+
+        return anchor_layer_ctls[anchor_layer]
 
     def _connect_anchor_root_space(self, refs: dict[str, PymelNode], anchor_name: str, npo: PymelNode) -> None:
         self._ensure_rotation_driver_plugin()
