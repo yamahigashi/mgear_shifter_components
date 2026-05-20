@@ -1424,12 +1424,7 @@ class Component(component.Main):
     ) -> float:
         # Depth values are measured in the anchor -> anchorEnd basis.
         # 0.0 is the anchor line, and 1.0 is the anchorEnd reference line.
-        depth = self._depth_ratio_from_position(position, base_position, end_position)
-        if not -0.001 <= depth <= 1.001:
-            raise RuntimeError(
-                "ymt_feather_ribbon_01 detail guide is outside the anchor -> anchorEnd depth range: %.3f." % depth
-            )
-        return max(0.0, min(1.0, depth))
+        return self._depth_ratio_from_position(position, base_position, end_position)
 
     def _clamped_depth_from_position(
         self,
