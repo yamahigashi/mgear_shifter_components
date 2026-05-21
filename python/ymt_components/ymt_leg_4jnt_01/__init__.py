@@ -728,13 +728,16 @@ class Component(component.Main):
         self.tws4_rot.setAttr("sx", 0.001)
 
         # Deform joint anchors and divisions ----------------
-        # Anchor refs keep exact joint orientation at anatomical points.
+        # Primary anchors are segment-aware limb joints.  Their base
+        # orientation is rebuilt from updated primary joint positions, while
+        # ctl rotation is composed below that base as local deformation input.
         # div_cns are only the in-span roll/squash/stretch drivers.
         o_set = self.settings
         self.divisions = o_set["div0"] + o_set["div1"] + o_set["div2"] + o_set["div3"]
 
         self.joint_indices = {}
         self.deform_anchor_refs = {}
+        self.deform_anchor_aims = {}
         self.deform_anchor_drivers = {}
         anchor_specs = [
             ("root", self.legBones[0], None),
@@ -751,26 +754,52 @@ class Component(component.Main):
             )
             self.deform_anchor_refs[name] = ref
             pm.parentConstraint(leg_bone, ref, mo=False)
-            driver = ref
+
+            aim = primitive.addTransform(
+                self.root_ctl,
+                self.getName("%s_jnt_aim" % name),
+                transform.getTransform(ref),
+            )
+            self.deform_anchor_aims[name] = aim
+            position_source = correction_ctl if correction_ctl else ref
+            node.createMultMatrixNode(
+                position_source.attr("worldMatrix"),
+                self.root_ctl.attr("worldInverseMatrix"),
+                aim,
+                "t",
+            )
+
+            driver = primitive.addTransform(
+                aim,
+                self.getName("%s_jnt_corr" % name),
+                transform.getTransform(ref),
+            )
             if correction_ctl:
-                driver = primitive.addTransform(
-                    self.root_ctl,
-                    self.getName("%s_jnt_corr" % name),
-                    transform.getTransform(ref),
-                )
-                node.createMultMatrixNode(
-                    correction_ctl.attr("worldMatrix"),
-                    self.root_ctl.attr("worldInverseMatrix"),
-                    driver,
-                    "t",
-                )
-                node.createMultMatrixNode(
-                    ref.attr("worldMatrix"),
-                    self.root_ctl.attr("worldInverseMatrix"),
-                    driver,
-                    "r",
-                )
+                pm.connectAttr(correction_ctl.attr("rotate"), driver.attr("rotate"), f=True)
             self.deform_anchor_drivers[name] = driver
+
+        world_up_vector = [self.normal.x, self.normal.y, self.normal.z]
+        for name, target_name in [
+            ("root", "knee"),
+            ("knee", "ankle"),
+            ("ankle", "foot"),
+            ("foot", "toe"),
+        ]:
+            pm.aimConstraint(
+                self.deform_anchor_aims[target_name],
+                self.deform_anchor_aims[name],
+                maintainOffset=False,
+                aimVector=[1, 0, 0],
+                upVector=[0, 0, 1],
+                worldUpType="vector",
+                worldUpVector=world_up_vector,
+            )
+        node.createMultMatrixNode(
+            self.deform_anchor_refs["toe"].attr("worldMatrix"),
+            self.deform_anchor_aims["toe"].attr("worldInverseMatrix"),
+            self.deform_anchor_drivers["toe"],
+            "r",
+        )
 
         self.div_cns = []
         div_index = 0
@@ -1328,6 +1357,8 @@ class Component(component.Main):
             pm.connectAttr(str(self.knee_ctl) + "." + x, str(self.tws1_loc) + "." + x)
         for x in "xy":
             pm.connectAttr(str(self.knee_ctl) + "." + "r" + x, str(self.tws1_loc) + "." + "r" + x)
+        rz_node = node.createAddNode(self.knee_ctl.attr("rz"), self.kneeFlipOffset_att)
+        pm.connectAttr(rz_node + ".output", str(self.tws1_loc) + ".rz")
 
         multTangent_node = node.createMulNode(self.roundnessAnkle_att, multVal)
         add_node = node.createAddNode(multTangent_node + ".outputX", initRound)
@@ -1336,6 +1367,8 @@ class Component(component.Main):
             pm.connectAttr(str(self.ankle_ctl) + "." + x, str(self.tws2_loc) + "." + x)
         for x in "xy":
             pm.connectAttr(str(self.ankle_ctl) + "." + "r" + x, str(self.tws2_loc) + "." + "r" + x)
+        rz_node = node.createAddNode(self.ankle_ctl.attr("rz"), self.ankleFlipOffset_att)
+        pm.connectAttr(rz_node + ".output", str(self.tws2_loc) + ".rz")
 
         multTangent_node = node.createMulNode(self.roundnessFoot_att, multVal)
         add_node = node.createAddNode(multTangent_node + ".outputX", initRound)
@@ -1344,6 +1377,8 @@ class Component(component.Main):
             pm.connectAttr(str(self.foot_ctl) + "." + x, str(self.tws3_loc) + "." + x)
         for x in "xy":
             pm.connectAttr(str(self.foot_ctl) + "." + "r" + x, str(self.tws3_loc) + "." + "r" + x)
+        rz_node = node.createAddNode(self.foot_ctl.attr("rz"), self.footFlipOffset_att)
+        pm.connectAttr(rz_node + ".output", str(self.tws3_loc) + ".rz")
 
         # Volume -------------------------------------------
         distA_node = node.createDistNode(self.tws0_loc, self.tws1_loc)
@@ -1361,11 +1396,6 @@ class Component(component.Main):
         div_node2 = node.createDivNode(div_node + ".outputX", dm_node + ".outputScaleX")
 
         self.volDriver_att = div_node2 + ".outputX"
-
-        # Flip Offset ----------------------------------------
-        pm.connectAttr(str(self.ankleFlipOffset_att), str(self.tws2_loc) + ".rz")
-        pm.connectAttr(str(self.kneeFlipOffset_att), str(self.tws1_loc) + ".rz")
-        pm.connectAttr(str(self.footFlipOffset_att), str(self.tws3_loc) + ".rz")
 
         # Divisions ----------------------------------------
         percents = self.division_percents
