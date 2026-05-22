@@ -11,9 +11,12 @@ chain, and deformation anchors are kept separate so each layer remains easy to
 inspect in Maya.
 """
 
+from __future__ import annotations
+
 import math
 
 import importlib
+from typing import Dict, List, Tuple
 try:
     pm = importlib.import_module("mgear.pymaya")
 except ImportError:
@@ -35,15 +38,15 @@ from ymt_shifter_utility.type_protocols import PymelNode
 class Component(component.Main):
     """Shifter component class."""
 
-    wrist_control_mode_names = ("IK", "Chain")
-    build_neutral_soft_ik_range = 0.0
-    default_soft_ik_speed = 2.5
-    soft_ik_initial_residual_ratio = 0.1
+    wrist_control_mode_names: Tuple[str, str] = ("IK", "Chain")
+    build_neutral_soft_ik_range: float = 0.0
+    default_soft_ik_speed: float = 2.5
+    soft_ik_initial_residual_ratio: float = 0.1
 
     def _connect_enum_condition(
         self, enum_attr: object, enum_index: int, target_weight: object, true_value: int = 1, false_value: int = 0
     ) -> PymelNode:
-        cond_node = pm.createNode("condition")
+        cond_node: PymelNode = pm.createNode("condition")
         pm.setAttr(cond_node + ".operation", 0)
         pm.connectAttr(enum_attr, cond_node + ".firstTerm")
         pm.setAttr(cond_node + ".secondTerm", enum_index)
@@ -52,116 +55,116 @@ class Component(component.Main):
         pm.connectAttr(cond_node + ".outColorR", target_weight, f=True)
         return cond_node
 
-    def _get_division_percents(self) -> list[float]:
-        percents = []
+    def _get_division_percents(self) -> List[float]:
+        percents: List[float] = []
         for span_index, div_count in enumerate([self.settings["div0"], self.settings["div1"], self.settings["div2"]]):
-            span_start = span_index / 3.0
+            span_start: float = span_index / 3.0
             for div_index in range(div_count):
-                perc = span_start + ((div_index + 1.0) / (div_count + 1.0)) / 3.0
+                perc: float = span_start + ((div_index + 1.0) / (div_count + 1.0)) / 3.0
                 percents.append(max(0.001, min(0.999, perc)))
         return percents
 
-    def _sample_profile_values(self, profile_name: str, percents: list[float]) -> list[float]:
-        profile_values = self.guide.paramDefs[profile_name].value
+    def _sample_profile_values(self, profile_name: str, percents: List[float]) -> List[float]:
+        profile_values: List[float] = self.guide.paramDefs[profile_name].value
         if profile_values:
             return self._interpolate_profile_values(profile_values, percents)
 
-        fcv_node = self.settings[profile_name]
-        values = []
+        fcv_node: PymelNode = self.settings[profile_name]
+        values: List[float] = []
         for perc in percents:
             pm.setAttr(fcv_node + ".input", perc)
             values.append(pm.getAttr(fcv_node + ".output"))
         return values
 
-    def _interpolate_profile_values(self, profile_values: list[float], percents: list[float]) -> list[float]:
+    def _interpolate_profile_values(self, profile_values: List[float], percents: List[float]) -> List[float]:
         if not profile_values:
             return [0] * len(percents)
 
-        values = [float(value) for value in profile_values]
+        values: List[float] = [float(value) for value in profile_values]
         if len(values) == 1:
             return [values[0]] * len(percents)
 
-        max_index = len(values) - 1
-        interpolated = []
+        max_index: int = len(values) - 1
+        interpolated: List[float] = []
         for perc in percents:
-            position = max(0.0, min(1.0, perc)) * max_index
-            low_index = math.floor(position)
-            high_index = min(low_index + 1, max_index)
-            blend = position - low_index
-            value = values[low_index] + ((values[high_index] - values[low_index]) * blend)
+            position: float = max(0.0, min(1.0, perc)) * max_index
+            low_index: int = math.floor(position)
+            high_index: int = min(low_index + 1, max_index)
+            blend: float = position - low_index
+            value: float = values[low_index] + ((values[high_index] - values[low_index]) * blend)
             interpolated.append(value)
         return interpolated
 
     def _add_match_ref_from(
         self, ctl: PymelNode, source: PymelNode, parent: PymelNode, name: str, cnx: bool = True
     ) -> PymelNode:
-        match = primitive.addTransform(parent, self.getName(name), transform.getTransform(source))
+        match: PymelNode = primitive.addTransform(parent, self.getName(name), transform.getTransform(source))
         if cnx:
             ctl.addAttr("match_ref", at="message", multi=False)
             pm.connectAttr(match.message, ctl.match_ref)
         return match
 
-    def _get_chain2bones_positions(self) -> list[datatypes.Vector]:
-        root_pos = datatypes.Vector(self.guide.pos["root"])
-        wrist_pos = datatypes.Vector(self.guide.pos["wrist"])
-        chain_dir = yu.get_normalized_direction(
+    def _get_chain2bones_positions(self) -> List[datatypes.Vector]:
+        root_pos: datatypes.Vector = datatypes.Vector(self.guide.pos["root"])
+        wrist_pos: datatypes.Vector = datatypes.Vector(self.guide.pos["wrist"])
+        chain_dir: datatypes.Vector = yu.get_normalized_direction(
             root_pos, wrist_pos, "{} chain2bones root/wrist".format(self.fullName)
         )
-        chain_length = vector.getDistance(root_pos, wrist_pos)
-        min_length = abs(self.length0 - self.length1)
-        max_length = self.length0 + self.length1
+        chain_length: float = vector.getDistance(root_pos, wrist_pos)
+        min_length: float = abs(self.length0 - self.length1)
+        max_length: float = self.length0 + self.length1
         if chain_length < min_length - 0.000001 or chain_length > max_length + 0.000001:
             raise ValueError("{} chain2bones lengths cannot reach the wrist guide position.".format(self.fullName))
 
-        distance_on_chain = (self.length0**2 + chain_length**2 - self.length1**2) / (2.0 * chain_length)
-        bend_height_squared = self.length0**2 - distance_on_chain**2
+        distance_on_chain: float = (self.length0**2 + chain_length**2 - self.length1**2) / (2.0 * chain_length)
+        bend_height_squared: float = self.length0**2 - distance_on_chain**2
         if bend_height_squared < -0.000001:
             raise ValueError("{} chain2bones guide lengths cannot form a valid solve triangle.".format(self.fullName))
 
-        bend_height = math.sqrt(max(0.0, bend_height_squared))
-        elbow_pos = root_pos + (chain_dir * distance_on_chain) + (self.bend_dir * bend_height)
+        bend_height: float = math.sqrt(max(0.0, bend_height_squared))
+        elbow_pos: datatypes.Vector = root_pos + (chain_dir * distance_on_chain) + (self.bend_dir * bend_height)
         return [root_pos, elbow_pos, wrist_pos]
 
     def addObjects(self) -> None:
         """Add all objects needed to create the component."""
 
-        self.setup = primitive.addTransformFromPos(self.setupWS, self.getName("WS"))
+        self.setup: PymelNode = primitive.addTransformFromPos(self.setupWS, self.getName("WS"))
         attribute.lockAttribute(self.setup)
 
-        self.WIP = self.options["mode"]
-        root_matrix = om2.MMatrix(self.guide.tra["root"])
-        self.root_normal = datatypes.Vector(root_matrix[1], root_matrix[5], root_matrix[9]).normal()
-        chain_dir = yu.get_normalized_direction(
+        self.WIP: bool = self.options["mode"]
+        root_matrix: om2.MMatrix = om2.MMatrix(self.guide.tra["root"])
+        self.root_normal: datatypes.Vector = datatypes.Vector(root_matrix[1], root_matrix[5], root_matrix[9]).normal()
+        chain_dir: datatypes.Vector = yu.get_normalized_direction(
             self.guide.pos["root"], self.guide.pos["wrist"], "{} root/wrist".format(self.fullName)
         )
-        blade_bend_dir = yu.get_explicit_bend_direction(
+        blade_bend_dir: datatypes.Vector = yu.get_explicit_bend_direction(
             self, self.guide.pos["root"], self.guide.pos["wrist"]
         )
-        self.normal = yu.get_chain_normal_from_bend_direction(
+        self.normal: datatypes.Vector = yu.get_chain_normal_from_bend_direction(
             chain_dir, blade_bend_dir, "{} root/wrist".format(self.fullName)
         )
-        self.bend_dir = self.normal ^ chain_dir
+        self.bend_dir: datatypes.Vector = self.normal ^ chain_dir
         self.bend_dir.normalize()
-        hand_chain_dir = yu.get_normalized_direction(
+        hand_chain_dir: datatypes.Vector = yu.get_normalized_direction(
             self.guide.pos["wrist"], self.guide.pos["hand"], "{} wrist/hand".format(self.fullName)
         )
-        self.hand_normal = yu.get_chain_normal_from_bend_direction(
+        self.hand_normal: datatypes.Vector = yu.get_chain_normal_from_bend_direction(
             hand_chain_dir, self.bend_dir, "{} wrist/hand".format(self.fullName)
         )
-        self.binormal = self.guide.blades["blade"].x
+        self.binormal: datatypes.Vector = self.guide.blades["blade"].x
 
-        self.bone_positions = [
+        self.bone_positions: List[datatypes.Vector] = [
             self.guide.pos["root"],
             self.guide.pos["elbow"],
             self.guide.pos["wrist"],
             self.guide.pos["hand"],
         ]
-        self.length0 = vector.getDistance(self.bone_positions[0], self.bone_positions[1])
-        self.length1 = vector.getDistance(self.bone_positions[1], self.bone_positions[2])
-        self.length2 = vector.getDistance(self.bone_positions[2], self.bone_positions[3])
-        self.chain2bones_positions = self._get_chain2bones_positions()
+        self.length0: float = vector.getDistance(self.bone_positions[0], self.bone_positions[1])
+        self.length1: float = vector.getDistance(self.bone_positions[1], self.bone_positions[2])
+        self.length2: float = vector.getDistance(self.bone_positions[2], self.bone_positions[3])
+        self.chain2bones_positions: List[datatypes.Vector] = self._get_chain2bones_positions()
 
-        self.chain2bones = yu.add3DChain(
+        self.chain2bones: List[PymelNode] = yu.add3DChain(
             self.setup,
             self.getName("chain2bones%s_jnt"),
             self.chain2bones_positions,
@@ -169,7 +172,7 @@ class Component(component.Main):
             False,
             self.WIP,
         )
-        self.handChain = yu.add3DChain(
+        self.handChain: List[PymelNode] = yu.add3DChain(
             self.setup,
             self.getName("handChain%s_jnt"),
             self.bone_positions[2:4],
@@ -177,7 +180,7 @@ class Component(component.Main):
             False,
             self.WIP,
         )
-        self.wingBones = yu.add3DChain(
+        self.wingBones: List[PymelNode] = yu.add3DChain(
             self.root,
             self.getName("wingBones%s_jnt"),
             self.bone_positions,
@@ -185,7 +188,7 @@ class Component(component.Main):
             False,
             self.WIP,
         )
-        self.wingBonesFK = yu.add3DChain(
+        self.wingBonesFK: List[PymelNode] = yu.add3DChain(
             self.root,
             self.getName("wingFK%s_jnt"),
             self.bone_positions,
@@ -193,7 +196,7 @@ class Component(component.Main):
             False,
             self.WIP,
         )
-        self.wingBonesIK = yu.add3DChain(
+        self.wingBonesIK: List[PymelNode] = yu.add3DChain(
             self.root,
             self.getName("wingIK%s_jnt"),
             self.bone_positions,
@@ -201,7 +204,7 @@ class Component(component.Main):
             False,
             self.WIP,
         )
-        self.upvRefChain = yu.add3DChain(
+        self.upvRefChain: List[PymelNode] = yu.add3DChain(
             self.root,
             self.getName("wingUpvRef%s_jnt"),
             [self.guide.apos[0], self.guide.apos[2]],
@@ -210,7 +213,7 @@ class Component(component.Main):
             self.WIP,
         )
 
-        self.elbow_mid_jnt = primitive.addJoint(
+        self.elbow_mid_jnt: PymelNode = primitive.addJoint(
             self.wingBones[0],
             self.getName("elbowMid_jnt"),
             self.wingBones[1].getMatrix(worldSpace=True),
@@ -219,7 +222,7 @@ class Component(component.Main):
         self.elbow_mid_jnt.attr("radius").set(3)
         self.elbow_mid_jnt.setAttr("jointOrient", 0, 0, 0)
 
-        self.wrist_mid_jnt = primitive.addJoint(
+        self.wrist_mid_jnt: PymelNode = primitive.addJoint(
             self.wingBones[1],
             self.getName("wristMid_jnt"),
             self.wingBones[2].getMatrix(worldSpace=True),
@@ -229,9 +232,9 @@ class Component(component.Main):
         self.wrist_mid_jnt.setAttr("jointOrient", 0, 0, 0)
 
         # Base control
-        t = transform.getTransformFromPos(self.guide.apos[0])
-        self.root_npo = primitive.addTransform(self.root, self.getName("root_npo"), t)
-        self.root_ctl = self.addCtl(
+        t: object = transform.getTransformFromPos(self.guide.apos[0])
+        self.root_npo: PymelNode = primitive.addTransform(self.root, self.getName("root_npo"), t)
+        self.root_ctl: PymelNode = self.addCtl(
             self.root_npo,
             "root_ctl",
             t,
@@ -245,9 +248,9 @@ class Component(component.Main):
         attribute.lockAttribute(self.root_ctl, ["sx", "sy", "sz", "v"])
 
         # FK controls
-        self.fk_ctl = []
-        parent = self.root_ctl
-        tag_parent = self.root_ctl
+        self.fk_ctl: List[PymelNode] = []
+        parent: PymelNode = self.root_ctl
+        tag_parent: PymelNode = self.root_ctl
         for index, (start, end, length) in enumerate(
             [
                 (self.bone_positions[0], self.bone_positions[1], self.length0),
@@ -256,8 +259,8 @@ class Component(component.Main):
             ]
         ):
             t = transform.getTransformLookingAt(start, end, self.normal, "xz", self.negate)
-            npo = primitive.addTransform(parent, self.getName("fk%s_npo" % index), t)
-            ctl = self.addCtl(
+            npo: PymelNode = primitive.addTransform(parent, self.getName("fk%s_npo" % index), t)
+            ctl: PymelNode = self.addCtl(
                 npo,
                 "fk%s_ctl" % index,
                 t,
@@ -278,10 +281,10 @@ class Component(component.Main):
             tag_parent = ctl
 
         # Corrective controls at elbow and wrist.
-        self.elbow_lvl = primitive.addTransform(
+        self.elbow_lvl: PymelNode = primitive.addTransform(
             self.root, self.getName("elbow_lvl"), transform.getTransform(self.elbow_mid_jnt)
         )
-        self.elbow_ctl = self.addCtl(
+        self.elbow_ctl: PymelNode = self.addCtl(
             self.elbow_lvl,
             "elbow_ctl",
             transform.getTransform(self.elbow_mid_jnt),
@@ -293,10 +296,10 @@ class Component(component.Main):
         attribute.setInvertMirror(self.elbow_ctl, ["tx", "ty", "tz"])
         attribute.lockAttribute(self.elbow_ctl, ["sx", "sy", "sz", "v"])
 
-        self.wrist_lvl = primitive.addTransform(
+        self.wrist_lvl: PymelNode = primitive.addTransform(
             self.root, self.getName("wrist_lvl"), transform.getTransform(self.wrist_mid_jnt)
         )
-        self.wrist_ctl = self.addCtl(
+        self.wrist_ctl: PymelNode = self.addCtl(
             self.wrist_lvl,
             "wrist_ctl",
             transform.getTransform(self.wrist_mid_jnt),
@@ -310,8 +313,8 @@ class Component(component.Main):
 
         # IK A: upper/lower wing 2-bone IK.
         t = transform.getTransformFromPos(self.guide.pos["wrist"])
-        self.ik_cns = primitive.addTransform(self.root_ctl, self.getName("ik_cns"), t)
-        self.ik_ctl = self.addCtl(
+        self.ik_cns: PymelNode = primitive.addTransform(self.root_ctl, self.getName("ik_cns"), t)
+        self.ik_ctl: PymelNode = self.addCtl(
             self.ik_cns,
             "ik_ctl",
             t,
@@ -327,12 +330,14 @@ class Component(component.Main):
         attribute.setInvertMirror(self.ik_ctl, ["tx", "ry", "rz"])
         attribute.lockAttribute(self.ik_ctl, ["sx", "sy", "sz", "v"])
 
-        self.ik_ref = primitive.addTransform(self.ik_ctl, self.getName("ik_ref"), transform.getTransform(self.ik_ctl))
+        self.ik_ref: PymelNode = primitive.addTransform(
+            self.ik_ctl, self.getName("ik_ref"), transform.getTransform(self.ik_ctl)
+        )
 
-        upv_pos = self.guide.apos[1] + (self.bend_dir * self.size * 0.5)
-        self.upv_lvl = primitive.addTransformFromPos(self.root, self.getName("upv_lvl"), upv_pos)
-        self.upv_cns = primitive.addTransformFromPos(self.upv_lvl, self.getName("upv_cns"), upv_pos)
-        self.upv_ctl = self.addCtl(
+        upv_pos: datatypes.Vector = self.guide.apos[1] + (self.bend_dir * self.size * 0.5)
+        self.upv_lvl: PymelNode = primitive.addTransformFromPos(self.root, self.getName("upv_lvl"), upv_pos)
+        self.upv_cns: PymelNode = primitive.addTransformFromPos(self.upv_lvl, self.getName("upv_cns"), upv_pos)
+        self.upv_ctl: PymelNode = self.addCtl(
             self.upv_cns,
             "upv_ctl",
             transform.getTransform(self.upv_cns),
@@ -344,12 +349,12 @@ class Component(component.Main):
         attribute.setInvertMirror(self.upv_ctl, ["tx"])
         attribute.setKeyableAttributes(self.upv_ctl, ["tx", "ty", "tz"])
 
-        self.effective_upv_npo = primitive.addTransform(
+        self.effective_upv_npo: PymelNode = primitive.addTransform(
             self.upv_cns,
             self.getName("effectiveUpv_npo"),
             transform.getTransform(self.upv_cns),
         )
-        self.effective_upv_ref = primitive.addTransform(
+        self.effective_upv_ref: PymelNode = primitive.addTransform(
             self.effective_upv_npo,
             self.getName("effectiveUpv_ref"),
             transform.getTransform(self.effective_upv_npo),
@@ -358,38 +363,42 @@ class Component(component.Main):
 
         # Soft IK objects for IK A: root/elbow/wrist.
         t = transform.getTransformLookingAt(self.guide.pos["root"], self.guide.pos["wrist"], self.normal, "zx", False)
-        self.aim_tra = primitive.addTransform(self.root_ctl, self.getName("aimSoftIK"), t)
+        self.aim_tra: PymelNode = primitive.addTransform(self.root_ctl, self.getName("aimSoftIK"), t)
 
         t = transform.getTransformFromPos(self.guide.pos["wrist"])
-        self.wristSoftIK = primitive.addTransform(self.aim_tra, self.getName("wristSoftIK"), t)
-        self.softblendLoc = primitive.addTransform(self.root, self.getName("softblendLoc"), t)
+        self.wristSoftIK: PymelNode = primitive.addTransform(self.aim_tra, self.getName("wristSoftIK"), t)
+        self.softblendLoc: PymelNode = primitive.addTransform(self.root, self.getName("softblendLoc"), t)
 
         # IK B: wrist/hand look-at target.
-        wrist_t = transform.getTransformFromPos(self.guide.pos["wrist"])
-        hand_t = transform.getTransformLookingAt(
+        wrist_t: object = transform.getTransformFromPos(self.guide.pos["wrist"])
+        hand_t: object = transform.getTransformLookingAt(
             self.guide.pos["wrist"], self.guide.pos["hand"], self.root_normal, "zx", False
         )
         hand_t = transform.setMatrixPosition(hand_t, self.guide.pos["eff"])
-        self.hand_ik_parent_cns = primitive.addTransform(self.root, self.getName("hand_ik_parent_cns"), wrist_t)
-        self.hand_ik_parent_ik_ref = primitive.addTransform(
+        self.hand_ik_parent_cns: PymelNode = primitive.addTransform(
+            self.root, self.getName("hand_ik_parent_cns"), wrist_t
+        )
+        self.hand_ik_parent_ik_ref: PymelNode = primitive.addTransform(
             self.softblendLoc, self.getName("hand_ik_parent_ik_ref"), wrist_t
         )
-        wrist_chain_t = transform.setMatrixPosition(
+        wrist_chain_t: object = transform.setMatrixPosition(
             transform.getTransform(self.chain2bones[1]), self.guide.pos["wrist"]
         )
-        self.hand_ik_parent_chain_pos = primitive.addTransform(
+        self.hand_ik_parent_chain_pos: PymelNode = primitive.addTransform(
             self.root, self.getName("hand_ik_parent_chain_pos"), wrist_chain_t
         )
-        self.hand_ik_parent_chain_ref = primitive.addTransform(
+        self.hand_ik_parent_chain_ref: PymelNode = primitive.addTransform(
             self.hand_ik_parent_chain_pos, self.getName("hand_ik_parent_chain_ref"), wrist_t
         )
-        self.wrist_mode_basis_ref = primitive.addTransform(
+        self.wrist_mode_basis_ref: PymelNode = primitive.addTransform(
             self.root, self.getName("wristModeBasis_ref"), wrist_t
         )
         self.wrist_mode_basis_ref.attr("visibility").set(False)
-        length = vector.getDistance(self.guide.pos["eff"], self.guide.pos["wrist"])
-        self.ikRot_npo = primitive.addTransform(self.hand_ik_parent_cns, self.getName("ikRot_npo"), wrist_t)
-        self.ikRot_ctl = self.addCtl(
+        length: float = vector.getDistance(self.guide.pos["eff"], self.guide.pos["wrist"])
+        self.ikRot_npo: PymelNode = primitive.addTransform(
+            self.hand_ik_parent_cns, self.getName("ikRot_npo"), wrist_t
+        )
+        self.ikRot_ctl: PymelNode = self.addCtl(
             self.ikRot_npo,
             "ikRot_ctl",
             wrist_t,
@@ -406,11 +415,11 @@ class Component(component.Main):
         attribute.setInvertMirror(self.ikRot_ctl, ["ry", "rz"])
         attribute.lockAttribute(self.ikRot_ctl, ["tx", "ty", "tz", "sx", "sy", "sz", "v"])
 
-        self.hand_aim_ref = primitive.addTransform(self.root, self.getName("hand_aim_ref"), wrist_t)
+        self.hand_aim_ref: PymelNode = primitive.addTransform(self.root, self.getName("hand_aim_ref"), wrist_t)
         self.hand_aim_ref.attr("visibility").set(False)
 
-        self.hand_ik_cns = primitive.addTransform(self.ikRot_ctl, self.getName("hand_ik_cns"), hand_t)
-        self.hand_ik_ctl = self.addCtl(
+        self.hand_ik_cns: PymelNode = primitive.addTransform(self.ikRot_ctl, self.getName("hand_ik_cns"), hand_t)
+        self.hand_ik_ctl: PymelNode = self.addCtl(
             self.hand_ik_cns,
             "hand_ik_ctl",
             hand_t,
@@ -426,8 +435,10 @@ class Component(component.Main):
         attribute.setInvertMirror(self.hand_ik_ctl, ["tx"])
         attribute.lockAttribute(self.hand_ik_ctl, ["rx", "ry", "rz", "sx", "sy", "sz", "v"])
 
-        self.handIkRot_npo = primitive.addTransform(self.hand_ik_ctl, self.getName("handIkRot_npo"), hand_t)
-        self.handIkRot_ctl = self.addCtl(
+        self.handIkRot_npo: PymelNode = primitive.addTransform(
+            self.hand_ik_ctl, self.getName("handIkRot_npo"), hand_t
+        )
+        self.handIkRot_ctl: PymelNode = self.addCtl(
             self.handIkRot_npo,
             "handIkRot_ctl",
             hand_t,
@@ -443,57 +454,57 @@ class Component(component.Main):
         attribute.setInvertMirror(self.handIkRot_ctl, ["ry", "rz"])
         attribute.lockAttribute(self.handIkRot_ctl, ["tx", "ty", "tz", "sx", "sy", "sz", "v"])
 
-        self.hand_final_ref = primitive.addTransform(
+        self.hand_final_ref: PymelNode = primitive.addTransform(
             self.handIkRot_ctl, self.getName("hand_final_ref"), transform.getTransform(self.handIkRot_ctl)
         )
-        self.fk_ref = primitive.addTransform(
+        self.fk_ref: PymelNode = primitive.addTransform(
             self.fk_ctl[2], self.getName("fk_ref"), transform.getTransform(self.handIkRot_ctl)
         )
 
         # Twist references and deformation drivers.
-        self.rollRef = primitive.add2DChain(
+        self.rollRef: List[PymelNode] = primitive.add2DChain(
             self.root, self.getName("rollChain"), self.guide.apos[:2], self.normal, False, self.WIP
         )
-        self.tws0_loc = primitive.addTransform(
+        self.tws0_loc: PymelNode = primitive.addTransform(
             self.rollRef[0], self.getName("tws0_loc"), transform.getTransform(self.wingBones[0])
         )
-        self.tws0_rot = primitive.addTransform(
+        self.tws0_rot: PymelNode = primitive.addTransform(
             self.tws0_loc, self.getName("tws0_rot"), transform.getTransform(self.wingBones[0])
         )
         self.tws0_rot.setAttr("sx", 0.001)
-        self.tws1_loc = primitive.addTransform(
+        self.tws1_loc: PymelNode = primitive.addTransform(
             self.elbow_mid_jnt, self.getName("tws1_loc"), transform.getTransform(self.elbow_mid_jnt)
         )
-        self.tws1_rot = primitive.addTransform(
+        self.tws1_rot: PymelNode = primitive.addTransform(
             self.tws1_loc, self.getName("tws1_rot"), transform.getTransform(self.elbow_mid_jnt)
         )
         self.tws1_rot.setAttr("sx", 0.001)
-        self.tws2_loc = primitive.addTransform(
+        self.tws2_loc: PymelNode = primitive.addTransform(
             self.wrist_mid_jnt, self.getName("tws2_loc"), transform.getTransform(self.wrist_mid_jnt)
         )
-        self.tws2_rot = primitive.addTransform(
+        self.tws2_rot: PymelNode = primitive.addTransform(
             self.tws2_loc, self.getName("tws2_rot"), transform.getTransform(self.wrist_mid_jnt)
         )
         self.tws2_rot.setAttr("sx", 0.001)
-        self.tws3_loc = primitive.addTransform(
+        self.tws3_loc: PymelNode = primitive.addTransform(
             self.wingBones[3], self.getName("tws3_loc"), transform.getTransform(self.wingBones[3])
         )
-        self.tws3_rot = primitive.addTransform(
+        self.tws3_rot: PymelNode = primitive.addTransform(
             self.tws3_loc, self.getName("tws3_rot"), transform.getTransform(self.wingBones[3])
         )
         self.tws3_rot.setAttr("sx", 0.001)
 
-        self.divisions = self.settings["div0"] + self.settings["div1"] + self.settings["div2"]
-        self.joint_indices = {}
-        self.deform_anchor_refs = {}
-        self.deform_anchor_drivers = {}
+        self.divisions: int = self.settings["div0"] + self.settings["div1"] + self.settings["div2"]
+        self.joint_indices: Dict[str, int] = {}
+        self.deform_anchor_refs: Dict[str, PymelNode] = {}
+        self.deform_anchor_drivers: Dict[str, PymelNode] = {}
         for name, wing_bone in [
             ("root", self.wingBones[0]),
             ("elbow", self.wingBones[1]),
             ("wrist", self.wingBones[2]),
             ("hand", self.wingBones[3]),
         ]:
-            ref = primitive.addTransform(
+            ref: PymelNode = primitive.addTransform(
                 self.root_ctl,
                 self.getName("%s_jnt_ref" % name),
                 transform.getTransform(wing_bone),
@@ -503,12 +514,12 @@ class Component(component.Main):
                 pm.parentConstraint(wing_bone, ref, mo=False)
             self.deform_anchor_drivers[name] = ref
 
-        self.wrist_anchor_fk_ref = primitive.addTransform(
+        self.wrist_anchor_fk_ref: PymelNode = primitive.addTransform(
             self.root_ctl,
             self.getName("wristAnchorFk_ref"),
             transform.getTransform(self.wingBones[2]),
         )
-        self.wrist_anchor_ik_mode_ref = primitive.addTransform(
+        self.wrist_anchor_ik_mode_ref: PymelNode = primitive.addTransform(
             self.root_ctl,
             self.getName("wristAnchorIkMode_ref"),
             transform.getTransform(self.wingBones[2]),
@@ -516,12 +527,12 @@ class Component(component.Main):
         self.wrist_anchor_fk_ref.attr("visibility").set(False)
         self.wrist_anchor_ik_mode_ref.attr("visibility").set(False)
 
-        self.support_anchor_drivers = {}
+        self.support_anchor_drivers: Dict[str, PymelNode] = {}
         for name, correction_ctl in [
             ("elbow_mid", self.elbow_ctl),
             ("wrist_mid", self.wrist_ctl),
         ]:
-            driver = primitive.addTransform(
+            driver: PymelNode = primitive.addTransform(
                 self.root_ctl,
                 self.getName("%s_jnt_corr" % name),
                 transform.getTransform(correction_ctl),
@@ -534,9 +545,9 @@ class Component(component.Main):
             )
             self.support_anchor_drivers[name] = driver
 
-        self.div_cns = []
-        div_index = 0
-        joint_index = 0
+        self.div_cns: List[PymelNode] = []
+        div_index: int = 0
+        joint_index: int = 0
         for anchor_name, div_count in [
             ("root", self.settings["div0"]),
             ("elbow", self.settings["div1"]),
@@ -546,7 +557,7 @@ class Component(component.Main):
             self.jnt_pos.append([self.deform_anchor_drivers[anchor_name], anchor_name])
             joint_index += 1
             for _ in range(div_count):
-                div_cns = primitive.addTransform(self.root_ctl, self.getName("div%s_loc" % div_index))
+                div_cns: PymelNode = primitive.addTransform(self.root_ctl, self.getName("div%s_loc" % div_index))
                 self.div_cns.append(div_cns)
                 self.jnt_pos.append([div_cns, div_index])
                 div_index += 1
@@ -555,7 +566,7 @@ class Component(component.Main):
         self.joint_indices["hand"] = joint_index
         self.jnt_pos.append([self.deform_anchor_drivers["hand"], "hand"])
         joint_index += 1
-        self.end_ref = primitive.addTransform(
+        self.end_ref: PymelNode = primitive.addTransform(
             self.tws3_rot, self.getName("end_ref"), transform.getTransform(self.wingBones[3])
         )
         self.jnt_pos.append([self.end_ref, "end"])
@@ -568,43 +579,47 @@ class Component(component.Main):
         self.joint_indices["wrist_mid"] = joint_index
         self.jnt_pos.append([self.support_anchor_drivers["wrist_mid"], "wrist_mid", "wrist"])
 
-        self.match_fk = []
+        self.match_fk: List[PymelNode] = []
         for index, fk_ctl in enumerate(self.fk_ctl):
-            match_off = self._add_match_ref_from(
+            match_off: PymelNode = self._add_match_ref_from(
                 fk_ctl, self.wingBones[index], self.root, "matchFk%s_npo" % index, False
             )
-            match_ref = self._add_match_ref_from(fk_ctl, self.wingBones[index], match_off, "fk%s_mth" % index)
+            match_ref: PymelNode = self._add_match_ref_from(
+                fk_ctl, self.wingBones[index], match_off, "fk%s_mth" % index
+            )
             setattr(self, "match_fk%s_off" % index, match_off)
             setattr(self, "match_fk%s" % index, match_ref)
             self.match_fk.append(match_ref)
 
-        self.match_ik = self._add_match_ref_from(self.ik_ctl, self.wingBones[2], self.root, "ik_mth")
-        self.match_hand_ik = self._add_match_ref_from(self.hand_ik_ctl, self.wingBones[3], self.root, "handIk_mth")
-        self.match_hand_ik_rot = self._add_match_ref_from(
+        self.match_ik: PymelNode = self._add_match_ref_from(self.ik_ctl, self.wingBones[2], self.root, "ik_mth")
+        self.match_hand_ik: PymelNode = self._add_match_ref_from(
+            self.hand_ik_ctl, self.wingBones[3], self.root, "handIk_mth"
+        )
+        self.match_hand_ik_rot: PymelNode = self._add_match_ref_from(
             self.handIkRot_ctl, self.wingBones[3], self.root, "handIkRot_mth"
         )
-        self.match_ikUpv = self.add_match_ref(self.upv_ctl, self.fk0_ctl, "upv_mth")
+        self.match_ikUpv: PymelNode = self.add_match_ref(self.upv_ctl, self.fk0_ctl, "upv_mth")
 
-        self.line_ref = icon.connection_display_curve(self.getName("visalRef"), [self.upv_ctl, self.elbow_ctl])
-        self.hand_line_ref = icon.connection_display_curve(
+        self.line_ref: PymelNode = icon.connection_display_curve(self.getName("visalRef"), [self.upv_ctl, self.elbow_ctl])
+        self.hand_line_ref: PymelNode = icon.connection_display_curve(
             self.getName("handVisalRef"), [self.ikRot_ctl, self.hand_ik_ctl]
         )
 
     def addAttributes(self) -> None:
         """Create anim and setup attributes."""
 
-        self.blend_att = self.addAnimParam("blend", "Fk/Ik Blend", "double", self.settings["blend"], 0, 1)
-        self.volume_att = self.addAnimParam("volume", "Volume", "double", 1, 0, 1)
-        self.roll_att = self.addAnimParam("roll", "Roll", "double", 0, -180, 180)
-        self.wristControlMode_att = self.addAnimEnumParam(
+        self.blend_att: object = self.addAnimParam("blend", "Fk/Ik Blend", "double", self.settings["blend"], 0, 1)
+        self.volume_att: object = self.addAnimParam("volume", "Volume", "double", 1, 0, 1)
+        self.roll_att: object = self.addAnimParam("roll", "Roll", "double", 0, -180, 180)
+        self.wristControlMode_att: object = self.addAnimEnumParam(
             "wristControlMode",
             "Wrist Control Mode",
             int(max(0, min(len(self.wrist_control_mode_names) - 1, self.settings.get("wristControlMode", 0)))),
             self.wrist_control_mode_names,
         )
-        self._softIKRange_initial_value = self.settings["softIKRange"]
-        self._softIKSpeed_initial_value = self.settings["softIKSpeed"]
-        self.soft_attr = self.addAnimParam(
+        self._softIKRange_initial_value: float = self.settings["softIKRange"]
+        self._softIKSpeed_initial_value: float = self.settings["softIKSpeed"]
+        self.soft_attr: object = self.addAnimParam(
             "softIKRange",
             "Soft IK Range Ratio",
             "double",
@@ -612,7 +627,7 @@ class Component(component.Main):
             0.0,
             1.0,
         )
-        self.softSpeed_attr = self.addAnimParam(
+        self.softSpeed_attr: object = self.addAnimParam(
             "softIKSpeed",
             "Soft IK Speed",
             "double",
@@ -620,26 +635,36 @@ class Component(component.Main):
             1.001,
             10.0,
         )
-        self.stretch_attr = self.addAnimParam("stretch", "Stretch", "double", 0, 0, 1)
-        self.roundnessElbow_att = self.addAnimParam("roundnessElbow", "Roundness Elbow", "double", 0, 0, self.size)
-        self.roundnessWrist_att = self.addAnimParam("roundnessWrist", "Roundness Wrist", "double", 0, 0, self.size)
-        self.boneALenghtMult_attr = self.addAnimParam("boneALenMult", "Bone A Mult", "double", 1)
-        self.boneBLenghtMult_attr = self.addAnimParam("boneBLenMult", "Bone B Mult", "double", 1)
-        self.boneCLenghtMult_attr = self.addAnimParam("boneCLenMult", "Bone C Mult", "double", 1)
-        self.boneALenght_attr = self.addAnimParam("boneALen", "Bone A Length", "double", self.length0, keyable=False)
-        self.boneBLenght_attr = self.addAnimParam("boneBLen", "Bone B Length", "double", self.length1, keyable=False)
-        self.boneCLenght_attr = self.addAnimParam("boneCLen", "Bone C Length", "double", self.length2, keyable=False)
+        self.stretch_attr: object = self.addAnimParam("stretch", "Stretch", "double", 0, 0, 1)
+        self.roundnessElbow_att: object = self.addAnimParam(
+            "roundnessElbow", "Roundness Elbow", "double", 0, 0, self.size
+        )
+        self.roundnessWrist_att: object = self.addAnimParam(
+            "roundnessWrist", "Roundness Wrist", "double", 0, 0, self.size
+        )
+        self.boneALenghtMult_attr: object = self.addAnimParam("boneALenMult", "Bone A Mult", "double", 1)
+        self.boneBLenghtMult_attr: object = self.addAnimParam("boneBLenMult", "Bone B Mult", "double", 1)
+        self.boneCLenghtMult_attr: object = self.addAnimParam("boneCLenMult", "Bone C Mult", "double", 1)
+        self.boneALenght_attr: object = self.addAnimParam(
+            "boneALen", "Bone A Length", "double", self.length0, keyable=False
+        )
+        self.boneBLenght_attr: object = self.addAnimParam(
+            "boneBLen", "Bone B Length", "double", self.length1, keyable=False
+        )
+        self.boneCLenght_attr: object = self.addAnimParam(
+            "boneCLen", "Bone C Length", "double", self.length2, keyable=False
+        )
 
         if self.settings["ikrefarray"]:
-            ref_names = self.get_valid_alias_list(self.settings["ikrefarray"].split(","))
+            ref_names: List[str] = self.get_valid_alias_list(self.settings["ikrefarray"].split(","))
             if len(ref_names) > 1:
-                self.ikref_att = self.addAnimEnumParam("ikref", "Ik Ref", 0, ref_names)
+                self.ikref_att: object = self.addAnimEnumParam("ikref", "Ik Ref", 0, ref_names)
 
         if self.settings["upvrefarray"]:
             ref_names = self.get_valid_alias_list(self.settings["upvrefarray"].split(","))
             ref_names = ["Auto", *ref_names]
             if len(ref_names) > 1:
-                self.upvref_att = self.addAnimEnumParam("upvref", "UpV Ref", 0, ref_names)
+                self.upvref_att: object = self.addAnimEnumParam("upvref", "UpV Ref", 0, ref_names)
 
         if self.validProxyChannels:
             attribute.addProxyAttribute(
@@ -666,32 +691,35 @@ class Component(component.Main):
                 [self.ik_ctl, self.ikRot_ctl, self.hand_ik_ctl, self.handIkRot_ctl, self.upv_ctl],
             )
 
-        self.division_percents = self._get_division_percents()
-        self.st_value = self._sample_profile_values("st_profile", self.division_percents)
-        self.sq_value = self._sample_profile_values("sq_profile", self.division_percents)
+        self.division_percents: List[float] = self._get_division_percents()
+        self.st_value: List[float] = self._sample_profile_values("st_profile", self.division_percents)
+        self.sq_value: List[float] = self._sample_profile_values("sq_profile", self.division_percents)
 
-        self.st_att = []
-        self.sq_att = []
+        self.st_att: List[object] = []
+        self.sq_att: List[object] = []
         for i in range(self.divisions):
-            st_val = self.st_value[i] if i < len(self.st_value) else 0
-            sq_val = self.sq_value[i] if i < len(self.sq_value) else 0
+            st_val: float = self.st_value[i] if i < len(self.st_value) else 0
+            sq_val: float = self.sq_value[i] if i < len(self.sq_value) else 0
             self.st_att.append(self.addSetupParam("stretch_%s" % i, "Stretch %s" % i, "double", st_val, -1, 0))
             self.sq_att.append(self.addSetupParam("squash_%s" % i, "Squash %s" % i, "double", sq_val, 0, 1))
 
-        self.resample_att = self.addSetupParam("resample", "Resample", "bool", True)
-        self.absolute_att = self.addSetupParam("absolute", "Absolute", "bool", False)
-        elbow_flip_offset = self.chain2bones[1].attr("jointOrientZ").get() / 2
-        self.elbowFlipOffset_att = self.addSetupParam(
+        self.resample_att: object = self.addSetupParam("resample", "Resample", "bool", True)
+        self.absolute_att: object = self.addSetupParam("absolute", "Absolute", "bool", False)
+        elbow_flip_offset: float = self.chain2bones[1].attr("jointOrientZ").get() / 2
+        self.elbowFlipOffset_att: object = self.addSetupParam(
             "elbowFlipOffset", "Elbow Flip Offset", "double", elbow_flip_offset, -180, 180
         )
-        self.wristFlipOffset_att = self.addSetupParam("wristFlipOffset", "Wrist Flip Offset", "double", 0, -180, 180)
+        self.wristFlipOffset_att: object = self.addSetupParam(
+            "wristFlipOffset", "Wrist Flip Offset", "double", 0, -180, 180
+        )
 
     def _set_ik_solver(self) -> None:
         if self.settings["ikSolver"]:
-            self.ikSolver = "ikRPsolver"
+            ik_solver: str = "ikRPsolver"
         else:
             pm.mel.eval("ikSpringSolver;")
-            self.ikSolver = "ikSpringSolver"
+            ik_solver = "ikSpringSolver"
+        self.ikSolver: str = ik_solver
 
     def _connect_mid_support_operators(self) -> None:
         for wing_bone, mid_jnt in [
@@ -702,7 +730,7 @@ class Component(component.Main):
             pm.connectAttr(wing_bone + ".translate", mid_jnt + ".translate", f=True)
 
     def _connect_upv_ref_operator(self) -> None:
-        self.ikHandleUpvRef = primitive.addIkHandle(
+        self.ikHandleUpvRef: PymelNode = primitive.addIkHandle(
             self.root, self.getName("ikHandleWingUpvRef"), self.upvRefChain, "ikSCsolver"
         )
         pm.pointConstraint(self.ik_ctl, self.ikHandleUpvRef)
@@ -712,7 +740,7 @@ class Component(component.Main):
         pm.parentConstraint(self.wrist_mid_jnt, self.wrist_lvl)
 
     def _connect_ik_handles(self) -> None:
-        self.ikHandle2 = primitive.addIkHandle(
+        self.ikHandle2: PymelNode = primitive.addIkHandle(
             self.softblendLoc, self.getName("ik2BonesHandle"), self.chain2bones, self.ikSolver, self.effective_upv_ref
         )
         if self.ikSolver == "ikSpringSolver":
@@ -722,7 +750,9 @@ class Component(component.Main):
         pm.connectAttr(self.upv_ctl.attr("translate"), self.effective_upv_ref.attr("translate"), f=True)
         pm.pointConstraint(self.chain2bones[2], self.handChain[0], maintainOffset=False)
 
-        self.ikHandleHand = primitive.addIkHandle(self.root, self.getName("ikHandHandle"), self.handChain, "ikSCsolver")
+        self.ikHandleHand: PymelNode = primitive.addIkHandle(
+            self.root, self.getName("ikHandHandle"), self.handChain, "ikSCsolver"
+        )
         pm.pointConstraint(self.hand_ik_ctl, self.ikHandleHand, maintainOffset=False)
 
     def _connect_hand_parent_mode(self) -> None:
@@ -739,7 +769,7 @@ class Component(component.Main):
             skipTranslate=["x", "y", "z"],
             maintainOffset=True,
         )
-        wrist_mode_basis_cns = pm.parentConstraint(
+        wrist_mode_basis_cns: PymelNode = pm.parentConstraint(
             self.hand_ik_parent_ik_ref,
             self.hand_ik_parent_chain_ref,
             self.wrist_mode_basis_ref,
@@ -766,7 +796,7 @@ class Component(component.Main):
         pm.parentConstraint(self.wingBonesFK[2], self.wrist_anchor_fk_ref, maintainOffset=False)
         pm.parentConstraint(self.wrist_mode_basis_ref, self.wrist_anchor_ik_mode_ref, maintainOffset=False)
 
-        wrist_anchor_cns = pm.parentConstraint(
+        wrist_anchor_cns: PymelNode = pm.parentConstraint(
             self.wrist_anchor_fk_ref,
             self.wrist_anchor_ik_mode_ref,
             self.deform_anchor_refs["wrist"],
@@ -776,11 +806,11 @@ class Component(component.Main):
         pm.connectAttr(self.blend_att, wrist_anchor_cns + ".target[1].targetWeight", f=True)
 
     def _connect_twist_and_aim(self) -> None:
-        chain_pos = [x.getTranslation(space="world") for x in self.chain2bones]
-        same_dir = self.verifyAlignmentAccuracy(chain_pos, self.guide.apos[:3])
-        angle = 0 if same_dir else 180
-        add_node_twist = node.createAddNode(angle, self.roll_att)
-        mul_val = 1 if self.negate else -1
+        chain_pos: List[datatypes.Vector] = [x.getTranslation(space="world") for x in self.chain2bones]
+        same_dir: bool = self.verifyAlignmentAccuracy(chain_pos, self.guide.apos[:3])
+        angle: int = 0 if same_dir else 180
+        add_node_twist: PymelNode = node.createAddNode(angle, self.roll_att)
+        mul_val: int = 1 if self.negate else -1
         node.createMulNode(add_node_twist + ".output", mul_val, self.ikHandle2.attr("twist"))
 
         applyop.aimCns(
@@ -794,27 +824,31 @@ class Component(component.Main):
         )
 
     def _connect_soft_ik_and_stretch(self, multJnt1_node: PymelNode, multJnt2_node: PymelNode) -> None:
-        plus_total_length_node = node.createPlusMinusAverage1D(
+        plus_total_length_node: PymelNode = node.createPlusMinusAverage1D(
             [multJnt1_node.attr("outputX"), multJnt2_node.attr("outputX")]
         )
-        soft_range_node = node.createMulNode(plus_total_length_node.attr("output1D"), self.soft_attr_cond)
-        soft_range_attr = soft_range_node.attr("outputX")
-        subtract1_node = node.createPlusMinusAverage1D([plus_total_length_node.attr("output1D"), soft_range_attr], 2)
-        distance1_node = node.createDistNode(self.ik_ref, self.aim_tra)
-        div1_node = node.createDivNode(1.0, self.rig.global_ctl + ".sx")
-        mult1_node = node.createMulNode(distance1_node + ".distance", div1_node + ".outputX")
-        subtract2_node = node.createPlusMinusAverage1D([mult1_node.attr("outputX"), subtract1_node.attr("output1D")], 2)
-        div2_node = node.createDivNode(subtract2_node + ".output1D", soft_range_attr)
-        mult2_node = node.createMulNode(-1, div2_node + ".outputX")
-        power_node = node.createPowNode(self.softSpeed_attr, mult2_node + ".outputX")
-        mult3_node = node.createMulNode(soft_range_attr, power_node + ".outputX")
-        subtract3_node = node.createPlusMinusAverage1D(
+        soft_range_node: PymelNode = node.createMulNode(plus_total_length_node.attr("output1D"), self.soft_attr_cond)
+        soft_range_attr: object = soft_range_node.attr("outputX")
+        subtract1_node: PymelNode = node.createPlusMinusAverage1D(
+            [plus_total_length_node.attr("output1D"), soft_range_attr], 2
+        )
+        distance1_node: PymelNode = node.createDistNode(self.ik_ref, self.aim_tra)
+        div1_node: PymelNode = node.createDivNode(1.0, self.rig.global_ctl + ".sx")
+        mult1_node: PymelNode = node.createMulNode(distance1_node + ".distance", div1_node + ".outputX")
+        subtract2_node: PymelNode = node.createPlusMinusAverage1D(
+            [mult1_node.attr("outputX"), subtract1_node.attr("output1D")], 2
+        )
+        div2_node: PymelNode = node.createDivNode(subtract2_node + ".output1D", soft_range_attr)
+        mult2_node: PymelNode = node.createMulNode(-1, div2_node + ".outputX")
+        power_node: PymelNode = node.createPowNode(self.softSpeed_attr, mult2_node + ".outputX")
+        mult3_node: PymelNode = node.createMulNode(soft_range_attr, power_node + ".outputX")
+        subtract3_node: PymelNode = node.createPlusMinusAverage1D(
             [plus_total_length_node.attr("output1D"), mult3_node.attr("outputX")], 2
         )
-        cond1_node = node.createConditionNode(
+        cond1_node: PymelNode = node.createConditionNode(
             soft_range_attr, 0, 2, subtract3_node + ".output1D", plus_total_length_node + ".output1D"
         )
-        cond2_node = node.createConditionNode(
+        cond2_node: PymelNode = node.createConditionNode(
             mult1_node + ".outputX",
             subtract1_node + ".output1D",
             2,
@@ -823,17 +857,19 @@ class Component(component.Main):
         )
         pm.connectAttr(cond2_node + ".outColorR", self.wristSoftIK + ".tz")
 
-        soft_blend_cns = pm.pointConstraint(self.wristSoftIK, self.ik_ref, self.softblendLoc)
+        soft_blend_cns: PymelNode = pm.pointConstraint(self.wristSoftIK, self.ik_ref, self.softblendLoc)
         node.createReverseNode(self.stretch_attr, soft_blend_cns + ".target[0].targetWeight")
         pm.connectAttr(self.stretch_attr, soft_blend_cns + ".target[1].targetWeight", f=True)
 
-        distance2_node = node.createDistNode(self.softblendLoc, self.wristSoftIK)
-        mult4_node = node.createMulNode(distance2_node + ".distance", div1_node + ".outputX")
+        distance2_node: PymelNode = node.createDistNode(self.softblendLoc, self.wristSoftIK)
+        mult4_node: PymelNode = node.createMulNode(distance2_node + ".distance", div1_node + ".outputX")
         for index, mul_node in enumerate([multJnt1_node, multJnt2_node]):
-            div3_node = node.createDivNode(mul_node + ".outputX", plus_total_length_node + ".output1D")
-            mult5_node = node.createMulNode(mult4_node + ".outputX", div3_node + ".outputX")
-            mult6_node = node.createMulNode(self.stretch_attr, mult5_node + ".outputX")
-            length_node = node.createPlusMinusAverage1D([mul_node.attr("outputX"), mult6_node.attr("outputX")], 1)
+            div3_node: PymelNode = node.createDivNode(mul_node + ".outputX", plus_total_length_node + ".output1D")
+            mult5_node: PymelNode = node.createMulNode(mult4_node + ".outputX", div3_node + ".outputX")
+            mult6_node: PymelNode = node.createMulNode(self.stretch_attr, mult5_node + ".outputX")
+            length_node: PymelNode = node.createPlusMinusAverage1D(
+                [mul_node.attr("outputX"), mult6_node.attr("outputX")], 1
+            )
             pm.connectAttr(length_node + ".output1D", self.chain2bones[index + 1] + ".tx")
 
     def _connect_result_chains(self, multJnt3_node: PymelNode) -> None:
@@ -855,13 +891,15 @@ class Component(component.Main):
         for i, wing_bone in enumerate(self.wingBones):
             node.createPairBlend(self.wingBonesFK[i], self.wingBonesIK[i], self.blend_att, 1, wing_bone)
 
+        self.ikhRollRef: PymelNode
+        self.tmpCrv: PymelNode
         self.ikhRollRef, self.tmpCrv = applyop.splineIK(
             self.getName("wingRollRef"), self.rollRef, parent=self.root, cParent=self.wingBones[0]
         )
 
     def _connect_twist_driver_controls(self) -> None:
-        init_round = 0.001
-        add_node = node.createAddNode(self.roundnessElbow_att, init_round)
+        init_round: float = 0.001
+        add_node: PymelNode = node.createAddNode(self.roundnessElbow_att, init_round)
         pm.connectAttr(add_node + ".output", self.tws1_rot + ".sx")
         pm.connectAttr(self.elbow_ctl + ".translate", self.tws1_loc + ".translate")
         pm.connectAttr(self.elbow_ctl + ".rx", self.tws1_loc + ".rx")
@@ -874,23 +912,23 @@ class Component(component.Main):
         pm.connectAttr(self.wrist_ctl + ".ry", self.tws2_loc + ".ry")
 
     def _connect_volume_driver(self) -> None:
-        distA_node = node.createDistNode(self.tws0_loc, self.tws1_loc)
-        distB_node = node.createDistNode(self.tws1_loc, self.tws2_loc)
-        distC_node = node.createDistNode(self.tws2_loc, self.tws3_loc)
-        add_node = node.createAddNode(distA_node + ".distance", distB_node + ".distance")
-        add_node2 = node.createAddNode(distC_node + ".distance", add_node + ".output")
-        div_node = node.createDivNode(add_node2 + ".output", self.root_ctl.attr("sx"))
-        dm_node = node.createDecomposeMatrixNode(self.root.attr("worldMatrix"))
-        div_node2 = node.createDivNode(div_node + ".outputX", dm_node + ".outputScaleX")
-        self.volDriver_att = div_node2 + ".outputX"
+        distA_node: PymelNode = node.createDistNode(self.tws0_loc, self.tws1_loc)
+        distB_node: PymelNode = node.createDistNode(self.tws1_loc, self.tws2_loc)
+        distC_node: PymelNode = node.createDistNode(self.tws2_loc, self.tws3_loc)
+        add_node: PymelNode = node.createAddNode(distA_node + ".distance", distB_node + ".distance")
+        add_node2: PymelNode = node.createAddNode(distC_node + ".distance", add_node + ".output")
+        div_node: PymelNode = node.createDivNode(add_node2 + ".output", self.root_ctl.attr("sx"))
+        dm_node: PymelNode = node.createDecomposeMatrixNode(self.root.attr("worldMatrix"))
+        div_node2: PymelNode = node.createDivNode(div_node + ".outputX", dm_node + ".outputScaleX")
+        self.volDriver_att: object = div_node2 + ".outputX"
 
         pm.connectAttr(self.elbowFlipOffset_att, self.tws1_loc + ".rz")
         pm.connectAttr(self.wristFlipOffset_att, self.tws2_loc + ".rz")
 
     def _connect_division_operators(self) -> None:
-        cts = [self.tws0_rot, self.tws1_rot, self.tws2_rot, self.tws3_rot]
+        cts: List[PymelNode] = [self.tws0_rot, self.tws1_rot, self.tws2_rot, self.tws3_rot]
         for i, div_cns in enumerate(self.div_cns):
-            o_node = applyop.gear_rollsplinekine_op(div_cns, cts, self.division_percents[i], 45)
+            o_node: PymelNode = applyop.gear_rollsplinekine_op(div_cns, cts, self.division_percents[i], 45)
             pm.connectAttr(self.resample_att, o_node + ".resample")
             pm.connectAttr(self.absolute_att, o_node + ".absolute")
 
@@ -901,7 +939,7 @@ class Component(component.Main):
             pm.connectAttr(self.sq_att[i], o_node + ".squash")
 
     def _connect_visibility(self) -> None:
-        fkvis_node = node.createReverseNode(self.blend_att)
+        fkvis_node: PymelNode = node.createReverseNode(self.blend_att)
         for ctrl in self.fk_ctl:
             for shp in ctrl.getShapes():
                 pm.connectAttr(fkvis_node + ".outputX", shp.attr("visibility"))
@@ -930,27 +968,27 @@ class Component(component.Main):
         pm.parentConstraint(self.wingBones[3], self.match_hand_ik_rot, mo=True)
 
     def _offset_ik_ctl_for_initial_soft_ik(self) -> None:
-        soft_ik_range = float(self._softIKRange_initial_value)
+        soft_ik_range: float = float(self._softIKRange_initial_value)
         if soft_ik_range <= 0.0:
             return
 
-        soft_ik_speed = float(self._softIKSpeed_initial_value)
+        soft_ik_speed: float = float(self._softIKSpeed_initial_value)
         if soft_ik_speed <= 1.0:
             return
 
-        offset_factor = math.log(1.0 / self.soft_ik_initial_residual_ratio) / math.log(soft_ik_speed) - 1.0
+        offset_factor: float = math.log(1.0 / self.soft_ik_initial_residual_ratio) / math.log(soft_ik_speed) - 1.0
         if offset_factor <= 0.0:
             return
 
-        root_pos = datatypes.Vector(self.guide.pos["root"])
-        wrist_pos = datatypes.Vector(self.guide.pos["wrist"])
-        direction = wrist_pos - root_pos
+        root_pos: datatypes.Vector = datatypes.Vector(self.guide.pos["root"])
+        wrist_pos: datatypes.Vector = datatypes.Vector(self.guide.pos["wrist"])
+        direction: datatypes.Vector = wrist_pos - root_pos
         if direction.length() <= 0.0:
             return
 
         direction.normalize()
-        offset = (self.length0 + self.length1) * soft_ik_range * offset_factor
-        current_pos = self.ik_ctl.getTranslation(space="world")
+        offset: float = (self.length0 + self.length1) * soft_ik_range * offset_factor
+        current_pos: datatypes.Vector = self.ik_ctl.getTranslation(space="world")
         self.ik_ctl.setTranslation(current_pos + (direction * offset), space="world")
 
     def _apply_soft_ik_initial_values(self) -> None:
@@ -962,13 +1000,13 @@ class Component(component.Main):
     def addOperators(self) -> None:
         """Apply operators, constraints, and expressions."""
 
-        soft_cond_node = node.createConditionNode(self.soft_attr, 0.0001, 4, 0.0001, self.soft_attr)
-        self.soft_attr_cond = soft_cond_node.outColorR
+        soft_cond_node: PymelNode = node.createConditionNode(self.soft_attr, 0.0001, 4, 0.0001, self.soft_attr)
+        self.soft_attr_cond: object = soft_cond_node.attr("outColorR")
         self._set_ik_solver()
 
-        multJnt1_node = node.createMulNode(self.boneALenght_attr, self.boneALenghtMult_attr)
-        multJnt2_node = node.createMulNode(self.boneBLenght_attr, self.boneBLenghtMult_attr)
-        multJnt3_node = node.createMulNode(self.boneCLenght_attr, self.boneCLenghtMult_attr)
+        multJnt1_node: PymelNode = node.createMulNode(self.boneALenght_attr, self.boneALenghtMult_attr)
+        multJnt2_node: PymelNode = node.createMulNode(self.boneBLenght_attr, self.boneBLenghtMult_attr)
+        multJnt3_node: PymelNode = node.createMulNode(self.boneCLenght_attr, self.boneCLenghtMult_attr)
 
         self._connect_upv_ref_operator()
         self._connect_ik_handles()
@@ -987,7 +1025,7 @@ class Component(component.Main):
         self._connect_match_refs()
 
     def verifyAlignmentAccuracy(
-        self, jnts: list[datatypes.Vector], guides: list[datatypes.Vector], degree: float = 10.0
+        self, jnts: List[datatypes.Vector], guides: List[datatypes.Vector], degree: float = 10.0
     ) -> bool:
         if len(jnts) != len(guides):
             raise ValueError("jnts and guides must have the same number of positions.")
@@ -997,8 +1035,8 @@ class Component(component.Main):
             raise ValueError("degree must be non-negative.")
 
         for j0, j1, g0, g1 in zip(jnts, jnts[1:], guides, guides[1:]):
-            joint_vec = om2.MVector(j1[0] - j0[0], j1[1] - j0[1], j1[2] - j0[2])
-            guide_vec = om2.MVector(g1[0] - g0[0], g1[1] - g0[1], g1[2] - g0[2])
+            joint_vec: om2.MVector = om2.MVector(j1[0] - j0[0], j1[1] - j0[1], j1[2] - j0[2])
+            guide_vec: om2.MVector = om2.MVector(g1[0] - g0[0], g1[1] - g0[1], g1[2] - g0[2])
             if joint_vec.length() == 0 or guide_vec.length() == 0:
                 return False
             joint_vec.normalize()
@@ -1032,7 +1070,7 @@ class Component(component.Main):
         self.connections["standard"] = self.connect_standard
         self.connections["ymt_shoulder_01"] = self.connect_ymt_shoulder
 
-    def get_feather_ribbon_refs(self) -> dict[str, object]:
+    def get_feather_ribbon_refs(self) -> Dict[str, object]:
         """Return stable driver objects used by feather ribbon child components."""
         return {
             "refs": {
@@ -1057,6 +1095,6 @@ class Component(component.Main):
 
     def connect_ymt_shoulder(self) -> None:
         if self.parent_comp is not None and "ymt_shoulder" in str(type(self.parent_comp)):
-            self.armChainUpvRef = self.upvRefChain
+            self.armChainUpvRef: List[PymelNode] = self.upvRefChain
             self.parent_comp.connect_arm(self)
         self.connect_standard()

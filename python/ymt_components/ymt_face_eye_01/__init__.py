@@ -1,6 +1,8 @@
 """mGear shifter components"""
-import sys
+from __future__ import annotations
+
 import re
+from typing import List, Optional, Tuple, TYPE_CHECKING, Union
 
 import maya.cmds as cmds
 import maya.api.OpenMaya as om
@@ -38,21 +40,8 @@ from mgear.core.primitive import (
 import ymt_shifter_utility as ymt_util
 import ymt_shifter_utility.curve as curve
 
-if sys.version_info > (3, 0):
-    from typing import TYPE_CHECKING
-    if TYPE_CHECKING:
-        from typing import (
-            Optional,
-            Dict,
-            List,
-            Tuple,
-            Callable,
-            Any,
-            Text,
-            Union
-        )
-        from re import Pattern
-        from collections.abc import Generator
+if TYPE_CHECKING:
+    from ymt_shifter_utility.type_protocols import MatrixLike, PymelNode, VectorLike, WorldPoint
 
 from logging import (
     StreamHandler,
@@ -85,96 +74,95 @@ class Component(component.Main):
     def addObjects(self) -> None:
         """Add all the objects needed to create the component."""
 
-        self.normal = self.guide.blades["blade"].z * -1.0
-        self.front = self.guide.blades["blade"].x
+        self.normal: VectorLike = self.guide.blades["blade"].z * -1.0
+        self.front: VectorLike = self.guide.blades["blade"].x
 
-        self.WIP = self.options["mode"]
+        self.WIP: Union[bool, str] = self.options["mode"]
 
         if self.negate and self.settings["overrideNegate"]:
             self.negate = False
             self.n_factor = 1
 
         if self.settings["overrideNegate"]:
-            self.mirror_conf = [0, 0, 1,
-                                1, 1, 0,
-                                0, 0, 0]
+            self.mirror_conf: List[int] = [0, 0, 1,
+                                           1, 1, 0,
+                                           0, 0, 0]
         else:
             self.mirror_conf = [0, 0, 0,
                                 0, 0, 0,
                                 0, 0, 0]
 
         # -------------------------------------------------------
-        self.eyeballPivotPos = self.guide.apos[1]
-        self.eyelidPivotPos = self.guide.apos[2]
-        self.eyeballPivotTra = self.guide.tra["eyelidPivot"]
-        self.eyelidPivotTra = self.guide.tra["eyeballPivot"]
+        self.eyeballPivotPos: VectorLike = self.guide.apos[1]
+        self.eyelidPivotPos: VectorLike = self.guide.apos[2]
+        self.eyeballPivotTra: MatrixLike = self.guide.tra["eyelidPivot"]
+        self.eyelidPivotTra: MatrixLike = self.guide.tra["eyeballPivot"]
 
-        self.num_uplocs = self.getNumberOfLocators("_uploc")
-        self.num_lowlocs = self.getNumberOfLocators("_lowloc")
+        self.num_uplocs: int = self.getNumberOfLocators("_uploc")
+        self.num_lowlocs: int = self.getNumberOfLocators("_lowloc")
 
-        self.inPos = self.guide.apos[-5]
-        self.outPos = self.guide.apos[-4]
-        self.upPos = self.guide.apos[-3]
-        self.lowPos = self.guide.apos[-2]
-        self.frontPos = self.guide.apos[-1]
-        self.rootPos = self.guide.apos[0]
-        self.normalVec = self.upPos - self.lowPos
+        self.inPos: VectorLike = self.guide.apos[-5]
+        self.outPos: VectorLike = self.guide.apos[-4]
+        self.upPos: VectorLike = self.guide.apos[-3]
+        self.lowPos: VectorLike = self.guide.apos[-2]
+        self.frontPos: VectorLike = self.guide.apos[-1]
+        self.rootPos: VectorLike = self.guide.apos[0]
+        self.normalVec: VectorLike = self.upPos - self.lowPos
 
-        self.uplocsPos = self.guide.apos[3:self.num_uplocs + 3]
-        self.lowlocsPos = self.guide.apos[3 + self.num_uplocs:-5]
+        self.uplocsPos: List[VectorLike] = self.guide.apos[3:self.num_uplocs + 3]
+        self.lowlocsPos: List[VectorLike] = self.guide.apos[3 + self.num_uplocs:-5]
 
-        self.offset = rotate_vector(self.frontPos - self.rootPos, self.front)
+        self.offset: VectorLike = rotate_vector(self.frontPos - self.rootPos, self.front)
 
         # -------------------------------------------------------
         # TODO: extract to settings
-        self.ctlName = "ctl"
-        self.detailControllersGroupName = "controllers_detail"
-        self.primaryControllersGroupName = "controllers_primary"
-        self.blinkH = 0.2
-        self.upperVTrackUp = 0.33
-        self.upperVTrackLow = 0.10
-        self.upperHTrack = 0.10
-        self.lowerVTrackUp = 0.25
-        self.lowerVTrackLow = 0.10
-        self.lowerHTrack = 0.10
+        self.ctlName: str = "ctl"
+        self.detailControllersGroupName: str = "controllers_detail"
+        self.primaryControllersGroupName: str = "controllers_primary"
+        self.blinkH: float = 0.2
+        self.upperVTrackUp: float = 0.33
+        self.upperVTrackLow: float = 0.10
+        self.upperHTrack: float = 0.10
+        self.lowerVTrackUp: float = 0.25
+        self.lowerVTrackLow: float = 0.10
+        self.lowerHTrack: float = 0.10
 
         # --------------------------------------------------------
-        self.upControls = []
-        self.lowControls = []
-        self.trackLvl = []
+        self.upControls: List[PymelNode] = []
+        self.lowControls: List[PymelNode] = []
+        self.trackLvl: List[PymelNode] = []
 
-        self.previusTag = self.parentCtlTag
-        self.guide.eyeMesh = self.guide.getObjectByLocalName("eyelidPivot")
-        self.guide.eyeballMesh = self.guide.getObjectByLocalName("eyeballPivot")
+        self.previusTag: Optional[PymelNode] = self.parentCtlTag
+        self.guide.eyeMesh: PymelNode = self.guide.getObjectByLocalName("eyelidPivot")
+        self.guide.eyeballMesh: PymelNode = self.guide.getObjectByLocalName("eyeballPivot")
         # --------------------------------------------------------
 
-        positions = [self.inPos]
+        positions: List[VectorLike] = [self.inPos]
         positions.extend(self.uplocsPos)
         positions.append(self.outPos)
-        relativeUpPositions = [x - self.rootPos for x in positions]
+        relativeUpPositions: List[VectorLike] = [x - self.rootPos for x in positions]
 
         positions = [self.inPos]
         positions.extend(self.lowlocsPos)
         positions.append(self.outPos)
-        relativeLowPositions = [x - self.rootPos for x in positions]
+        relativeLowPositions: List[VectorLike] = [x - self.rootPos for x in positions]
 
         self.addCurves(relativeUpPositions, relativeLowPositions)
         self.addControllers()
 
-        self.connect_surface_slider = self.settings["isSlidingSurface"]
+        self.connect_surface_slider: bool = self.settings["isSlidingSurface"]
         if not self.connect_surface_slider:
             return
 
-        self.surfRef = self.settings["surfaceReference"]
+        self.surfRef: str = self.settings["surfaceReference"]
         if not self.surfRef:
-            guide_surface = self.guide.getObjectByLocalName("sliding_surface")
-            self.sliding_surface = pm.duplicate(guide_surface)[0]
+            guide_surface: PymelNode = self.guide.getObjectByLocalName("sliding_surface")
+            self.sliding_surface: PymelNode = pm.duplicate(guide_surface)[0]
             pm.parent(self.sliding_surface.name(), self.root)
             self.sliding_surface.visibility.set(False)
             pm.makeIdentity(self.sliding_surface, apply=True, t=1,  r=1, s=1, n=0, pn=1)  # type: ignore
 
-    def getNumberOfLocators(self, query: object) -> None:
-        # type: (Text) -> int
+    def getNumberOfLocators(self, query: str) -> int:
         """ _uplocs."""
         num = 0
         for k, v in self.guide.tra.items():
@@ -187,7 +175,7 @@ class Component(component.Main):
 
         return num
 
-    def addCurves(self, upPositions: object, lowPositions: object) -> None:
+    def addCurves(self, upPositions: List[WorldPoint], lowPositions: List[WorldPoint]) -> None:
 
         gen2 = curve.createCurveFromCurveEvenLength
         gen3 = curve.addCurve
@@ -242,7 +230,7 @@ class Component(component.Main):
 
         return
 
-    def getBboxRadius(self) -> None:
+    def getBboxRadius(self) -> Tuple[float, float]:
         # localBBOX
 
         localBBox = self.guide.eyeMesh.getBoundingBox(invisible=True, space="world")
@@ -251,7 +239,7 @@ class Component(component.Main):
 
         return wRadius, dRadius
 
-    def getEyeballBboxRadius(self) -> None:
+    def getEyeballBboxRadius(self) -> Tuple[float, float]:
         # localBBOX
 
         localBBox = self.guide.eyeballMesh.getBoundingBox(invisible=True, space="world")
@@ -301,7 +289,7 @@ class Component(component.Main):
         self.addBlinkControllers(t)
         self.jnt_pos.append([self.arrow_ctl, "eyeball"])
 
-    def addOverControllers(self, t: object) -> None:
+    def addOverControllers(self, t: MatrixLike) -> None:
 
         up_blink_pos = self.upPos
         lo_blink_pos = self.lowPos
@@ -331,7 +319,7 @@ class Component(component.Main):
             self.over_ctl,
             params=["tx", "ty", "tz", "ro", "rx", "ry", "rz", "sx", "sy", "sz"])
 
-    def addLookAtControlers(self, t_root: object, t_look: object) -> None:
+    def addLookAtControlers(self, t_root: MatrixLike, t_look: MatrixLike) -> None:
 
         self.center_lookat = addTransform(self.over_ctl, self.getName("center_lookat"), t_root)
         ymt_util.setKeyableAttributesDontLockVisibility(self.center_lookat, params=[])
@@ -358,7 +346,7 @@ class Component(component.Main):
             params=["tx", "ty", "tz", "ro", "rx", "ry", "rz", "sx", "sy", "sz"]
         )
 
-    def addAimControllers(self, t: object) -> None:
+    def addAimControllers(self, t: MatrixLike) -> None:
 
         radius = abs(self.getEyeballBboxRadius()[0] / 1.7)
         pos = transform.getPositionFromMatrix(t)
@@ -377,7 +365,7 @@ class Component(component.Main):
         ymt_util.setKeyableAttributesDontLockVisibility(aimTrigger_lvl, [])
         ymt_util.setKeyableAttributesDontLockVisibility(self.aimTrigger_ref, [])
 
-    def addBlinkControllers(self, t: object) -> None:
+    def addBlinkControllers(self, t: MatrixLike) -> None:
         blink_root = addTransform(self.over_ctl, self.getName("blink_root"), t)
 
         inv = datatypes.EulerRotation(180.0, 0.0, 0.0)
@@ -414,7 +402,7 @@ class Component(component.Main):
         ymt_util.setKeyableAttributesDontLockVisibility(self.blink_upper_ctl, params=["ty"])
         ymt_util.setKeyableAttributesDontLockVisibility(self.blink_lower_ctl, params=["ty"])
 
-    def addCurveControllers(self, t: object) -> None:
+    def addCurveControllers(self, t: MatrixLike) -> None:
 
         # upper eyelid controls
         upperCtlNames = ["inCorner", "upInMid", "upMid", "upOutMid", "outCorner"]
@@ -429,7 +417,7 @@ class Component(component.Main):
         # self.lowControls.insert(0, self.upControls[0])
         # self.lowControls.append(self.upControls[-1])
 
-    def addCurveJoints(self, t: object) -> None:
+    def addCurveJoints(self, t: MatrixLike) -> None:
 
         skip = not self.settings.get("isSplitCorners", False)
 
@@ -444,14 +432,21 @@ class Component(component.Main):
         self.lowDetailNpos = npos
         self.lowDetailAimNpos = aim_npos
 
-    def _addCurveControllers(self, t: object, crv: object, ctlNames: str, inCtl: object=None, outCtl: object=None) -> None:
+    def _addCurveControllers(
+        self,
+        t: MatrixLike,
+        crv: PymelNode,
+        ctlNames: List[str],
+        inCtl: Optional[PymelNode] = None,
+        outCtl: Optional[PymelNode] = None,
+    ) -> List[PymelNode]:
 
         cvs = ymt_util.getCurveCVs(crv, space="world")
         if self.negate:
             # cvs = [cv for cv in reversed(cvs)]
             pass
 
-        ctls = []
+        ctls: List[PymelNode] = []
         for i, cv in enumerate(cvs):
             if inCtl is not None and i == 0:
                 ctls.append(inCtl)
@@ -511,7 +506,7 @@ class Component(component.Main):
 
         return ctls
 
-    def addToSubGroup(self, obj: object, group_name: str) -> None:
+    def addToSubGroup(self, obj: PymelNode, group_name: str) -> None:
 
         if self.settings["ctlGrp"]:
             ctlGrp = self.settings["ctlGrp"]
@@ -520,11 +515,11 @@ class Component(component.Main):
 
         self.addToGroup(obj, group_name, parentGrp=ctlGrp)
 
-    def _selectNearestCvIndex(self, crv: object, pos: float) -> None:
+    def _selectNearestCvIndex(self, crv: PymelNode, pos: float) -> int:
 
         cvs = ymt_util.getCurveCVs(crv, space="world")
         min_dist = 9999999999
-        nearest = None
+        nearest = -1
         for i, cv in enumerate(cvs):
             dist = (pos - cv).length()
             if dist < min_dist:
@@ -533,11 +528,13 @@ class Component(component.Main):
 
         return nearest
 
-    def _addCurveDetailControllers(self, t: object, crv: object, detailCrv: object, name: str, skipHeadAndTail: object=False) -> None:
+    def _addCurveDetailControllers(
+        self, t: MatrixLike, crv: PymelNode, detailCrv: PymelNode, name: str, skipHeadAndTail: bool = False
+    ) -> Tuple[List[PymelNode], List[PymelNode], List[PymelNode]]:
 
-        controls = []
-        npos = []
-        aim_npos = []
+        controls: List[PymelNode] = []
+        npos: List[PymelNode] = []
+        aim_npos: List[PymelNode] = []
 
         cvs = ymt_util.getCurveCVs(crv, space="world")
         crv_info = node.createCurveInfoNode(detailCrv)
@@ -854,7 +851,7 @@ class Component(component.Main):
         for i, ctl in enumerate(self.lowDetailControllers):
             self._connect_slide_ghost2(ctl, "lowEyelid_crvdetail" + str(i))
 
-    def _connect_slide_ghost2(self, surfaceCtl: object, index: int) -> None:
+    def _connect_slide_ghost2(self, surfaceCtl: PymelNode, index: str) -> None:
 
         # create ghost controls
         t = surfaceCtl.getMatrix(worldSpace=True)
@@ -926,7 +923,7 @@ class Component(component.Main):
         self.relatives["outloc"] = self.upDetailControllers[-1]
 
 
-def rotate_vector(pos: float, rot: object, front: object=om.MVector(0, 0, 1)) -> None:
+def rotate_vector(pos: VectorLike, rot: VectorLike, front: Optional[om.MVector] = None) -> VectorLike:
     # type: (Tuple[float, float, float], Tuple[float, float, float], None|om.MVector) -> datatypes.Vector
     """
     ベクトル pos を回転ベクトル rot で回転させる。

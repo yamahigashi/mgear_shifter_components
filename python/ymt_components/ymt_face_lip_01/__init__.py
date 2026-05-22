@@ -1,9 +1,11 @@
 """mGear shifter components"""
 # pylint: disable=import-error,W0201,C0111,C0112
+from __future__ import annotations
+
 import re
 import six
-import sys
 import traceback
+from typing import List, Optional, Tuple, TYPE_CHECKING, Union
 
 import maya.cmds as cmds
 import maya.OpenMaya as om1
@@ -54,23 +56,8 @@ from mgear.core.primitive import (
 import ymt_shifter_utility as ymt_util
 import ymt_shifter_utility.curve as curve
 
-if sys.version_info >= (3, 0):  # pylint: disable=using-constant-test  # pylint: disable=using-constant-test, wrong-import-order
-    # For type annotation
-    from typing import (
-        Optional,
-        Dict,
-        List,
-        Tuple,
-        Callable,
-        Any,
-        Text,
-        Union
-    )
-    from re import Pattern
-    from collections.abc import Generator
-    from pathlib import Path
-    from types import ModuleType
-    from six.moves import reload_module as reload
+if TYPE_CHECKING:
+    from ymt_shifter_utility.type_protocols import MatrixLike, PymelNode, VectorLike
 
 from logging import (
     StreamHandler,
@@ -101,96 +88,96 @@ class Component(component.Main):
     def addObjects(self) -> None:
         """Add all the objects needed to create the component."""
 
-        self.normal = self.guide.blades["blade"].z * -1.
-        self.binormal = self.guide.blades["blade"].x
+        self.normal: VectorLike = self.guide.blades["blade"].z * -1.
+        self.binormal: VectorLike = self.guide.blades["blade"].x
 
-        self.WIP = self.options["mode"]
+        self.WIP: Union[bool, str] = self.options["mode"]
 
         if self.negate and self.settings["overrideNegate"]:
             self.negate = False
             self.n_factor = 1
 
         if self.settings["overrideNegate"]:
-            self.mirror_conf = [0, 0, 1,
-                                1, 1, 0,
-                                0, 0, 0]
+            self.mirror_conf: List[int] = [0, 0, 1,
+                                           1, 1, 0,
+                                           0, 0, 0]
         else:
             self.mirror_conf = [0, 0, 0,
                                 0, 0, 0,
                                 0, 0, 0]
 
         # -------------------------------------------------------
-        self.surfRef = self.settings["surfaceReference"]
-        self.connect_surface_slider = self.settings["isSlidingSurface"]
+        self.surfRef: str = self.settings["surfaceReference"]
+        self.connect_surface_slider: bool = self.settings["isSlidingSurface"]
 
-        self.num_uplocs = self.getNumberOfLocators("_uploc")
-        self.num_lowlocs = self.getNumberOfLocators("_lowloc")
+        self.num_uplocs: int = self.getNumberOfLocators("_uploc")
+        self.num_lowlocs: int = self.getNumberOfLocators("_lowloc")
 
-        self.inPos = self.guide.apos[-5]
-        self.outPos = self.guide.apos[-4]
-        self.upPos = self.guide.apos[-3]
-        self.lowPos = self.guide.apos[-2]
-        self.frontPos = self.guide.apos[-1]
-        self.rootPos = self.guide.apos[0]
+        self.inPos: VectorLike = self.guide.apos[-5]
+        self.outPos: VectorLike = self.guide.apos[-4]
+        self.upPos: VectorLike = self.guide.apos[-3]
+        self.lowPos: VectorLike = self.guide.apos[-2]
+        self.frontPos: VectorLike = self.guide.apos[-1]
+        self.rootPos: VectorLike = self.guide.apos[0]
 
-        self.uplocsPos = self.guide.apos[2:self.num_uplocs + 2]
-        self.lowlocsPos = self.guide.apos[2 + self.num_uplocs:-5]
+        self.uplocsPos: List[VectorLike] = self.guide.apos[2:self.num_uplocs + 2]
+        self.lowlocsPos: List[VectorLike] = self.guide.apos[2 + self.num_uplocs:-5]
 
-        self.offset = (self.frontPos - self.rootPos) * 0.3
+        self.offset: VectorLike = (self.frontPos - self.rootPos) * 0.3
         if self.negate:
             pass
-            # self.offset[2] = self.offset[2] * -1.0
+            # self.offSet[2] = self.offSet[2] * -1.0
 
         # -------------------------------------------------------
-        self.ctlName = "ctl"
+        self.ctlName: str = "ctl"
         self.detailControllersGroupName = "controllers_detail"  # TODO: extract to settings
         self.primaryControllersGroupName = "controllers_primary"  # TODO: extract to settings
-        self.blinkH = 0.2
-        self.upperVTrack = 0.04
-        self.upperHTrack = 0.01
-        self.lowerVTrack = 0.02
-        self.lowerHTrack = 0.01
+        self.blinkH: float = 0.2
+        self.upperVTrack: float = 0.04
+        self.upperHTrack: float = 0.01
+        self.lowerVTrack: float = 0.02
+        self.lowerHTrack: float = 0.01
 
-        self.thickness = 0.003
-        self.FRONT_OFFSET = .0002
+        self.thickness: float = 0.003
+        self.FRONT_OFFSET: float = .0002
 
         if self.num_uplocs % 2 == 0:
             # even
-            self.num_rope_up = self.num_uplocs * 20 + 1
+            self.num_rope_up: int = self.num_uplocs * 20 + 1
         else:
             self.num_rope_up = self.num_uplocs * 20
 
         if self.num_lowlocs % 2 == 0:
             # even
-            self.num_rope_low = self.num_lowlocs * 20 + 1
+            self.num_rope_low: int = self.num_lowlocs * 20 + 1
         else:
             self.num_rope_low = self.num_lowlocs * 20
 
         # --------------------------------------------------------
-        self.ik_ctl = []
-        self.ik_npo = []
-        self.ik_roll_npo = []
-        self.ik_global_in = []
-        self.ik_local_in = []
-        self.ik_global_out = []
-        self.ik_global_ref = []
-        self.ik_uv_param = []
-        self.ik_decompose_rot = []
+        self.ik_ctl: List[PymelNode] = []
+        self.ik_npo: List[PymelNode] = []
+        self.ik_roll_npo: List[PymelNode] = []
+        self.ik_global_in: List[PymelNode] = []
+        self.ik_local_in: List[PymelNode] = []
+        self.ik_global_out: List[PymelNode] = []
+        self.ik_global_ref: List[PymelNode] = []
+        self.ik_uv_param: List[float] = []
+        self.ik_decompose_rot: List[PymelNode] = []
 
-        self.arrow_ctl = None
-        self.arrow_npo = None
-        self.upControls = []
-        self.lowControls = []
-        self.trackLvl = []
+        self.arrow_ctl: Optional[PymelNode] = None
+        self.arrow_npo: Optional[PymelNode] = None
+        self.upControls: List[PymelNode] = []
+        self.lowControls: List[PymelNode] = []
+        self.trackLvl: List[PymelNode] = []
 
-        self.upCrv = None
-        self.lowCrv = None
-        self.upCrv_ctl = None
-        self.lowCrv_ctl = None
-        self.upBlink = None
-        self.lowBlink = None
-        self.upTarget = None
-        self.lowTarget = None
+        self.upCrv: Optional[PymelNode] = None
+        self.lowCrv: Optional[PymelNode] = None
+        self.upCrv_ctl: Optional[PymelNode] = None
+        self.lowCrv_ctl: Optional[PymelNode] = None
+        self.upBlink: Optional[PymelNode] = None
+        self.lowBlink: Optional[PymelNode] = None
+        self.upTarget: Optional[PymelNode] = None
+        self.lowTarget: Optional[PymelNode] = None
         self.midTarget = None
         self.midTargetLower = None
 
@@ -210,8 +197,7 @@ class Component(component.Main):
         self.crv_root = addTransform(self.root, self.getName("crvs"), t)
         self.lipsRope_root = addTransform(self.root, self.getName("rope"), t)
 
-    def getNumberOfLocators(self, query: object) -> None:
-        # type: (Text) -> int
+    def getNumberOfLocators(self, query: str) -> int:
         """ _uplocs."""
         num = 0
         for k, v in self.guide.tra.items():
@@ -247,14 +233,14 @@ class Component(component.Main):
             self.sliding_surface.visibility.set(False)
             pm.makeIdentity(self.sliding_surface, apply=True, t=1,  r=1, s=1, n=0, pn=1)
 
-    def addCurves(self, crv_root: object, plane: object) -> None:
+    def addCurves(self, crv_root: PymelNode, plane: PymelNode) -> None:
 
         t = getTransform(self.root)
         gen = curve.createCurveFromOrderedEdges
         planeNode = pm.PyNode(plane.longName())
 
         # -------------------------------------------------------------------
-        def _inner(edges: object, name: str) -> None:
+        def _inner(edges: List[str], name: str) -> PymelNode:
             crv = gen(edges, planeNode.verts[1], self.getName("{}Crv".format(name)), parent=crv_root, m=t)
             ctl = gen(edges, planeNode.verts[1], self.getName("{}Ctl_crv".format(name)), parent=crv_root, m=t)
             crv.attr("visibility").set(False)
@@ -285,15 +271,15 @@ class Component(component.Main):
         self.upCrv, self.upCrv_ctl = _inner(edgeList, "upper")
 
         # -------------------------------------------------------------------
-        edgeList = []
+        edgeList: List[str] = []
         for i in reversed(range(self.num_uplocs + 1, self.num_uplocs + self.num_lowlocs + 2)):
             edgeList.append("{}.e[{}]".format(plane.longName(), i * 2 + 1))
         edgeList = [pm.PyNode(x) for x in edgeList]
         self.lowCrv, self.lowCrv_ctl = _inner(edgeList, "lower")
 
-    def addCurveBaseControllers(self, crv_root: object, plane: object) -> None:
+    def addCurveBaseControllers(self, crv_root: PymelNode, plane: PymelNode) -> None:
 
-        def gen2(crv: object, name: str, nbPoints: object, tobe_offset: float) -> object:
+        def gen2(crv: PymelNode, name: str, nbPoints: int, tobe_offset: float) -> PymelNode:
             t = getTransform(self.root)
 
             new_crv = curve.createCurveFromCurve(crv, self.getName(name), nbPoints=nbPoints, parent=crv_root, m=t)
@@ -339,12 +325,20 @@ class Component(component.Main):
         self.upJoints = self._addControlJoints(self.upCrv, "up", self.lipsRope_root, self.upRope, self.upRope_upv)
         self.lowJoints = self._addControlJoints(self.lowCrv, "low", self.lipsRope_root, self.lowRope, self.lowRope_upv, skipHeadAndTail=skip)
 
-    def _addControlJoints(self, crv: object, name: str, rope_root: object, rope: object, rope_upv: object, skipHeadAndTail: object=False) -> None:
+    def _addControlJoints(
+        self,
+        crv: PymelNode,
+        name: str,
+        rope_root: PymelNode,
+        rope: PymelNode,
+        rope_upv: PymelNode,
+        skipHeadAndTail: bool = False,
+    ) -> None:
 
         lvlType = "transform"
         cvs = ymt_util.getCurveCVs(crv, space="world")
         local_cvs = ymt_util.getCurveCVs(crv, space="object")
-        controls = []
+        controls: List[PymelNode] = []
         t = getTransform(self.root)
 
         icon_shape = "sphere"
@@ -428,7 +422,7 @@ class Component(component.Main):
         pm.progressWindow(e=True, endProgress=True)
         return controls
 
-    def addToSubGroup(self, obj: object, group_name: str) -> None:
+    def addToSubGroup(self, obj: PymelNode, group_name: str) -> None:
 
         if self.settings["ctlGrp"]:
             ctlGrp = self.settings["ctlGrp"]
@@ -512,7 +506,7 @@ class Component(component.Main):
 
     def addConstraints(self) -> None:
 
-        def __upper(ctls: object, s1: object, s2: object, d: float, p1: object, p2: object) -> None:
+        def __upper(ctls: List[PymelNode], s1: int, s2: int, d: int, p1: float, p2: float) -> None:
             s1o = ctls[s1]
             s2o = ctls[s2]
             do = ctls[d].getParent()
@@ -521,7 +515,7 @@ class Component(component.Main):
             cns_node.attr(ctls[s1].name() + "W0").set(p1)
             cns_node.attr(ctls[s2].name() + "W1").set(p2)
 
-        def __lower(s1: object, s2: object, d: float, p1: object, p2: object) -> None:
+        def __lower(s1: PymelNode, s2: PymelNode, d: PymelNode, p1: float, p2: float) -> None:
             cns_node = pm.parentConstraint(s1, s2, d.getParent(), mo=True, skipRotate=["x", "y", "z"])
             cns_node.attr(s1.name() + "W0").set(p1)
             cns_node.attr(s2.name() + "W1").set(p2)
@@ -536,7 +530,12 @@ class Component(component.Main):
         __lower(self.lips_L_Corner_ctl, self.lips_C_lower_ctl, self.lips_L_lowInner_ctl, 0.25, 0.75)
         __lower(self.lips_L_Corner_ctl, self.lips_C_lower_ctl, self.lips_L_lowOuter_ctl, 0.33, 0.67)
 
-    def _addControls(self, crv_ctl: object, option: object, sidecut: object) -> None:
+    def _addControls(
+        self,
+        crv_ctl: PymelNode,
+        option: List[List[Union[str, float, List[str]]]],
+        sidecut: bool,
+    ) -> Tuple[List[PymelNode], List[PymelNode], List[PymelNode]]:
 
         cvs = ymt_util.getCurveCVs(crv_ctl, space="world")
 
@@ -546,9 +545,9 @@ class Component(component.Main):
         v1 = transform.getTransformFromPos(cvs[-1])
         distSize = vector.getDistance(v0, v1) * 3
 
-        npos = []
-        ctls = []
-        upvs = []
+        npos: List[PymelNode] = []
+        ctls: List[PymelNode] = []
+        upvs: List[PymelNode] = []
         params = ["tx", "ty", "tz", "rx", "ry", "rz"]
         joints = self.upJoints + self.lowJoints
 
@@ -733,7 +732,7 @@ class Component(component.Main):
         original_parent_l.addChild(corner_l_comp.root)
         original_parent_r.addChild(corner_r_comp.root)
 
-    def _createGhostCtl(self, ghost_ctl: object, parent: object) -> None:
+    def _createGhostCtl(self, ghost_ctl: PymelNode, parent: PymelNode) -> None:
 
         ctl = ghost.createGhostCtl(ghost_ctl, parent)
         ctl.attr("isCtl") // ghost_ctl.attr("isCtl")
@@ -766,7 +765,7 @@ class Component(component.Main):
 
         return ctl
 
-    def _removeFromCtrlGroup(self, obj: object) -> None:
+    def _removeFromCtrlGroup(self, obj: PymelNode) -> None:
 
         if self.settings["ctlGrp"]:
             ctlGrp = self.settings["ctlGrp"]
@@ -786,7 +785,9 @@ class Component(component.Main):
                 pass
                 # logger.error(e)
 
-    def connect_slide_ghost(self, intTra: object, slide_c_ref: object, corner_l_ref: object, corner_r_ref: object) -> None:
+    def connect_slide_ghost(
+        self, intTra: PymelNode, slide_c_ref: PymelNode, corner_l_ref: PymelNode, corner_r_ref: PymelNode
+    ) -> None:
 
         # create ghost controls
         self.mouthSlide_ctl = self._createGhostCtl(slide_c_ref, intTra)
@@ -819,7 +820,7 @@ class Component(component.Main):
 
         return drivers
 
-    def connect_mouth_ghost(self, lipup_ref: object, liplow_ref: object) -> None:
+    def connect_mouth_ghost(self, lipup_ref: PymelNode, liplow_ref: PymelNode) -> None:
 
         # center main controls
         self.lips_C_upper_ctl, up_ghost_ctl = createGhostWithParentConstraint(self.lips_C_upper_ctl, lipup_ref)
@@ -836,7 +837,7 @@ class Component(component.Main):
 
         return
 
-    def connect_averageParentCns(self, parents: object, target: str) -> None:
+    def connect_averageParentCns(self, parents: List[PymelNode], target: str) -> None:
         """
         Connection definition using average parent constraint.
         """
@@ -860,7 +861,7 @@ class Component(component.Main):
         self.relatives["root"] = self.root
 
 
-def draw_eye_guide_mesh_plane(points: object, t: object) -> None:
+def draw_eye_guide_mesh_plane(points: List[VectorLike], t: MatrixLike) -> PymelNode:
     # type: (Tuple[float, float, float], datatypes.MMatrix) -> om.MFnMesh
 
     mesh = om.MFnMesh()
@@ -875,8 +876,8 @@ def draw_eye_guide_mesh_plane(points: object, t: object) -> None:
 
     # Simple unitCube coordinates
     vertices = [om.MPoint(mean) ]
-    polygonCounts = []
-    polygonConnects = []
+    polygonCounts: List[int] = []
+    polygonConnects: List[int] = []
 
     for i, p in enumerate(points):
         vertices.append(om.MPoint(p))    # 0
@@ -909,7 +910,9 @@ def draw_eye_guide_mesh_plane(points: object, t: object) -> None:
     return mesh
 
 
-def ghostSliderForMouth(ghostControls: object, intTra: object, surface: object, sliderParent: object) -> None:
+def ghostSliderForMouth(
+    ghostControls: List[PymelNode], _intTra: PymelNode, surface: PymelNode, sliderParent: PymelNode
+) -> None:
     """Modify the ghost control behaviour to slide on top of a surface
 
     Args:
@@ -921,7 +924,7 @@ def ghostSliderForMouth(ghostControls: object, intTra: object, surface: object, 
         ghostControls = [ghostControls]
 
 
-    def conn(ctl: object, driver: object, ghost: object) -> None:
+    def conn(ctl: PymelNode, driver: PymelNode, ghost: PymelNode) -> None:
         for attr in ["translate", "scale", "rotate"]:
             try:
                 pm.connectAttr("{}.{}".format(ctl, attr), "{}.{}".format(driver, attr))
@@ -929,7 +932,7 @@ def ghostSliderForMouth(ghostControls: object, intTra: object, surface: object, 
             except RuntimeError:
                 pass
 
-    def connCenter(ctl: object, driver: object, ghost: object) -> None:
+    def connCenter(ctl: PymelNode, driver: PymelNode, ghost: PymelNode) -> None:
         dm_node = ymt_util.getDecomposeMatrixOfAtoB(ctl, driver, skip_last=True)
 
         for attr in ["translate", "scale", "rotate"]:
@@ -937,8 +940,8 @@ def ghostSliderForMouth(ghostControls: object, intTra: object, surface: object, 
             pm.disconnectAttr("{}.{}".format(ctl, attr), "{}.{}".format(ghost, attr))
 
     surfaceShape = surface.getShape()
-    sliders = []
-    drivers = []
+    sliders: List[PymelNode] = []
+    drivers: List[PymelNode] = []
 
     for i, ctlGhost in enumerate(ghostControls):
         ctl = pm.listConnections(ctlGhost, t="transform")[-1]
@@ -993,7 +996,9 @@ def ghostSliderForMouth(ghostControls: object, intTra: object, surface: object, 
     return drivers
 
 
-def createGhostWithParentConstraint(ctl: object, parent: object=None, connect: object=True) -> None:
+def createGhostWithParentConstraint(
+    ctl: PymelNode, parent: Optional[PymelNode] = None, connect: bool = True
+) -> PymelNode:
     """Create a duplicated Ghost control
 
     Create a duplicate of the control and rename the original with _ghost.
@@ -1051,7 +1056,7 @@ def createGhostWithParentConstraint(ctl: object, parent: object=None, connect: o
     return newCtl, ctl
 
 
-def applyPathCnsLocal(target: str, curve: object, u: float, negate: bool=False) -> None:
+def applyPathCnsLocal(target: str, curve: PymelNode, u: float, negate: bool = False) -> None:
     cns = applyop.pathCns(target, curve, cnsType=False, u=u, tangent=False)
     pm.connectAttr(str(curve) + ".local", str(cns) + ".geometryPath", f=True)  # tobe local space
 
@@ -1082,7 +1087,7 @@ def applyPathCnsLocal(target: str, curve: object, u: float, negate: bool=False) 
     return cns
 
 
-def _visi_off_lock(node: object) -> None:
+def _visi_off_lock(node: PymelNode) -> None:
     """Short cuts."""
     if not node:
         raise Exception("node is null")

@@ -5,7 +5,12 @@ from __future__ import annotations
 import math
 import importlib
 from contextlib import suppress
-from typing import TYPE_CHECKING, Optional, TypedDict, Union, cast
+from typing import TYPE_CHECKING, Dict, List, Optional, Set, Tuple, Union, cast
+
+try:
+    from typing import TypedDict
+except ImportError:
+    TypedDict = dict
 
 import maya.cmds as cmds
 
@@ -26,7 +31,7 @@ import ymt_shifter_utility as ymt_util
 from . import detail_config
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Callable, Sequence
     from typing import Protocol
 
     from ymt_shifter_utility.type_protocols import MatrixLike, PymelNode, VectorLike, WorldPoint
@@ -35,13 +40,24 @@ if TYPE_CHECKING:
         z: VectorLike
 
     class ParentWingGuideLike(Protocol):
-        apos: list[VectorLike]
-        blades: dict[str, BladeLike]
+        compType: str
+        fullName: str
+        apos: List[VectorLike]
+        blades: Dict[str, BladeLike]
+        values: Dict[str, object]
+
+    class ParentWingComponentLike(Protocol):
+        def get_feather_ribbon_refs(self) -> FeatherRibbonRefs: ...
 
 
-MAYA_2025_API_VERSION = 20250000
-PARENT_COMPONENT_TYPE = "ymt_birdwing_3jnt_01"
-ROTATE_ORDER_XYZ = 0
+class FeatherRibbonRefs(TypedDict):
+    refs: Dict[str, PymelNode]
+    metadata: Dict[str, object]
+
+
+MAYA_2025_API_VERSION: int = 20250000
+PARENT_COMPONENT_TYPE: str = "ymt_birdwing_3jnt_01"
+ROTATE_ORDER_XYZ: int = 0
 
 
 class DetailSpec(TypedDict):
@@ -63,8 +79,8 @@ class SurfaceSample(TypedDict):
     local: float
     depth: float
     distance: float
-    anchor_distances: list[float]
-    span_lengths: list[float]
+    anchor_distances: List[float]
+    span_lengths: List[float]
 
 
 class WeightedRotationSource(TypedDict):
@@ -75,83 +91,89 @@ class WeightedRotationSource(TypedDict):
 class Component(component.Main):
     """Shifter component class."""
 
-    placement_modes = ("surface", "fixed")
-    anchor_names = ("root", "elbow", "wrist", "hand")
-    anchor_end_names = ("rootEnd", "elbowEnd", "wristEnd", "handEnd")
-    surface_curl_max_weight = 0.65
-    surface_segment_subdivisions = 4
+    placement_modes: Tuple[str, str] = ("surface", "fixed")
+    anchor_names: Tuple[str, str, str, str] = ("root", "elbow", "wrist", "hand")
+    anchor_end_names: Tuple[str, str, str, str] = ("rootEnd", "elbowEnd", "wristEnd", "handEnd")
+    surface_curl_max_weight: float = 0.65
+    surface_segment_subdivisions: int = 4
 
     def addObjects(self) -> None:
         """Add controls, optional ribbon surface, and detail feather outputs."""
-        self.WIP = self.options["mode"]
-        self.ctl_size = self.size * float(self.settings["ctlSize"]) * 0.15
-        self.placement_mode = self._parse_placement_mode(self.settings["placementMode"])
-        self.row_names = self._parse_row_names(self.settings["rowNames"])
-        self.row_counts = self._parse_row_counts(self.settings["rowCounts"], self.row_names)
-        self.row_u_ranges = self._parse_row_u_ranges(self.settings["rowURanges"], self.row_names)
+        self.WIP: bool = self.options["mode"]
+        self.ctl_size: float = self.size * float(self.settings["ctlSize"]) * 0.15
+        self.placement_mode: str = self._parse_placement_mode(self.settings["placementMode"])
+        self.row_names: List[str] = self._parse_row_names(self.settings["rowNames"])
+        self.row_counts: List[int] = self._parse_row_counts(self.settings["rowCounts"], self.row_names)
+        self.row_u_ranges: List[Tuple[float, float]] = self._parse_row_u_ranges(
+            self.settings["rowURanges"], self.row_names
+        )
         if "detailColumnDepths" not in self.settings:
             raise RuntimeError("ymt_feather_ribbon_01 requires the detailColumnDepths setting.")
-        self.detail_column_depths_by_row = self._parse_detail_column_depths_by_row(
+        self.detail_column_depths_by_row: List[List[float]] = self._parse_detail_column_depths_by_row(
             self.settings["detailColumnDepths"],
             self.row_names,
         )
-        self.detail_column_count = max(len(depths) for depths in self.detail_column_depths_by_row)
+        self.detail_column_count: int = max(len(depths) for depths in self.detail_column_depths_by_row)
         if "detailCurlRotMults" not in self.settings:
             raise RuntimeError("ymt_feather_ribbon_01 requires the detailCurlRotMults setting.")
-        self.detail_curl_rot_multipliers = detail_config.normalize_detail_curl_rot_multipliers(
+        self.detail_curl_rot_multipliers: List[float] = detail_config.normalize_detail_curl_rot_multipliers(
             self.settings["detailCurlRotMults"],
             self.detail_column_count,
         )
-        self.anchor_positions = self._get_anchor_positions()
-        self.anchor_end_positions = self._get_anchor_end_positions()
-        self.anchor_segment_lengths = self._get_anchor_segment_lengths()
-        self.anchor_total_length = sum(self.anchor_segment_lengths)
-        self.span_axis = self._get_parent_span_axis()
-        self.wing_normal = self._get_parent_blade_normal()
-        self.depth_segments = self._collect_depth_segments()
-        self.depth_segment_centers = self._collect_depth_segment_centers()
-        self.surface_depths = self._collect_surface_depths()
+        self.anchor_positions: List[VectorLike] = self._get_anchor_positions()
+        self.anchor_end_positions: List[VectorLike] = self._get_anchor_end_positions()
+        self.anchor_segment_lengths: List[float] = self._get_anchor_segment_lengths()
+        self.anchor_total_length: float = sum(self.anchor_segment_lengths)
+        self.span_axis: VectorLike = self._get_parent_span_axis()
+        self.wing_normal: VectorLike = self._get_parent_blade_normal()
+        self.depth_segments: List[Tuple[float, float]] = self._collect_depth_segments()
+        self.depth_segment_centers: List[float] = self._collect_depth_segment_centers()
+        self.surface_depths: List[float] = self._collect_surface_depths()
 
-        self.driver_root = primitive.addTransform(self.root, self.getName("drivers"), transform.getTransform(self.root))
-        self.detail_root = primitive.addTransform(self.root, self.getName("details"), transform.getTransform(self.root))
-        self.no_transform = primitive.addTransform(
+        self.driver_root: PymelNode = primitive.addTransform(
+            self.root, self.getName("drivers"), transform.getTransform(self.root)
+        )
+        self.detail_root: PymelNode = primitive.addTransform(
+            self.root, self.getName("details"), transform.getTransform(self.root)
+        )
+        self.no_transform: PymelNode = primitive.addTransform(
             self.root, self.getName("noTransform"), transform.getTransform(self.root)
         )
         self.no_transform.attr("inheritsTransform").set(True)
         ymt_util.setKeyableAttributesDontLockVisibility([self.driver_root, self.detail_root, self.no_transform], [])
         self.no_transform.attr("visibility").set(False)
 
-        self.anchor_npos = []
-        self.anchor_ctls = []
-        self.anchor_endpoint_refs = []
+        self.anchor_npos: List[List[PymelNode]] = []
+        self.anchor_ctls: List[List[PymelNode]] = []
+        self.anchor_endpoint_refs: List[PymelNode] = []
         self._add_anchor_controls()
 
-        self.curl_npos = []
-        self.curl_offset_npos = []
-        self.curl_ctls = []
-        self.curl_deforms = []
+        self.curl_npos: List[PymelNode] = []
+        self.curl_offset_npos: List[PymelNode] = []
+        self.curl_ctls: List[PymelNode] = []
+        self.curl_deforms: List[PymelNode] = []
         self._add_curl_controls()
 
-        self.detail_specs = self._collect_detail_specs()
-        self.detail_rivet_refs = []
-        self.detail_rivet_refs_by_key = {}
-        self.detail_aim_refs = []
-        self.detail_aim_refs_by_key = {}
-        self.detail_chain_npos = []
-        self.detail_chain_npos_by_key = {}
-        self.detail_aim_npos = []
-        self.detail_aim_npos_by_key = {}
-        self.detail_curl_npos = []
-        self.detail_curl_npos_by_key = {}
-        self.detail_ctls = []
-        self.detail_ctls_by_key = {}
-        self.detail_curl_rot_mult_attrs = []
+        self.detail_specs: List[DetailSpec] = self._collect_detail_specs()
+        self.detail_rivet_refs: List[PymelNode] = []
+        self.detail_rivet_refs_by_key: Dict[Tuple[str, int, int], PymelNode] = {}
+        self.detail_aim_refs: List[PymelNode] = []
+        self.detail_aim_refs_by_key: Dict[Tuple[str, int, int], PymelNode] = {}
+        self.detail_chain_npos: List[PymelNode] = []
+        self.detail_chain_npos_by_key: Dict[Tuple[str, int, int], PymelNode] = {}
+        self.detail_aim_npos: List[PymelNode] = []
+        self.detail_aim_npos_by_key: Dict[Tuple[str, int, int], PymelNode] = {}
+        self.detail_curl_npos: List[PymelNode] = []
+        self.detail_curl_npos_by_key: Dict[Tuple[str, int, int], PymelNode] = {}
+        self.detail_ctls: List[PymelNode] = []
+        self.detail_ctls_by_key: Dict[Tuple[str, int, int], PymelNode] = {}
+        self.detail_curl_rot_mult_attrs: List[object] = []
         self._add_detail_controls()
 
-        self.sliding_surface = None
-        self.surface_skin_joints = []
-        self.anchor_surface_skin_joints = []
-        self.curl_surface_skin_joints = []
+        self.sliding_surface: Optional[PymelNode] = None
+        self.surface_skin_joints: List[PymelNode] = []
+        self.anchor_surface_skin_joints: List[List[PymelNode]] = []
+        self.curl_surface_skin_joints: List[PymelNode] = []
         if self.placement_mode == "surface":
             self._add_surface()
 
@@ -169,7 +191,7 @@ class Component(component.Main):
 
     def addAttributes(self) -> None:
         """Add animator-facing detail curl rotation tuning attributes."""
-        self.detail_curl_rot_mult_attrs = [
+        self.detail_curl_rot_mult_attrs: List[object] = [
             self.addAnimParam(
                 "detailCurlRotMult%s" % col,
                 "Detail Curl Rot Mult %s" % col,
@@ -202,14 +224,14 @@ class Component(component.Main):
 
     def connect_ymt_birdwing_3jnt_01(self) -> None:
         self.connect_standard()
-        parent_comp = getattr(self, "parent_comp", None)
+        parent_comp: Optional[ParentWingComponentLike] = getattr(self, "parent_comp", None)
         if parent_comp is None or not hasattr(parent_comp, "get_feather_ribbon_refs"):
             raise RuntimeError("ymt_feather_ribbon_01 requires a ymt_birdwing_3jnt_01 parent component.")
 
-        refs = parent_comp.get_feather_ribbon_refs()
-        source_refs = refs["refs"]
+        refs: FeatherRibbonRefs = parent_comp.get_feather_ribbon_refs()
+        source_refs: Dict[str, PymelNode] = refs["refs"]
         pm.pointConstraint(source_refs["root"], self.anchor_npos[0][0], mo=True)
-        cns = pm.orientConstraint(source_refs["root_ctl"], self.anchor_npos[0][0], mo=True)
+        cns: PymelNode = pm.orientConstraint(source_refs["root_ctl"], self.anchor_npos[0][0], mo=True)
         pm.setAttr(cns.attr("interpType"), 0)  # no-flip
         self._connect_anchor_root_space(source_refs, "elbow", self.anchor_npos[1][0])
         self._connect_anchor_root_space(source_refs, "wrist", self.anchor_npos[2][0])
@@ -218,18 +240,20 @@ class Component(component.Main):
 
     def _add_anchor_controls(self) -> None:
         for anchor_index, name in enumerate(self.anchor_names):
-            parent = self.driver_root
-            tag_parent = self.parentCtlTag
-            anchor_npos = []
-            anchor_ctls = []
+            parent: PymelNode = self.driver_root
+            tag_parent: object = self.parentCtlTag
+            anchor_npos: List[PymelNode] = []
+            anchor_ctls: List[PymelNode] = []
             for layer_index, (start_depth, end_depth) in enumerate(self.depth_segments):
-                start_position = self._anchor_position_from_depth(anchor_index, start_depth)
-                end_position = self._anchor_position_from_depth(anchor_index, end_depth)
-                matrix = self._anchor_control_matrix(start_position, end_position)
+                start_position: VectorLike = self._anchor_position_from_depth(anchor_index, start_depth)
+                end_position: VectorLike = self._anchor_position_from_depth(anchor_index, end_depth)
+                matrix: MatrixLike = self._anchor_control_matrix(start_position, end_position)
 
-                npo = primitive.addTransform(parent, self.getName("feather_%s_%02d_npo" % (name, layer_index)), matrix)
-                length = vector.getDistance(start_position, end_position)
-                ctl = self.addCtl(
+                npo: PymelNode = primitive.addTransform(
+                    parent, self.getName("feather_%s_%02d_npo" % (name, layer_index)), matrix
+                )
+                length: float = vector.getDistance(start_position, end_position)
+                ctl: PymelNode = self.addCtl(
                     npo,
                     "feather_%s_%02d_ctl" % (name, layer_index),
                     matrix,
@@ -248,10 +272,10 @@ class Component(component.Main):
                 anchor_ctls.append(ctl)
                 parent = ctl
                 tag_parent = ctl
-            endpoint_matrix = transform.getTransformFromPos(
+            endpoint_matrix: MatrixLike = transform.getTransformFromPos(
                 self._anchor_position_from_depth(anchor_index, 1.0)
             )
-            endpoint_ref = primitive.addTransform(
+            endpoint_ref: PymelNode = primitive.addTransform(
                 parent,
                 self.getName("feather_%s_endpoint_ref" % name),
                 endpoint_matrix,
@@ -263,11 +287,11 @@ class Component(component.Main):
 
     def _add_curl_controls(self) -> None:
         for index in range(3):
-            basis_matrix = self._curl_basis_matrix(index)
-            offset_matrix = self._curl_offset_matrix(index)
-            npo = primitive.addTransform(self.driver_root, self.getName("curl%s_npo" % index), basis_matrix)
-            offset_npo = primitive.addTransform(npo, self.getName("curl%s_offset_npo" % index), offset_matrix)
-            ctl = self.addCtl(
+            basis_matrix: MatrixLike = self._curl_basis_matrix(index)
+            offset_matrix: MatrixLike = self._curl_offset_matrix(index)
+            npo: PymelNode = primitive.addTransform(self.driver_root, self.getName("curl%s_npo" % index), basis_matrix)
+            offset_npo: PymelNode = primitive.addTransform(npo, self.getName("curl%s_offset_npo" % index), offset_matrix)
+            ctl: PymelNode = self.addCtl(
                 offset_npo,
                 "curl%s_ctl" % index,
                 offset_matrix,
@@ -276,7 +300,7 @@ class Component(component.Main):
                 w=self.ctl_size * 0.4,
                 tp=self.anchor_ctls[min(index + 1, len(self.anchor_ctls) - 1)][0],
             )
-            deform = primitive.addTransform(offset_npo, self.getName("curl%s_deform" % index), offset_matrix)
+            deform: PymelNode = primitive.addTransform(offset_npo, self.getName("curl%s_deform" % index), offset_matrix)
             attribute.setKeyableAttributes(ctl, ["tx", "ty", "tz", "rx", "ry", "rz"])
             attribute.setInvertMirror(ctl, ["tx", "ry", "rz"])
             self.curl_npos.append(npo)
@@ -285,18 +309,20 @@ class Component(component.Main):
             self.curl_deforms.append(deform)
 
     def _add_detail_controls(self) -> None:
-        matrices_by_feather_part = self._detail_chain_matrices(self.detail_specs)
+        matrices_by_feather_part: Dict[Tuple[str, int, int], MatrixLike] = self._detail_chain_matrices(
+            self.detail_specs
+        )
         self._add_detail_rivet_refs(matrices_by_feather_part)
         for spec in self.detail_specs:
-            detail_name = self._detail_name(spec)
-            section = int(spec["section"])
-            col = int(spec["col"])
-            key = (str(spec["row"]), section, col)
-            matrix = matrices_by_feather_part[(str(spec["row"]), section, col)]
+            detail_name: str = self._detail_name(spec)
+            section: int = int(spec["section"])
+            col: int = int(spec["col"])
+            key: Tuple[str, int, int] = (str(spec["row"]), section, col)
+            matrix: MatrixLike = matrices_by_feather_part[(str(spec["row"]), section, col)]
             if col == 0:
                 tag_parent = self.curl_ctls[min(spec["span"], len(self.curl_ctls) - 1)]
             else:
-                previous_key = (str(spec["row"]), section, col - 1)
+                previous_key: Tuple[str, int, int] = (str(spec["row"]), section, col - 1)
                 if previous_key not in self.detail_ctls_by_key:
                     raise RuntimeError(
                         "ymt_feather_ribbon_01 detail FK chain is missing previous feather part: %s_%s_%s."
@@ -304,22 +330,22 @@ class Component(component.Main):
                     )
                 tag_parent = self.detail_ctls_by_key[previous_key]
             chain_parent = self.detail_root if col == 0 else self.detail_ctls_by_key[previous_key]
-            chain_npo = primitive.addTransform(
+            chain_npo: PymelNode = primitive.addTransform(
                 chain_parent,
                 self.getName("%s_npo" % detail_name),
                 matrix,
             )
-            aim_npo = primitive.addTransform(
+            aim_npo: PymelNode = primitive.addTransform(
                 chain_npo,
                 self.getName("%s_aim_npo" % detail_name),
                 matrix,
             )
-            curl_npo = primitive.addTransform(
+            curl_npo: PymelNode = primitive.addTransform(
                 aim_npo,
                 self.getName("%s_curl_npo" % detail_name),
                 matrix,
             )
-            ctl = self.addCtl(
+            ctl: PymelNode = self.addCtl(
                 curl_npo,
                 "%s_ctl" % detail_name,
                 matrix,
@@ -345,19 +371,19 @@ class Component(component.Main):
     def _add_detail_joint_positions(self) -> None:
         for segment in self._detail_joint_segments():
             for index, spec in enumerate(segment):
-                key = (str(spec["row"]), int(spec["section"]), int(spec["col"]))
-                joint_entry = [self.detail_ctls_by_key[key], self._detail_name(spec)]
+                key: Tuple[str, int, int] = (str(spec["row"]), int(spec["section"]), int(spec["col"]))
+                joint_entry: List[object] = [self.detail_ctls_by_key[key], self._detail_name(spec)]
                 if index == 0:
                     joint_entry.append("parent_relative_jnt")
                 self.jnt_pos.append(joint_entry)
 
-    def _detail_joint_segments(self) -> list[list[DetailSpec]]:
-        specs_by_row_section: dict[tuple[str, int], list[DetailSpec]] = {}
+    def _detail_joint_segments(self) -> List[List[DetailSpec]]:
+        specs_by_row_section: Dict[Tuple[str, int], List[DetailSpec]] = {}
         for spec in self.detail_specs:
             key = (str(spec["row"]), int(spec["section"]))
             specs_by_row_section.setdefault(key, []).append(spec)
 
-        segments = []
+        segments: List[List[DetailSpec]] = []
         for row_name in self.row_names:
             row_sections = sorted(section for row, section in specs_by_row_section if row == row_name)
             for section in row_sections:
@@ -365,19 +391,19 @@ class Component(component.Main):
                 segments.append(sorted(segment, key=lambda item: int(item["col"])))
         return segments
 
-    def _add_detail_rivet_refs(self, matrices_by_feather_part: dict[tuple[str, int, int], MatrixLike]) -> None:
-        parent = self.no_transform if self.placement_mode == "surface" else self.detail_root
+    def _add_detail_rivet_refs(self, matrices_by_feather_part: Dict[Tuple[str, int, int], MatrixLike]) -> None:
+        parent: PymelNode = self.no_transform if self.placement_mode == "surface" else self.detail_root
         for spec in self.detail_specs:
-            key = (str(spec["row"]), int(spec["section"]), int(spec["col"]))
-            detail_name = self._detail_name(spec)
-            matrix = matrices_by_feather_part[key]
-            ref = primitive.addTransform(
+            key: Tuple[str, int, int] = (str(spec["row"]), int(spec["section"]), int(spec["col"]))
+            detail_name: str = self._detail_name(spec)
+            matrix: MatrixLike = matrices_by_feather_part[key]
+            ref: PymelNode = primitive.addTransform(
                 parent,
                 self.getName("%s_rivet_ref" % detail_name),
                 matrix,
             )
             ymt_util.setKeyableAttributesDontLockVisibility(ref, ["tx", "ty", "tz"])
-            aim_ref = primitive.addTransform(
+            aim_ref: PymelNode = primitive.addTransform(
                 ref,
                 self.getName("%s_aim_ref" % detail_name),
                 matrix,
@@ -388,9 +414,9 @@ class Component(component.Main):
             self.detail_aim_refs.append(aim_ref)
             self.detail_aim_refs_by_key[key] = aim_ref
 
-    def _detail_chain_matrices(self, specs: list[DetailSpec]) -> dict[tuple[str, int, int], MatrixLike]:
-        specs_by_key = self._detail_specs_by_key(specs)
-        matrices = {}
+    def _detail_chain_matrices(self, specs: List[DetailSpec]) -> Dict[Tuple[str, int, int], MatrixLike]:
+        specs_by_key: Dict[Tuple[str, int, int], DetailSpec] = self._detail_specs_by_key(specs)
+        matrices: Dict[Tuple[str, int, int], MatrixLike] = {}
         for key, spec in specs_by_key.items():
             row, section, col = key
             next_spec = specs_by_key.get((row, section, col + 1))
@@ -403,7 +429,7 @@ class Component(component.Main):
                 matrices[key] = self._single_detail_chain_matrix(spec)
         return matrices
 
-    def _detail_specs_by_key(self, specs: list[DetailSpec]) -> dict[tuple[str, int, int], DetailSpec]:
+    def _detail_specs_by_key(self, specs: List[DetailSpec]) -> Dict[Tuple[str, int, int], DetailSpec]:
         return {
             (str(spec["row"]), int(spec["section"]), int(spec["col"])): spec
             for spec in specs
@@ -418,10 +444,10 @@ class Component(component.Main):
         end_position: VectorLike,
         matrix_position: Optional[VectorLike] = None,  # noqa: UP045
     ) -> MatrixLike:
-        position = matrix_position if matrix_position is not None else start_position
+        position: VectorLike = matrix_position if matrix_position is not None else start_position
         if vector.getDistance(start_position, end_position) < 0.001:
             return transform.getTransformFromPos(position)
-        matrix = transform.getTransformLookingAt(
+        matrix: MatrixLike = transform.getTransformLookingAt(
             start_position,
             end_position,
             self.wing_normal,
@@ -431,10 +457,10 @@ class Component(component.Main):
         return transform.setMatrixPosition(matrix, position)
 
     def _single_detail_chain_matrix(self, spec: DetailSpec) -> MatrixLike:
-        span = min(int(spec["span"]), len(self.anchor_segment_lengths) - 1)
-        local = float(spec["local"])
-        start = self._position_from_span_local(span, local)
-        end = self._position_from_anchor_end_span_local(span, local)
+        span: int = min(int(spec["span"]), len(self.anchor_segment_lengths) - 1)
+        local: float = float(spec["local"])
+        start: VectorLike = self._position_from_span_local(span, local)
+        end: VectorLike = self._position_from_anchor_end_span_local(span, local)
         if vector.getDistance(start, end) < 0.001:
             raise RuntimeError(
                 "ymt_feather_ribbon_01 requires non-zero detail column depth length for detail chain: %s."
@@ -443,9 +469,9 @@ class Component(component.Main):
         return self._detail_chain_matrix(start, end, spec["position"])
 
     def _add_surface(self) -> None:
-        surface_u_values = self._surface_u_values()
-        surface_depths = self._surface_depths()
-        surface = cmds.nurbsPlane(
+        surface_u_values: List[float] = self._surface_u_values()
+        surface_depths: List[float] = self._surface_depths()
+        surface: str = cmds.nurbsPlane(
             n=self.getName("ribbonSurface"),
             ch=False,
             d=1,
@@ -458,7 +484,7 @@ class Component(component.Main):
             t=self._point_tuple(self._position_from_span_local(0, 0)),
         )
 
-        surface_shape = self._surface_shape_name(surface)
+        surface_shape: str = self._surface_shape_name(surface)
         for u_index, u in enumerate(surface_u_values):
             for v_index, depth in enumerate(surface_depths):
                 cmds.xform(
@@ -471,35 +497,35 @@ class Component(component.Main):
         ymt_util.setKeyableAttributesDontLockVisibility(self.sliding_surface, [])
 
         self._add_surface_skin_joints()
-        influence_names = [self._node_name(joint) for joint in self.surface_skin_joints]
-        skin = cmds.skinCluster(
+        influence_names: List[str] = [self._node_name(joint) for joint in self.surface_skin_joints]
+        skin: str = cmds.skinCluster(
             *influence_names,
             self._node_name(self.sliding_surface),
             tsb=True,
             n=self.getName("ribbonSurface_skinCluster"),
         )[0]
-        self.surface_skin_cluster = pm.PyNode(skin)
+        self.surface_skin_cluster: PymelNode = pm.PyNode(skin)
         self._set_local_relative_space_mode(skin)
         self._set_surface_skin_weights(skin)
 
     def _add_surface_skin_joints(self) -> None:
-        self.anchor_surface_skin_joints = []
-        self.curl_surface_skin_joints = []
+        self.anchor_surface_skin_joints: List[List[PymelNode]] = []
+        self.curl_surface_skin_joints: List[PymelNode] = []
         for anchor_ctls in self.anchor_ctls:
-            anchor_joints = []
+            anchor_joints: List[PymelNode] = []
             for ctl in anchor_ctls:
-                joint = self._add_surface_skin_joint(ctl)
+                joint: PymelNode = self._add_surface_skin_joint(ctl)
                 anchor_joints.append(joint)
                 self.surface_skin_joints.append(joint)
             self.anchor_surface_skin_joints.append(anchor_joints)
 
         for deform in self.curl_deforms:
-            joint = self._add_surface_skin_joint(deform)
+            joint: PymelNode = self._add_surface_skin_joint(deform)
             self.curl_surface_skin_joints.append(joint)
             self.surface_skin_joints.append(joint)
 
     def _add_surface_skin_joint(self, ctl: PymelNode) -> PymelNode:
-        joint = primitive.addJoint(
+        joint: PymelNode = primitive.addJoint(
             ctl,
             self.getName("%s_surfaceSkin_jnt" % self._node_name(ctl).replace(self.getName(""), "")),
             transform.getTransform(ctl),
@@ -509,29 +535,31 @@ class Component(component.Main):
         return joint
 
     def _set_surface_skin_weights(self, skin: str) -> None:
-        surface = self._node_name(self.sliding_surface)
-        surface_shape = self._surface_shape_name(surface)
+        surface: str = self._node_name(self.sliding_surface)
+        surface_shape: str = self._surface_shape_name(surface)
+        u_count: int
+        v_count: int
         u_count, v_count = self._surface_cv_counts(surface)
-        surface_u_values = self._surface_u_values()
-        surface_depths = self._surface_depths()
+        surface_u_values: List[float] = self._surface_u_values()
+        surface_depths: List[float] = self._surface_depths()
         self._validate_surface_topology(u_count, v_count, surface_u_values, surface_depths)
-        influence_names = self._skin_influence_names(skin)
-        influence_by_node = self._skin_influence_names_by_node(skin)
+        influence_names: List[str] = self._skin_influence_names(skin)
+        influence_by_node: Dict[str, str] = self._skin_influence_names_by_node(skin)
         with suppress(RuntimeError):
             cmds.setAttr(skin + ".normalizeWeights", 0)
 
         for u_index in range(u_count):
             for v_index in range(v_count):
-                component = "%s.cv[%s][%s]" % (surface_shape, u_index, v_index)
-                sample = self._surface_sample_from_component(component)
-                weights = dict.fromkeys(influence_names, 0.0)
+                component: str = "%s.cv[%s][%s]" % (surface_shape, u_index, v_index)
+                sample: SurfaceSample = self._surface_sample_from_component(component)
+                weights: Dict[str, float] = dict.fromkeys(influence_names, 0.0)
                 for joint, weight in self._surface_weight_entries(sample):
-                    influence = influence_by_node[self._node_name(joint)]
+                    influence: str = influence_by_node[self._node_name(joint)]
                     weights[influence] += weight
-                total = sum(weights.values())
+                total: float = sum(weights.values())
                 if total <= 0.0:
                     raise RuntimeError("ymt_feather_ribbon_01 generated zero total skin weight for %s." % component)
-                normalized = [(name, weight / total) for name, weight in weights.items()]
+                normalized: List[Tuple[str, float]] = [(name, weight / total) for name, weight in weights.items()]
                 cmds.skinPercent(skin, component, transformValue=normalized, normalize=False)
 
         with suppress(RuntimeError):
@@ -545,35 +573,38 @@ class Component(component.Main):
         self,
         skin: str,
         surface_shape: str,
-        surface_u_values: list[float],
+        surface_u_values: List[float],
         v_count: int,
-        surface_depths: list[float],
-        influence_by_node: dict[str, str],
+        surface_depths: List[float],
+        influence_by_node: Dict[str, str],
     ) -> None:
-        v_index = max(range(v_count), key=lambda index: abs(surface_depths[index]))
+        v_index: int = max(range(v_count), key=lambda index: abs(surface_depths[index]))
         for index, joint in enumerate(self.curl_surface_skin_joints):
-            u = self._curl_u(index)
-            u_index = min(
+            u: float = self._curl_u(index)
+            u_index: int = min(
                 range(len(surface_u_values)),
                 key=lambda index: abs(surface_u_values[index] - u),
             )
-            component = "%s.cv[%s][%s]" % (surface_shape, u_index, v_index)
-            sample = self._surface_sample_from_component(component)
-            expected_entries = dict(self._surface_curl_weight_entries(sample))
-            expected = expected_entries.get(joint, 0.0)
+            component: str = "%s.cv[%s][%s]" % (surface_shape, u_index, v_index)
+            sample: SurfaceSample = self._surface_sample_from_component(component)
+            expected_entries: Dict[PymelNode, float] = dict(self._surface_curl_weight_entries(sample))
+            expected: float = expected_entries.get(joint, 0.0)
             if expected <= 0.05:
                 continue
-            influence = influence_by_node[self._node_name(joint)]
-            actual = cmds.skinPercent(skin, component, query=True, transform=influence)
+            influence: str = influence_by_node[self._node_name(joint)]
+            actual: Union[float, List[float], Tuple[float, ...]] = cmds.skinPercent(
+                skin, component, query=True, transform=influence
+            )
             if isinstance(actual, (list, tuple)):
                 actual = actual[0] if actual else 0.0
-            if float(actual) < expected * 0.5:
+            actual_value: float = float(actual)
+            if actual_value < expected * 0.5:
                 raise RuntimeError(
                     "ymt_feather_ribbon_01 failed to assign curl skin weight: "
-                    "%s expected %.3f on %s, got %.3f." % (influence, expected, component, float(actual))
+                    "%s expected %.3f on %s, got %.3f." % (influence, expected, component, actual_value)
                 )
 
-    def _surface_cv_counts(self, surface: str) -> tuple[int, int]:
+    def _surface_cv_counts(self, surface: str) -> Tuple[int, int]:
         shape = self._surface_shape_name(surface)
         return (
             int(cmds.getAttr(shape + ".spansU")) + int(cmds.getAttr(shape + ".degreeU")),
@@ -584,8 +615,8 @@ class Component(component.Main):
         self,
         u_count: int,
         v_count: int,
-        surface_u_values: list[float],
-        surface_depths: list[float],
+        surface_u_values: List[float],
+        surface_depths: List[float],
     ) -> None:
         if u_count != len(surface_u_values):
             raise RuntimeError(
@@ -599,21 +630,21 @@ class Component(component.Main):
             )
 
     def _surface_shape_name(self, surface: str) -> str:
-        shapes = cmds.listRelatives(surface, shapes=True, fullPath=True) or []
+        shapes: List[str] = cmds.listRelatives(surface, shapes=True, fullPath=True) or []
         if not shapes:
             raise RuntimeError("ymt_feather_ribbon_01 could not find the ribbon surface shape.")
         return shapes[0]
 
     def _surface_sample_from_component(self, component: str) -> SurfaceSample:
-        position = self._to_vector(cmds.xform(component, query=True, worldSpace=True, translation=True))
+        position: VectorLike = self._to_vector(cmds.xform(component, query=True, worldSpace=True, translation=True))
         return self._surface_sample_from_position(position)
 
     def _surface_sample_from_position(self, position: VectorLike) -> SurfaceSample:
-        best_sample = None
-        best_distance = None
+        best_sample: Optional[SurfaceSample] = None
+        best_distance: Optional[float] = None
         for span in range(len(self.anchor_segment_lengths)):
-            sample = self._surface_sample_from_position_on_span(position, span)
-            distance = (position - sample["position"]).length()
+            sample: SurfaceSample = self._surface_sample_from_position_on_span(position, span)
+            distance: float = (position - sample["position"]).length()
             if best_distance is None or distance < best_distance:
                 best_sample = sample
                 best_distance = distance
@@ -622,25 +653,25 @@ class Component(component.Main):
         return best_sample
 
     def _surface_sample_from_position_on_span(self, position: VectorLike, span: int) -> SurfaceSample:
-        low = 0.0
-        high = 1.0
+        low: float = 0.0
+        high: float = 1.0
         for _ in range(12):
-            first = low + ((high - low) / 3.0)
-            second = high - ((high - low) / 3.0)
-            first_distance = self._surface_projection_distance_on_span(position, span, first)
-            second_distance = self._surface_projection_distance_on_span(position, span, second)
+            first: float = low + ((high - low) / 3.0)
+            second: float = high - ((high - low) / 3.0)
+            first_distance: float = self._surface_projection_distance_on_span(position, span, first)
+            second_distance: float = self._surface_projection_distance_on_span(position, span, second)
             if first_distance < second_distance:
                 high = second
             else:
                 low = first
-        local = (low + high) * 0.5
-        base_position = self._position_from_span_local(span, local)
-        end_position = self._position_from_anchor_end_span_local(span, local)
-        depth = self._clamped_depth_from_position(position, base_position, end_position)
-        sample_position = base_position + ((end_position - base_position) * depth)
-        span_lengths = self._surface_span_lengths_from_sample_depth(depth)
-        anchor_distances = self._anchor_distances_from_span_lengths(span_lengths)
-        distance = anchor_distances[span] + (span_lengths[span] * local)
+        local: float = (low + high) * 0.5
+        base_position: VectorLike = self._position_from_span_local(span, local)
+        end_position: VectorLike = self._position_from_anchor_end_span_local(span, local)
+        depth: float = self._clamped_depth_from_position(position, base_position, end_position)
+        sample_position: VectorLike = base_position + ((end_position - base_position) * depth)
+        span_lengths: List[float] = self._surface_span_lengths_from_sample_depth(depth)
+        anchor_distances: List[float] = self._anchor_distances_from_span_lengths(span_lengths)
+        distance: float = anchor_distances[span] + (span_lengths[span] * local)
         return {
             "position": sample_position,
             "span": span,
@@ -652,18 +683,18 @@ class Component(component.Main):
         }
 
     def _surface_projection_distance_on_span(self, position: VectorLike, span: int, local: float) -> float:
-        base_position = self._position_from_span_local(span, local)
-        end_position = self._position_from_anchor_end_span_local(span, local)
-        depth = self._clamped_depth_from_position(position, base_position, end_position)
-        projected = base_position + ((end_position - base_position) * depth)
+        base_position: VectorLike = self._position_from_span_local(span, local)
+        end_position: VectorLike = self._position_from_anchor_end_span_local(span, local)
+        depth: float = self._clamped_depth_from_position(position, base_position, end_position)
+        projected: VectorLike = base_position + ((end_position - base_position) * depth)
         return (position - projected).length()
 
-    def _surface_span_lengths_from_sample_depth(self, depth: float) -> list[float]:
-        lengths = []
+    def _surface_span_lengths_from_sample_depth(self, depth: float) -> List[float]:
+        lengths: List[float] = []
         for span in range(len(self.anchor_segment_lengths)):
-            start = self._anchor_position_from_depth(span, depth)
-            end = self._anchor_position_from_depth(span + 1, depth)
-            length = (end - start).length()
+            start: VectorLike = self._anchor_position_from_depth(span, depth)
+            end: VectorLike = self._anchor_position_from_depth(span + 1, depth)
+            length: float = (end - start).length()
             if length < 0.001:
                 raise RuntimeError(
                     "ymt_feather_ribbon_01 requires non-zero surface segment %s at depth %.3f." % (span, depth)
@@ -671,30 +702,30 @@ class Component(component.Main):
             lengths.append(length)
         return lengths
 
-    def _anchor_distances_from_span_lengths(self, span_lengths: list[float]) -> list[float]:
-        distances = [0.0]
-        total = 0.0
+    def _anchor_distances_from_span_lengths(self, span_lengths: List[float]) -> List[float]:
+        distances: List[float] = [0.0]
+        total: float = 0.0
         for length in span_lengths:
             total += length
             distances.append(total)
         return distances
 
-    def _skin_influence_names(self, skin: str) -> list[str]:
+    def _skin_influence_names(self, skin: str) -> List[str]:
         return [self._node_name(influence) for influence in cmds.skinCluster(skin, query=True, influence=True)]
 
-    def _skin_influence_names_by_node(self, skin: str) -> dict[str, str]:
-        mapping = {}
+    def _skin_influence_names_by_node(self, skin: str) -> Dict[str, str]:
+        mapping: Dict[str, str] = {}
         for influence in cmds.skinCluster(skin, query=True, influence=True):
-            influence_name = self._node_name(influence)
-            long_names = cmds.ls(influence_name, long=True) or []
-            names = {influence_name}
+            influence_name: str = self._node_name(influence)
+            long_names: List[str] = cmds.ls(influence_name, long=True) or []
+            names: Set[str] = {influence_name}
             names.update(long_names)
             for long_name in long_names:
                 names.update(cmds.ls(long_name, shortNames=True) or [])
             for name in names:
                 mapping[name] = influence_name
         for joint in self.surface_skin_joints:
-            joint_name = self._node_name(joint)
+            joint_name: str = self._node_name(joint)
             if joint_name not in mapping:
                 long_names = cmds.ls(joint_name, long=True) or []
                 for long_name in long_names:
@@ -705,20 +736,22 @@ class Component(component.Main):
                 raise RuntimeError("ymt_feather_ribbon_01 could not resolve skin influence for '%s'." % joint_name)
         return mapping
 
-    def _surface_weight_entries(self, sample: SurfaceSample) -> list[tuple[PymelNode, float]]:
-        curl_strength = self._surface_curl_weight_for_sample(sample)
-        anchor_weight = max(0.0, 1.0 - curl_strength)
-        entries = [(joint, weight * anchor_weight) for joint, weight in self._surface_anchor_weight_entries(sample)]
+    def _surface_weight_entries(self, sample: SurfaceSample) -> List[Tuple[PymelNode, float]]:
+        curl_strength: float = self._surface_curl_weight_for_sample(sample)
+        anchor_weight: float = max(0.0, 1.0 - curl_strength)
+        entries: List[Tuple[PymelNode, float]] = [
+            (joint, weight * anchor_weight) for joint, weight in self._surface_anchor_weight_entries(sample)
+        ]
         entries.extend(self._surface_curl_weight_entries(sample, curl_strength))
         return entries
 
-    def _surface_anchor_weight_entries(self, sample: SurfaceSample) -> list[tuple[PymelNode, float]]:
-        anchor_entries = self._anchor_weight_entries_for_surface_sample(sample)
-        layer_entries = self._anchor_layer_weight_entries_for_depth(sample["depth"])
-        entries = []
+    def _surface_anchor_weight_entries(self, sample: SurfaceSample) -> List[Tuple[PymelNode, float]]:
+        anchor_entries: List[Tuple[int, float]] = self._anchor_weight_entries_for_surface_sample(sample)
+        layer_entries: List[Tuple[int, float]] = self._anchor_layer_weight_entries_for_depth(sample["depth"])
+        entries: List[Tuple[PymelNode, float]] = []
         for anchor_index, anchor_value in anchor_entries:
             for layer_index, layer_value in layer_entries:
-                joint = self.anchor_surface_skin_joints[anchor_index][layer_index]
+                joint: PymelNode = self.anchor_surface_skin_joints[anchor_index][layer_index]
                 entries.append((joint, anchor_value * layer_value))
         return entries
 
@@ -726,7 +759,7 @@ class Component(component.Main):
         self,
         sample: SurfaceSample,
         curl_weight: Optional[float] = None,  # noqa: UP045
-    ) -> list[tuple[PymelNode, float]]:
+    ) -> List[Tuple[PymelNode, float]]:
         if not self.curl_surface_skin_joints:
             raise RuntimeError("ymt_feather_ribbon_01 curl surface skin joints were not properly initialized.")
         return [
@@ -738,13 +771,13 @@ class Component(component.Main):
         self,
         sample: SurfaceSample,
         curl_weight: Optional[float] = None,  # noqa: UP045
-    ) -> list[tuple[int, float]]:
+    ) -> List[Tuple[int, float]]:
         if curl_weight is None:
             curl_weight = self._surface_curl_weight_for_sample(sample)
         if curl_weight <= 0.0:
             return []
-        raw_weights = self._surface_curl_raw_weights_for_sample(sample)
-        raw_total = sum(raw_weights)
+        raw_weights: List[float] = self._surface_curl_raw_weights_for_sample(sample)
+        raw_total: float = sum(raw_weights)
         if raw_total <= 0.0:
             return []
         return [
@@ -754,16 +787,16 @@ class Component(component.Main):
         ]
 
     def _surface_curl_weight_for_sample(self, sample: SurfaceSample) -> float:
-        max_depth = self._max_surface_depth()
+        max_depth: float = self._max_surface_depth()
         if max_depth <= 0.0:
             return 0.0
-        segment_weight = min(1.0, sum(self._surface_curl_raw_weights_for_sample(sample)))
-        depth_weight = max(0.0, min(1.0, sample["depth"] / max_depth))
+        segment_weight: float = min(1.0, sum(self._surface_curl_raw_weights_for_sample(sample)))
+        depth_weight: float = max(0.0, min(1.0, sample["depth"] / max_depth))
         return max(0.0, min(1.0, depth_weight * segment_weight * self.surface_curl_max_weight))
 
-    def _detail_curl_rotation_index_weight_entries(self, sample: SurfaceSample) -> list[tuple[int, float]]:
-        raw_weights = self._surface_curl_raw_weights_for_sample(sample)
-        raw_total = sum(raw_weights)
+    def _detail_curl_rotation_index_weight_entries(self, sample: SurfaceSample) -> List[Tuple[int, float]]:
+        raw_weights: List[float] = self._surface_curl_raw_weights_for_sample(sample)
+        raw_total: float = sum(raw_weights)
         if raw_total <= 0.0:
             return []
         return [
@@ -772,9 +805,9 @@ class Component(component.Main):
             if raw_weight > 0.0
         ]
 
-    def _surface_curl_raw_weights_for_sample(self, sample: SurfaceSample) -> list[float]:
-        count = len(self.curl_surface_skin_joints) if self.curl_surface_skin_joints else len(self.curl_npos)
-        centers = [
+    def _surface_curl_raw_weights_for_sample(self, sample: SurfaceSample) -> List[float]:
+        count: int = len(self.curl_surface_skin_joints) if self.curl_surface_skin_joints else len(self.curl_npos)
+        centers: List[float] = [
             sample["anchor_distances"][index] + (sample["span_lengths"][index] * 0.5)
             for index in range(count)
         ]
@@ -787,17 +820,17 @@ class Component(component.Main):
         self,
         u: float,
         center: float,
-        centers: list[float],
+        centers: List[float],
         index: int,
     ) -> float:
-        radius = self._surface_curl_weight_radius(centers, index)
+        radius: float = self._surface_curl_weight_radius(centers, index)
         if radius <= 0.0:
             return 1.0 if abs(u - center) <= 0.001 else 0.0
-        t = max(0.0, min(1.0, abs(u - center) / radius))
+        t: float = max(0.0, min(1.0, abs(u - center) / radius))
         return 1.0 - self._smootherstep(t)
 
-    def _surface_curl_weight_radius(self, centers: list[float], index: int) -> float:
-        distances = []
+    def _surface_curl_weight_radius(self, centers: List[float], index: int) -> float:
+        distances: List[float] = []
         if index > 0:
             distances.append(abs(centers[index] - centers[index - 1]))
         if index < len(centers) - 1:
@@ -805,56 +838,58 @@ class Component(component.Main):
         return max(distances) if distances else 0.0
 
     def _smootherstep(self, value: float) -> float:
-        t = max(0.0, min(1.0, value))
+        t: float = max(0.0, min(1.0, value))
         return t * t * t * (t * ((t * 6.0) - 15.0) + 10.0)
 
     def _max_surface_depth(self) -> float:
         return max(self.surface_depths)
 
-    def _anchor_weight_entries_for_u(self, u: float) -> list[tuple[int, float]]:
+    def _anchor_weight_entries_for_u(self, u: float) -> List[Tuple[int, float]]:
+        span: int
+        local: float
         span, local = self._span_local_from_u(u)
         return self._anchor_weight_entries_from_span_local(span, local)
 
-    def _anchor_weight_entries_for_surface_sample(self, sample: SurfaceSample) -> list[tuple[int, float]]:
-        anchor_distances = sample["anchor_distances"]
-        distance = sample["distance"]
-        nearest = min(range(len(anchor_distances)), key=lambda index: abs(anchor_distances[index] - distance))
-        start = max(0, nearest - 1)
-        end = min(len(anchor_distances) - 1, nearest + 1)
-        raw_entries = []
+    def _anchor_weight_entries_for_surface_sample(self, sample: SurfaceSample) -> List[Tuple[int, float]]:
+        anchor_distances: List[float] = sample["anchor_distances"]
+        distance: float = sample["distance"]
+        nearest: int = min(range(len(anchor_distances)), key=lambda index: abs(anchor_distances[index] - distance))
+        start: int = max(0, nearest - 1)
+        end: int = min(len(anchor_distances) - 1, nearest + 1)
+        raw_entries: List[Tuple[int, float]] = []
         for index in range(start, end + 1):
-            radius = self._anchor_weight_radius(anchor_distances, index)
+            radius: float = self._anchor_weight_radius(anchor_distances, index)
             if radius <= 0.0:
-                weight = 1.0 if abs(distance - anchor_distances[index]) <= 0.001 else 0.0
+                weight: float = 1.0 if abs(distance - anchor_distances[index]) <= 0.001 else 0.0
             else:
-                normalized_distance = abs(distance - anchor_distances[index]) / radius
+                normalized_distance: float = abs(distance - anchor_distances[index]) / radius
                 weight = max(0.0, 1.0 - self._smootherstep(normalized_distance))
             if weight > 0.0:
                 raw_entries.append((index, weight))
-        total = sum(weight for _, weight in raw_entries)
+        total: float = sum(weight for _, weight in raw_entries)
         if total <= 0.0:
             return [(nearest, 1.0)]
         return [(index, weight / total) for index, weight in raw_entries]
 
-    def _anchor_weight_radius(self, anchor_distances: list[float], index: int) -> float:
-        distances = []
+    def _anchor_weight_radius(self, anchor_distances: List[float], index: int) -> float:
+        distances: List[float] = []
         if index > 0:
             distances.append(anchor_distances[index] - anchor_distances[index - 1])
         if index < len(anchor_distances) - 1:
             distances.append(anchor_distances[index + 1] - anchor_distances[index])
         return max(distances) if distances else 0.0
 
-    def _anchor_weight_entries_from_span_local(self, span: int, local: float) -> list[tuple[int, float]]:
-        start_anchor = min(span, len(self.anchor_names) - 1)
-        end_anchor = min(span + 1, len(self.anchor_names) - 1)
+    def _anchor_weight_entries_from_span_local(self, span: int, local: float) -> List[Tuple[int, float]]:
+        start_anchor: int = min(span, len(self.anchor_names) - 1)
+        end_anchor: int = min(span + 1, len(self.anchor_names) - 1)
         if local <= 0.001 or start_anchor == end_anchor:
             return [(start_anchor, 1.0)]
         if local >= 0.999:
             return [(end_anchor, 1.0)]
         return [(start_anchor, 1.0 - local), (end_anchor, local)]
 
-    def _anchor_layer_weight_entries_for_depth(self, depth: float) -> list[tuple[int, float]]:
-        centers = self.depth_segment_centers
+    def _anchor_layer_weight_entries_for_depth(self, depth: float) -> List[Tuple[int, float]]:
+        centers: List[float] = self.depth_segment_centers
         if not centers:
             raise RuntimeError("ymt_feather_ribbon_01 requires at least one depth segment center.")
         if len(centers) == 1 or depth <= centers[0]:
@@ -863,19 +898,22 @@ class Component(component.Main):
             return [(len(centers) - 1, 1.0)]
         for index, (start, end) in enumerate(zip(centers[:-1], centers[1:])):
             if start <= depth <= end:
-                width = end - start
+                width: float = end - start
                 if width <= 0.0:
                     return [(index, 1.0)]
-                weight = (depth - start) / width
+                weight: float = (depth - start) / width
                 return [(index, 1.0 - weight), (index + 1, weight)]
         return [(self._anchor_layer_from_depth(depth), 1.0)]
 
     def _connect_surface_rivets(self) -> None:
         for ref in self.detail_rivet_refs:
-            rivets = ymt_util.apply_rivet_constrain_to_selected(self.sliding_surface, ref)
-            rivet = pm.PyNode(rivets[0])
+            rivets: List[str] = ymt_util.apply_rivet_constrain_to_selected(self.sliding_surface, ref)
+            rivet: PymelNode = pm.PyNode(rivets[0])
             for r in rivets:
-                uv_pins = cmds.listConnections(r + ".offsetParentMatrix", source=True, destination=False, type="uvPin") or []
+                uv_pins: List[str] = (
+                    cmds.listConnections(r + ".offsetParentMatrix", source=True, destination=False, type="uvPin")
+                    or []
+                )
                 if not uv_pins:
                     raise RuntimeError("ymt_feather_ribbon_01 could not find uvPin driving rivet: %s." % r)
 
@@ -893,16 +931,18 @@ class Component(component.Main):
             ymt_util.setKeyableAttributesDontLockVisibility(rivet, [])
 
     def _set_rivet_uv_pin_local_relative_space_mode(self, rivet: PymelNode) -> None:
-        rivet_name = self._node_name(rivet)
-        pins = cmds.listConnections(rivet_name + ".offsetParentMatrix", source=True, destination=False, type="uvPin") or []
+        rivet_name: str = self._node_name(rivet)
+        pins: List[str] = (
+            cmds.listConnections(rivet_name + ".offsetParentMatrix", source=True, destination=False, type="uvPin") or []
+        )
         if not pins:
             raise RuntimeError("ymt_feather_ribbon_01 could not find uvPin driving rivet: %s." % rivet_name)
         for pin in pins:
             self._set_local_relative_space_mode(pin)
 
     def _set_local_relative_space_mode(self, node: Union[PymelNode, str]) -> None:  # noqa: UP007
-        node_name = self._node_name(node)
-        attr = node_name + ".relativeSpaceMode"
+        node_name: str = self._node_name(node)
+        attr: str = node_name + ".relativeSpaceMode"
         if not cmds.objExists(attr):
             raise RuntimeError("ymt_feather_ribbon_01 node does not support relativeSpaceMode: %s." % node_name)
         cmds.setAttr(attr, 1)
@@ -911,10 +951,10 @@ class Component(component.Main):
         for segment_index, npo in enumerate(self.curl_npos):
             self._connect_curl_translate_matrix(segment_index, npo)
 
-    def _connect_curl_rotations(self, refs: dict[str, PymelNode]) -> None:
+    def _connect_curl_rotations(self, refs: Dict[str, PymelNode]) -> None:
         for segment_index, npo in enumerate(self.curl_npos):
-            start_name = self.anchor_names[segment_index]
-            end_name = self.anchor_names[segment_index + 1]
+            start_name: str = self.anchor_names[segment_index]
+            end_name: str = self.anchor_names[segment_index + 1]
             self._connect_curl_rotation_blend(segment_index, npo, refs[start_name], refs[end_name])
 
     def _connect_curl_deforms(self) -> None:
@@ -927,17 +967,17 @@ class Component(component.Main):
                 )
 
     def _connect_curl_translate_matrix(self, segment_index: int, npo: PymelNode) -> None:
-        lower_midpoint = self._create_midpoint_translate_node(
+        lower_midpoint: str = self._create_midpoint_translate_node(
             self.anchor_endpoint_refs[segment_index],
             self.anchor_endpoint_refs[segment_index + 1],
             "curl%sLowerMid" % segment_index,
         )
-        translate_matrix = self._create_compose_translate_node(
+        translate_matrix: str = self._create_compose_translate_node(
             lower_midpoint + ".output3D",
             "curl%sTranslateMatrix" % segment_index,
         )
 
-        local_translate_matrix = cmds.createNode(
+        local_translate_matrix: str = cmds.createNode(
             "multMatrix", name=self.getName("curl%s_translateLocalMatrix" % segment_index)
         )
         cmds.connectAttr(translate_matrix + ".outputMatrix", local_translate_matrix + ".matrixIn[0]", force=True)
@@ -947,7 +987,7 @@ class Component(component.Main):
             force=True,
         )
 
-        translate_decompose = cmds.createNode(
+        translate_decompose: str = cmds.createNode(
             "decomposeMatrix", name=self.getName("curl%s_translateDecomposeMatrix" % segment_index)
         )
         cmds.connectAttr(local_translate_matrix + ".matrixSum", translate_decompose + ".inputMatrix", force=True)
@@ -960,7 +1000,7 @@ class Component(component.Main):
         start_ref: PymelNode,
         end_ref: PymelNode,
     ) -> None:
-        constraint = cmds.orientConstraint(
+        constraint: str = cmds.orientConstraint(
             self._node_name(start_ref),
             self._node_name(end_ref),
             self._node_name(npo),
@@ -968,7 +1008,7 @@ class Component(component.Main):
             name=self.getName("curl%s_rotate_orientCns" % segment_index),
         )[0]
         cmds.setAttr(constraint + ".interpType", 0)  # no-flip
-        aliases = cmds.orientConstraint(constraint, query=True, weightAliasList=True) or []
+        aliases: List[str] = cmds.orientConstraint(constraint, query=True, weightAliasList=True) or []
         if len(aliases) != 2:
             raise RuntimeError(
                 f"ymt_feather_ribbon_01 failed to create curl rotation anchor blend. Constraint: {constraint}, aliases: {aliases}"
@@ -977,21 +1017,25 @@ class Component(component.Main):
         cmds.setAttr("%s.%s" % (constraint, aliases[1]), 0.5)
 
     def _create_midpoint_translate_node(self, a: PymelNode, b: PymelNode, name: str) -> str:
-        decompose_a = self._create_decompose_matrix(self._node_name(a) + ".worldMatrix[0]", self.getName(name + "A_dm"))
-        decompose_b = self._create_decompose_matrix(self._node_name(b) + ".worldMatrix[0]", self.getName(name + "B_dm"))
-        midpoint = cmds.createNode("plusMinusAverage", name=self.getName(name + "_pma"))
+        decompose_a: str = self._create_decompose_matrix(
+            self._node_name(a) + ".worldMatrix[0]", self.getName(name + "A_dm")
+        )
+        decompose_b: str = self._create_decompose_matrix(
+            self._node_name(b) + ".worldMatrix[0]", self.getName(name + "B_dm")
+        )
+        midpoint: str = cmds.createNode("plusMinusAverage", name=self.getName(name + "_pma"))
         cmds.setAttr(midpoint + ".operation", 3)
         cmds.connectAttr(decompose_a + ".outputTranslate", midpoint + ".input3D[0]", force=True)
         cmds.connectAttr(decompose_b + ".outputTranslate", midpoint + ".input3D[1]", force=True)
         return midpoint
 
     def _create_compose_translate_node(self, translate_attr: str, name: str) -> str:
-        compose = cmds.createNode("composeMatrix", name=self.getName(name + "_cm"))
+        compose: str = cmds.createNode("composeMatrix", name=self.getName(name + "_cm"))
         cmds.connectAttr(translate_attr, compose + ".inputTranslate", force=True)
         return compose
 
     def _create_decompose_matrix(self, matrix_attr: str, name: str) -> str:
-        decompose = cmds.createNode("decomposeMatrix", name=name)
+        decompose: str = cmds.createNode("decomposeMatrix", name=name)
         cmds.connectAttr(matrix_attr, decompose + ".inputMatrix", force=True)
         return decompose
 
@@ -999,7 +1043,7 @@ class Component(component.Main):
         for spec in self.detail_specs:
             if int(spec["col"]) != 0:
                 continue
-            key = (str(spec["row"]), int(spec["section"]), int(spec["col"]))
+            key: Tuple[str, int, int] = (str(spec["row"]), int(spec["section"]), int(spec["col"]))
             pm.pointConstraint(
                 self.detail_rivet_refs_by_key[key],
                 self.detail_chain_npos_by_key[key],
@@ -1008,15 +1052,15 @@ class Component(component.Main):
 
     def _connect_detail_aim_refs(self) -> None:
         for spec in self.detail_specs:
-            aim_up = self._select_anchor_point_for_detail(spec)
-            key = (str(spec["row"]), int(spec["section"]), int(spec["col"]))
-            next_key = (key[0], key[1], key[2] + 1)
-            next_ref = self.detail_rivet_refs_by_key.get(next_key)
+            aim_up: PymelNode = self._select_anchor_point_for_detail(spec)
+            key: Tuple[str, int, int] = (str(spec["row"]), int(spec["section"]), int(spec["col"]))
+            next_key: Tuple[str, int, int] = (key[0], key[1], key[2] + 1)
+            next_ref: Optional[PymelNode] = self.detail_rivet_refs_by_key.get(next_key)
             if next_ref is None:
-                previous_key = (key[0], key[1], key[2] - 1)
-                previous_aim_ref = self.detail_aim_refs_by_key.get(previous_key)
+                previous_key: Tuple[str, int, int] = (key[0], key[1], key[2] - 1)
+                previous_aim_ref: Optional[PymelNode] = self.detail_aim_refs_by_key.get(previous_key)
                 if previous_aim_ref is not None:
-                    constraint = pm.orientConstraint(
+                    constraint: PymelNode = pm.orientConstraint(
                         previous_aim_ref,
                         self.detail_aim_refs_by_key[key],
                         mo=False,
@@ -1037,9 +1081,9 @@ class Component(component.Main):
 
     def _connect_detail_aim_apply_rotations(self) -> None:
         for spec in self.detail_specs:
-            key = (str(spec["row"]), int(spec["section"]), int(spec["col"]))
-            previous_key = (key[0], key[1], key[2] - 1)
-            rotate_attr = self._create_local_offset_rotation_node(
+            key: Tuple[str, int, int] = (str(spec["row"]), int(spec["section"]), int(spec["col"]))
+            previous_key: Tuple[str, int, int] = (key[0], key[1], key[2] - 1)
+            rotate_attr: str = self._create_local_offset_rotation_node(
                 self.detail_aim_refs_by_key[key],
                 self.detail_aim_npos_by_key[key],
                 "%s_detailAimApply" % self._detail_name(spec),
@@ -1048,18 +1092,18 @@ class Component(component.Main):
             cmds.connectAttr(rotate_attr, self._node_name(self.detail_aim_npos_by_key[key]) + ".rotate", force=True)
 
     def _connect_detail_curl_rotations(self) -> None:
-        decomposers = [
+        decomposers: List[str] = [
             self._create_decompose_rotate(ctl, self.getName("curl%s_detailDecomposeRotate" % index))
             for index, ctl in enumerate(self.curl_ctls)
         ]
         for spec in self.detail_specs:
-            key = (str(spec["row"]), int(spec["section"]), int(spec["col"]))
-            curl_npo = self.detail_curl_npos_by_key[key]
-            sample = self._surface_sample_from_position(spec["position"])
-            curl_entries = self._detail_curl_rotation_index_weight_entries(sample)
+            key: Tuple[str, int, int] = (str(spec["row"]), int(spec["section"]), int(spec["col"]))
+            curl_npo: PymelNode = self.detail_curl_npos_by_key[key]
+            sample: SurfaceSample = self._surface_sample_from_position(spec["position"])
+            curl_entries: List[Tuple[int, float]] = self._detail_curl_rotation_index_weight_entries(sample)
             if not curl_entries:
                 continue
-            compose = self._compose_weighted_detail_curl_rotation_sources(
+            compose: str = self._compose_weighted_detail_curl_rotation_sources(
                 [
                     {
                         "decomposer": decomposers[index],
@@ -1068,12 +1112,12 @@ class Component(component.Main):
                     for index, weight in curl_entries
                 ]
             )
-            scaled_rotate_attr = self._create_scaled_rotate_node(
+            scaled_rotate_attr: str = self._create_scaled_rotate_node(
                 compose + ".outRotate",
                 self.detail_curl_rot_mult_attrs[int(spec["col"])],
                 "%s_detailCurlRotateMult" % self._detail_name(spec),
             )
-            rotate_attr = self._create_initial_offset_rotate_node(
+            rotate_attr: str = self._create_initial_offset_rotate_node(
                 curl_npo,
                 scaled_rotate_attr,
                 "%s_detailCurlRotate" % self._detail_name(spec),
@@ -1081,34 +1125,36 @@ class Component(component.Main):
             cmds.connectAttr(rotate_attr, self._node_name(curl_npo) + ".rotate", force=True)
 
     def _select_anchor_point_for_detail(self, spec: DetailSpec) -> PymelNode:
-        anchor_entries = self._anchor_weight_entries_from_span_local(int(spec["span"]), float(spec["local"]))
+        anchor_entries: List[Tuple[int, float]] = self._anchor_weight_entries_from_span_local(
+            int(spec["span"]), float(spec["local"])
+        )
         if not anchor_entries:
             raise RuntimeError("ymt_feather_ribbon_01 could not resolve detail anchor for: %s." % self._detail_name(spec))
 
-        anchor_index = max(anchor_entries, key=lambda item: item[1])[0]
+        anchor_index: int = max(anchor_entries, key=lambda item: item[1])[0]
         if not 0 <= anchor_index < len(self.anchor_ctls):
             raise RuntimeError("ymt_feather_ribbon_01 unsupported detail anchor index: %s." % anchor_index)
 
-        anchor_layer = int(spec["anchor_layer"])
-        anchor_layer_ctls = self.anchor_ctls[anchor_index]
+        anchor_layer: int = int(spec["anchor_layer"])
+        anchor_layer_ctls: List[PymelNode] = self.anchor_ctls[anchor_index]
         if not 0 <= anchor_layer < len(anchor_layer_ctls):
             raise RuntimeError("ymt_feather_ribbon_01 unsupported detail anchor layer: %s." % anchor_layer)
 
         return anchor_layer_ctls[anchor_layer]
 
-    def _connect_anchor_root_space(self, refs: dict[str, PymelNode], anchor_name: str, npo: PymelNode) -> None:
+    def _connect_anchor_root_space(self, refs: Dict[str, PymelNode], anchor_name: str, npo: PymelNode) -> None:
         self._ensure_rotation_driver_plugin()
-        rotation_parent = self._create_anchor_rotation_parent(anchor_name, refs[anchor_name], npo)
-        entries = self._anchor_root_space_entries(anchor_name)
-        sources: list[WeightedRotationSource] = []
+        rotation_parent: PymelNode = self._create_anchor_rotation_parent(anchor_name, refs[anchor_name], npo)
+        entries: List[Tuple[str, float]] = self._anchor_root_space_entries(anchor_name)
+        sources: List[WeightedRotationSource] = []
 
         for source_name, weight in entries:
-            proxy = primitive.addTransform(
+            proxy: PymelNode = primitive.addTransform(
                 rotation_parent,
                 self.getName("feather_%s_%s_rotProxy" % (anchor_name, source_name)),
                 transform.getTransform(npo),
             )
-            constraint = pm.orientConstraint(refs[source_name], proxy, mo=True)
+            constraint: PymelNode = pm.orientConstraint(refs[source_name], proxy, mo=True)
             pm.setAttr(constraint.attr("interpType"), 0)  # no-flip
             ymt_util.setKeyableAttributesDontLockVisibility(proxy, [])
             sources.append(
@@ -1120,7 +1166,7 @@ class Component(component.Main):
                     "weight": weight,
                 }
             )
-        compose = self._compose_weighted_rotation_sources(sources, include_bend_v=False)
+        compose: str = self._compose_weighted_rotation_sources(sources, include_bend_v=False)
         cmds.connectAttr(compose + ".outRotate", self._node_name(npo) + ".rotate", force=True)
 
     def _create_anchor_rotation_parent(
@@ -1129,22 +1175,22 @@ class Component(component.Main):
         driven_ref: PymelNode,
         npo: PymelNode,
     ) -> PymelNode:
-        parent = npo.getParent()
+        parent: Optional[PymelNode] = cast("Optional[PymelNode]", npo.getParent())
         if parent is None:
             raise RuntimeError("ymt_feather_ribbon_01 anchor rotation parent requires a parented npo: %s." % npo)
-        rotation_parent = primitive.addTransform(
+        rotation_parent: PymelNode = primitive.addTransform(
             parent,
             self.getName("feather_%s_rotParent" % anchor_name),
             transform.getTransform(npo),
         )
         pm.parent(npo, rotation_parent)
         pm.pointConstraint(driven_ref, rotation_parent, mo=True)
-        constraint = pm.orientConstraint(driven_ref, rotation_parent, mo=True)
+        constraint: PymelNode = pm.orientConstraint(driven_ref, rotation_parent, mo=True)
         pm.setAttr(constraint.attr("interpType"), 0)  # no-flip
         ymt_util.setKeyableAttributesDontLockVisibility(rotation_parent, [])
         return rotation_parent
 
-    def _anchor_root_space_entries(self, anchor_name: str) -> list[tuple[str, float]]:
+    def _anchor_root_space_entries(self, anchor_name: str) -> List[Tuple[str, float]]:
         if anchor_name == "elbow":
             return [("root_ctl", 0.25), ("elbow", 0.5), ("wrist", 0.25)]
         if anchor_name == "wrist":
@@ -1153,10 +1199,10 @@ class Component(component.Main):
 
     def _compose_weighted_rotation_sources(
         self,
-        sources: list[WeightedRotationSource],
+        sources: List[WeightedRotationSource],
         include_bend_v: bool = True,
     ) -> str:
-        output_attrs = ["outRoll", "outBendH"]
+        output_attrs: List[str] = ["outRoll", "outBendH"]
         if include_bend_v:
             output_attrs.append("outBendV")
         return self._compose_weighted_rotation_sources_with_attrs(
@@ -1164,7 +1210,7 @@ class Component(component.Main):
             [(output_attr, 1.0) for output_attr in output_attrs],
         )
 
-    def _compose_weighted_detail_curl_rotation_sources(self, sources: list[WeightedRotationSource]) -> str:
+    def _compose_weighted_detail_curl_rotation_sources(self, sources: List[WeightedRotationSource]) -> str:
         return self._compose_weighted_rotation_sources_with_attrs(
             sources,
             [
@@ -1176,21 +1222,21 @@ class Component(component.Main):
 
     def _compose_weighted_rotation_sources_with_attrs(
         self,
-        sources: list[WeightedRotationSource],
-        output_attrs: list[tuple[str, float]],
+        sources: List[WeightedRotationSource],
+        output_attrs: List[Tuple[str, float]],
     ) -> str:
-        sum_attrs = []
+        sum_attrs: List[str] = []
         for output_attr, sign in output_attrs:
-            add_node = cmds.createNode("plusMinusAverage")
+            add_node: str = cmds.createNode("plusMinusAverage")
             cmds.setAttr(add_node + ".operation", 1)
             for index, source in enumerate(sources):
-                mult = cmds.createNode(self._multiply_node_type())
+                mult: str = cmds.createNode(self._multiply_node_type())
                 cmds.connectAttr(source["decomposer"] + "." + output_attr, mult + ".input1")
                 cmds.setAttr(mult + ".input2", source["weight"] * sign)
                 cmds.connectAttr(mult + ".output", add_node + ".input1D[%s]" % index)
             sum_attrs.append(add_node + ".output1D")
 
-        compose = cmds.createNode("composeRotate")
+        compose: str = cmds.createNode("composeRotate")
         cmds.setAttr(compose + ".rotateOrder", ROTATE_ORDER_XYZ)
         cmds.connectAttr(sum_attrs[0], compose + ".roll")
         cmds.connectAttr(sum_attrs[1], compose + ".bendH")
@@ -1199,13 +1245,13 @@ class Component(component.Main):
         return compose
 
     def _create_decompose_rotate(self, source: PymelNode, name: str) -> str:
-        node = cmds.createNode("decomposeRotate", name=name)
-        cmds.setAttr(node + ".rotateOrder", ROTATE_ORDER_XYZ)
-        cmds.connectAttr(self._node_name(source) + ".rotate", node + ".rotate", force=True)
-        return node
+        decompose_node: str = cmds.createNode("decomposeRotate", name=name)
+        cmds.setAttr(decompose_node + ".rotateOrder", ROTATE_ORDER_XYZ)
+        cmds.connectAttr(self._node_name(source) + ".rotate", decompose_node + ".rotate", force=True)
+        return decompose_node
 
     def _create_scaled_rotate_node(self, rotate_attr: str, multiplier_attr: object, name: str) -> str:
-        multiply = cmds.createNode("multiplyDivide", name=self.getName(name + "_md"))
+        multiply: str = cmds.createNode("multiplyDivide", name=self.getName(name + "_md"))
         cmds.setAttr(multiply + ".operation", 1)
         cmds.connectAttr(rotate_attr, multiply + ".input1", force=True)
         for axis in "XYZ":
@@ -1219,52 +1265,56 @@ class Component(component.Main):
         name: str,
         previous_source: Optional[PymelNode] = None,  # noqa: UP045
     ) -> str:
-        source_initial_matrix = source.getMatrix()
-        driven_initial_matrix = driven.getMatrix()
-        driver_initial_matrix = source_initial_matrix
+        source_initial_matrix: MatrixLike = source.getMatrix()
+        driven_initial_matrix: MatrixLike = driven.getMatrix()
+        driver_initial_matrix: MatrixLike = source_initial_matrix
         if previous_source is not None:
-            previous_initial_matrix = previous_source.getMatrix()
+            previous_initial_matrix: MatrixLike = previous_source.getMatrix()
             driver_initial_matrix = cast("MatrixLike", source_initial_matrix * previous_initial_matrix.inverse())
-        offset_matrix = cast("MatrixLike", driver_initial_matrix.inverse() * driven_initial_matrix)
+        offset_matrix: MatrixLike = cast("MatrixLike", driver_initial_matrix.inverse() * driven_initial_matrix)
 
-        mult = cmds.createNode("multMatrix", name=self.getName(name + "_mm"))
+        mult: str = cmds.createNode("multMatrix", name=self.getName(name + "_mm"))
         cmds.connectAttr(self._node_name(source) + ".matrix", mult + ".matrixIn[0]", force=True)
-        offset_index = 1
+        offset_index: int = 1
         if previous_source is not None:
             cmds.connectAttr(self._node_name(previous_source) + ".inverseMatrix", mult + ".matrixIn[1]", force=True)
             offset_index = 2
         cmds.setAttr(mult + ".matrixIn[%s]" % offset_index, *self._matrix_values(offset_matrix), type="matrix")
 
-        decompose = cmds.createNode("decomposeMatrix", name=self.getName(name + "_dm"))
+        decompose: str = cmds.createNode("decomposeMatrix", name=self.getName(name + "_dm"))
         cmds.connectAttr(mult + ".matrixSum", decompose + ".inputMatrix", force=True)
         cmds.setAttr(decompose + ".inputRotateOrder", ROTATE_ORDER_XYZ)
         return decompose + ".outputRotate"
 
     def _create_initial_offset_rotate_node(self, npo: PymelNode, driver_rotate_attr: str, name: str) -> str:
-        npo_name = self._node_name(npo)
-        initial_rotate = cmds.getAttr(npo_name + ".rotate")[0]
+        npo_name: str = self._node_name(npo)
+        initial_rotate: Sequence[float] = cmds.getAttr(npo_name + ".rotate")[0]
 
-        initial_compose = cmds.createNode("composeMatrix", name=self.getName(name + "_initial_cm"))
+        initial_compose: str = cmds.createNode("composeMatrix", name=self.getName(name + "_initial_cm"))
         cmds.setAttr(initial_compose + ".inputRotate", *initial_rotate)
         cmds.setAttr(initial_compose + ".inputRotateOrder", ROTATE_ORDER_XYZ)
 
-        driver_compose = cmds.createNode("composeMatrix", name=self.getName(name + "_driver_cm"))
+        driver_compose: str = cmds.createNode("composeMatrix", name=self.getName(name + "_driver_cm"))
         cmds.connectAttr(driver_rotate_attr, driver_compose + ".inputRotate", force=True)
         cmds.setAttr(driver_compose + ".inputRotateOrder", ROTATE_ORDER_XYZ)
 
-        mult = cmds.createNode("multMatrix", name=self.getName(name + "_mm"))
+        mult: str = cmds.createNode("multMatrix", name=self.getName(name + "_mm"))
         cmds.connectAttr(driver_compose + ".outputMatrix", mult + ".matrixIn[0]", force=True)
         cmds.connectAttr(initial_compose + ".outputMatrix", mult + ".matrixIn[1]", force=True)
 
-        decompose = cmds.createNode("decomposeMatrix", name=self.getName(name + "_dm"))
+        decompose: str = cmds.createNode("decomposeMatrix", name=self.getName(name + "_dm"))
         cmds.connectAttr(mult + ".matrixSum", decompose + ".inputMatrix", force=True)
         cmds.setAttr(decompose + ".inputRotateOrder", ROTATE_ORDER_XYZ)
         return decompose + ".outputRotate"
 
-    def _matrix_values(self, matrix: MatrixLike) -> tuple[float, ...]:
-        matrix_get = getattr(matrix, "get", None)
-        values = matrix_get() if callable(matrix_get) else matrix
-        first_value = values[0]
+    def _matrix_values(self, matrix: MatrixLike) -> Tuple[float, ...]:
+        matrix_get: object = getattr(matrix, "get", None)
+        if callable(matrix_get):
+            get_values = cast("Callable[[], Union[Sequence[float], Sequence[Sequence[float]]]]", matrix_get)
+            values: Union[Sequence[float], Sequence[Sequence[float]]] = get_values()
+        else:
+            values = cast("Union[Sequence[float], Sequence[Sequence[float]]]", matrix)
+        first_value: object = values[0]
         if isinstance(first_value, (int, float)):
             return tuple(float(cast("Sequence[float]", values)[index]) for index in range(16))
         return tuple(
@@ -1279,9 +1329,10 @@ class Component(component.Main):
         return "multDoubleLinear"
 
     def _node_name(self, node: Union[PymelNode, str]) -> str:  # noqa: UP007
-        name_method = getattr(node, "name", None)
+        name_method: object = getattr(node, "name", None)
         if callable(name_method):
-            return name_method()
+            get_name = cast("Callable[[], str]", name_method)
+            return get_name()
         return str(node)
 
     def _detail_name(self, spec: DetailSpec) -> str:
@@ -1289,28 +1340,30 @@ class Component(component.Main):
             return "%s_%02d" % (spec["row"], spec["col"])
         return "%s_%02d_%02d" % (spec["row"], spec["section"], spec["col"])
 
-    def _point_tuple(self, point: VectorLike) -> tuple[float, float, float]:
+    def _point_tuple(self, point: VectorLike) -> Tuple[float, float, float]:
         return (point[0], point[1], point[2])
 
     def _to_vector(self, value: WorldPoint) -> VectorLike:
         return datatypes.Vector(value)
 
-    def _collect_detail_specs(self) -> list[DetailSpec]:
-        guide_specs = self._collect_detail_guide_specs()
+    def _collect_detail_specs(self) -> List[DetailSpec]:
+        guide_specs: List[DetailSpec] = self._collect_detail_guide_specs()
         if guide_specs:
             return guide_specs
 
-        specs = []
+        specs: List[DetailSpec] = []
         for row_index, row_name in enumerate(self.row_names):
-            section_count = self.row_counts[row_index]
+            section_count: int = self.row_counts[row_index]
+            u_start: float
+            u_end: float
             u_start, u_end = self.row_u_ranges[row_index]
-            v = (row_index + 0.5) / max(len(self.row_names), 1)
+            v: float = (row_index + 0.5) / max(len(self.row_names), 1)
             for section in range(section_count):
-                ratio = (section + 0.5) / max(section_count, 1)
-                u = u_start + ((u_end - u_start) * ratio)
+                ratio: float = (section + 0.5) / max(section_count, 1)
+                u: float = u_start + ((u_end - u_start) * ratio)
                 for col, depth in enumerate(self.detail_column_depths_by_row[row_index]):
-                    position = self._position_from_u_and_depth(u, depth)
-                    spec = self._detail_spec(
+                    position: VectorLike = self._position_from_u_and_depth(u, depth)
+                    spec: DetailSpec = self._detail_spec(
                         row_name,
                         section,
                         col,
@@ -1323,19 +1376,25 @@ class Component(component.Main):
                     specs.append(spec)
         return specs
 
-    def _collect_detail_guide_specs(self) -> list[DetailSpec]:
-        specs = []
+    def _collect_detail_guide_specs(self) -> List[DetailSpec]:
+        specs: List[DetailSpec] = []
         for local_name, matrix in self.guide.tra.items():
-            parsed = self._parse_detail_guide_name(local_name)
+            parsed: Optional[Tuple[str, int, int]] = self._parse_detail_guide_name(local_name)
             if parsed is None:
                 continue
+            row: str
+            section: int
+            col: int
             row, section, col = parsed
-            position = self._to_vector(transform.getPositionFromMatrix(matrix))
+            position: VectorLike = self._to_vector(transform.getPositionFromMatrix(matrix))
+            span: int
+            local: float
+            base_position: VectorLike
             span, local, base_position = self._closest_span_local_from_position(position)
-            end_position = self._position_from_anchor_end_span_local(span, local)
-            depth = self._depth_from_position_in_anchor_depth_space(position, base_position, end_position)
-            u = self._u_from_span_local(span, local)
-            v = self._v_from_row_name(row)
+            end_position: VectorLike = self._position_from_anchor_end_span_local(span, local)
+            depth: float = self._depth_from_position_in_anchor_depth_space(position, base_position, end_position)
+            u: float = self._u_from_span_local(span, local)
+            v: float = self._v_from_row_name(row)
             specs.append(
                 self._detail_spec(
                     row,
@@ -1361,6 +1420,8 @@ class Component(component.Main):
         v: float,
         position: VectorLike,
     ) -> DetailSpec:
+        span: int
+        local: float
         span, local = self._span_local_from_u(u)
         return {
             "row": row,
@@ -1376,44 +1437,48 @@ class Component(component.Main):
         }
 
     def _position_from_u_and_depth(self, u: float, depth: float) -> VectorLike:
+        span: int
+        local: float
         span, local = self._span_local_from_u(u)
-        start = self._anchor_position_from_depth(span, depth)
-        end = self._anchor_position_from_depth(span + 1, depth)
+        start: VectorLike = self._anchor_position_from_depth(span, depth)
+        end: VectorLike = self._anchor_position_from_depth(span + 1, depth)
         return start + ((end - start) * local)
 
     def _base_position_from_u(self, u: float) -> VectorLike:
+        span: int
+        local: float
         span, local = self._span_local_from_u(u)
         return self._position_from_span_local(span, local)
 
-    def _span_local_from_u(self, u: float) -> tuple[int, float]:
-        clamped_u = max(0.0, min(1.0, u))
-        distance = clamped_u * self.anchor_total_length
-        traversed = 0.0
+    def _span_local_from_u(self, u: float) -> Tuple[int, float]:
+        clamped_u: float = max(0.0, min(1.0, u))
+        distance: float = clamped_u * self.anchor_total_length
+        traversed: float = 0.0
         for span, segment_length in enumerate(self.anchor_segment_lengths):
             if distance <= traversed + segment_length or span == len(self.anchor_segment_lengths) - 1:
-                local = (distance - traversed) / segment_length
+                local: float = (distance - traversed) / segment_length
                 return span, max(0.0, min(1.0, local))
             traversed += segment_length
         return len(self.anchor_segment_lengths) - 1, 1.0
 
     def _u_from_span_local(self, span: int, local: float) -> float:
-        distance = sum(self.anchor_segment_lengths[:span]) + (self.anchor_segment_lengths[span] * local)
+        distance: float = sum(self.anchor_segment_lengths[:span]) + (self.anchor_segment_lengths[span] * local)
         return max(0.0, min(1.0, distance / self.anchor_total_length))
 
     def _position_from_span_local(self, span: int, local: float) -> VectorLike:
-        start = self.anchor_positions[span]
-        end = self.anchor_positions[span + 1]
+        start: VectorLike = self.anchor_positions[span]
+        end: VectorLike = self.anchor_positions[span + 1]
         return start + ((end - start) * local)
 
     def _position_from_anchor_end_span_local(self, span: int, local: float) -> VectorLike:
-        start = self.anchor_end_positions[span]
-        end = self.anchor_end_positions[span + 1]
+        start: VectorLike = self.anchor_end_positions[span]
+        end: VectorLike = self.anchor_end_positions[span + 1]
         return start + ((end - start) * local)
 
-    def _get_anchor_end_positions(self) -> list[VectorLike]:
-        positions = []
+    def _get_anchor_end_positions(self) -> List[VectorLike]:
+        positions: List[VectorLike] = []
         for name in self.anchor_end_names:
-            matrix = self.guide.tra.get(name)
+            matrix: Optional[MatrixLike] = self.guide.tra.get(name)
             if matrix is None:
                 raise RuntimeError("ymt_feather_ribbon_01 requires the %s guide locator." % name)
             positions.append(self._to_vector(transform.getPositionFromMatrix(matrix)))
@@ -1421,37 +1486,39 @@ class Component(component.Main):
             raise RuntimeError("ymt_feather_ribbon_01 requires one anchor end locator per anchor.")
         return positions
 
-    def _collect_depth_segments(self) -> list[tuple[float, float]]:
-        detail_column_depths = {depth for depths in self.detail_column_depths_by_row for depth in depths}
+    def _collect_depth_segments(self) -> List[Tuple[float, float]]:
+        detail_column_depths: Set[float] = {depth for depths in self.detail_column_depths_by_row for depth in depths}
         if not detail_column_depths:
             raise RuntimeError("ymt_feather_ribbon_01 requires at least one detail column depth.")
-        boundaries = sorted({0.0, 1.0}.union(detail_column_depths))
-        segments = [(start, end) for start, end in zip(boundaries[:-1], boundaries[1:]) if end - start > 0.001]
+        boundaries: List[float] = sorted({0.0, 1.0}.union(detail_column_depths))
+        segments: List[Tuple[float, float]] = [
+            (start, end) for start, end in zip(boundaries[:-1], boundaries[1:]) if end - start > 0.001
+        ]
         if not segments:
             raise RuntimeError("ymt_feather_ribbon_01 requires a non-zero detail column depth range.")
         return segments
 
-    def _collect_surface_depths(self) -> list[float]:
+    def _collect_surface_depths(self) -> List[float]:
         if not self.depth_segments:
             raise RuntimeError("ymt_feather_ribbon_01 ribbon surface requires at least one depth segment.")
-        base_subdivisions = max(int(self.surface_segment_subdivisions), 1)
-        segment_widths = [end - start for start, end in self.depth_segments]
-        average_width = sum(segment_widths) / float(len(segment_widths))
-        target_step = average_width / float(base_subdivisions)
+        base_subdivisions: int = max(int(self.surface_segment_subdivisions), 1)
+        segment_widths: List[float] = [end - start for start, end in self.depth_segments]
+        average_width: float = sum(segment_widths) / float(len(segment_widths))
+        target_step: float = average_width / float(base_subdivisions)
         if target_step <= 0.0:
             raise RuntimeError("ymt_feather_ribbon_01 ribbon surface requires non-zero anchor depth segment width.")
 
-        depths = [self.depth_segments[0][0]]
+        depths: List[float] = [self.depth_segments[0][0]]
         for start, end in self.depth_segments:
-            subdivisions = max(1, math.ceil((end - start) / target_step))
+            subdivisions: int = max(1, math.ceil((end - start) / target_step))
             for step in range(1, subdivisions + 1):
-                ratio = step / float(subdivisions)
+                ratio: float = step / float(subdivisions)
                 depths.append(start + ((end - start) * ratio))
         if len(depths) < 2:
             raise RuntimeError("ymt_feather_ribbon_01 ribbon surface requires at least two V depth rows.")
         return depths
 
-    def _collect_depth_segment_centers(self) -> list[float]:
+    def _collect_depth_segment_centers(self) -> List[float]:
         if not self.depth_segments:
             raise RuntimeError("ymt_feather_ribbon_01 requires at least one depth segment.")
         return [(start + end) * 0.5 for start, end in self.depth_segments]
@@ -1490,8 +1557,8 @@ class Component(component.Main):
         base_position: VectorLike,
         end_position: VectorLike,
     ) -> float:
-        depth_axis = end_position - base_position
-        length_squared = depth_axis * depth_axis
+        depth_axis: VectorLike = end_position - base_position
+        length_squared: float = depth_axis * depth_axis
         if length_squared < 0.000001:
             raise RuntimeError("ymt_feather_ribbon_01 requires non-zero anchorEnd depth length.")
         return ((position - base_position) * depth_axis) / length_squared
@@ -1511,12 +1578,12 @@ class Component(component.Main):
         # detailColumnDepths uses this same anchor -> anchorEnd basis.
         if not 0.0 <= depth <= 1.0:
             raise RuntimeError("ymt_feather_ribbon_01 detail column depth must be between 0 and 1: %.3f." % depth)
-        base_position = self.anchor_positions[anchor_index]
-        end_position = self.anchor_end_positions[anchor_index]
+        base_position: VectorLike = self.anchor_positions[anchor_index]
+        end_position: VectorLike = self.anchor_end_positions[anchor_index]
         return base_position + ((end_position - base_position) * depth)
 
     def _curl_guide_position(self, index: int) -> VectorLike:
-        guide_matrix = self.guide.tra.get("curl%s" % index)
+        guide_matrix: Optional[MatrixLike] = self.guide.tra.get("curl%s" % index)
         if guide_matrix is None:
             raise RuntimeError("ymt_feather_ribbon_01 requires the curl%s guide locator." % index)
         return self._to_vector(transform.getPositionFromMatrix(guide_matrix))
@@ -1525,27 +1592,27 @@ class Component(component.Main):
         return self._curl_guide_position(index)
 
     def _curl_offset_matrix(self, index: int) -> MatrixLike:
-        curl_position = self._curl_ctl_position(index)
+        curl_position: VectorLike = self._curl_ctl_position(index)
         return transform.setMatrixPosition(
             self._curl_orientation_matrix(index, curl_position),
             curl_position,
         )
 
     def _curl_basis_matrix(self, index: int) -> MatrixLike:
-        lower_midpoint = self._midpoint(
+        lower_midpoint: VectorLike = self._midpoint(
             self._anchor_position_from_depth(index, 1.0),
             self._anchor_position_from_depth(index + 1, 1.0),
         )
         return transform.setMatrixPosition(self._curl_orientation_matrix(index), lower_midpoint)
 
     def _curl_orientation_matrix(self, index: int, tip_position: Optional[VectorLike] = None) -> MatrixLike:  # noqa: UP045
-        root_position = self._curl_root_position(index)
+        root_position: VectorLike = self._curl_root_position(index)
         if tip_position is None:
             tip_position = self._curl_ctl_position(index)
         else:
             tip_position = self._to_vector(tip_position)
 
-        root_to_tip = tip_position - root_position
+        root_to_tip: VectorLike = tip_position - root_position
         if root_to_tip.length() < 0.001:
             raise RuntimeError("ymt_feather_ribbon_01 requires curl tip position away from the feather root.")
 
@@ -1566,50 +1633,50 @@ class Component(component.Main):
     def _curl_u(self, index: int) -> float:
         return (index + 0.5) / max(len(self.anchor_positions) - 1, 1)
 
-    def _surface_u_values(self) -> list[float]:
-        base_subdivisions = max(int(self.surface_segment_subdivisions), 1)
-        surface_segment_lengths = self._surface_segment_lengths()
-        average_length = sum(surface_segment_lengths) / max(len(surface_segment_lengths), 1)
-        target_step = average_length / float(base_subdivisions)
+    def _surface_u_values(self) -> List[float]:
+        base_subdivisions: int = max(int(self.surface_segment_subdivisions), 1)
+        surface_segment_lengths: List[float] = self._surface_segment_lengths()
+        average_length: float = sum(surface_segment_lengths) / max(len(surface_segment_lengths), 1)
+        target_step: float = average_length / float(base_subdivisions)
         if target_step <= 0.0:
             raise RuntimeError("ymt_feather_ribbon_01 ribbon surface requires non-zero anchor segment length.")
-        values = []
+        values: List[float] = []
         for span, segment_length in enumerate(surface_segment_lengths):
-            subdivisions = max(1, math.ceil(segment_length / target_step))
+            subdivisions: int = max(1, math.ceil(segment_length / target_step))
             for step in range(subdivisions):
                 values.append(self._u_from_span_local(span, step / float(subdivisions)))
         values.append(1.0)
         return values
 
-    def _surface_segment_lengths(self) -> list[float]:
-        lengths = []
+    def _surface_segment_lengths(self) -> List[float]:
+        lengths: List[float] = []
         for span, upper_length in enumerate(self.anchor_segment_lengths):
-            lower_start = self.anchor_end_positions[span]
-            lower_end = self.anchor_end_positions[span + 1]
-            lower_length = (lower_end - lower_start).length()
+            lower_start: VectorLike = self.anchor_end_positions[span]
+            lower_end: VectorLike = self.anchor_end_positions[span + 1]
+            lower_length: float = (lower_end - lower_start).length()
             if lower_length < 0.001:
                 raise RuntimeError("ymt_feather_ribbon_01 requires non-zero lower surface segment %s." % span)
             lengths.append(max(upper_length, lower_length))
         return lengths
 
-    def _surface_depths(self) -> list[float]:
+    def _surface_depths(self) -> List[float]:
         if len(self.surface_depths) < 2:
             raise RuntimeError("ymt_feather_ribbon_01 ribbon surface requires at least two V depth rows.")
         return list(self.surface_depths)
 
-    def _closest_span_local_from_position(self, position: VectorLike) -> tuple[int, float, VectorLike]:
-        best_span = 0
-        best_local = 0.0
-        best_position = self.anchor_positions[0]
-        best_distance = None
+    def _closest_span_local_from_position(self, position: VectorLike) -> Tuple[int, float, VectorLike]:
+        best_span: int = 0
+        best_local: float = 0.0
+        best_position: VectorLike = self.anchor_positions[0]
+        best_distance: Optional[float] = None
         for span, segment_length in enumerate(self.anchor_segment_lengths):
-            start = self.anchor_positions[span]
-            end = self.anchor_positions[span + 1]
-            axis = (end - start).normal()
-            local_distance = (position - start) * axis
-            local = max(0.0, min(1.0, local_distance / segment_length))
-            candidate = self._position_from_span_local(span, local)
-            distance = (position - candidate).length()
+            start: VectorLike = self.anchor_positions[span]
+            end: VectorLike = self.anchor_positions[span + 1]
+            axis: VectorLike = (end - start).normal()
+            local_distance: float = (position - start) * axis
+            local: float = max(0.0, min(1.0, local_distance / segment_length))
+            candidate: VectorLike = self._position_from_span_local(span, local)
+            distance: float = (position - candidate).length()
             if best_distance is None or distance < best_distance:
                 best_span = span
                 best_local = local
@@ -1621,23 +1688,23 @@ class Component(component.Main):
         if row in self.row_names:
             return (self.row_names.index(row) + 0.5) / max(len(self.row_names), 1)
         if row.isdigit():
-            row_index = int(row)
+            row_index: int = int(row)
             if 0 <= row_index < len(self.row_names):
                 return (row_index + 0.5) / max(len(self.row_names), 1)
         raise RuntimeError("ymt_feather_ribbon_01 detail guide row is not defined in rowNames: %s." % row)
 
-    def _get_anchor_positions(self) -> list[VectorLike]:
-        positions = self._get_parent_guide_anchor_positions()
+    def _get_anchor_positions(self) -> List[VectorLike]:
+        positions: Optional[List[VectorLike]] = self._get_parent_guide_anchor_positions()
         if positions is None:
             raise RuntimeError(
                 "ymt_feather_ribbon_01 requires parent ymt_birdwing_3jnt_01 guide apos: root, elbow, wrist, eff."
             )
         return positions
 
-    def _get_anchor_segment_lengths(self) -> list[float]:
-        lengths = []
+    def _get_anchor_segment_lengths(self) -> List[float]:
+        lengths: List[float] = []
         for index, (start, end) in enumerate(zip(self.anchor_positions[:-1], self.anchor_positions[1:])):
-            length = (end - start).length()
+            length: float = (end - start).length()
             if length < 0.001:
                 raise RuntimeError("ymt_feather_ribbon_01 requires non-zero parent wing guide segment %s." % index)
             lengths.append(length)
@@ -1646,40 +1713,40 @@ class Component(component.Main):
         return lengths
 
     def _get_parent_span_axis(self) -> VectorLike:
-        root = self.anchor_positions[0]
-        hand = self.anchor_positions[-1]
-        tangent = hand - root
-        tangent_length = tangent.length()
+        root: VectorLike = self.anchor_positions[0]
+        hand: VectorLike = self.anchor_positions[-1]
+        tangent: VectorLike = hand - root
+        tangent_length: float = tangent.length()
         if tangent_length < 0.001:
             raise RuntimeError("ymt_feather_ribbon_01 requires a valid parent wing root-to-eff guide axis.")
         return tangent.normal()
 
     def _get_parent_blade_normal(self) -> VectorLike:
-        parent_guide = self._get_parent_wing_guide()
-        blades = getattr(parent_guide, "blades", None)
-        blade = blades.get("blade") if blades is not None else None
+        parent_guide: Optional[ParentWingGuideLike] = self._get_parent_wing_guide()
+        blades: Optional[Dict[str, BladeLike]] = getattr(parent_guide, "blades", None)
+        blade: Optional[BladeLike] = blades.get("blade") if blades is not None else None
         if blade is None:
             raise RuntimeError("ymt_feather_ribbon_01 requires parent ymt_birdwing_3jnt_01 guide blade.")
 
-        normal = blade.z * -1
+        normal: VectorLike = blade.z * -1
         if normal.length() < 0.001:
             raise RuntimeError("ymt_feather_ribbon_01 requires a valid parent wing blade normal.")
         return normal.normal()
 
-    def _get_parent_guide_anchor_positions(self) -> Optional[list[VectorLike]]:  # noqa: UP045
-        parent_guide = self._get_parent_wing_guide()
-        guide_positions = getattr(parent_guide, "apos", None)
+    def _get_parent_guide_anchor_positions(self) -> Optional[List[VectorLike]]:  # noqa: UP045
+        parent_guide: Optional[ParentWingGuideLike] = self._get_parent_wing_guide()
+        guide_positions: Optional[List[VectorLike]] = getattr(parent_guide, "apos", None)
         if guide_positions is None or len(guide_positions) < len(self.anchor_names):
             return None
         return list(guide_positions[: len(self.anchor_names)])
 
     def _get_parent_wing_guide(self) -> Optional[ParentWingGuideLike]:  # noqa: UP045
-        parent_guide = getattr(self.guide, "parentComponent", None)
+        parent_guide: Optional[ParentWingGuideLike] = getattr(self.guide, "parentComponent", None)
         if parent_guide is not None and getattr(parent_guide, "compType", None) == PARENT_COMPONENT_TYPE:
             return parent_guide
 
-        candidates = []
-        rig_guides = getattr(self.rig, "guides", {})
+        candidates: List[ParentWingGuideLike] = []
+        rig_guides: Dict[str, ParentWingGuideLike] = getattr(self.rig, "guides", {})
         for guide in rig_guides.values():
             if getattr(guide, "compType", None) != PARENT_COMPONENT_TYPE:
                 continue
@@ -1692,11 +1759,11 @@ class Component(component.Main):
         if len(candidates) == 1:
             return candidates[0]
         if len(candidates) > 1:
-            names = ", ".join(guide.fullName for guide in candidates)
+            names: str = ", ".join(guide.fullName for guide in candidates)
             raise RuntimeError("ymt_feather_ribbon_01 found multiple parent wing guide candidates: %s." % names)
         return None
 
-    def _parse_detail_guide_name(self, local_name: str) -> Optional[tuple[str, int, int]]:  # noqa: UP045
+    def _parse_detail_guide_name(self, local_name: str) -> Optional[Tuple[str, int, int]]:  # noqa: UP045
         return detail_config.parse_detail_guide_name(local_name)
 
     def _ensure_rotation_driver_plugin(self) -> None:
@@ -1709,21 +1776,21 @@ class Component(component.Main):
 
     def _parse_placement_mode(self, value: str) -> str:
         try:
-            index = int(value)
+            index: int = int(value)
         except (TypeError, ValueError) as exc:
             raise RuntimeError("ymt_feather_ribbon_01 placementMode must be an integer enum index.") from exc
         if index < 0 or index >= len(self.placement_modes):
             raise RuntimeError("ymt_feather_ribbon_01 placementMode index is out of range: %s." % index)
         return self.placement_modes[index]
 
-    def _parse_row_names(self, value: str) -> list[str]:
+    def _parse_row_names(self, value: str) -> List[str]:
         return detail_config.parse_row_names(value)
 
-    def _parse_row_counts(self, value: str, row_names: list[str]) -> list[int]:
+    def _parse_row_counts(self, value: str, row_names: List[str]) -> List[int]:
         return detail_config.parse_row_counts(value, row_names)
 
-    def _parse_row_u_ranges(self, value: str, row_names: list[str]) -> list[tuple[float, float]]:
+    def _parse_row_u_ranges(self, value: str, row_names: List[str]) -> List[Tuple[float, float]]:
         return detail_config.parse_row_u_ranges(value, row_names)
 
-    def _parse_detail_column_depths_by_row(self, value: str, row_names: list[str]) -> list[list[float]]:
+    def _parse_detail_column_depths_by_row(self, value: str, row_names: List[str]) -> List[List[float]]:
         return detail_config.parse_detail_column_depths_by_row(value, row_names)

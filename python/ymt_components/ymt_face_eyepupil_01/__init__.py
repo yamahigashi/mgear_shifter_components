@@ -1,7 +1,10 @@
 """mGear shifter components"""
 # pylint: disable=import-error,W0201,C0111,C0112
+from __future__ import annotations
+
 import importlib
-import sys
+from typing import List, TYPE_CHECKING
+
 import maya.cmds as cmds
 
 try:
@@ -22,21 +25,8 @@ from mgear.core import (
 
 import ymt_shifter_utility as ymt_util
 
-if sys.version_info > (3, 0):
-    from typing import TYPE_CHECKING
-    if TYPE_CHECKING:
-        from typing import (
-            Optional,
-            Dict,
-            List,
-            Tuple,
-            Callable,
-            Any,
-            Text,
-            Union
-        )
-        from re import Pattern
-        from collections.abc import Generator
+if TYPE_CHECKING:
+    from ymt_shifter_utility.type_protocols import MatrixLike, PlugLike, PymelNode, VectorLike
 
 from logging import (
     StreamHandler,
@@ -63,7 +53,7 @@ class Component(component.Main):
     # =====================================================
     # OBJECTS
     # =====================================================
-    def addToSubGroup(self, obj: object, group_name: str) -> None:
+    def addToSubGroup(self, obj: PymelNode, group_name: str) -> None:
 
         if self.settings["ctlGrp"]:
             ctlGrp = self.settings["ctlGrp"]
@@ -76,23 +66,23 @@ class Component(component.Main):
         """Add all the objects needed to create the component."""
 
         if self.settings["neutralRotation"]:
-            t = transform.getTransformFromPos(self.guide.pos["root"])
+            t: MatrixLike = transform.getTransformFromPos(self.guide.pos["root"])
         else:
             t = self.guide.tra["root"]
             if self.settings["mirrorBehaviour"] and self.negate:
-                scl = [1, 1, -1]
+                scl: List[int] = [1, 1, -1]
             else:
                 scl = [1, 1, 1]
             t = transform.setMatrixScale(t, scl)
 
-        self.initialDist = self.size * .2
-        self.detailControllersGroupName = "controllers_detail"  # TODO: extract to settings
-        self.primaryControllersGroupName = "controllers_primary"  # TODO: extract to settings
-        self.connect_surface_slider = self.settings["isSlidingSurface"]
+        self.initialDist: float = self.size * .2
+        self.detailControllersGroupName: str = "controllers_detail"  # TODO: extract to settings
+        self.primaryControllersGroupName: str = "controllers_primary"  # TODO: extract to settings
+        self.connect_surface_slider: bool = self.settings["isSlidingSurface"]
 
-        pivot_t = self.guide.tra["sliding_surface"]
-        self.lookat_cns = primitive.addTransform(self.root, self.getName("lookat_cns"), pivot_t)
-        self.ctl = self.addCtl(self.lookat_cns,
+        pivot_t: MatrixLike = self.guide.tra["sliding_surface"]
+        self.lookat_cns: PymelNode = primitive.addTransform(self.root, self.getName("lookat_cns"), pivot_t)
+        self.ctl: PymelNode = self.addCtl(self.lookat_cns,
                                "ctl",
                                t,
                                self.color_ik,
@@ -103,21 +93,21 @@ class Component(component.Main):
                                tp=self.parentCtlTag)
         self.addToSubGroup(self.ctl, self.primaryControllersGroupName)
 
-        self.aim_cns = primitive.addTransform(self.root, self.getName("aim_cns"), t)
+        self.aim_cns: PymelNode = primitive.addTransform(self.root, self.getName("aim_cns"), t)
         if self.settings["joint"]:
             self.jnt_pos.append([self.aim_cns, "aim"])
 
-        diff = self.guide.apos[2] - self.guide.apos[0]
-        base_pos = transform.getPositionFromMatrix(t)
+        diff: VectorLike = self.guide.apos[2] - self.guide.apos[0]
+        base_pos: VectorLike = transform.getPositionFromMatrix(t)
         base_pos = dt.Vector(base_pos[0], base_pos[1], base_pos[2])
-        offset = diff.normal() * self.initialDist + base_pos
-        offset_mat = transform.setMatrixPosition(t, offset)
-        self.proj_cns = primitive.addTransform(self.aim_cns, self.getName("proj_cns"), offset_mat)
+        offset: VectorLike = diff.normal() * self.initialDist + base_pos
+        offset_mat: MatrixLike = transform.setMatrixPosition(t, offset)
+        self.proj_cns: PymelNode = primitive.addTransform(self.aim_cns, self.getName("proj_cns"), offset_mat)
 
-        pos = self.guide.pos["lookat"]
+        pos: VectorLike = self.guide.pos["lookat"]
         t = transform.setMatrixPosition(t, pos)
-        self.ik_cns = primitive.addTransform(self.root, self.getName("ik_cns"), t)
-        self.lookat = self.addCtl(self.ik_cns,
+        self.ik_cns: PymelNode = primitive.addTransform(self.root, self.getName("ik_cns"), t)
+        self.lookat: PymelNode = self.addCtl(self.ik_cns,
                                   "lookat_ctl",
                                   t,
                                   self.color_ik,
@@ -132,11 +122,11 @@ class Component(component.Main):
 
         # we need to set the rotation order before lock any rotation axis
         if self.settings["k_ro"]:
-            rotOderList = ["XYZ", "YZX", "ZXY", "XZY", "YXZ", "ZYX"]
+            rotOderList: List[str] = ["XYZ", "YZX", "ZXY", "XZY", "YXZ", "ZYX"]
             attribute.setRotOrder(
                 self.ctl, rotOderList[self.settings["default_rotorder"]])
 
-        params = [s for s in
+        params: List[str] = [s for s in
                   ("tx", "ty", "tz", "ro", "rx", "ry", "rz", "sx", "sy", "sz")
                   if self.settings["k_" + s]]
         ymt_util.setKeyableAttributesDontLockVisibility(self.ctl, params)
@@ -144,10 +134,10 @@ class Component(component.Main):
         if self.settings["joint"]:
             self.jnt_pos.append([self.ctl, 0, None, self.settings["uniScale"]])
 
-        self.surfRef = self.settings["surfaceReference"]
+        self.surfRef: str = self.settings["surfaceReference"]
         if not self.surfRef:
-            guide_surface = self.guide.getObjectByLocalName("sliding_surface")
-            self.sliding_surface = pm.duplicate(guide_surface)[0]
+            guide_surface: PymelNode = self.guide.getObjectByLocalName("sliding_surface")
+            self.sliding_surface: PymelNode = pm.duplicate(guide_surface)[0]
             pm.parent(self.sliding_surface, self.root)
             self.sliding_surface.visibility.set(False)
             pm.makeIdentity(self.sliding_surface, apply=True, t=1,  r=1, s=1, n=0, pn=1)
@@ -155,10 +145,10 @@ class Component(component.Main):
     def addAttributes(self) -> None:
         # Ref
         if self.settings["ikrefarray"]:
-            ref_names = self.get_valid_alias_list(
+            ref_names: List[str] = self.get_valid_alias_list(
                 self.settings["ikrefarray"].split(","))
             if len(ref_names) > 1:
-                self.ikref_att = self.addAnimEnumParam(
+                self.ikref_att: PlugLike = self.addAnimEnumParam(
                     "ikref",
                     "Ik Ref",
                     0,
@@ -204,7 +194,7 @@ class Component(component.Main):
                 self.connect_slide_ghost()
                 parentGuide = self.guide.parentComponent
                 if parentGuide is not None and "face_eye" in parentGuide.compType:
-                    arrow = self.parent_comp.arrow_ctl
+                    arrow: PymelNode = self.parent_comp.arrow_ctl
                     cmds.parentConstraint(
                         arrow.name(),
                         self.proj_cns.name(),
@@ -229,7 +219,7 @@ class Component(component.Main):
 
         parentGuide = self.guide.parentComponent
         if parentGuide is not None and "face_eye" in parentGuide.compType:
-            arrow = self.parent_comp.arrow_ctl
+            arrow: PymelNode = self.parent_comp.arrow_ctl
             cmds.parentConstraint(
                 arrow.name(),
                 self.lookat_cns.name(),
@@ -261,7 +251,7 @@ class Component(component.Main):
             raise
 
 
-def ghostSliderForPupil(ctl: object, ghostCtl: object, surface: object, sliderParent: object) -> None:
+def ghostSliderForPupil(ctl: PymelNode, ghostCtl: PymelNode, surface: PymelNode, sliderParent: PymelNode) -> None:
     """Modify the ghost control behaviour to slide on top of a surface
 
     Args:
@@ -270,29 +260,32 @@ def ghostSliderForPupil(ctl: object, ghostCtl: object, surface: object, sliderPa
         sliderParent (dagNode): The parent for the slider.
     """
 
-    surfaceShape = surface.getShape()
+    surfaceShape: PymelNode = surface.getShape()
 
-    t = ctl.getMatrix(worldSpace=True)
+    t: MatrixLike = ctl.getMatrix(worldSpace=True)
 
-    oParent = ghostCtl.getParent()
-    npoName = "_".join(ghostCtl.name().split("_")[:-1]) + "_npo"
-    oTra = pm.PyNode(pm.createNode("transform", n=npoName, p=oParent, ss=True))
+    oParent: PymelNode = ghostCtl.getParent()
+    npoName: str = "_".join(ghostCtl.name().split("_")[:-1]) + "_npo"
+    oTra: PymelNode = pm.PyNode(pm.createNode("transform", n=npoName, p=oParent, ss=True))
     oTra.setTransformation(ghostCtl.getMatrix())
     pm.parent(ghostCtl, oTra)
 
-    slider = primitive.addTransform(sliderParent, ctl.name() + "_slideDriven", t)
+    slider: PymelNode = primitive.addTransform(sliderParent, ctl.name() + "_slideDriven", t)
 
+    down: List[PymelNode]
+    up: List[PymelNode]
     down, _, up = ymt_util.findPathAtoB(ctl, sliderParent)
-    mul_node = pm.createNode("multMatrix")
-    j = k = 0
+    mul_node: PymelNode = pm.createNode("multMatrix")
+    j: int = 0
+    k: int = 0
     for j, d in enumerate(down):
         d.attr("matrix") >> mul_node.attr("matrixIn[{}]".format(j))
     for k, u in enumerate(up):
         u.attr("inverseMatrix") >> mul_node.attr("matrixIn[{}]".format(k + j + 1))
 
-    dm_node = node.createDecomposeMatrixNode(mul_node.attr("matrixSum"))
+    dm_node: PymelNode = node.createDecomposeMatrixNode(mul_node.attr("matrixSum"))
 
-    cps_node = pm.createNode("closestPointOnSurface")
+    cps_node: PymelNode = pm.createNode("closestPointOnSurface")
     dm_node.attr("outputTranslate") >> cps_node.attr("inPosition")
     surfaceShape.attr("local") >> cps_node.attr("inputSurface")
     cps_node.attr("position") >> slider.attr("translate")

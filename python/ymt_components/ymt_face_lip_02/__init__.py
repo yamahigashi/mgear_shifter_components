@@ -1,10 +1,12 @@
 """mGear shifter components"""
 # pylint: disable=import-error,W0201,C0111,C0112
+from __future__ import annotations
+
 import re
 import six
-import sys
 import math
 import traceback
+from typing import List, Optional, Tuple, TYPE_CHECKING, Union
 
 import maya.cmds as cmds
 import maya.api.OpenMaya as om
@@ -44,21 +46,8 @@ import ymt_shifter_utility.curve as curve
 import ymt_shifter_utility.fit_curve as fit_curve
 
 
-if sys.version_info > (3, 0):
-    from typing import TYPE_CHECKING
-    if TYPE_CHECKING:
-        from typing import (
-            Optional,
-            Dict,
-            List,
-            Tuple,
-            Callable,
-            Any,
-            Text,
-            Union
-        )
-        from re import Pattern
-        from collections.abc import Generator
+if TYPE_CHECKING:
+    from ymt_shifter_utility.type_protocols import MatrixLike, PymelNode, VectorLike
 
 from logging import (
     StreamHandler,
@@ -89,79 +78,79 @@ class Component(component.Main):
     def addObjects(self) -> None:
         """Add all the objects needed to create the component."""
 
-        self.WIP = self.options["mode"]
+        self.WIP: Union[bool, str] = self.options["mode"]
 
         if self.negate and self.settings["overrideNegate"]:
             self.negate = False
             self.n_factor = 1
 
         if self.settings["overrideNegate"]:
-            self.mirror_conf = [0, 0, 1,
-                                1, 1, 0,
-                                0, 0, 0]
+            self.mirror_conf: List[int] = [0, 0, 1,
+                                           1, 1, 0,
+                                           0, 0, 0]
         else:
             self.mirror_conf = [0, 0, 0,
                                 0, 0, 0,
                                 0, 0, 0]
 
-        self.connect_surface_slider = self.settings["isSlidingSurface"]
-        self.surfRef = self.settings["surfaceReference"]
-        self.mouthCenterRef = self.settings["mouthCenterReference"]
-        self.mouthLeftRef = self.settings["mouthLeftReference"]
-        self.mouthRightRef = self.settings["mouthRightReference"]
+        self.connect_surface_slider: bool = self.settings["isSlidingSurface"]
+        self.surfRef: str = self.settings["surfaceReference"]
+        self.mouthCenterRef: str = self.settings["mouthCenterReference"]
+        self.mouthLeftRef: str = self.settings["mouthLeftReference"]
+        self.mouthRightRef: str = self.settings["mouthRightReference"]
         # -------------------------------------------------------
 
-        self.num_locs = self.getNumberOfLocators("_loc")
-        self.frontPos = self.guide.apos[-1]
-        self.rootPos = self.guide.apos[0]
-        self.locsPos = self.guide.apos[2:self.num_locs + 2]
+        self.num_locs: int = self.getNumberOfLocators("_loc")
+        self.frontPos: VectorLike = self.guide.apos[-1]
+        self.rootPos: VectorLike = self.guide.apos[0]
+        self.locsPos: List[VectorLike] = self.guide.apos[2:self.num_locs + 2]
 
-        self.offset = (self.frontPos - self.rootPos) * 0.3
+        self.offset: VectorLike = (self.frontPos - self.rootPos) * 0.3
         if self.negate:
             pass
-            # self.offset[2] = self.offset[2] * -1.0
+            # self.offSet[2] = self.offSet[2] * -1.0
 
         # -------------------------------------------------------
-        self.ctlName = "ctl"
+        self.ctlName: str = "ctl"
         self.detailControllersGroupName = "controllers_detail"  # TODO: extract to settings
         self.primaryControllersGroupName = "controllers_primary"  # TODO: extract to settings
         # self.symmetry = self.settings["symmetry"]  # TODO: extract to settings
-        self.symmetry = True
+        self.symmetry: bool = True
 
-        self.thickness = self.offset.length()
+        self.thickness: float = self.offset.length()
         # self.thickness = self.size * 0.05
-        self.FRONT_OFFSET = self.size * 0.025
-        self.NB_CVS = 2 * 4 + 4  # means 4 spans with 2 controllers each + 4 controllers for the corners
+        self.FRONT_OFFSET: float = self.size * 0.025
+        self.NB_CVS: int = 2 * 4 + 4  # means 4 spans with 2 controllers each + 4 controllers for the corners
 
         # odd / event
         if self.num_locs % 2 == 0:
             # even
-            self.NB_ROPE = self.num_locs * 20 + 1
-            self.bottom_index = int(self.num_locs / 2)
+            self.NB_ROPE: int = self.num_locs * 20 + 1
+            self.bottom_index: int = int(self.num_locs / 2)
         else:
             self.NB_ROPE = self.num_locs * 20
             self.bottom_index = int((self.num_locs -1) / 2)
 
         # treat most left side as corner index
-        peek_x = 0.0
-        self.left_index = 0
+        peek_x: float = 0.0
+        self.left_index: int = 0
         for i in range(0, self.bottom_index):
             if self.locsPos[i][0] > peek_x:
                 peek_x = self.locsPos[i][0]
                 self.left_index = i
 
         peek_x = 0.0
-        self.right_index = 0
+        self.right_index: int = 0
         for i in range(self.bottom_index, self.num_locs):
             if self.locsPos[i][0] < peek_x:
                 peek_x = self.locsPos[i][0]
                 self.right_index = i
 
         # --------------------------------------------------------
-        self.crv = None
-        self.crv_ctl = None
+        self.crv: Optional[PymelNode] = None
+        self.crv_ctl: Optional[PymelNode] = None
 
-        self.previusTag = self.parentCtlTag
+        self.previusTag: Optional[PymelNode] = self.parentCtlTag
 
         self.addContainers()
         self.addCurve()
@@ -184,8 +173,7 @@ class Component(component.Main):
         ymt_util.setKeyableAttributesDontLockVisibility(self.rope_root, [])
         ymt_util.setKeyableAttributesDontLockVisibility(self.upv_root, [])
 
-    def getNumberOfLocators(self, query: object) -> None:
-        # type: (Text) -> int
+    def getNumberOfLocators(self, query: str) -> int:
         """ _uplocs."""
         num = 0
         for k, v in self.guide.tra.items():
@@ -207,8 +195,7 @@ class Component(component.Main):
             self.sliding_surface.visibility.set(False)
             pm.makeIdentity(self.sliding_surface, apply=True, t=1,  r=1, s=1, n=0, pn=1)
 
-    def getCurveCVs(self, crv: object, space: object="world") -> None:
-        # type: (...) -> List[om.MPoint]
+    def getCurveCVs(self, crv: PymelNode, space: str = "world") -> List[om.MPoint]:
 
         cvs = ymt_util.getCurveCVs(crv, space=space)
         degree = ymt_util.getCurveDegree(crv)
@@ -219,7 +206,7 @@ class Component(component.Main):
 
         return cvs
 
-    def addCurves(self, crv_root: object) -> None:
+    def addCurves(self, crv_root: PymelNode) -> None:
         m = getTransform(self.root)
         positions = [self._worldToObj(x) for x in self.locsPos]
 
@@ -233,11 +220,11 @@ class Component(component.Main):
         crv.attr("visibility").set(False)
         self.crv = crv
 
-    def addCurveBaseControllers(self, crv_root: object) -> None:
+    def addCurveBaseControllers(self, crv_root: PymelNode) -> None:
 
         t = getTransform(self.root)
 
-        def curveFromCurve(crv: object, name: str, nbPoints: object) -> None:
+        def curveFromCurve(crv: PymelNode, name: str, nbPoints: int) -> PymelNode:
 
             new_crv = curve.createCurveFromCurveEvenLength(
                 crv,
@@ -300,8 +287,8 @@ class Component(component.Main):
         else:
             cvs = cvPairs[0:-1]
 
-        controls = []
-        npos = []
+        controls: List[PymelNode] = []
+        npos: List[PymelNode] = []
         for i, (cvo, cvw) in enumerate(cvs):
 
             mirror = i > self.num_locs / 2
@@ -394,7 +381,7 @@ class Component(component.Main):
         self.tweakNpos = npos
         self.tweakControllers = controls
 
-    def addToSubGroup(self, obj: object, group_name: str) -> None:
+    def addToSubGroup(self, obj: PymelNode, group_name: str) -> None:
 
         if self.settings["ctlGrp"]:
             ctlGrp = self.settings["ctlGrp"]
@@ -459,15 +446,22 @@ class Component(component.Main):
         front_offset = front_dir * front_amount
         for i, cv in enumerate(cvs):
             new_pos = [
-                cv[0] + front_offset[0],
-                cv[1] + front_offset[1],
-                cv[2] + front_offset[2],
+                cv[0] + front_offSet[0],
+                cv[1] + front_offSet[1],
+                cv[2] + front_offSet[2],
             ]
             ymt_util.setCurveCV(self.upv_crv, i, new_pos, space="world")
 
     def addConstraints(self) -> None:
 
-        def applyMultiCns(ctls: object, src1Index: int, src2Index: int, dstIndex: int, p1: object, p2: object) -> None:
+        def applyMultiCns(
+            ctls: List[PymelNode],
+            src1Index: int,
+            src2Index: int,
+            dstIndex: int,
+            p1: float,
+            p2: float,
+        ) -> None:
 
             src1 = ctls[src1Index]
             src2 = ctls[src2Index]
@@ -506,7 +500,7 @@ class Component(component.Main):
             cmds.setAttr(attr1, (r1 * 0.4) + (p1 * 0.6))
             cmds.setAttr(attr2, (r2 * 0.4) + (p2 * 0.6))
 
-        def calcDistRatio(a: object, b: object, c: object) -> None:
+        def calcDistRatio(a: PymelNode, b: PymelNode, c: PymelNode) -> Tuple[float, float]:
             pa = a.getTranslation(space="world")
             pb = b.getTranslation(space="world")
             pc = c.getTranslation(space="world")
@@ -579,7 +573,7 @@ class Component(component.Main):
             cmds.connectAttr(mult + ".output", npo.longName() + ".rotateX")
             ymt_util.setKeyableAttributesDontLockVisibility(npo, [])
 
-    def evalPuckerRollProfileFcurve(self, i: int) -> object:
+    def evalPuckerRollProfileFcurve(self, i: int) -> float:
         _index = i
         mirror = i > self.num_locs / 2
         length = self.num_locs / 2.0
@@ -618,7 +612,11 @@ class Component(component.Main):
         else:
             return fcurve.getFCurveValues(self.settings[prof], int(div))
 
-    def _addControls(self, crv_ctl: object, option: object) -> None:
+    def _addControls(
+        self,
+        crv_ctl: PymelNode,
+        option: List[List[Union[str, float, List[str]]]],
+    ) -> Tuple[List[PymelNode], List[PymelNode]]:
 
         cvs = self.getCurveCVs(crv_ctl)
         sum_cvs = datatypes.Vector()
@@ -631,8 +629,8 @@ class Component(component.Main):
 
         distSize = average_dist * 5.0
 
-        npos = []
-        ctls = []
+        npos: List[PymelNode] = []
+        ctls: List[PymelNode] = []
 
         for i, cv in enumerate(cvs):
 
@@ -677,7 +675,7 @@ class Component(component.Main):
 
         return npos, ctls
 
-    def _constrainCtlRotToCurve(self, ctls: object, crv: object) -> None:
+    def _constrainCtlRotToCurve(self, ctls: List[PymelNode], crv: PymelNode) -> None:
 
         # for i, cv in enumerate(cvs):
         for i in (1, 2, 4, 5, 7, 8, 10, 11):
@@ -734,7 +732,7 @@ class Component(component.Main):
             cmds.setAttr("{}.rotateZ".format(ctl), lock=True)
 
     def _worldToObj(self, pos: float) -> None:
-        # type: (list[float]) -> dt.Vector
+        # type: (List[float]) -> dt.Vector
 
         m = getTransform(self.root)
         m = om.MMatrix(m)
@@ -753,7 +751,7 @@ class Component(component.Main):
         return positions
 
     def _objToWorld(self, pos: float) -> None:
-        # type: (list[float]) -> dt.Vector
+        # type: (List[float]) -> dt.Vector
 
         m = getTransform(self.root)
         m = om.MMatrix(m)
@@ -875,7 +873,7 @@ class Component(component.Main):
 
                 comp.groups[k] = []
 
-    def _createGhostCtl(self, ghost_ctl: object, parent: object) -> None:
+    def _createGhostCtl(self, ghost_ctl: PymelNode, parent: PymelNode) -> None:
 
         ctl = ghost.createGhostCtl(ghost_ctl, parent=parent, connect=True)
         # rigbits.connectLocalTransform([ctl, ghost_ctl])
@@ -907,7 +905,7 @@ class Component(component.Main):
 
         return ctl
 
-    def _removeFromCtrlGroup(self, obj: object) -> None:
+    def _removeFromCtrlGroup(self, obj: PymelNode) -> None:
 
         if self.settings["ctlGrp"]:
             ctlGrp = self.settings["ctlGrp"]
@@ -924,7 +922,9 @@ class Component(component.Main):
             except ValueError:
                 pass
 
-    def connect_slide_ghost(self, intTra: object, slide_c_ref: object, corner_l_ref: object, corner_r_ref: object) -> None:
+    def connect_slide_ghost(
+        self, intTra: PymelNode, slide_c_ref: PymelNode, corner_l_ref: PymelNode, corner_r_ref: PymelNode
+    ) -> None:
 
         # create ghost controls
         self.mouthSlide_ctl = self._createGhostCtl(slide_c_ref, intTra)
@@ -958,7 +958,7 @@ class Component(component.Main):
 
         return drivers
 
-    def connect_mouth_ghost(self, lipup_ref: object, liplow_ref: object) -> None:
+    def connect_mouth_ghost(self, lipup_ref: PymelNode, liplow_ref: PymelNode) -> None:
 
         # center main controls
         self.lips_C_upper_ctl, up_ghost_ctl = createGhostWithParentConstraint(self.lips_C_upper_ctl, lipup_ref)
@@ -999,7 +999,7 @@ class Component(component.Main):
 
         return
 
-    def connect_averageParentCns(self, parents: object, target: str) -> None:
+    def connect_averageParentCns(self, parents: List[PymelNode], target: str) -> None:
         """
         Connection definition using average parent constraint.
         """
@@ -1027,8 +1027,19 @@ class Component(component.Main):
             self.controlRelatives["%s_loc" % i] = ctl
 
 
-    def createCurveControl(self, crv: object, posTop: object, posLeft: object, posBottom: object, posRight: object, name: str, m: object=None, parent: object=None, symmetry: object=True) -> None:
-        # type: (str, list[float], list[float], list[float], list[float], str, dt.Matrix, dt.Transform, bool) -> pm.nodetypes.Transform
+    def createCurveControl(
+        self,
+        crv: PymelNode,
+        posTop: VectorLike,
+        posLeft: VectorLike,
+        posBottom: VectorLike,
+        posRight: VectorLike,
+        name: str,
+        m: Optional[MatrixLike] = None,
+        parent: Optional[PymelNode] = None,
+        symmetry: bool = True,
+    ) -> PymelNode:
+        # type: (str, List[float], List[float], List[float], List[float], str, dt.Matrix, dt.Transform, bool) -> pm.nodetypes.Transform
 
         # For now, we are not using this function, but we are keeping it here for future reference
         # posTop = inflate_position_by_curve_flattness(crv, posTop)
@@ -1093,7 +1104,9 @@ class Component(component.Main):
         return crv_ctl
 
 
-def ghostSliderForMouth(ghostControls: object, intTra: object, surface: object, sliderParent: object) -> None:
+def ghostSliderForMouth(
+    ghostControls: List[PymelNode], _intTra: PymelNode, surface: PymelNode, sliderParent: PymelNode
+) -> None:
     """Modify the ghost control behaviour to slide on top of a surface
 
     Args:
@@ -1105,13 +1118,13 @@ def ghostSliderForMouth(ghostControls: object, intTra: object, surface: object, 
         ghostControls = [ghostControls]
 
 
-    def conn(ctl: object, driver: object, ghost: object) -> None:
+    def conn(ctl: PymelNode, driver: PymelNode, ghost: PymelNode) -> None:
 
         for attr in ["translate", "scale", "rotate"]:
             pm.connectAttr("{}.{}".format(ctl, attr), "{}.{}".format(driver, attr))
             pm.disconnectAttr("{}.{}".format(ctl, attr), "{}.{}".format(ghost, attr))
 
-    def connCenter(ctl: object, driver: object, ghost: object) -> None:
+    def connCenter(ctl: PymelNode, driver: PymelNode, ghost: PymelNode) -> None:
         dm_node = ymt_util.getDecomposeMatrixOfAtoB(ctl, driver, skip_last=True)
 
         for attr in ["translate", "scale"]:
@@ -1119,8 +1132,8 @@ def ghostSliderForMouth(ghostControls: object, intTra: object, surface: object, 
             pm.disconnectAttr("{}.{}".format(ctl, attr), "{}.{}".format(ghost, attr))
 
     surfaceShape = surface.getShape()
-    sliders = []
-    drivers = []
+    sliders: List[PymelNode] = []
+    drivers: List[PymelNode] = []
 
     for i, ctlGhost in enumerate(ghostControls):
         ctl = pm.listConnections(ctlGhost, t="transform")[-1]
@@ -1175,7 +1188,9 @@ def ghostSliderForMouth(ghostControls: object, intTra: object, surface: object, 
     return drivers
 
 
-def createGhostWithParentConstraint(ctl: object, parent: object=None, connect: object=True) -> None:
+def createGhostWithParentConstraint(
+    ctl: PymelNode, parent: Optional[PymelNode] = None, connect: bool = True
+) -> PymelNode:
     """Create a duplicated Ghost control
 
     Create a duplicate of the control and rename the original with _ghost.
@@ -1232,7 +1247,7 @@ def createGhostWithParentConstraint(ctl: object, parent: object=None, connect: o
     return newCtl, ctl
 
 
-def _visi_off_lock(node: object) -> None:
+def _visi_off_lock(node: PymelNode) -> None:
     """Short cuts."""
     if not node:
         raise Exception("node is null")
@@ -1245,8 +1260,8 @@ def _visi_off_lock(node: object) -> None:
         pass
 
 
-def calculate_flatness_ratio(points: object) -> object:
-    # type: (list[tuple[float, float, float]]) -> tuple[tuple[float, float, float], float]
+def calculate_flatness_ratio(points: List[Tuple[float, float, float]]) -> Tuple[Tuple[float, float, float], float]:
+    # type: (List[Tuple[float, float, float]]) -> Tuple[Tuple[float, float, float], float]
 
     try:
         import numpy as np  # type: ignore
@@ -1257,8 +1272,10 @@ def calculate_flatness_ratio(points: object) -> object:
         return calculate_flatness_ratio_simple(points)
 
 
-def calculate_flatness_ratio_using_numpy(points: object) -> None:
-    # type: (list[tuple[float, float, float]]) -> tuple[tuple[float, float, float], float]
+def calculate_flatness_ratio_using_numpy(
+    points: List[Tuple[float, float, float]]
+) -> Tuple[Tuple[float, float, float], float]:
+    # type: (List[Tuple[float, float, float]]) -> Tuple[Tuple[float, float, float], float]
 
     import numpy as np  # type: ignore
     mean = np.mean(points, axis=0)
@@ -1283,8 +1300,8 @@ def calculate_flatness_ratio_using_numpy(points: object) -> None:
     return principal_directions, flatness_ratio
 
 
-def calculate_flatness_ratio_simple(points: object) -> None:
-    # type: (list[tuple[float, float, float]]) -> tuple[tuple[float, float, float], float]
+def calculate_flatness_ratio_simple(points: List[Tuple[float, float, float]]) -> Tuple[Tuple[float, float, float], float]:
+    # type: (List[Tuple[float, float, float]]) -> Tuple[Tuple[float, float, float], float]
 
     if not points:
         raise ValueError("Points list cannot be empty.")
@@ -1329,7 +1346,7 @@ def calculate_flatness_ratio_simple(points: object) -> None:
     return sorted_eigenvectors, flatness_ratio
 
 
-def eigen_decomposition_3x3(matrix: object) -> object:
+def eigen_decomposition_3x3(matrix: List[List[float]]) -> Tuple[List[float], List[List[float]]]:
     """
     3x3 対称行列の固有値と固有ベクトルを計算する関数。
     数値的な精度は低く、実際の用途では numpy を使用することを推奨します。
@@ -1389,7 +1406,7 @@ def eigen_decomposition_3x3(matrix: object) -> object:
     eigenvalues = [eig1, eig2, eig3]
 
     # 固有ベクトルの計算
-    eigenvectors = []
+    eigenvectors: List[List[float]] = []
     for eig in eigenvalues:
         # (A - λI)v = 0 を解く
         A_minus_lambda_I = [
@@ -1412,7 +1429,7 @@ def eigen_decomposition_3x3(matrix: object) -> object:
 
     return eigenvalues, eigenvectors
 
-def determinant_3x3(m: object) -> None:
+def determinant_3x3(m: List[List[float]]) -> float:
     """
     3x3行列の行列式を計算する関数。
 
@@ -1428,7 +1445,7 @@ def determinant_3x3(m: object) -> None:
         m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0])
     )
 
-def solve_linear_system_3x3(m: object) -> object:
+def solve_linear_system_3x3(m: List[List[float]]) -> List[float]:
     """
     3x3行列の線形方程式を解く関数。
     解が一意でない場合は None を返す。
@@ -1484,7 +1501,7 @@ def solve_linear_system_3x3(m: object) -> object:
     else:
         return None
 
-def matrix_rank_3x3(m: object) -> int:
+def matrix_rank_3x3(m: List[List[float]]) -> int:
     """
     3x3行列のランクを計算する関数。
 
@@ -1521,12 +1538,12 @@ def matrix_rank_3x3(m: object) -> int:
     return 0
 
 
-def calculate_principal_direction_and_flatness_ratio(crv: object) -> None:
+def calculate_principal_direction_and_flatness_ratio(crv: PymelNode) -> Tuple[Tuple[float, float, float], float]:
 
     fnCurve = curve.getMFnNurbsCurve(crv)
     u_min, u_max = fnCurve.knotDomain
 
-    samplePos = []
+    samplePos: List[Tuple[float, float, float]] = []
     for i in range(100):
         u = u_min + (u_max - u_min) * i / 100
         p = fnCurve.getPointAtParam(u)
@@ -1536,8 +1553,8 @@ def calculate_principal_direction_and_flatness_ratio(crv: object) -> None:
     return direction, flatness_ratio
 
 
-def inflate_position_by_curve_flattness(crv: object, position: object) -> None:
-    # type: (pm.PyNode, tuple[float, float, float]) -> tuple[float, float, float]
+def inflate_position_by_curve_flattness(crv: PymelNode, position: Tuple[float, float, float]) -> Tuple[float, float, float]:
+    # type: (pm.PyNode, Tuple[float, float, float]) -> Tuple[float, float, float]
 
     centerPos = curve.getCenterPosition(crv)
 

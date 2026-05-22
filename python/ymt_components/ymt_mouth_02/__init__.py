@@ -1,6 +1,9 @@
 """Component Mouth 01 module"""
+from __future__ import annotations
 
 import importlib
+from typing import TYPE_CHECKING
+
 try:
     pm = importlib.import_module("mgear.pymaya")
 except ImportError:
@@ -15,6 +18,9 @@ from mgear.shifter import component
 from mgear.core import attribute, transform, primitive
 import ymt_shifter_utility as ymt_util
 
+if TYPE_CHECKING:
+    from ymt_shifter_utility.type_protocols import MatrixLike, PlugLike, PymelNode
+
 #############################################
 # COMPONENT
 #############################################
@@ -26,7 +32,7 @@ class Component(component.Main):
     # =====================================================
     # OBJECTS
     # =====================================================
-    def addToSubGroup(self, obj: object, group_name: str) -> None:
+    def addToSubGroup(self, obj: PymelNode, group_name: str) -> None:
 
         if self.settings["ctlGrp"]:
             ctlGrp = self.settings["ctlGrp"]
@@ -37,18 +43,18 @@ class Component(component.Main):
 
     def addObjects(self) -> None:
         """Add all the objects needed to create the component."""
-        self.detailControllersGroupName = "controllers_detail"  # TODO: extract to settings
-        self.primaryControllersGroupName = "controllers_primary"  # TODO: extract to settings
+        self.detailControllersGroupName: str = "controllers_detail"  # TODO: extract to settings
+        self.primaryControllersGroupName: str = "controllers_primary"  # TODO: extract to settings
 
-        self.normalizeSize = self.settings.get("normalizeSize", False)
+        self.normalizeSize: bool = self.settings.get("normalizeSize", False)
 
         # jaw control
-        t = transform.getTransformFromPos(self.guide.pos["jaw"])
+        t: MatrixLike = transform.getTransformFromPos(self.guide.pos["jaw"])
 
-        self.ctl_npo = primitive.addTransform(
+        self.ctl_npo: PymelNode = primitive.addTransform(
             self.root, self.getName("ctl_npo"), t)
 
-        self.jaw_ctl = self.addCtl(
+        self.jaw_ctl: PymelNode = self.addCtl(
             self.ctl_npo,
             "jaw_ctl",
             t,
@@ -62,36 +68,36 @@ class Component(component.Main):
 
         # mouth center
         t = transform.getTransformFromPos(self.guide.pos["rotcenter"])
-        self.mouthCenter_npo = primitive.addTransform(
+        self.mouthCenter_npo: PymelNode = primitive.addTransform(
             self.root, self.getName("mouthCenter_npo"), t)
-        self.mouthCenter = primitive.addTransform(
+        self.mouthCenter: PymelNode = primitive.addTransform(
             self.mouthCenter_npo, self.getName("mouthCenter"), t)
 
         # jaw "UPPER"
         t = transform.getTransformFromPos(self.guide.pos["root"])
-        self.jawUp_npo = primitive.addTransform(
+        self.jawUp_npo: PymelNode = primitive.addTransform(
             self.mouthCenter, self.getName("jawUpper_npo"), t)
-        self.jawUp_pos = primitive.addTransform(
+        self.jawUp_pos: PymelNode = primitive.addTransform(
             self.jawUp_npo, self.getName("jawUpper_pos"), t)
-        self.jawUp_rot = primitive.addTransform(
+        self.jawUp_rot: PymelNode = primitive.addTransform(
             self.jawUp_pos, self.getName("jawUpper_rot"), t)
 
         # jaw "LOWER"
         t = transform.getTransformFromPos(self.guide.pos["root"])
-        self.jawLow_npo = primitive.addTransform(
+        self.jawLow_npo: PymelNode = primitive.addTransform(
             self.mouthCenter, self.getName("jaw_npo"), t)
-        self.jawLow_pos = primitive.addTransform(
+        self.jawLow_pos: PymelNode = primitive.addTransform(
             self.jawLow_npo, self.getName("jawLow_pos"), t)
-        self.jawLow_rot = primitive.addTransform(
+        self.jawLow_rot: PymelNode = primitive.addTransform(
             self.jawLow_pos, self.getName("jawLow_rot"), t)
 
         # lips
         t = transform.getTransformFromPos(self.guide.pos["lipup"])
 
-        self.lipup_npo = primitive.addTransform(
+        self.lipup_npo: PymelNode = primitive.addTransform(
             self.jawUp_rot, self.getName("lipup_npo"), t)
 
-        self.lipup_ctl = self.addCtl(
+        self.lipup_ctl: PymelNode = self.addCtl(
             self.lipup_npo,
             "lipup_ctl",
             t,
@@ -104,10 +110,10 @@ class Component(component.Main):
 
         t = transform.getTransformFromPos(self.guide.pos["liplow"])
 
-        self.liplow_npo = primitive.addTransform(
+        self.liplow_npo: PymelNode = primitive.addTransform(
             self.jawLow_rot, self.getName("liplow_npo"), t)
 
-        self.liplow_ctl = self.addCtl(
+        self.liplow_ctl: PymelNode = self.addCtl(
             self.liplow_npo,
             "liplow_ctl",
             t, self.color_fk,
@@ -119,10 +125,10 @@ class Component(component.Main):
 
         # teeth
         t = transform.getTransformFromPos(self.guide.pos["lipup"])
-        self.teethup_npo = primitive.addTransform(
+        self.teethup_npo: PymelNode = primitive.addTransform(
             self.jawUp_rot, self.getName("teethup_npo"), t)
 
-        self.teethup_ctl = self.addCtl(self.teethup_npo,
+        self.teethup_ctl: PymelNode = self.addCtl(self.teethup_npo,
                                        "teethup_ctl",
                                        t,
                                        self.color_ik,
@@ -134,10 +140,10 @@ class Component(component.Main):
 
         t = transform.getTransformFromPos(self.guide.pos["liplow"])
 
-        self.teethlow_npo = primitive.addTransform(
+        self.teethlow_npo: PymelNode = primitive.addTransform(
             self.jawLow_rot, self.getName("teethlow_npo"), t)
 
-        self.teethlow_ctl = self.addCtl(self.teethlow_npo,
+        self.teethlow_ctl: PymelNode = self.addCtl(self.teethlow_npo,
                                         "teethlow_ctl",
                                         t,
                                         self.color_ik,
@@ -170,17 +176,17 @@ class Component(component.Main):
     def addAttributes(self) -> None:
         """Create the anim and setupr rig attributes for the component"""
 
-        self.sideRotation_att = self.addAnimParam(
+        self.sideRotation_att: PlugLike = self.addAnimParam(
             "siderot", "Sides Rotation", "double", 2.5, 0, 100)
-        self.vertRotation_att = self.addAnimParam(
+        self.vertRotation_att: PlugLike = self.addAnimParam(
             "vertrot", "Vertical Rotation", "double", 5, 0, 100)
-        self.frontalTranslation_att = self.addAnimParam(
+        self.frontalTranslation_att: PlugLike = self.addAnimParam(
             "fronttrans", "Frontal Translation", "double", 0.3, 0, 1)
-        self.verticalTranslation_att = self.addAnimParam(
+        self.verticalTranslation_att: PlugLike = self.addAnimParam(
             "verttrans", "Vertical Translation", "double", 0.2, 0, 1)
-        self.followLips_att = self.addAnimParam(
+        self.followLips_att: PlugLike = self.addAnimParam(
             "floowlips", "FollowLips", "double", 0.05, 0, 1)
-        self.lipsAlignSpeed_att = self.addAnimParam(
+        self.lipsAlignSpeed_att: PlugLike = self.addAnimParam(
             "lipsAlignSpeed", "Lips Align Speed", "double", 0.03, 0, 10)
 
     # =====================================================
