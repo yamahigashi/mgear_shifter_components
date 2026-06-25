@@ -55,7 +55,7 @@ class FeatherRibbonRefs(TypedDict):
     metadata: Dict[str, object]
 
 
-MAYA_2025_API_VERSION: int = 20250000
+MAYA_2026_API_VERSION: int = 20260000
 PARENT_COMPONENT_TYPE: str = "ymt_birdwing_3jnt_01"
 ROTATE_ORDER_XYZ: int = 0
 
@@ -1324,7 +1324,7 @@ class Component(component.Main):
         )
 
     def _multiply_node_type(self) -> str:
-        if int(cmds.about(apiVersion=True)) >= MAYA_2025_API_VERSION:
+        if int(cmds.about(apiVersion=True)) >= MAYA_2026_API_VERSION:
             return "multDL"
         return "multDoubleLinear"
 
