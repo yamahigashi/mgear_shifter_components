@@ -12,7 +12,7 @@ from mgear.vendor.Qt import QtCore, QtWidgets
 from mgear.core import attribute
 from mgear.core import pyqt
 import mgear.core.anim_utils as anim_utils
-import mgear.synoptic.utils as syn_utils
+import ymt_synoptics.synoptic.utils as syn_utils
 import mgear.core.utils as utils
 import gml_maya.decorator as deco
 

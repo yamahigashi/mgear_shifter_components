@@ -11025,5 +11025,5 @@ class Ui_ymt_face(object):
         self.b_toggleVisibility_3.setText(QtWidgets.QApplication.translate("ymt_face", "Detail", None, -1))
         self.b_toggleVisibility_3.setProperty("group_name", QtWidgets.QApplication.translate("ymt_face", "face_controllers_detail_grp", None, -1))
 
-from mgear.synoptic.widgets import SelectBtn_yellowCircle, QuickSelButton, SelectBtn_RIkBox, SelectBtn_LFkBox, SelectBtn_yellowBox, resetBindPose, SelectBtn_redCircle, SelectBtn_greenBox, SelectBtn_blueCircle, SelectBtn_blueBox, FlipPoseButton, SelectBtn_redBox, SelectBtn_greenCircle, MirrorPoseButton, resetTransform
+from ymt_synoptics.synoptic.widgets import SelectBtn_yellowCircle, QuickSelButton, SelectBtn_RIkBox, SelectBtn_LFkBox, SelectBtn_yellowBox, resetBindPose, SelectBtn_redCircle, SelectBtn_greenBox, SelectBtn_blueCircle, SelectBtn_blueBox, FlipPoseButton, SelectBtn_redBox, SelectBtn_greenCircle, MirrorPoseButton, resetTransform
 from ymt_synoptics.ymt_biped.control import toggleControllerVisibilityButton

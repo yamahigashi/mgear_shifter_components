@@ -12,30 +12,30 @@ from Qt.QtCore import *
 from Qt.QtGui import *
 from Qt.QtWidgets import *
 
-from mgear.synoptic.widgets import QuickSelButton
-from mgear.synoptic.widgets import MirrorPoseButton
-from mgear.synoptic.widgets import FlipPoseButton
-from mgear.synoptic.widgets import resetBindPose
-from mgear.synoptic.widgets import resetTransform
-from mgear.synoptic.widgets import SelectBtn_LFkBox
-from mgear.synoptic.widgets import SelectBtn_RIkBox
-from mgear.synoptic.widgets import SelectBtn_yellowBox
-from mgear.synoptic.widgets import SelectBtn_greenCircle
-from mgear.synoptic.widgets import SelectBtn_yellowCircle
+from ymt_synoptics.synoptic.widgets import QuickSelButton
+from ymt_synoptics.synoptic.widgets import MirrorPoseButton
+from ymt_synoptics.synoptic.widgets import FlipPoseButton
+from ymt_synoptics.synoptic.widgets import resetBindPose
+from ymt_synoptics.synoptic.widgets import resetTransform
+from ymt_synoptics.synoptic.widgets import SelectBtn_LFkBox
+from ymt_synoptics.synoptic.widgets import SelectBtn_RIkBox
+from ymt_synoptics.synoptic.widgets import SelectBtn_yellowBox
+from ymt_synoptics.synoptic.widgets import SelectBtn_greenCircle
+from ymt_synoptics.synoptic.widgets import SelectBtn_yellowCircle
 from ymt_synoptics.ymt_biped.control import toggleControllerVisibilityButton
-from mgear.synoptic.widgets import SelectBtn_redBox
-from mgear.synoptic.widgets import SelectBtn_redCircle
-from mgear.synoptic.widgets import SelectBtn_blueBox
-from mgear.synoptic.widgets import SelectBtn_blueCircle
-from mgear.synoptic.widgets import SelectBtn_greenBox
-from mgear.synoptic.widgets import SelectBtn_greenOutlineCircle
-from mgear.synoptic.widgets import SelectBtn_blueOutlineCircle
-from mgear.synoptic.widgets import SelectBtn_CFkOutlineBox
-from mgear.synoptic.widgets import SelectBtn_greenTriangleLeft
-from mgear.synoptic.widgets import SelectBtn_LIkTriangleLeft
-from mgear.synoptic.widgets import SelectBtn_yellowOutlineBox
-from mgear.synoptic.widgets import SelectBtn_RIkBox
-from mgear.synoptic.widgets import SelectBtn_LIkBox
+from ymt_synoptics.synoptic.widgets import SelectBtn_redBox
+from ymt_synoptics.synoptic.widgets import SelectBtn_redCircle
+from ymt_synoptics.synoptic.widgets import SelectBtn_blueBox
+from ymt_synoptics.synoptic.widgets import SelectBtn_blueCircle
+from ymt_synoptics.synoptic.widgets import SelectBtn_greenBox
+from ymt_synoptics.synoptic.widgets import SelectBtn_greenOutlineCircle
+from ymt_synoptics.synoptic.widgets import SelectBtn_blueOutlineCircle
+from ymt_synoptics.synoptic.widgets import SelectBtn_CFkOutlineBox
+from ymt_synoptics.synoptic.widgets import SelectBtn_greenTriangleLeft
+from ymt_synoptics.synoptic.widgets import SelectBtn_LIkTriangleLeft
+from ymt_synoptics.synoptic.widgets import SelectBtn_yellowOutlineBox
+from ymt_synoptics.synoptic.widgets import SelectBtn_RIkBox
+from ymt_synoptics.synoptic.widgets import SelectBtn_LIkBox
 
 
 class Ui_ymt_face(object):

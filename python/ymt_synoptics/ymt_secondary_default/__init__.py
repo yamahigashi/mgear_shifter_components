@@ -1,4 +1,4 @@
-from mgear.synoptic.tabs import MainSynopticTab
+from ymt_synoptics.synoptic.tabs import MainSynopticTab
 from mgear.vendor.Qt import QtWidgets, QtCore
 import importlib
 try:
@@ -6,7 +6,7 @@ try:
 except ImportError:
     pm = importlib.import_module("pymel.core")
 
-from mgear.synoptic import utils
+from ymt_synoptics.synoptic import utils
 from . import widget
 
 

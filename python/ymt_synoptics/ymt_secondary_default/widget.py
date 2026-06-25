@@ -1927,4 +1927,4 @@ class Ui_baker(object):
         self.b_keyAll.setText(QtWidgets.QApplication.translate("baker", "Key All", None, -1))
 
 from .searchControlsWidget import ControlListerUI
-from mgear.synoptic.widgets import QuickSelButton, resetBindPose, FlipPoseButton, MirrorPoseButton, resetTransform
+from ymt_synoptics.synoptic.widgets import QuickSelButton, resetBindPose, FlipPoseButton, MirrorPoseButton, resetTransform

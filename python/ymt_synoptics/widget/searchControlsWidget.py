@@ -1,6 +1,6 @@
 from maya import cmds
 from mgear.vendor.Qt import QtWidgets
-from mgear.synoptic import utils
+from ymt_synoptics.synoptic import utils
 
 from logging import getLogger, INFO
 

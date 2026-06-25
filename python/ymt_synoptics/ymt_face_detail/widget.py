@@ -11003,5 +11003,5 @@ class Ui_ymt_face_detail(object):
         self.eyebrow_L0_sec_00_ctl_14.setProperty("object", QtWidgets.QApplication.translate("ymt_face_detail", "brow_R2_ctl", None, -1))
         self.eyebrow_L0_sec_00_ctl_13.setProperty("object", QtWidgets.QApplication.translate("ymt_face_detail", "brow_R0_ctl", None, -1))
 
-from mgear.synoptic.widgets import SelectBtn_yellowCircle, QuickSelButton, resetBindPose, SelectBtn_redCircle, FlipPoseButton, MirrorPoseButton, resetTransform
+from ymt_synoptics.synoptic.widgets import SelectBtn_yellowCircle, QuickSelButton, resetBindPose, SelectBtn_redCircle, FlipPoseButton, MirrorPoseButton, resetTransform
 from ymt_synoptics.ymt_biped.control import toggleControllerVisibilityButton

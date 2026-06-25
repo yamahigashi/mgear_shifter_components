@@ -12,7 +12,7 @@ from Qt.QtCore import *
 from Qt.QtGui import *
 from Qt.QtWidgets import *
 
-from mgear.synoptic.widgets import (
+from ymt_synoptics.synoptic.widgets import (
     SelectBtn_RIkCircle,
     SelectBtn_yellowCircle,
     QuickSelButton,
