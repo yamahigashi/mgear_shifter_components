@@ -16,6 +16,32 @@ from mgear.core.anim_utils import *
 SYNOPTIC_WIDGET_NAME = "synoptic_view"
 
 
+def _qtFlagValue(value: int) -> int:
+    try:
+        return value.value
+    except AttributeError:
+        pass
+
+    return int(value)
+
+
+def _qtFlagsEqual(flags: int, *expected_flags: int) -> bool:
+    try:
+        expected = expected_flags[0]
+        for expected_flag in expected_flags[1:]:
+            expected = expected | expected_flag
+        return flags == expected
+    except TypeError:
+        pass
+
+    flags_value = _qtFlagValue(flags)
+    expected_value = 0
+    for expected_flag in expected_flags:
+        expected_value |= _qtFlagValue(expected_flag)
+
+    return flags_value == expected_value
+
+
 ##################################################
 #
 ##################################################
@@ -115,30 +141,33 @@ def selectObj(model, object_names, mouse_button, key_modifier):
             mirrorPose(True, nodes)
             return
         # Key pressed
-        if key_modifier is None:
+        if (key_modifier is None
+                or _qtFlagsEqual(key_modifier, QtCore.Qt.NoModifier)):  # No Key
             pm.select(nodes)
-        elif key_modifier == QtCore.Qt.NoModifier:  # No Key
-            pm.select(nodes)
-        elif key_modifier == QtCore.Qt.ControlModifier:  # ctrl
+        elif _qtFlagsEqual(key_modifier, QtCore.Qt.ControlModifier):  # ctrl
             pm.select(nodes, deselect=True)
-        elif key_modifier == QtCore.Qt.ShiftModifier:  # shift
+        elif _qtFlagsEqual(key_modifier, QtCore.Qt.ShiftModifier):  # shift
             pm.select(nodes, toggle=True)
-        elif int(key_modifier) == (QtCore.Qt.ControlModifier
-                                   | QtCore.Qt.ShiftModifier):  # ctrl + shift
+        elif _qtFlagsEqual(key_modifier,
+                           QtCore.Qt.ControlModifier,
+                           QtCore.Qt.ShiftModifier):  # ctrl + shift
             pm.select(nodes, add=True)
-        elif key_modifier == QtCore.Qt.AltModifier:  # alt
+        elif _qtFlagsEqual(key_modifier, QtCore.Qt.AltModifier):  # alt
             pm.select(nodes)
-        elif int(key_modifier) == (QtCore.Qt.ControlModifier
-                                   | QtCore.Qt.AltModifier):  # ctrl + alt
+        elif _qtFlagsEqual(key_modifier,
+                           QtCore.Qt.ControlModifier,
+                           QtCore.Qt.AltModifier):  # ctrl + alt
             pm.select(nodes, deselect=True)
-        elif int(key_modifier) == (QtCore.Qt.ShiftModifier
-                                   | QtCore.Qt.AltModifier):  # shift + alt
+        elif _qtFlagsEqual(key_modifier,
+                           QtCore.Qt.ShiftModifier,
+                           QtCore.Qt.AltModifier):  # shift + alt
             pm.select(nodes, toggle=True)
 
             # Ctrl + alt + shift
-        elif int(key_modifier) == (QtCore.Qt.ControlModifier
-                                   | QtCore.Qt.AltModifier
-                                   | QtCore.Qt.ShiftModifier):
+        elif _qtFlagsEqual(key_modifier,
+                           QtCore.Qt.ControlModifier,
+                           QtCore.Qt.AltModifier,
+                           QtCore.Qt.ShiftModifier):
             pm.select(nodes, add=True)
         else:
             pm.select(nodes)

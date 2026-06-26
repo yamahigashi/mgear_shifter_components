@@ -406,7 +406,7 @@ class SynopticTabWrapper(QtWidgets.QWidget):
 
         return (
             self._pan_active
-            and bool(int(event.buttons()) & int(QtCore.Qt.MiddleButton))
+            and self._hasFlag(event.buttons(), QtCore.Qt.MiddleButton)
         )
 
     def _isPanReleaseEvent(self, event: QtGui.QMouseEvent) -> bool:
@@ -557,7 +557,22 @@ class SynopticTabWrapper(QtWidgets.QWidget):
 
     def _isZoomWheelEvent(self, event: QtGui.QWheelEvent) -> bool:
 
-        return bool(int(event.modifiers()) & int(QtCore.Qt.ControlModifier))
+        return self._hasFlag(event.modifiers(), QtCore.Qt.ControlModifier)
+
+    def _hasFlag(self, flags: int, flag: int) -> bool:
+        """Test a Qt flag across bindings with different enum semantics."""
+
+        try:
+            return bool(flags & flag)
+        except TypeError:
+            pass
+
+        try:
+            return bool(int(flags) & int(flag))
+        except (TypeError, ValueError):
+            pass
+
+        return bool(flags.value & flag.value)
 
     def _zoomWheelEvent(self, event: QtGui.QWheelEvent) -> None:
 
